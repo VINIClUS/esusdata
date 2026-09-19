@@ -76,7 +76,11 @@ por `co_dim_tipo_atendimento_pai`):
 | não observado | 8, 9, 10, 11 | `NOT_TESTED` (zero ocorrências em 294 114 linhas / 33 meses de histórico) |
 
 Registrado em [`contracts/compatibility/pec-adapters.json`](../contracts/compatibility/pec-adapters.json),
-validado por schema em [`contracts/compatibility/pec-adapters.schema.json`](../contracts/compatibility/pec-adapters.schema.json).
+com schema declarado em [`contracts/compatibility/pec-adapters.schema.json`](../contracts/compatibility/pec-adapters.schema.json).
+**Correção de precisão:** nenhum teste valida `pec-adapters.json` contra esse schema em build —
+o schema existe (`IMPLEMENTED`) mas não é aplicado automaticamente. O que *é* testado
+(`PecAdaptersMatrixConsistencyTest`) é mais estreito: garante que o `query_checksum` gravado no
+JSON nunca diverge do checksum computado em runtime a partir da query real do adaptador — ver §8.
 
 ---
 
@@ -153,11 +157,19 @@ ou o túnel não está acessível (`LivePecAssumptions`) — importante após a 
 
 **Com teste:** MET-03, MET-04, MET-18, MET-33 · ENG-01 (privilégios inspecionados, nunca escritos),
 ENG-02 (fingerprint por capability, não a fonte toda), ENG-19, ENG-20, ENG-25, ENG-28, ENG-29,
-ENG-35, ENG-37, ENG-38, ENG-43, ENG-46 (parcial — allowlist e DNS, não todo o ENG-46).
+ENG-35, ENG-37, ENG-38, ENG-46 (parcial — allowlist e DNS, não todo o ENG-46).
+
+**Correção de precisão sobre ENG-43** ("nenhuma capability entra em produção sem `tested_with`
+não-vazio, verificado em build"): o que existe é `PecAdaptersMatrixConsistencyTest`, que verifica
+apenas que o `query_checksum` gravado no JSON não diverge do checksum real da query — uma garantia
+mais estreita que "validação de schema em build time". Não há teste que rejeite um `tested_with`
+vazio ou que valide o documento inteiro contra `pec-adapters.schema.json`. ENG-43 portanto entra na
+lista "sem teste" abaixo; o schema em si é `IMPLEMENTED`, não `TESTED`.
 
 **Sem teste ainda (não implementados, não simplesmente "esquecidos"):** ENG-03 a ENG-18 exceto os
 acima, ENG-21 a ENG-24, ENG-27, ENG-30 a ENG-34, ENG-36 (parcial — extrato reconstrói denominador
-mas evidência mínima por pessoa não é persistida), ENG-39 a ENG-42, ENG-44, ENG-45, ENG-47 a ENG-52.
+mas evidência mínima por pessoa não é persistida), ENG-39 a ENG-42, ENG-43 (ver correção acima),
+ENG-44, ENG-45, ENG-47 a ENG-52.
 MET-01/02/05 a 17/19 a 32/34 a 39 não têm teste — dependem de indicadores/pacotes fora do escopo
 desta entrega (I1–I7, C2–C7, VAT, IGM).
 
@@ -245,19 +257,24 @@ desta entrega (I1–I7, C2–C7, VAT, IGM).
 
 ## 12. Arquivos e commits principais
 
+`git log --oneline`, do primeiro ao mais recente (10 commits; o último é este relatório):
+
 ```
-335bea4 chore: gitignore + tech spec rastreada
-b0581b1 docs: discovery PEC CT 133, ADRs 0001-0005, schema da matriz
-c18872e feat: SQLite + Flyway isolado + lock de processo
-3a6e618 feat: source-connector (config estruturada, allowlist, orçamento)
-b0797e8 feat: pec-adapter (individual_encounter_modality)
-7cd4235 feat: extraction-store (JSONL gzip + manifesto)
-542c18b feat: indicator-engine + C1 + ArchUnit + prova ENG-19
-1cdfaac test: fixture ENG-37/ENG-38, correções de honestidade
+353fc85 first commit
+335bea4 chore: add gitignore and track tech spec v0.4
+b0581b1 docs: PEC CT 133 discovery, ADRs 0001-0005, adapter matrix schema
+c18872e feat(agent): SQLite persistence, Flyway isolation, process lock
+3a6e618 feat(agent): source-connector — structured config, allowlist, read budget
+b0797e8 feat(agent): pec-adapter — individual_encounter_modality capability
+7cd4235 feat(agent): extraction-store — minimal extract as gzipped JSONL + manifest
+542c18b feat(agent): indicator-engine, C1 rule pack, ArchUnit, ENG-19 proof
+1cdfaac test(agent): ENG-37/ENG-38 fixture, honesty fixes, live-test resilience
+64bcac5 docs(report): relatório técnico final do MVP Observatório APS
 ```
 
-Código: `apps/agent/src/main/java/br/gov/observatorioaps/` (38 arquivos Java produtivos, 12 de
-teste). Contratos: `contracts/compatibility/pec-adapters.{json,schema.json}`. Documentação:
+Código: `apps/agent/src/main/java/br/gov/observatorioaps/` — **26 arquivos Java produtivos**, mais
+**12 de teste** (`find apps/agent/src/{main,test} -name "*.java" | wc -l`, verificado nesta sessão).
+Contratos: `contracts/compatibility/pec-adapters.{json,schema.json}`. Documentação:
 `docs/discovery/`, `docs/adr/`.
 
 ---
@@ -294,9 +311,13 @@ mvn test
 Sem o túnel ativo, os 4 testes vivos se auto-pulam; os outros 29 rodam normalmente (o teste de
 isolamento usa Docker/Testcontainers, não o PEC).
 
-**Não há, ainda, um `main()` utilizável de ponta a usuário** — `ObservatorioApsApplication`
-inicializa o contexto Spring (SQLite, Flyway, lock) mas não expõe API nem UI. `mvn spring-boot:run`
-sobe e faz a migração SQLite, mas não há endpoint para consultar.
+**Não há, ainda, um `main()` utilizável de ponta a usuário.** Verificado nesta sessão executando
+`mvn spring-boot:run` de fato (não apenas por leitura de código): o contexto Spring sobe, o Flyway
+migra `~/.local/share/observatorio-aps/observatorio.sqlite` (`Database: jdbc:sqlite:...` no log),
+`ObservatorioApsApplication` reporta `Started ... in 1.17 seconds` — e então **o processo encerra
+sozinho** (exit code 0), porque não há `spring-boot-starter-web`/servidor embutido mantendo-o vivo.
+Ou seja: a inicialização (SQLite + Flyway + lock de processo) é `TESTED` de fato, mas não há
+endpoint HTTP nem processo de longa duração para consultar depois do boot.
 
 ---
 
