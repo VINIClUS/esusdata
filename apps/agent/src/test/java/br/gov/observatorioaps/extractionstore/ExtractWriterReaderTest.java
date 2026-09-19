@@ -107,6 +107,133 @@ class ExtractWriterReaderTest {
                 .hasMessageContaining("Checksum mismatch");
     }
 
+    @Test
+    void onlyCompleteSnapshotManifestsAreCalculationInputs() throws Exception {
+        String extractionId = "ext-live-consistency";
+        ExtractionManifest manifest;
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+            writer.write(encounter("1", CanonicalModality.PROGRAMADO));
+            manifest = writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    "sha256:test-query-checksum", "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+
+        writeManifest(new ExtractionManifest(
+                manifest.extractionId(), manifest.sourceId(), manifest.municipalityIbge(),
+                manifest.periodStart(), manifest.periodEndExclusive(), manifest.startedAt(),
+                manifest.finishedAt(), manifest.canonicalSchemaVersion(),
+                manifest.completenessStatus(), "LIVE", manifest.sourceZoneId(), manifest.rowCount(),
+                manifest.exclusionCount(), manifest.checksum(), manifest.queryChecksum(),
+                manifest.adapterVersion()));
+
+        assertThatThrownBy(() -> reader.readEncounters(dir, reader.readManifest(dir, extractionId)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SNAPSHOT");
+    }
+
+    @Test
+    void manifestScopeAndPeriodMustMatchEveryDecodedRecord() throws Exception {
+        String extractionId = "ext-scope-validation";
+        ExtractionManifest manifest;
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+            writer.write(encounter("1", CanonicalModality.PROGRAMADO));
+            manifest = writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    "sha256:test-query-checksum", "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+
+        writeManifest(new ExtractionManifest(
+                manifest.extractionId(), manifest.sourceId(), "3550308", manifest.periodStart(),
+                manifest.periodEndExclusive(), manifest.startedAt(), manifest.finishedAt(),
+                manifest.canonicalSchemaVersion(), manifest.completenessStatus(),
+                manifest.consistencyLevel(), manifest.sourceZoneId(), manifest.rowCount(),
+                manifest.exclusionCount(), manifest.checksum(), manifest.queryChecksum(),
+                manifest.adapterVersion()));
+
+        ExtractionManifest mismatchedScope = reader.readManifest(dir, extractionId);
+        assertThatThrownBy(() -> reader.readEncounters(dir, mismatchedScope))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("municipality");
+
+        writeManifest(new ExtractionManifest(
+                manifest.extractionId(), manifest.sourceId(), manifest.municipalityIbge(),
+                "2026-04-01", "2026-05-01", manifest.startedAt(), manifest.finishedAt(),
+                manifest.canonicalSchemaVersion(), manifest.completenessStatus(),
+                manifest.consistencyLevel(), manifest.sourceZoneId(), manifest.rowCount(),
+                manifest.exclusionCount(), manifest.checksum(), manifest.queryChecksum(),
+                manifest.adapterVersion()));
+
+        ExtractionManifest mismatchedPeriod = reader.readManifest(dir, extractionId);
+        assertThatThrownBy(() -> reader.readEncounters(dir, mismatchedPeriod))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("period");
+    }
+
+    @Test
+    void manifestCountsAndTimestampsAreValidatedBeforeRecordsAreAccepted() throws Exception {
+        String extractionId = "ext-manifest-invariants";
+        ExtractionManifest manifest;
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+            writer.write(encounter("1", CanonicalModality.UNMAPPED));
+            manifest = writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    "sha256:test-query-checksum", "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+
+        writeManifest(new ExtractionManifest(
+                manifest.extractionId(), manifest.sourceId(), manifest.municipalityIbge(),
+                manifest.periodStart(), manifest.periodEndExclusive(), "not-an-instant",
+                manifest.finishedAt(), manifest.canonicalSchemaVersion(),
+                manifest.completenessStatus(), manifest.consistencyLevel(), manifest.sourceZoneId(),
+                manifest.rowCount(), manifest.exclusionCount(), manifest.checksum(),
+                manifest.queryChecksum(), manifest.adapterVersion()));
+        assertThatThrownBy(() -> reader.readEncounters(dir, reader.readManifest(dir, extractionId)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("timestamp");
+
+        writeManifest(new ExtractionManifest(
+                manifest.extractionId(), manifest.sourceId(), manifest.municipalityIbge(),
+                manifest.periodStart(), manifest.periodEndExclusive(), manifest.startedAt(),
+                manifest.finishedAt(), manifest.canonicalSchemaVersion(),
+                manifest.completenessStatus(), manifest.consistencyLevel(), manifest.sourceZoneId(),
+                manifest.rowCount(), 0, manifest.checksum(), manifest.queryChecksum(),
+                manifest.adapterVersion()));
+        assertThatThrownBy(() -> reader.readEncounters(dir, reader.readManifest(dir, extractionId)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("exclusion");
+    }
+
+    @Test
+    void traversalAbsoluteAndSymlinkExtractionIdsAreRejectedByBothBoundaries() throws Exception {
+        assertThatThrownBy(() -> new ExtractWriter(dir, "../escape"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ExtractWriter(dir, "/tmp/escape"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        Path target = dir.resolve("target-id");
+        Files.writeString(target, "not a manifest");
+        Path symlink = dir.resolve("linked-id");
+        Files.createSymbolicLink(symlink, target.getFileName());
+
+        assertThatThrownBy(() -> new ExtractWriter(dir, "linked-id"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reader.readManifest(dir, "../escape"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reader.readManifest(dir, "/tmp/escape"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reader.readManifest(dir, "linked-id"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private void writeManifest(ExtractionManifest manifest) throws IOException {
+        Files.write(
+                dir.resolve(manifest.extractionId() + ".manifest.json"),
+                new tools.jackson.databind.ObjectMapper().writeValueAsBytes(manifest));
+    }
+
     private CanonicalEncounter encounter(String recordId, CanonicalModality modality) {
         return new CanonicalEncounter(
                 new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", recordId),

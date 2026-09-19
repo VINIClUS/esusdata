@@ -4,14 +4,18 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.StandardCopyOption;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.zip.GZIPOutputStream;
 
@@ -37,12 +41,19 @@ public final class ExtractWriter implements AutoCloseable {
     private long rowCount = 0;
     private long exclusionCount = 0;
     private boolean closed = false;
+    private String writtenSourceId;
+    private String writtenMunicipalityIbge;
+    private LocalDate earliestCareDate;
+    private LocalDate latestCareDate;
 
     public ExtractWriter(Path baseDir, String extractionId) throws IOException {
         this.baseDir = baseDir;
         this.extractionId = extractionId;
+        ExtractValidation.validateExtractionId(baseDir, extractionId);
         Files.createDirectories(baseDir);
+        ExtractValidation.validateExtractionId(baseDir, extractionId);
         this.tempFile = baseDir.resolve(extractionId + ".jsonl.gz.tmp");
+        ExtractValidation.rejectSymbolicLink(tempFile, "extract temporary file");
 
         MessageDigest digest;
         try {
@@ -50,13 +61,15 @@ public final class ExtractWriter implements AutoCloseable {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
-        OutputStream fileOut = Files.newOutputStream(tempFile);
+        OutputStream fileOut = Files.newOutputStream(tempFile,
+                StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
         this.digestOut = new DigestOutputStream(fileOut, digest);
         this.gzipOut = new GZIPOutputStream(digestOut);
     }
 
     public void write(CanonicalEncounter encounter) throws IOException {
         if (closed) throw new IllegalStateException("writer already finalized/closed");
+        validateRecordForWrite(encounter);
         byte[] line = (mapper.writeValueAsString(encounter) + "\n").getBytes(StandardCharsets.UTF_8);
         gzipOut.write(line);
         rowCount++;
@@ -82,12 +95,19 @@ public final class ExtractWriter implements AutoCloseable {
             String completenessStatus,
             String consistencyLevel
     ) throws IOException {
+        validateManifestArguments(sourceId, municipalityIbge, periodStart, periodEndExclusive,
+                startedAt, sourceZoneId, queryChecksum, adapterVersion, completenessStatus,
+                consistencyLevel);
+        ensureWrittenScopeMatches(sourceId, municipalityIbge, periodStart, periodEndExclusive);
         gzipOut.close();
         closed = true;
         String checksum = HexFormat.of().formatHex(digestOut.getMessageDigest().digest());
+        forceFile(tempFile);
 
         Path finalFile = baseDir.resolve(extractionId + ".jsonl.gz");
+        ExtractValidation.rejectSymbolicLink(finalFile, "extract data file");
         Files.move(tempFile, finalFile, StandardCopyOption.ATOMIC_MOVE);
+        forceDirectory(baseDir);
 
         Instant finishedAt = Instant.now();
         ExtractionManifest manifest = new ExtractionManifest(
@@ -96,11 +116,15 @@ public final class ExtractWriter implements AutoCloseable {
                 CANONICAL_SCHEMA_VERSION, completenessStatus, consistencyLevel, sourceZoneId,
                 rowCount, exclusionCount, checksum, queryChecksum, adapterVersion
         );
+        ExtractValidation.validateManifest(manifest);
 
         Path manifestFile = baseDir.resolve(extractionId + ".manifest.json");
         Path manifestTemp = baseDir.resolve(extractionId + ".manifest.json.tmp");
-        Files.write(manifestTemp, mapper.writeValueAsBytes(manifest));
+        ExtractValidation.rejectSymbolicLink(manifestTemp, "manifest temporary file");
+        ExtractValidation.rejectSymbolicLink(manifestFile, "manifest file");
+        writeAndForce(manifestTemp, mapper.writeValueAsBytes(manifest));
         Files.move(manifestTemp, manifestFile, StandardCopyOption.ATOMIC_MOVE);
+        forceDirectory(baseDir);
 
         return manifest;
     }
@@ -114,6 +138,131 @@ public final class ExtractWriter implements AutoCloseable {
             // A startup reconciliation routine is responsible for cleaning these up (§1.9.3) —
             // not implemented in this pass; the invariant this class guarantees is narrower:
             // such a file can never be mistaken for a valid extract by ExtractReader.
+        }
+    }
+
+    private void validateRecordForWrite(CanonicalEncounter encounter) {
+        if (encounter == null || encounter.sourceRef() == null) {
+            throw new IllegalArgumentException("encounter and sourceRef are required");
+        }
+        if (encounter.sourceRef().sourceId() == null || encounter.sourceRef().sourceId().isBlank()
+                || encounter.sourceRef().entityType() == null || encounter.sourceRef().entityType().isBlank()
+                || encounter.sourceRef().recordId() == null || encounter.sourceRef().recordId().isBlank()) {
+            throw new IllegalArgumentException("encounter source reference is incomplete");
+        }
+        if (encounter.municipalityIbge() == null || !encounter.municipalityIbge().matches("\\d{7}")) {
+            throw new IllegalArgumentException("encounter municipality must be a 7-digit IBGE code");
+        }
+        if (encounter.modality() == null) {
+            throw new IllegalArgumentException("encounter modality is required");
+        }
+        LocalDate careDate;
+        try {
+            careDate = LocalDate.parse(encounter.careDate());
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("encounter careDate must be an ISO local date", e);
+        }
+        if (encounter.cnes() != null && encounter.cnes().isBlank()
+                || encounter.ine() != null && encounter.ine().isBlank()
+                || encounter.cbo() != null && encounter.cbo().isBlank()) {
+            throw new IllegalArgumentException("encounter optional fields cannot be blank");
+        }
+
+        if (writtenSourceId == null) {
+            writtenSourceId = encounter.sourceRef().sourceId();
+            writtenMunicipalityIbge = encounter.municipalityIbge();
+            earliestCareDate = careDate;
+            latestCareDate = careDate;
+        } else {
+            if (!writtenSourceId.equals(encounter.sourceRef().sourceId())) {
+                throw new IllegalArgumentException("all records in an extract must use one sourceId");
+            }
+            if (!writtenMunicipalityIbge.equals(encounter.municipalityIbge())) {
+                throw new IllegalArgumentException("all records in an extract must use one municipality");
+            }
+            earliestCareDate = earliestCareDate.isAfter(careDate) ? careDate : earliestCareDate;
+            latestCareDate = latestCareDate.isBefore(careDate) ? careDate : latestCareDate;
+        }
+    }
+
+    private void validateManifestArguments(
+            String sourceId,
+            String municipalityIbge,
+            String periodStart,
+            String periodEndExclusive,
+            Instant startedAt,
+            String sourceZoneId,
+            String queryChecksum,
+            String adapterVersion,
+            String completenessStatus,
+            String consistencyLevel
+    ) {
+        if (sourceId == null || sourceId.isBlank()) throw new IllegalArgumentException("sourceId is required");
+        if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
+            throw new IllegalArgumentException("municipalityIbge must be a 7-digit IBGE code");
+        }
+        LocalDate start;
+        LocalDate end;
+        try {
+            start = LocalDate.parse(periodStart);
+            end = LocalDate.parse(periodEndExclusive);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("period must use ISO local dates", e);
+        }
+        if (!end.isAfter(start)) throw new IllegalArgumentException("period end must be after period start");
+        if (startedAt == null) throw new IllegalArgumentException("startedAt is required");
+        if (sourceZoneId == null || sourceZoneId.isBlank()) throw new IllegalArgumentException("sourceZoneId is required");
+        if (queryChecksum == null || queryChecksum.isBlank()) throw new IllegalArgumentException("queryChecksum is required");
+        if (adapterVersion == null || adapterVersion.isBlank()) throw new IllegalArgumentException("adapterVersion is required");
+        if (!"COMPLETE".equals(completenessStatus)) {
+            throw new IllegalArgumentException("only COMPLETE extracts may be published");
+        }
+        if (!"SNAPSHOT".equals(consistencyLevel)) {
+            throw new IllegalArgumentException("only SNAPSHOT extracts may be published");
+        }
+        try {
+            java.time.ZoneId.of(sourceZoneId);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("sourceZoneId is invalid", e);
+        }
+    }
+
+    private void ensureWrittenScopeMatches(
+            String sourceId, String municipalityIbge, String periodStart, String periodEndExclusive) {
+        if (writtenSourceId == null) return;
+        if (!sourceId.equals(writtenSourceId)) {
+            throw new IllegalArgumentException("manifest sourceId does not match written records");
+        }
+        if (!municipalityIbge.equals(writtenMunicipalityIbge)) {
+            throw new IllegalArgumentException("manifest municipality does not match written records");
+        }
+        LocalDate start = LocalDate.parse(periodStart);
+        LocalDate end = LocalDate.parse(periodEndExclusive);
+        if (earliestCareDate.isBefore(start) || !latestCareDate.isBefore(end)) {
+            throw new IllegalArgumentException("manifest period does not contain all written records");
+        }
+    }
+
+    private static void forceFile(Path path) throws IOException {
+        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE)) {
+            channel.force(true);
+        }
+    }
+
+    private static void writeAndForce(Path path, byte[] bytes) throws IOException {
+        try (FileChannel channel = FileChannel.open(path,
+                StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            while (buffer.hasRemaining()) channel.write(buffer);
+            channel.force(true);
+        }
+    }
+
+    private static void forceDirectory(Path directory) throws IOException {
+        try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {
+            channel.force(true);
+        } catch (UnsupportedOperationException ignored) {
+            // Directory fsync is unavailable on some platforms; file contents were still forced.
         }
     }
 }
