@@ -39,6 +39,15 @@
       <artifactId>spring-boot-starter-jdbc</artifactId>
     </dependency>
 
+    <!-- extraction-store manifest + JSON Lines serialization (§1.9.1). Version tracks the
+         Boot 4.1.1 BOM's managed tools.jackson:jackson-databind. DTOs represent dates/instants
+         as explicit ISO-8601 strings rather than pulling in a jsr310 module — consistent with
+         the spec's own textual-serialization discipline for canonical values (§1.7.1). -->
+    <dependency>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+
     <!-- PEC access: pgJDBC only, no JPA/Hibernate anywhere in this project -->
     <dependency>
       <groupId>org.postgresql</groupId>
