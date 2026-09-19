@@ -36,10 +36,12 @@ public final class ProcessLock implements AutoCloseable {
      * not queued (§1.9.4).
      */
     public static ProcessLock acquireOrFail(Path lockFile) {
+        RandomAccessFile raf = null;
+        FileChannel channel = null;
         try {
             Files.createDirectories(lockFile.getParent());
-            RandomAccessFile raf = new RandomAccessFile(lockFile.toFile(), "rw");
-            FileChannel channel = raf.getChannel();
+            raf = new RandomAccessFile(lockFile.toFile(), "rw");
+            channel = raf.getChannel();
             FileLock lock = channel.tryLock();
             if (lock == null) {
                 channel.close();
@@ -50,11 +52,28 @@ public final class ProcessLock implements AutoCloseable {
             }
             return new ProcessLock(raf, channel, lock);
         } catch (OverlappingFileLockException e) {
+            closeQuietly(channel, raf);
             throw new ProcessLockUnavailableException(
                     "Data directory already locked within this JVM: " + lockFile, e);
         } catch (IOException e) {
+            closeQuietly(channel, raf);
             throw new ProcessLockUnavailableException(
                     "Could not acquire process lock on " + lockFile, e);
+        }
+    }
+
+    private static void closeQuietly(FileChannel channel, RandomAccessFile raf) {
+        if (channel != null) {
+            try {
+                channel.close();
+            } catch (IOException ignored) {
+            }
+        }
+        if (raf != null) {
+            try {
+                raf.close();
+            } catch (IOException ignored) {
+            }
         }
     }
 

@@ -33,6 +33,11 @@ public record PecConnectionProperties(
         if (database == null || database.isBlank()) {
             throw new IllegalArgumentException("database is required");
         }
+        if (!isValidPostgresIdentifier(database)) {
+            throw new IllegalArgumentException(
+                    "database name is not a valid PostgreSQL identifier: " + database
+                            + " — must be alphanumeric or underscore, no JDBC URL parameter injection allowed");
+        }
         if (user == null || user.isBlank()) {
             throw new IllegalArgumentException("user is required");
         }
@@ -44,5 +49,21 @@ public record PecConnectionProperties(
             throw new IllegalArgumentException(
                     "municipality_ibge must be a 7-digit code, got: " + municipalityIbge);
         }
+    }
+
+    private static boolean isValidPostgresIdentifier(String name) {
+        if (name.isEmpty()) {
+            return false;
+        }
+        if (!Character.isLetter(name.charAt(0)) && name.charAt(0) != '_') {
+            return false;
+        }
+        for (int i = 1; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != '_') {
+                return false;
+            }
+        }
+        return true;
     }
 }
