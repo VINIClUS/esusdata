@@ -98,5 +98,10 @@ class SqliteDataSourceConfigTest {
             assertThatThrownBy(() -> ProcessLock.acquireOrFail(lockFile))
                     .isInstanceOf(ProcessLock.ProcessLockUnavailableException.class);
         }
+        // The failed overlapping acquire must not leak the descriptor or keep the first lock
+        // alive after the owner closes it.
+        try (ProcessLock ignored = ProcessLock.acquireOrFail(lockFile)) {
+            assertThat(ignored).isNotNull();
+        }
     }
 }

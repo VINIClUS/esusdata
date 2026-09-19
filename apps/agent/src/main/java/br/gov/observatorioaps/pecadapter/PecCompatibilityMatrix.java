@@ -47,6 +47,9 @@ public final class PecCompatibilityMatrix {
             PecSourceIdentity identity,
             String postgresVersion
     ) {
+        requireNonBlank(capability, "capability");
+        requireNonBlank(adapterVersion, "adapterVersion");
+        requireNonBlank(postgresVersion, "postgresVersion");
         if (identity == null || !identity.isComplete()) {
             throw new IllegalStateException(
                     "PecSourceIdentity is required and must include an installation role");
@@ -111,7 +114,9 @@ public final class PecCompatibilityMatrix {
             }
             List<String> requestedColumns = new ArrayList<>();
             for (JsonNode column : columnsNode) requestedColumns.add(column.asString());
-            fingerprints.put(name, fingerprint);
+            if (fingerprints.put(name, fingerprint) != null) {
+                throw new IllegalStateException("Compatibility matrix contains duplicate object: " + name);
+            }
             columns.put(name, List.copyOf(requestedColumns));
         }
         return new Entry(
@@ -125,6 +130,12 @@ public final class PecCompatibilityMatrix {
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value == null || value.isNull() ? null : value.asString();
+    }
+
+    private static void requireNonBlank(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("Compatibility " + field + " is required");
+        }
     }
 
     public record Entry(

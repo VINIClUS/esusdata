@@ -35,7 +35,12 @@ public final class AllowedDestinations {
      * IPv4/IPv6 address must be explicitly approved — prevents DNS rebinding attacks.
      */
     public InetAddress assertAllowed(String host, int port) {
-        String lookupHost = new HostPort(host, port).host();
+        HostPort requested = new HostPort(host, port);
+        if (!allowed.contains(requested)) {
+            throw new DestinationNotAllowedException(
+                    "Destination " + host + ":" + port + " is not in the approved allowlist.");
+        }
+        String lookupHost = requested.host();
         InetAddress[] resolvedAddresses;
         try {
             resolvedAddresses = dnsResolver.resolve(lookupHost);
