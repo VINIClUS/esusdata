@@ -1,0 +1,115 @@
+package br.gov.observatorioaps.indicatorpacks.c1;
+
+import br.gov.observatorioaps.extractionstore.CanonicalEncounter;
+import br.gov.observatorioaps.extractionstore.CanonicalModality;
+import br.gov.observatorioaps.indicatorengine.Classification;
+import br.gov.observatorioaps.indicatorengine.ExactRatio;
+import br.gov.observatorioaps.indicatorengine.IndicatorResult;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * C1 — Mais acesso (Tech Spec §2.4, verbatim formula): {@code 100 × programados /
+ * (programados + espontâneos)}. Counts encounters, not people. Monthly apportionment.
+ *
+ * <p>Gate status (§4.4 Portões A–E), recorded honestly rather than collapsed into "works":
+ * Portão C (adaptador) is what this class and its adapter query actually prove —
+ * {@code VALIDATED_AGAINST_PEC} for PEC 5.4.37/PostgreSQL 9.6.13. Portões A/B (Q01 ficha — the
+ * exact CBO list and ficha fields) were not retrieved in this session and remain
+ * {@code BLOCKED}; this rule pack therefore ships with an explicit {@code cbo_policy=ALL_CBO}
+ * limitation rather than silently filtering by an assumed CBO set. Portão D (reconciliation
+ * against Siaps/SISAB) has no reference data available in this environment and is
+ * {@code NOT_IMPLEMENTED}. Portão E requires a human review and is out of scope for code.
+ */
+public final class C1Rule {
+
+    public static final String RULE_VERSION = "c1-mais-acesso@0.1.0";
+    public static final String CALCULATION_POLICY_VERSION = "c1-exact-ratio@1";
+    public static final String DENOMINATOR_KIND = "PROGRAMADOS_MAIS_ESPONTANEOS";
+
+    private static final List<String> STANDING_LIMITATIONS = List.of(
+            "cbo_policy=ALL_CBO — Q01 (ficha metodológica oficial C1) não foi recuperada nesta sessão; "
+                    + "nenhum filtro de CBO foi aplicado (Portão A/B BLOCKED).",
+            "Nenhuma reconciliação com Siaps/SISAB foi realizada (Portão D NOT_IMPLEMENTED)."
+    );
+
+    private C1Rule() {
+    }
+
+    /**
+     * Computes C1 for one competency from already-canonical encounters. Encounters whose modality
+     * is {@link CanonicalModality#UNMAPPED} are excluded from both numerator and denominator and
+     * counted, never silently folded into an arm (§2.4: "Filtros de modalidade devem ser mutuamente
+     * exclusivos após a normalização").
+     */
+    public static IndicatorResult compute(
+            List<CanonicalEncounter> encounters,
+            String municipalityIbge,
+            String referencePeriod,
+            String dataCutoff
+    ) {
+        long programados = 0;
+        long espontaneos = 0;
+        long unmapped = 0;
+
+        for (CanonicalEncounter e : encounters) {
+            switch (e.modality()) {
+                case PROGRAMADO -> programados++;
+                case ESPONTANEO -> espontaneos++;
+                case UNMAPPED -> unmapped++;
+            }
+        }
+
+        BigInteger numerator = BigInteger.valueOf(programados);
+        BigInteger denominator = BigInteger.valueOf(programados + espontaneos);
+
+        List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
+        if (unmapped > 0) {
+            limitations.add(unmapped + " encontro(s) com tipo de atendimento fora do mapeamento "
+                    + "congelado (ids 8/9/10/11 de tb_dim_tipo_atendimento) foram excluídos do cálculo.");
+        }
+
+        if (denominator.signum() == 0) {
+            return new IndicatorResult(
+                    IndicatorResult.IndicatorStatus.NO_DENOMINATOR,
+                    null, numerator, denominator, DENOMINATOR_KIND, null,
+                    referencePeriod, RULE_VERSION, dataCutoff, municipalityIbge,
+                    limitations, CALCULATION_POLICY_VERSION);
+        }
+
+        ExactRatio ratio = new ExactRatio(numerator, denominator).asPercentage();
+        Classification classification = classify(ratio);
+        String valueText = ratio.toScaledBigDecimal(4).toPlainString();
+
+        return new IndicatorResult(
+                IndicatorResult.IndicatorStatus.COMPUTED,
+                valueText, numerator, denominator, DENOMINATOR_KIND, classification,
+                referencePeriod, RULE_VERSION, dataCutoff, municipalityIbge,
+                limitations, CALCULATION_POLICY_VERSION);
+    }
+
+    /**
+     * Classification bands, verbatim from §2.4:
+     * {@code 50 < x ≤ 70 Ótimo · 30 < x ≤ 50 Bom · 10 < x ≤ 30 Suficiente · x ≤ 10 or x > 70 Regular}.
+     * Deliberately non-monotonic (MET-18) — decided entirely by integer cross-multiplication,
+     * never by converting {@code ratio} to a decimal first.
+     */
+    public static Classification classify(ExactRatio percentageRatio) {
+        if (percentageRatio.compareToFraction(70, 1) > 0) return Classification.REGULAR;
+        if (percentageRatio.compareToFraction(50, 1) > 0) return Classification.OTIMO;
+        if (percentageRatio.compareToFraction(30, 1) > 0) return Classification.BOM;
+        if (percentageRatio.compareToFraction(10, 1) > 0) return Classification.SUFICIENTE;
+        return Classification.REGULAR;
+    }
+
+    /**
+     * Quadrimestral consolidation (§2.4 @800-802, MET-33): mean of the monitored monthly results,
+     * band applied only after averaging — never round intermediate monthly values.
+     */
+    public static Classification classifyQuadrimestral(long... monthlyPercentages) {
+        ExactRatio mean = ExactRatio.meanOfIntegerPercentages(monthlyPercentages);
+        return classify(mean);
+    }
+}
