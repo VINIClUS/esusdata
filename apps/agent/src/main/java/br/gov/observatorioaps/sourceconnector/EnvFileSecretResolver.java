@@ -27,18 +27,14 @@ public final class EnvFileSecretResolver implements PecSecretResolver {
         Map<String, String> values = new HashMap<>();
         try {
             for (String line : Files.readAllLines(envFile)) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#")) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
                     continue;
                 }
                 int i = line.indexOf('=');
                 if (i > 0) {
                     String key = line.substring(0, i).trim();
-                    String value = line.substring(i + 1).trim();
-                    int commentIdx = value.indexOf('#');
-                    if (commentIdx >= 0) {
-                        value = value.substring(0, commentIdx).trim();
-                    }
+                    String value = line.substring(i + 1);
                     values.put(key, value);
                 }
             }

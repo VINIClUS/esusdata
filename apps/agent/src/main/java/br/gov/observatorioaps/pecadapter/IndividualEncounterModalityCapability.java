@@ -119,11 +119,11 @@ public final class IndividualEncounterModalityCapability {
 
     private static void validateAdapterCompatibility() {
         try {
-            Path matrixFile = Paths.get("contracts/compatibility/pec-adapters.json");
+            Path matrixFile = findCompatibilityMatrix();
             if (!Files.exists(matrixFile)) {
                 throw new IllegalStateException(
-                        "Adapter compatibility matrix not found at " + matrixFile.toAbsolutePath()
-                                + " — cannot validate that this adapter is approved for the target PEC.");
+                        "Adapter compatibility matrix not found — cannot validate that this adapter is "
+                                + "approved for the target PEC. Searched: " + matrixFile.toAbsolutePath());
             }
 
             ObjectMapper mapper = new ObjectMapper();
@@ -155,5 +155,19 @@ public final class IndividualEncounterModalityCapability {
             throw new IllegalStateException(
                     "Failed to load or parse adapter compatibility matrix: " + e.getMessage(), e);
         }
+    }
+
+    private static Path findCompatibilityMatrix() {
+        Path[] candidates = {
+                Paths.get("contracts/compatibility/pec-adapters.json"),
+                Paths.get("../contracts/compatibility/pec-adapters.json"),
+                Paths.get("../../contracts/compatibility/pec-adapters.json")
+        };
+        for (Path candidate : candidates) {
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+        }
+        return candidates[0];
     }
 }
