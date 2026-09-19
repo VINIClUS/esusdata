@@ -31,6 +31,22 @@ public record ReadBudget(
         long maxRows,
         long maxDurationMs
 ) {
+    public ReadBudget {
+        if (poolMaxSize <= 0) throw new IllegalArgumentException("poolMaxSize must be positive");
+        if (connectionTimeout == null || connectionTimeout.isNegative() || connectionTimeout.isZero()) {
+            throw new IllegalArgumentException("connectionTimeout must be positive");
+        }
+        if (acquisitionTimeout == null || acquisitionTimeout.toMillis() < 250) {
+            throw new IllegalArgumentException("acquisitionTimeout must be at least 250ms");
+        }
+        if (statementTimeoutMs <= 0 || lockTimeoutMs <= 0 || idleInTransactionTimeoutMs <= 0) {
+            throw new IllegalArgumentException("PostgreSQL timeout budgets must be positive");
+        }
+        if (maxRows <= 0 || maxDurationMs <= 0) {
+            throw new IllegalArgumentException("acquisition ceilings must be positive");
+        }
+    }
+
     /**
      * The spec's own initial engineering proposal (§1.9.2), not a load-tested profile. A real
      * deployment must record which profile id was in effect on every run (plan: a versioned

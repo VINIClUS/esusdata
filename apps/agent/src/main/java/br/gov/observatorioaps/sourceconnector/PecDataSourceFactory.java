@@ -3,6 +3,9 @@ package br.gov.observatorioaps.sourceconnector;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
+import java.net.InetAddress;
+import java.time.Duration;
+
 /**
  * The only place in this codebase that assembles a PEC JDBC URL string — always from
  * {@link PecConnectionProperties}' structured fields, never from a caller-supplied URL
@@ -25,9 +28,9 @@ public final class PecDataSourceFactory {
     }
 
     public HikariDataSource create(PecConnectionProperties properties, ReadBudget budget) {
-        allowedDestinations.assertAllowed(properties.host(), properties.port());
+        InetAddress validatedAddress = allowedDestinations.assertAllowed(properties.host(), properties.port());
 
-        String jdbcUrl = "jdbc:postgresql://" + properties.host() + ":" + properties.port()
+        String jdbcUrl = "jdbc:postgresql://" + jdbcHostLiteral(validatedAddress) + ":" + properties.port()
                 + "/" + properties.database();
 
         char[] password = secretResolver.resolve(properties.secretRef());
@@ -40,7 +43,11 @@ public final class PecDataSourceFactory {
             config.setAutoCommit(false);
             config.setMaximumPoolSize(budget.poolMaxSize());
             config.setMinimumIdle(0);
-            config.setConnectionTimeout(budget.connectionTimeout().toMillis());
+            // Configuration creation must not perform an unbounded/fail-fast network attempt;
+            // the acquisition timeout applies when a caller actually borrows a connection.
+            config.setInitializationFailTimeout(-1);
+            config.setConnectionTimeout(budget.acquisitionTimeout().toMillis());
+            config.addDataSourceProperty("connectTimeout", pgConnectTimeoutSeconds(budget.connectionTimeout()));
             config.setPoolName("pec-" + properties.sourceId());
             config.setConnectionInitSql(
                     "SET application_name = 'observatorio-aps'; "
@@ -53,5 +60,19 @@ public final class PecDataSourceFactory {
         } finally {
             java.util.Arrays.fill(password, '\0');
         }
+    }
+
+    private static String jdbcHostLiteral(InetAddress address) {
+        String literal = address.getHostAddress();
+        return address.getAddress().length == 16 ? "[" + literal + "]" : literal;
+    }
+
+    private static int pgConnectTimeoutSeconds(Duration timeout) {
+        long millis = timeout.toMillis();
+        long seconds = Math.max(1, (millis + 999) / 1000);
+        if (seconds > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("connectionTimeout is too large for pgJDBC connectTimeout");
+        }
+        return (int) seconds;
     }
 }
