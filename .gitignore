@@ -1,0 +1,40 @@
+# Observatório APS — nothing here may ever hold a secret or real clinical data.
+
+# Build outputs
+target/
+node_modules/
+dist/
+*.class
+*.jar
+!.mvn/wrapper/*.jar
+
+# Own persistence — SQLite belongs to a running instance, never to the repo
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db
+data/
+extracts/
+
+# Secrets — must never be committed, regardless of where a dev script writes them
+*.env
+.env
+.env.*
+*.pem
+*.key
+credenciais*.txt
+pec.env
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Local test artifacts
+.mvn/timing.properties
