@@ -38,3 +38,6 @@ logs/
 
 # Local test artifacts
 .mvn/timing.properties
+
+# Maven build output at every module level
+apps/agent/target/
