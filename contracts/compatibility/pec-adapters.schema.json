@@ -31,7 +31,6 @@
         "status",
         "objects_used",
         "municipal_isolation_evidence",
-        "fixture_checksum",
         "test_result",
         "approved_at",
         "approved_by"
@@ -71,6 +70,7 @@
         "fixture_checksum": { "type": "string" },
         "test_result": { "type": "string", "enum": ["PASS", "FAIL", "NOT_RUN"] },
         "test_evidence_ref": { "type": "string", "description": "Path to the discovery doc or test report backing this entry." },
+        "test_notes": { "type": "string" },
         "approved_at": { "type": "string", "format": "date" },
         "approved_by": { "type": "string" }
       }
