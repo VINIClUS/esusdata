@@ -25,6 +25,7 @@ public record IndicatorResult(
 ) {
     public enum IndicatorStatus {
         COMPUTED,
-        NO_DENOMINATOR
+        NO_DENOMINATOR,
+        BLOCKED
     }
 }

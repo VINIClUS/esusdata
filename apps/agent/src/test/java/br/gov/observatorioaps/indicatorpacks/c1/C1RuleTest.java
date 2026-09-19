@@ -24,7 +24,7 @@ class C1RuleTest {
     @Test
     void met03_zeroNumeratorWithValidDenominatorIsARealZeroNotAFailure() {
         List<CanonicalEncounter> encounters = encounters(0, 5, 0);
-        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.COMPUTED);
         assertThat(result.numerator()).isEqualTo(BigInteger.ZERO);
@@ -37,7 +37,7 @@ class C1RuleTest {
     @Test
     void met04_zeroDenominatorYieldsNullValueAndNoDenominatorStatus() {
         List<CanonicalEncounter> encounters = encounters(0, 0, 0);
-        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.NO_DENOMINATOR);
         assertThat(result.valueText()).isNull();
@@ -49,11 +49,11 @@ class C1RuleTest {
     @Test
     void met18_60PercentIsOtimoAnd80PercentIsRegular() {
         // 60 programados, 40 espontaneos -> 60/(60+40) = 60%
-        IndicatorResult sixty = C1Rule.compute(encounters(60, 40, 0), "3541307", "2026-01", "2026-01-31");
+        IndicatorResult sixty = C1Rule.computeEvidenceOnly(encounters(60, 40, 0), "3541307", "2026-01", "2026-01-31");
         assertThat(sixty.classification()).isEqualTo(Classification.OTIMO);
 
         // 80 programados, 20 espontaneos -> 80%
-        IndicatorResult eighty = C1Rule.compute(encounters(80, 20, 0), "3541307", "2026-02", "2026-02-28");
+        IndicatorResult eighty = C1Rule.computeEvidenceOnly(encounters(80, 20, 0), "3541307", "2026-02", "2026-02-28");
         assertThat(eighty.classification()).isEqualTo(Classification.REGULAR);
     }
 
@@ -86,7 +86,7 @@ class C1RuleTest {
     @Test
     void unmappedEncountersAreExcludedFromBothArmsAndReportedAsALimitation() {
         List<CanonicalEncounter> encounters = encounters(6, 4, 3);
-        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(6));
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(10)); // 6+4, not 13
@@ -97,13 +97,48 @@ class C1RuleTest {
     @Test
     void realData202603BaselineReproducesRegularAt70_7947Percent() {
         List<CanonicalEncounter> encounters = encounters(7100, 2929, 0);
-        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.COMPUTED);
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(7100));
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(10029));
         assertThat(result.valueText()).isEqualTo("70.7947");
         assertThat(result.classification()).isEqualTo(Classification.REGULAR);
+    }
+
+    @Test
+    void normalCalculationIsBlockedUntilEveryReleaseGateIsExplicitlyComplete() {
+        IndicatorResult result = C1Rule.compute(
+                encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31");
+
+        assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.BLOCKED);
+        assertThat(result.valueText()).isNull();
+        assertThat(result.classification()).isNull();
+        assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(60));
+        assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(100));
+        assertThat(result.limitations()).anyMatch(l -> l.contains("Portão"));
+    }
+
+    @Test
+    void completeReleaseGatesPermitTheSameExactCalculation() {
+        IndicatorResult result = C1Rule.compute(
+                encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31",
+                C1Rule.ReleaseGates.allComplete());
+
+        assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.COMPUTED);
+        assertThat(result.valueText()).isEqualTo("60.0000");
+        assertThat(result.classification()).isEqualTo(Classification.OTIMO);
+    }
+
+    @Test
+    void quadrimestralAverageKeepsAValueJustAboveTheFiftyBoundary() {
+        Classification result = C1Rule.classifyQuadrimestral(
+                ExactRatio.of(500001, 10000),
+                ExactRatio.of(50, 1),
+                ExactRatio.of(50, 1),
+                ExactRatio.of(50, 1));
+
+        assertThat(result).isEqualTo(Classification.OTIMO);
     }
 
     private List<CanonicalEncounter> encounters(int programados, int espontaneos, int unmapped) {

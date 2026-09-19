@@ -39,6 +39,42 @@ public final class C1Rule {
     }
 
     /**
+     * Release gates are deliberately supplied by the release workflow rather than inferred from
+     * the presence of this class or its compatibility entry. A result must not look published
+     * while any one of the five gates is incomplete.
+     */
+    public record ReleaseGates(
+            boolean sourceAndValidity,
+            boolean calculationModel,
+            boolean adapter,
+            boolean reconciliation,
+            boolean pilotAndOperations
+    ) {
+        public static ReleaseGates allComplete() {
+            return new ReleaseGates(true, true, true, true, true);
+        }
+
+        public static ReleaseGates knownIncomplete() {
+            return new ReleaseGates(false, false, true, false, false);
+        }
+
+        public boolean isComplete() {
+            return sourceAndValidity && calculationModel && adapter
+                    && reconciliation && pilotAndOperations;
+        }
+
+        public List<String> incompleteReasons() {
+            List<String> reasons = new ArrayList<>();
+            if (!sourceAndValidity) reasons.add("Portão A (fonte e vigência) incompleto");
+            if (!calculationModel) reasons.add("Portão B (modelo de cálculo) incompleto");
+            if (!adapter) reasons.add("Portão C (adaptador) incompleto");
+            if (!reconciliation) reasons.add("Portão D (reconciliação) incompleto");
+            if (!pilotAndOperations) reasons.add("Portão E (piloto e operação) incompleto");
+            return List.copyOf(reasons);
+        }
+    }
+
+    /**
      * Computes C1 for one competency from already-canonical encounters. Encounters whose modality
      * is {@link CanonicalModality#UNMAPPED} are excluded from both numerator and denominator and
      * counted, never silently folded into an arm (§2.4: "Filtros de modalidade devem ser mutuamente
@@ -50,33 +86,96 @@ public final class C1Rule {
             String referencePeriod,
             String dataCutoff
     ) {
-        long programados = 0;
-        long espontaneos = 0;
-        long unmapped = 0;
+        return compute(encounters, municipalityIbge, referencePeriod, dataCutoff,
+                ReleaseGates.knownIncomplete());
+    }
+
+    /**
+     * Computes a publishable C1 result only when the release workflow has completed every gate.
+     * Counts are still returned exactly as diagnostic evidence, but the value and classification
+     * stay unavailable while a gate is incomplete.
+     */
+    public static IndicatorResult compute(
+            List<CanonicalEncounter> encounters,
+            String municipalityIbge,
+            String referencePeriod,
+            String dataCutoff,
+            ReleaseGates releaseGates
+    ) {
+        Computation computation = count(encounters);
+        if (!releaseGates.isComplete()) {
+            List<String> limitations = new ArrayList<>(computation.limitations());
+            limitations.addAll(releaseGates.incompleteReasons());
+            return new IndicatorResult(
+                    IndicatorResult.IndicatorStatus.BLOCKED,
+                    null,
+                    computation.numerator(),
+                    computation.denominator(),
+                    DENOMINATOR_KIND,
+                    null,
+                    referencePeriod,
+                    RULE_VERSION,
+                    dataCutoff,
+                    municipalityIbge,
+                    limitations,
+                    CALCULATION_POLICY_VERSION);
+        }
+        return toResult(computation, municipalityIbge, referencePeriod, dataCutoff);
+    }
+
+    /**
+     * Exact calculation over evidence that has already been validated by the acquisition layer.
+     * This method is intentionally named so callers cannot mistake a reproducibility calculation
+     * for a release-approved indicator.
+     */
+    public static IndicatorResult computeEvidenceOnly(
+            List<CanonicalEncounter> encounters,
+            String municipalityIbge,
+            String referencePeriod,
+            String dataCutoff
+    ) {
+        return toResult(count(encounters), municipalityIbge, referencePeriod, dataCutoff);
+    }
+
+    private static Computation count(List<CanonicalEncounter> encounters) {
+        BigInteger programados = BigInteger.ZERO;
+        BigInteger espontaneos = BigInteger.ZERO;
+        BigInteger unmapped = BigInteger.ZERO;
 
         for (CanonicalEncounter e : encounters) {
             switch (e.modality()) {
-                case PROGRAMADO -> programados++;
-                case ESPONTANEO -> espontaneos++;
-                case UNMAPPED -> unmapped++;
+                case PROGRAMADO -> programados = programados.add(BigInteger.ONE);
+                case ESPONTANEO -> espontaneos = espontaneos.add(BigInteger.ONE);
+                case UNMAPPED -> unmapped = unmapped.add(BigInteger.ONE);
             }
         }
 
-        BigInteger numerator = BigInteger.valueOf(programados);
-        BigInteger denominator = BigInteger.valueOf(programados + espontaneos);
+        BigInteger denominator = programados.add(espontaneos);
 
         List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
-        if (unmapped > 0) {
+        if (unmapped.signum() > 0) {
             limitations.add(unmapped + " encontro(s) com tipo de atendimento fora do mapeamento "
                     + "congelado (ids 8/9/10/11 de tb_dim_tipo_atendimento) foram excluídos do cálculo.");
         }
+
+        return new Computation(programados, denominator, limitations);
+    }
+
+    private static IndicatorResult toResult(
+            Computation computation,
+            String municipalityIbge,
+            String referencePeriod,
+            String dataCutoff
+    ) {
+        BigInteger numerator = computation.numerator();
+        BigInteger denominator = computation.denominator();
 
         if (denominator.signum() == 0) {
             return new IndicatorResult(
                     IndicatorResult.IndicatorStatus.NO_DENOMINATOR,
                     null, numerator, denominator, DENOMINATOR_KIND, null,
                     referencePeriod, RULE_VERSION, dataCutoff, municipalityIbge,
-                    limitations, CALCULATION_POLICY_VERSION);
+                    computation.limitations(), CALCULATION_POLICY_VERSION);
         }
 
         ExactRatio ratio = new ExactRatio(numerator, denominator).asPercentage();
@@ -87,7 +186,14 @@ public final class C1Rule {
                 IndicatorResult.IndicatorStatus.COMPUTED,
                 valueText, numerator, denominator, DENOMINATOR_KIND, classification,
                 referencePeriod, RULE_VERSION, dataCutoff, municipalityIbge,
-                limitations, CALCULATION_POLICY_VERSION);
+                computation.limitations(), CALCULATION_POLICY_VERSION);
+    }
+
+    private record Computation(
+            BigInteger numerator,
+            BigInteger denominator,
+            List<String> limitations
+    ) {
     }
 
     /**
