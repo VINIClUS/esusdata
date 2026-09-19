@@ -3,6 +3,7 @@ package br.gov.observatorioaps.pecadapter;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
+import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -89,5 +90,22 @@ class PecCompatibilityMatrixTest {
                 null, null, catalog, matrix))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("PecSourceIdentity");
+    }
+
+    @Test
+    void aChangedQueryChecksumBlocksTheExactEntry() throws Exception {
+        String json;
+        try (var stream = getClass().getResourceAsStream(PecCompatibilityMatrix.RESOURCE)) {
+            json = new String(stream.readAllBytes(), StandardCharsets.UTF_8)
+                    .replace(IndividualEncounterModalityCapability.QUERY_CHECKSUM,
+                            "sha256:0000000000000000000000000000000000000000000000000000000000000000");
+        }
+        PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromJson(json);
+        var catalog = CompatibilityTestCatalog.productionEntry();
+
+        assertThatThrownBy(() -> IndividualEncounterModalityCapability.validateAdapterCompatibility(
+                null, CT133_IDENTITY, catalog, matrix))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Query checksum mismatch");
     }
 }
