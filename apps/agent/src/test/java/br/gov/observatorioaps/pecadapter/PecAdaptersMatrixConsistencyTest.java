@@ -1,13 +1,6 @@
 package br.gov.observatorioaps.pecadapter;
 
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -20,22 +13,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PecAdaptersMatrixConsistencyTest {
 
     @Test
-    void frozenQueryChecksumMatchesTheLiveAdapterQuery() throws IOException {
-        Path matrixFile = repoRoot().resolve("contracts/compatibility/pec-adapters.json");
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode root = mapper.readTree(Files.readString(matrixFile));
-        JsonNode entry = root.get("tested_with").get(0);
+    void frozenQueryChecksumMatchesTheLiveAdapterQuery() {
+        var entry = PecCompatibilityMatrix.fromClasspathResource().findExact(
+                IndividualEncounterModalityCapability.CAPABILITY,
+                IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                "9.6.13");
 
-        assertThat(entry.get("capability").asString()).isEqualTo("individual_encounter_modality");
-        assertThat(entry.get("query_checksum").asString())
+        assertThat(entry.capability()).isEqualTo("individual_encounter_modality");
+        assertThat(entry.queryChecksum())
                 .as("contracts/compatibility/pec-adapters.json query_checksum must match "
                         + "IndividualEncounterModalityCapability.QUERY_CHECKSUM — update the matrix "
                         + "if the adapter query changed intentionally")
                 .isEqualTo(IndividualEncounterModalityCapability.QUERY_CHECKSUM);
-    }
-
-    private Path repoRoot() {
-        // apps/agent -> repo root
-        return Path.of("").toAbsolutePath().getParent().getParent();
     }
 }

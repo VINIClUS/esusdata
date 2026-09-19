@@ -1,0 +1,60 @@
+{
+  "schema_version": "1",
+  "validation_status": "VALIDATED",
+  "tested_with": [
+    {
+      "pec_version": "5.4.37",
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "individual_encounter_modality",
+      "status": "VALIDATED",
+      "status_reason": "Leaf-id mapping {2,3}=programado, {5,6,7}=espontâneo covers 100% of tb_fat_atendimento_individual across the full observed history (2023-07-03 to 2026-04-30, 294114 rows). Ids 8, 9, 10, 11 of tb_dim_tipo_atendimento never occur on this instance and remain NOT_TESTED — if a future extraction encounters them, the run must raise a limitation rather than silently classifying them.",
+      "objects_used": [
+        {
+          "object": "tb_fat_atendimento_individual",
+          "columns_used": [
+            "co_seq_fat_atd_ind",
+            "co_dim_municipio",
+            "co_dim_tempo",
+            "co_dim_tipo_atendimento",
+            "co_dim_unidade_saude_1",
+            "co_dim_equipe_1",
+            "co_dim_cbo_1",
+            "nu_uuid_ficha",
+            "nu_atendimento"
+          ],
+          "signature_fingerprint": "sha256:9c272cc866503313f95549d1e7da5489815d9ba13e816d195a53de02af14c38f"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro"],
+          "signature_fingerprint": "sha256:171fa7fbe8ab3d697ce9728c8e36f459e7e4193dd9b58072ad05350942a9d565"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge"],
+          "signature_fingerprint": "sha256:f650a801030410054b43ae63fe8f03bc3550567217cd7ea43a79b1c2b9b7f4f9"
+        },
+        {
+          "object": "tb_dim_tipo_atendimento",
+          "columns_used": ["co_seq_dim_tipo_atendimento", "co_dim_tipo_atendimento_pai", "LEAF_IDS=2,3,5,6,7"],
+          "signature_fingerprint": "sha256:138c33a76f93469434a4a30064420374d5b777a3000aa6e352273879b03e312a"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "WHERE clause parameterized on co_ibge (7-digit text), never on the installation-local surrogate co_seq_dim_municipio. tb_dim_municipio is a shared national reference table (1870 rows), not partitioned per installation; single-municipality-per-row is a property of this data, not assumed structurally.",
+        "single_municipality_installation": true
+      },
+      "query_checksum": "sha256:847104e65728bd48244e3029e6b4aaf1a57692a18ec194af7969d52a95a982ba",
+      "fixture_checksum": "sha256:8909c30b9acd60ffc1b96b8c0c2d77fa2bbe46b0d19bc7f4f9bfb6ae54164148",
+      "test_result": "PASS",
+      "test_evidence_ref": "docs/discovery/2026-09-19-pec-ct133.md; apps/agent/src/test/java/br/gov/observatorioaps/pecadapter/IndividualEncounterModalityCapabilityLiveTest.java; apps/agent/src/test/java/br/gov/observatorioaps/pecadapter/IndividualEncounterModalityCapabilityIsolationTest.java; apps/agent/src/test/java/br/gov/observatorioaps/integration/Eng19ReproducibilityWithoutPecLiveTest.java",
+      "test_notes": "Validated twice, independently: (1) live against the production PEC on CT 133 through the actual adapter code, reproducing 7100 programados / 2929 espontaneos / 0 fora / 10029 total for competencia 2026-03, byte-identical to the psql baseline, and again end-to-end through a full acquire-extract-disconnect-recompute cycle (ENG-19). (2) against a synthetic Testcontainers postgres:9.6 fixture (fixture_checksum above) with two municipalities that deliberately share the same unidade/equipe/cbo surrogate ids, proving the join binds on tb_dim_municipio.co_ibge and not on any installation-local key (ENG-37, ENG-38).",
+      "approved_at": "2026-09-19",
+      "approved_by": "vasrtr@gmail.com"
+    }
+  ]
+}

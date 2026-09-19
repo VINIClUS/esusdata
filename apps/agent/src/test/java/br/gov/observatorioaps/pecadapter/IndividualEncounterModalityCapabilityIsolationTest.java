@@ -57,13 +57,17 @@ class IndividualEncounterModalityCapabilityIsolationTest {
             var guardA = new BudgetGuard(ReadBudget.initialEngineeringProposal());
             IndividualEncounterModalityCapability.stream(
                     c, "1100015", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
-                    guardA, municipalityA::add);
+                    guardA, municipalityA::add,
+                    new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                    CompatibilityTestCatalog.productionEntry());
 
             List<RawEncounterRecord> municipalityB = new ArrayList<>();
             var guardB = new BudgetGuard(ReadBudget.initialEngineeringProposal());
             IndividualEncounterModalityCapability.stream(
                     c, "3550308", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
-                    guardB, municipalityB::add);
+                    guardB, municipalityB::add,
+                    new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                    CompatibilityTestCatalog.productionEntry());
 
             // Municipality A: 3 programados (ids 1,3, one more), 2 espontaneos -> 5 total.
             assertThat(municipalityA).hasSize(5);

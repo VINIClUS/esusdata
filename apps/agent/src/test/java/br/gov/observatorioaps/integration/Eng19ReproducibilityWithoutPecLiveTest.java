@@ -11,6 +11,7 @@ import br.gov.observatorioaps.indicatorengine.IndicatorResult;
 import br.gov.observatorioaps.indicatorpacks.c1.C1Rule;
 import br.gov.observatorioaps.pecadapter.EncounterModality;
 import br.gov.observatorioaps.pecadapter.IndividualEncounterModalityCapability;
+import br.gov.observatorioaps.pecadapter.PecSourceIdentity;
 import br.gov.observatorioaps.pecadapter.RawEncounterRecord;
 import br.gov.observatorioaps.sourceconnector.AllowedDestinations;
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
@@ -103,7 +104,8 @@ class Eng19ReproducibilityWithoutPecLiveTest {
                 var guard = new BudgetGuard(budget);
                 IndividualEncounterModalityCapability.stream(
                         c, "3541307", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), guard,
-                        raw -> writeCanonical(writer, raw));
+                        raw -> writeCanonical(writer, raw),
+                        new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"));
             }
             return writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01", startedAt,

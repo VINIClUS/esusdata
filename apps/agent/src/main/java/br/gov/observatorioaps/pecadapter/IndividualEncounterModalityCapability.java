@@ -1,14 +1,7 @@
 package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
@@ -18,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -35,6 +29,9 @@ import java.util.function.Consumer;
  * {@code date >= character varying} with no implicit cast (found live during the pgJDBC spike).
  */
 public final class IndividualEncounterModalityCapability {
+
+    public static final String CAPABILITY = "individual_encounter_modality";
+    public static final String ADAPTER_VERSION = "0.1.0";
 
     /** Frozen query text — its SHA-256 is recorded as {@code query_checksum} in the adapter matrix. */
     public static final String QUERY = """
@@ -90,7 +87,40 @@ public final class IndividualEncounterModalityCapability {
             BudgetGuard guard,
             Consumer<RawEncounterRecord> consumer
     ) throws SQLException {
-        validateAdapterCompatibility();
+        stream(connection, municipalityIbge, periodStart, periodEndExclusive, guard, consumer,
+                null, new JdbcCompatibilityCatalog());
+    }
+
+    public static void stream(
+            Connection connection,
+            String municipalityIbge,
+            LocalDate periodStart,
+            LocalDate periodEndExclusive,
+            BudgetGuard guard,
+            Consumer<RawEncounterRecord> consumer,
+            PecSourceIdentity sourceIdentity
+    ) throws SQLException {
+        stream(connection, municipalityIbge, periodStart, periodEndExclusive, guard, consumer,
+                sourceIdentity, new JdbcCompatibilityCatalog());
+    }
+
+    /**
+     * Streams a capability after probing the connected PostgreSQL version and every object
+     * fingerprint named by the exact matrix entry. The catalog is injectable only so synthetic
+     * PostgreSQL fixtures can provide the same probes without pretending they are the production
+     * PEC; validation itself is never bypassed.
+     */
+    public static void stream(
+            Connection connection,
+            String municipalityIbge,
+            LocalDate periodStart,
+            LocalDate periodEndExclusive,
+            BudgetGuard guard,
+            Consumer<RawEncounterRecord> consumer,
+            PecSourceIdentity sourceIdentity,
+            CompatibilityCatalog catalog
+    ) throws SQLException {
+        validateAdapterCompatibility(connection, sourceIdentity, catalog);
 
         try (PreparedStatement ps = connection.prepareStatement(
                 QUERY, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
@@ -117,57 +147,51 @@ public final class IndividualEncounterModalityCapability {
         }
     }
 
-    private static void validateAdapterCompatibility() {
-        try {
-            Path matrixFile = findCompatibilityMatrix();
-            if (!Files.exists(matrixFile)) {
-                throw new IllegalStateException(
-                        "Adapter compatibility matrix not found — cannot validate that this adapter is "
-                                + "approved for the target PEC. Searched: " + matrixFile.toAbsolutePath());
-            }
-
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode root = mapper.readTree(Files.readString(matrixFile));
-            JsonNode testedWith = root.get("tested_with");
-
-            if (testedWith == null || testedWith.size() == 0) {
-                throw new IllegalStateException(
-                        "Adapter compatibility matrix has no tested_with entries — cannot validate compatibility.");
-            }
-
-            JsonNode entry = testedWith.get(0);
-            String matrixQueryChecksum = entry.get("query_checksum").asString();
-
-            if (!QUERY_CHECKSUM.equals(matrixQueryChecksum)) {
-                throw new IllegalStateException(
-                        "Query checksum mismatch: adapter frozen checksum " + matrixQueryChecksum
-                                + " does not match live query " + QUERY_CHECKSUM
-                                + " — adapter query was changed without updating the compatibility matrix (ENG-43).");
-            }
-
-            String capabilityStatus = entry.get("status").asString();
-            if (!"VALIDATED".equals(capabilityStatus)) {
-                throw new IllegalStateException(
-                        "Adapter capability status is " + capabilityStatus
-                                + " — only VALIDATED adapters are allowed to execute queries.");
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException(
-                    "Failed to load or parse adapter compatibility matrix: " + e.getMessage(), e);
-        }
+    public static void validateAdapterCompatibility(
+            Connection connection,
+            PecSourceIdentity sourceIdentity,
+            CompatibilityCatalog catalog
+    ) throws SQLException {
+        validateAdapterCompatibility(connection, sourceIdentity, catalog,
+                PecCompatibilityMatrix.fromClasspathResource());
     }
 
-    private static Path findCompatibilityMatrix() {
-        Path[] candidates = {
-                Paths.get("contracts/compatibility/pec-adapters.json"),
-                Paths.get("../contracts/compatibility/pec-adapters.json"),
-                Paths.get("../../contracts/compatibility/pec-adapters.json")
-        };
-        for (Path candidate : candidates) {
-            if (Files.exists(candidate)) {
-                return candidate;
+    public static void validateAdapterCompatibility(
+            Connection connection,
+            PecSourceIdentity sourceIdentity,
+            CompatibilityCatalog catalog,
+            PecCompatibilityMatrix matrix
+    ) throws SQLException {
+        if (sourceIdentity == null || !sourceIdentity.isComplete()) {
+            throw new IllegalStateException(
+                    "PecSourceIdentity is required before acquiring a PEC capability");
+        }
+        if (catalog == null) {
+            throw new IllegalStateException("CompatibilityCatalog is required before acquiring a PEC capability");
+        }
+        if (matrix == null) {
+            throw new IllegalStateException("PecCompatibilityMatrix is required before acquiring a PEC capability");
+        }
+
+        String postgresVersion = catalog.postgresVersion(connection);
+        PecCompatibilityMatrix.Entry entry = matrix.findExact(
+                CAPABILITY, ADAPTER_VERSION, sourceIdentity, postgresVersion);
+
+        if (!QUERY_CHECKSUM.equals(entry.queryChecksum())) {
+            throw new IllegalStateException(
+                    "Query checksum mismatch: matrix has " + entry.queryChecksum()
+                            + " but live query has " + QUERY_CHECKSUM
+                            + " — adapter query was changed without updating the compatibility matrix (ENG-43).");
+        }
+
+        for (Map.Entry<String, String> expected : entry.objectFingerprints().entrySet()) {
+            String object = expected.getKey();
+            String actual = catalog.fingerprint(connection, object, entry.objectColumns().get(object));
+            if (!expected.getValue().equals(actual)) {
+                throw new IllegalStateException(
+                        "Compatibility fingerprint mismatch for " + object
+                                + ": expected " + expected.getValue() + " but connected source returned " + actual);
             }
         }
-        return candidates[0];
     }
 }
