@@ -60,7 +60,12 @@ class C1RuleTest {
     // ---- MET-33: quadrimestral mean of 40/50/60/70 -> 55, band applied after averaging ----
     @Test
     void met33_quadrimestralMeanOf40_50_60_70Is55ThenBanded() {
-        Classification result = C1Rule.classifyQuadrimestral(40, 50, 60, 70);
+        Classification result = C1Rule.classifyQuadrimestral(
+                ExactRatio.of(40, 1),
+                ExactRatio.of(50, 1),
+                ExactRatio.of(60, 1),
+                ExactRatio.of(70, 1)
+        );
         assertThat(result).isEqualTo(Classification.OTIMO); // 55 is in (50,70]
     }
 

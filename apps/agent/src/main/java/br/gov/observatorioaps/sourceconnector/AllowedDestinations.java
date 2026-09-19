@@ -24,7 +24,8 @@ public final class AllowedDestinations {
 
     /**
      * Resolves the host via DNS (never trusting a cached/previous resolution) and checks both the
-     * literal host:port pair and the resolved address against the allowlist.
+     * literal host:port pair and the resolved address against the allowlist. Every resolved
+     * IPv4/IPv6 address must be explicitly approved — prevents DNS rebinding attacks.
      */
     public void assertAllowed(String host, int port) {
         HostPort requested = new HostPort(host, port);
@@ -40,12 +41,12 @@ public final class AllowedDestinations {
             throw new DestinationNotAllowedException("Could not resolve host: " + host, e);
         }
 
-        if (resolved.isLoopbackAddress() && !allowed.contains(new HostPort("127.0.0.1", port))
-                && !allowed.contains(new HostPort("localhost", port))) {
-            // Loopback is only acceptable when explicitly allowlisted as loopback — a host name
-            // that unexpectedly resolves to loopback must not get an implicit pass.
+        String resolvedIp = resolved.getHostAddress();
+        HostPort resolvedAddr = new HostPort(resolvedIp, port);
+        if (!allowed.contains(resolvedAddr)) {
             throw new DestinationNotAllowedException(
-                    "Host " + host + " resolved to a loopback address that is not itself allowlisted.");
+                    "Host " + host + " resolved to address " + resolvedIp + ":" + port
+                            + " which is not in the approved allowlist — DNS rebinding protection.");
         }
     }
 

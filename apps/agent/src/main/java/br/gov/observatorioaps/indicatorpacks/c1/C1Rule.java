@@ -108,8 +108,8 @@ public final class C1Rule {
      * Quadrimestral consolidation (§2.4 @800-802, MET-33): mean of the monitored monthly results,
      * band applied only after averaging — never round intermediate monthly values.
      */
-    public static Classification classifyQuadrimestral(long... monthlyPercentages) {
-        ExactRatio mean = ExactRatio.meanOfIntegerPercentages(monthlyPercentages);
+    public static Classification classifyQuadrimestral(ExactRatio... monthlyRatios) {
+        ExactRatio mean = ExactRatio.meanOfExactRatios(monthlyRatios);
         return classify(mean);
     }
 }

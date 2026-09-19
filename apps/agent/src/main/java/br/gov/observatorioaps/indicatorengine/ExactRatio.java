@@ -63,6 +63,27 @@ public record ExactRatio(BigInteger numerator, BigInteger denominator) {
         return new ExactRatio(sum, BigInteger.valueOf(monthlyPercentages.length));
     }
 
+    /** Average of several exact ratios, preserving precision — never rounds intermediate values (MET-33). */
+    public static ExactRatio meanOfExactRatios(ExactRatio... ratios) {
+        if (ratios.length == 0) {
+            return zero();
+        }
+        BigInteger sumNumerator = BigInteger.ZERO;
+        BigInteger lcm = BigInteger.ONE;
+        for (ExactRatio r : ratios) {
+            lcm = lcm.multiply(r.denominator).divide(gcd(lcm, r.denominator));
+        }
+        for (ExactRatio r : ratios) {
+            BigInteger factor = lcm.divide(r.denominator);
+            sumNumerator = sumNumerator.add(r.numerator.multiply(factor));
+        }
+        return new ExactRatio(sumNumerator, lcm.multiply(BigInteger.valueOf(ratios.length)));
+    }
+
+    private static BigInteger gcd(BigInteger a, BigInteger b) {
+        return b.signum() == 0 ? a : gcd(b, a.mod(b));
+    }
+
     /**
      * Explicit, final, display-only decimal conversion. Never used in a classification decision
      * — only for rendering (§1.7.1: "duas casas, arredondamento HALF_UP, exclusivamente na

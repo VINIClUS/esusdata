@@ -1,8 +1,14 @@
 package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
@@ -72,6 +78,9 @@ public final class IndividualEncounterModalityCapability {
      * row so a runaway result set is interrupted rather than fully materialized. The caller owns
      * the {@link Connection} — this method never closes it, and never opens one itself, keeping
      * source-connector the single place that manages PEC connections (§1.5).
+     *
+     * <p>Validates adapter compatibility against the frozen matrix entry before executing any query
+     * — an unsupported source version or schema fingerprint blocks acquisition (ENG-43).
      */
     public static void stream(
             Connection connection,
@@ -81,6 +90,8 @@ public final class IndividualEncounterModalityCapability {
             BudgetGuard guard,
             Consumer<RawEncounterRecord> consumer
     ) throws SQLException {
+        validateAdapterCompatibility();
+
         try (PreparedStatement ps = connection.prepareStatement(
                 QUERY, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
             ps.setFetchSize(FETCH_SIZE);
@@ -103,6 +114,46 @@ public final class IndividualEncounterModalityCapability {
                     ));
                 }
             }
+        }
+    }
+
+    private static void validateAdapterCompatibility() {
+        try {
+            Path matrixFile = Paths.get("contracts/compatibility/pec-adapters.json");
+            if (!Files.exists(matrixFile)) {
+                throw new IllegalStateException(
+                        "Adapter compatibility matrix not found at " + matrixFile.toAbsolutePath()
+                                + " — cannot validate that this adapter is approved for the target PEC.");
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(Files.readString(matrixFile));
+            JsonNode testedWith = root.get("tested_with");
+
+            if (testedWith == null || testedWith.size() == 0) {
+                throw new IllegalStateException(
+                        "Adapter compatibility matrix has no tested_with entries — cannot validate compatibility.");
+            }
+
+            JsonNode entry = testedWith.get(0);
+            String matrixQueryChecksum = entry.get("query_checksum").asString();
+
+            if (!QUERY_CHECKSUM.equals(matrixQueryChecksum)) {
+                throw new IllegalStateException(
+                        "Query checksum mismatch: adapter frozen checksum " + matrixQueryChecksum
+                                + " does not match live query " + QUERY_CHECKSUM
+                                + " — adapter query was changed without updating the compatibility matrix (ENG-43).");
+            }
+
+            String capabilityStatus = entry.get("status").asString();
+            if (!"VALIDATED".equals(capabilityStatus)) {
+                throw new IllegalStateException(
+                        "Adapter capability status is " + capabilityStatus
+                                + " — only VALIDATED adapters are allowed to execute queries.");
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "Failed to load or parse adapter compatibility matrix: " + e.getMessage(), e);
         }
     }
 }
