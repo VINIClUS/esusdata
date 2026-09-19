@@ -6,8 +6,10 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -18,6 +20,7 @@ class ExtractWriterReaderTest {
     Path dir;
 
     private final ExtractReader reader = new ExtractReader();
+    private static final String TEST_QUERY_CHECKSUM = "sha256:" + "0".repeat(64);
 
     @Test
     void writeFinalizeAndReadBackRoundTrips() throws Exception {
@@ -32,7 +35,7 @@ class ExtractWriterReaderTest {
             manifest = writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
                     Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    "sha256:test-query-checksum", "0.1.0", "COMPLETE", "SNAPSHOT");
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
         }
 
         assertThat(manifest.rowCount()).isEqualTo(3);
@@ -48,6 +51,98 @@ class ExtractWriterReaderTest {
         assertThat(records.get(0).modality()).isEqualTo(CanonicalModality.PROGRAMADO);
         assertThat(records.get(1).modality()).isEqualTo(CanonicalModality.ESPONTANEO);
         assertThat(records.get(2).modality()).isEqualTo(CanonicalModality.UNMAPPED);
+    }
+
+    @Test
+    void reusingAnExtractionIdCannotReplaceThePublishedSnapshot() throws Exception {
+        String extractionId = "ext-immutable";
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+            writer.write(encounter("original", CanonicalModality.PROGRAMADO));
+            writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+        byte[] originalData = Files.readAllBytes(dir.resolve(extractionId + ".jsonl.gz"));
+        byte[] originalManifest = Files.readAllBytes(dir.resolve(extractionId + ".manifest.json"));
+
+        assertThatThrownBy(() -> {
+            try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+                writer.write(encounter("replacement", CanonicalModality.ESPONTANEO));
+                writer.finalizeExtract(
+                        "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                        Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                        TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+            }
+        }).isInstanceOf(IOException.class);
+
+        assertThat(Files.readAllBytes(dir.resolve(extractionId + ".jsonl.gz")))
+                .isEqualTo(originalData);
+        assertThat(Files.readAllBytes(dir.resolve(extractionId + ".manifest.json")))
+                .isEqualTo(originalManifest);
+    }
+
+    @Test
+    void finalizationSurvivesAPlatformWithoutDirectoryReadForFsync() throws Exception {
+        if (Files.getFileAttributeView(dir, java.nio.file.attribute.PosixFileAttributeView.class) == null) {
+            return;
+        }
+        Set<PosixFilePermission> originalPermissions = Files.getPosixFilePermissions(dir);
+        Files.setPosixFilePermissions(dir, Set.of(
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.OWNER_EXECUTE));
+        try {
+            try (ExtractWriter writer = new ExtractWriter(dir, "ext-no-directory-read")) {
+                writer.write(encounter("1", CanonicalModality.PROGRAMADO));
+                writer.finalizeExtract(
+                        "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                        Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                        TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+            }
+        } finally {
+            Files.setPosixFilePermissions(dir, originalPermissions);
+        }
+
+        assertThat(reader.readEncounters(dir, reader.readManifest(dir, "ext-no-directory-read")))
+                .hasSize(1);
+    }
+
+    @Test
+    void detachedManifestCannotAuthorizeReadingAPublishedExtract() throws Exception {
+        String extractionId = "ext-detached-manifest";
+        ExtractionManifest published;
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+            writer.write(encounter("1", CanonicalModality.PROGRAMADO));
+            published = writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+
+        ExtractionManifest forged = new ExtractionManifest(
+                published.extractionId(), published.sourceId(), published.municipalityIbge(),
+                published.periodStart(), published.periodEndExclusive(), published.startedAt(),
+                published.finishedAt(), published.canonicalSchemaVersion(),
+                published.completenessStatus(), published.consistencyLevel(), published.sourceZoneId(),
+                published.rowCount(), published.exclusionCount(), published.checksum(),
+                "sha256:forged", published.adapterVersion());
+
+        assertThatThrownBy(() -> reader.readEncounters(dir, forged))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("published manifest");
+    }
+
+    @Test
+    void queryChecksumMustBeAnActualSha256Digest() {
+        ExtractionManifest manifest = new ExtractionManifest(
+                "ext-query-checksum", "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                "2026-09-19T20:00:00Z", "2026-09-19T20:01:00Z", "1", "COMPLETE", "SNAPSHOT",
+                "America/Sao_Paulo", 0, 0, "sha256:" + "0".repeat(64),
+                "sha256:not-a-digest", "0.1.0");
+
+        assertThatThrownBy(() -> ExtractValidation.validateManifest(manifest))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("queryChecksum");
     }
 
     @Test
@@ -85,7 +180,7 @@ class ExtractWriterReaderTest {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
             manifestA = writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.now(), "America/Sao_Paulo", "sha256:x", "0.1.0", "COMPLETE", "SNAPSHOT");
+                    Instant.now(), "America/Sao_Paulo", TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
         }
 
         String extractionIdB = "ext-b";
@@ -94,7 +189,7 @@ class ExtractWriterReaderTest {
             writer.write(encounter("2", CanonicalModality.ESPONTANEO));
             writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.now(), "America/Sao_Paulo", "sha256:x", "0.1.0", "COMPLETE", "SNAPSHOT");
+                    Instant.now(), "America/Sao_Paulo", TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
         }
 
         // Overwrite A's finalized data file with B's — valid gzip, wrong content relative to
@@ -116,7 +211,7 @@ class ExtractWriterReaderTest {
             manifest = writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
                     Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    "sha256:test-query-checksum", "0.1.0", "COMPLETE", "SNAPSHOT");
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
         }
 
         writeManifest(new ExtractionManifest(
@@ -141,7 +236,7 @@ class ExtractWriterReaderTest {
             manifest = writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
                     Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    "sha256:test-query-checksum", "0.1.0", "COMPLETE", "SNAPSHOT");
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
         }
 
         writeManifest(new ExtractionManifest(
@@ -180,7 +275,7 @@ class ExtractWriterReaderTest {
             manifest = writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
                     Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    "sha256:test-query-checksum", "0.1.0", "COMPLETE", "SNAPSHOT");
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
         }
 
         writeManifest(new ExtractionManifest(

@@ -40,7 +40,7 @@ public final class ExtractReader {
         if (!Files.isRegularFile(manifestFile, LinkOption.NOFOLLOW_LINKS)) {
             throw new IllegalStateException("Manifest is not a regular file: " + manifestFile);
         }
-        ExtractionManifest manifest = mapper.readValue(Files.readString(manifestFile), ExtractionManifest.class);
+        ExtractionManifest manifest = mapper.readValue(readUtf8NoFollow(manifestFile), ExtractionManifest.class);
         if (!extractionId.equals(manifest.extractionId())) {
             throw new IllegalStateException(
                     "Manifest extractionId does not match requested extractionId=" + extractionId);
@@ -55,8 +55,17 @@ public final class ExtractReader {
      * file is rejected before the engine ever sees it (ENG-20).
      */
     public List<CanonicalEncounter> readEncounters(Path baseDir, ExtractionManifest manifest) throws IOException {
+        if (manifest == null) {
+            throw new IllegalStateException("Extraction manifest is required");
+        }
         ExtractValidation.validateExtractionId(baseDir, manifest.extractionId());
-        ExtractValidation.validateManifest(manifest);
+        ExtractionManifest publishedManifest = readManifest(baseDir, manifest.extractionId());
+        if (!publishedManifest.equals(manifest)) {
+            throw new IllegalStateException(
+                    "Supplied extraction manifest does not match the published manifest for extractionId="
+                            + manifest.extractionId());
+        }
+        manifest = publishedManifest;
 
         Path dataFile = baseDir.resolve(manifest.extractionId() + ".jsonl.gz");
         ExtractValidation.rejectSymbolicLink(dataFile, "extract data file");
@@ -75,7 +84,7 @@ public final class ExtractReader {
         }
 
         List<CanonicalEncounter> records = new ArrayList<>();
-        try (InputStream fileIn = Files.newInputStream(dataFile);
+        try (InputStream fileIn = Files.newInputStream(dataFile, LinkOption.NOFOLLOW_LINKS);
              DigestInputStream digestIn = new DigestInputStream(fileIn, digest);
              GZIPInputStream gzipIn = new GZIPInputStream(digestIn);
              BufferedReader reader = new BufferedReader(new InputStreamReader(gzipIn, StandardCharsets.UTF_8))) {
@@ -120,5 +129,11 @@ public final class ExtractReader {
         }
 
         return records;
+    }
+
+    private static String readUtf8NoFollow(Path path) throws IOException {
+        try (InputStream input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 }

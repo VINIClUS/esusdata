@@ -25,22 +25,22 @@
             "nu_uuid_ficha",
             "nu_atendimento"
           ],
-          "signature_fingerprint": "sha256:9c272cc866503313f95549d1e7da5489815d9ba13e816d195a53de02af14c38f"
+          "signature_fingerprint": "sha256:f50af7ce617cfa68de192564cedd19b6e1cedecbbd3f2ef716cef3173bc3eadb"
         },
         {
           "object": "tb_dim_tempo",
           "columns_used": ["co_seq_dim_tempo", "dt_registro"],
-          "signature_fingerprint": "sha256:171fa7fbe8ab3d697ce9728c8e36f459e7e4193dd9b58072ad05350942a9d565"
+          "signature_fingerprint": "sha256:fe74e7801a81fff88f3c2293da22ec024cce09a0a100f036850deaf5a41a18c4"
         },
         {
           "object": "tb_dim_municipio",
           "columns_used": ["co_seq_dim_municipio", "co_ibge"],
-          "signature_fingerprint": "sha256:f650a801030410054b43ae63fe8f03bc3550567217cd7ea43a79b1c2b9b7f4f9"
+          "signature_fingerprint": "sha256:45ab26332b75ca798520417c3575ace4f49a2d7160ce49bfcf41f85c8b8dbc3d"
         },
         {
           "object": "tb_dim_tipo_atendimento",
           "columns_used": ["co_seq_dim_tipo_atendimento", "co_dim_tipo_atendimento_pai", "LEAF_IDS=2,3,5,6,7"],
-          "signature_fingerprint": "sha256:138c33a76f93469434a4a30064420374d5b777a3000aa6e352273879b03e312a"
+          "signature_fingerprint": "sha256:1765ccc3434d5c489aced6a200c1facf97ffecc97b25dd22ed4929f7ab328aed"
         }
       ],
       "municipal_isolation_evidence": {

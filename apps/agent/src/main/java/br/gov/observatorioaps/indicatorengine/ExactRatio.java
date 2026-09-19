@@ -66,7 +66,7 @@ public record ExactRatio(BigInteger numerator, BigInteger denominator) {
     /** Average of several exact ratios, preserving precision — never rounds intermediate values (MET-33). */
     public static ExactRatio meanOfExactRatios(ExactRatio... ratios) {
         if (ratios.length == 0) {
-            return zero();
+            throw new IllegalArgumentException("at least one ratio is required to compute a mean");
         }
         BigInteger sumNumerator = BigInteger.ZERO;
         BigInteger lcm = BigInteger.ONE;

@@ -7,10 +7,12 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.LinkOption;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.StandardCopyOption;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -99,14 +101,17 @@ public final class ExtractWriter implements AutoCloseable {
                 startedAt, sourceZoneId, queryChecksum, adapterVersion, completenessStatus,
                 consistencyLevel);
         ensureWrittenScopeMatches(sourceId, municipalityIbge, periodStart, periodEndExclusive);
+        Path finalFile = baseDir.resolve(extractionId + ".jsonl.gz");
+        Path manifestFile = baseDir.resolve(extractionId + ".manifest.json");
+        requirePublicationTargetAbsent(finalFile, "extract data file");
+        requirePublicationTargetAbsent(manifestFile, "manifest file");
+
         gzipOut.close();
         closed = true;
         String checksum = HexFormat.of().formatHex(digestOut.getMessageDigest().digest());
         forceFile(tempFile);
 
-        Path finalFile = baseDir.resolve(extractionId + ".jsonl.gz");
-        ExtractValidation.rejectSymbolicLink(finalFile, "extract data file");
-        Files.move(tempFile, finalFile, StandardCopyOption.ATOMIC_MOVE);
+        publishNewFile(tempFile, finalFile);
         forceDirectory(baseDir);
 
         Instant finishedAt = Instant.now();
@@ -118,12 +123,10 @@ public final class ExtractWriter implements AutoCloseable {
         );
         ExtractValidation.validateManifest(manifest);
 
-        Path manifestFile = baseDir.resolve(extractionId + ".manifest.json");
         Path manifestTemp = baseDir.resolve(extractionId + ".manifest.json.tmp");
         ExtractValidation.rejectSymbolicLink(manifestTemp, "manifest temporary file");
-        ExtractValidation.rejectSymbolicLink(manifestFile, "manifest file");
         writeAndForce(manifestTemp, mapper.writeValueAsBytes(manifest));
-        Files.move(manifestTemp, manifestFile, StandardCopyOption.ATOMIC_MOVE);
+        publishNewFile(manifestTemp, manifestFile);
         forceDirectory(baseDir);
 
         return manifest;
@@ -212,7 +215,9 @@ public final class ExtractWriter implements AutoCloseable {
         if (!end.isAfter(start)) throw new IllegalArgumentException("period end must be after period start");
         if (startedAt == null) throw new IllegalArgumentException("startedAt is required");
         if (sourceZoneId == null || sourceZoneId.isBlank()) throw new IllegalArgumentException("sourceZoneId is required");
-        if (queryChecksum == null || queryChecksum.isBlank()) throw new IllegalArgumentException("queryChecksum is required");
+        if (!ExtractValidation.isSha256Digest(queryChecksum)) {
+            throw new IllegalArgumentException("queryChecksum must be a SHA-256 digest");
+        }
         if (adapterVersion == null || adapterVersion.isBlank()) throw new IllegalArgumentException("adapterVersion is required");
         if (!"COMPLETE".equals(completenessStatus)) {
             throw new IllegalArgumentException("only COMPLETE extracts may be published");
@@ -258,11 +263,32 @@ public final class ExtractWriter implements AutoCloseable {
         }
     }
 
+    /**
+     * Publishes a new file without replacement semantics. {@link Files#move(Path, Path,
+     * java.nio.file.StandardCopyOption...)} with {@code ATOMIC_MOVE} is allowed to replace an
+     * existing target on common Unix providers even when {@code REPLACE_EXISTING} is absent. A
+     * hard link creates the destination directory entry with create-new semantics; the source is
+     * removed only after publication, so a retry can never mutate an already finalized extract.
+     */
+    private static void publishNewFile(Path temporaryFile, Path finalFile) throws IOException {
+        requirePublicationTargetAbsent(finalFile, "publication target");
+        Files.createLink(finalFile, temporaryFile);
+        Files.delete(temporaryFile);
+    }
+
+    private static void requirePublicationTargetAbsent(Path path, String description) throws IOException {
+        ExtractValidation.rejectSymbolicLink(path, description);
+        if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
+            throw new FileAlreadyExistsException(path.toString());
+        }
+    }
+
     private static void forceDirectory(Path directory) throws IOException {
         try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {
             channel.force(true);
-        } catch (UnsupportedOperationException ignored) {
-            // Directory fsync is unavailable on some platforms; file contents were still forced.
+        } catch (UnsupportedOperationException | AccessDeniedException ignored) {
+            // Directory fsync is unavailable on some platforms (notably Windows); file contents
+            // were still forced, and real file-write failures have already propagated.
         }
     }
 }

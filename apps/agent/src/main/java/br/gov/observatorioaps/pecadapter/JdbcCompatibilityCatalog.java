@@ -56,23 +56,25 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
             }
         }
 
-        List<String> canonicalColumns = new ArrayList<>();
+        List<String> signatureParts = new ArrayList<>();
+        signatureParts.add(object);
         for (String requested : columnsUsed) {
             if (requested.startsWith("LEAF_IDS=")) {
                 verifyFrozenLeafIds(connection, requested);
-                canonicalColumns.add(requested);
+                signatureParts.add(requested);
                 continue;
             }
             Column column = columns.get(requested);
             if (column == null) {
                 throw new SQLException("Required compatibility column is missing: " + object + "." + requested);
             }
-            canonicalColumns.add(requested);
+            if (column.dataType() == null || column.udtName() == null || column.ordinalPosition() <= 0) {
+                throw new SQLException("Incomplete compatibility metadata for " + object + "." + requested);
+            }
+            signatureParts.add(requested + "|" + column.dataType() + "|" + column.udtName()
+                    + "|" + column.ordinalPosition());
         }
-        // This is the canonical form already recorded by the compatibility contract. The
-        // catalog query above verifies that every named column exists before hashing; the frozen
-        // value-set marker is also probed above rather than treated as documentation only.
-        return sha256(object + "|" + String.join(",", canonicalColumns));
+        return sha256(String.join("\n", signatureParts));
     }
 
     private static void verifyFrozenLeafIds(Connection connection, String marker) throws SQLException {

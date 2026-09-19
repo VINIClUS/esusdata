@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Tech Spec §4.2 MET-* cases relevant to C1, plus §4.3 ENG-25 boundary coverage, as executable
@@ -139,6 +140,13 @@ class C1RuleTest {
                 ExactRatio.of(50, 1));
 
         assertThat(result).isEqualTo(Classification.OTIMO);
+    }
+
+    @Test
+    void emptyQuadrimestralEvidenceCannotBecomeRegular() {
+        assertThatThrownBy(C1Rule::classifyQuadrimestral)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least one");
     }
 
     private List<CanonicalEncounter> encounters(int programados, int espontaneos, int unmapped) {

@@ -90,11 +90,17 @@ final class ExtractValidation {
                     "Manifest exclusion count is invalid: " + manifest.exclusionCount()
                             + " for rowCount=" + manifest.rowCount());
         }
-        if (manifest.checksum() == null || !manifest.checksum().matches(SHA256)) {
+        if (!isSha256Digest(manifest.checksum())) {
             throw new IllegalStateException("Manifest checksum must be a SHA-256 digest");
         }
-        requireNonBlank(manifest.queryChecksum(), "queryChecksum");
+        if (!isSha256Digest(manifest.queryChecksum())) {
+            throw new IllegalStateException("Manifest queryChecksum must be a SHA-256 digest");
+        }
         requireNonBlank(manifest.adapterVersion(), "adapterVersion");
+    }
+
+    static boolean isSha256Digest(String value) {
+        return value != null && value.matches(SHA256);
     }
 
     static void validateRecord(CanonicalEncounter record, ExtractionManifest manifest) {
