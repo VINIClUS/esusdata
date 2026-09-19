@@ -46,6 +46,11 @@ class PecDataSourceFactoryLiveTest {
                 "3541307"
         );
 
+        Assumptions.assumeTrue(
+                br.gov.observatorioaps.testsupport.LivePecAssumptions.isReachable(properties.host(), properties.port()),
+                "Skipping: " + properties.host() + ":" + properties.port() + " not reachable "
+                        + "— SSH tunnel likely down (see ADR 0003)");
+
         var allowlist = new AllowedDestinations(
                 Set.of(new AllowedDestinations.HostPort(properties.host(), properties.port())));
         var factory = new PecDataSourceFactory(allowlist, new EnvFileSecretResolver(ENV_FILE));

@@ -41,3 +41,8 @@ logs/
 
 # Maven build output at every module level
 apps/agent/target/
+
+# Local agent/tooling state, not part of the project
+.claude/
+.serena/
+.tokensave/

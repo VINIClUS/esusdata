@@ -57,6 +57,11 @@ class Eng19ReproducibilityWithoutPecLiveTest {
     @Test
     void recomputesTheSameResultFromTheExtractAfterThePecConnectionIsFullyClosed() throws Exception {
         Assumptions.assumeTrue(Files.exists(ENV_FILE), "Skipping: no dev PEC secret file at " + ENV_FILE);
+        Map<String, String> env = readEnvFile();
+        Assumptions.assumeTrue(
+                br.gov.observatorioaps.testsupport.LivePecAssumptions.isReachable(
+                        env.get("PEC_DB_HOST"), Integer.parseInt(env.get("PEC_DB_PORT"))),
+                "Skipping: PEC not reachable — SSH tunnel likely down (see ADR 0003)");
 
         // --- Phase A: connected. Acquire from the PEC and write a finalized extract. ---
         String extractionId = "eng19-2026-03";
@@ -103,7 +108,7 @@ class Eng19ReproducibilityWithoutPecLiveTest {
             return writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01", startedAt,
                     "America/Sao_Paulo",
-                    "sha256:" + Integer.toHexString(IndividualEncounterModalityCapability.QUERY.hashCode()),
+                    IndividualEncounterModalityCapability.QUERY_CHECKSUM,
                     "0.1.0", "COMPLETE", "SNAPSHOT");
         } finally {
             ds.close(); // The PEC connection pool is fully torn down here — Phase B has nothing left.

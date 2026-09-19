@@ -31,6 +31,7 @@
         "status",
         "objects_used",
         "municipal_isolation_evidence",
+        "fixture_checksum",
         "test_result",
         "approved_at",
         "approved_by"

@@ -2,12 +2,16 @@ package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.HexFormat;
 import java.util.function.Consumer;
 
 /**
@@ -41,7 +45,24 @@ public final class IndividualEncounterModalityCapability {
              ORDER BY f.co_seq_fat_atd_ind
             """;
 
+    /**
+     * Real SHA-256 of {@link #QUERY}, computed once and reused everywhere a query checksum is
+     * recorded (the adapter matrix, extraction manifests) — so those provenance fields can never
+     * drift from the query text they claim to describe.
+     */
+    public static final String QUERY_CHECKSUM = computeQueryChecksum();
+
     private static final int FETCH_SIZE = 1000;
+
+    private static String computeQueryChecksum() {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return "sha256:" + HexFormat.of().formatHex(
+                    digest.digest(QUERY.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
 
     private IndividualEncounterModalityCapability() {
     }

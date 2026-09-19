@@ -6,7 +6,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.List;
 
@@ -71,23 +70,41 @@ class ExtractWriterReaderTest {
         assertThat(Files.exists(dir.resolve(extractionId + ".jsonl.gz.tmp"))).isTrue();
     }
 
+    /**
+     * Swaps in a different, validly-gzipped extract's data file under extract A's finalized name.
+     * Decompression succeeds (it's real gzip data, just the wrong content), so this specifically
+     * exercises the SHA-256 comparison in {@link ExtractReader}, not gzip's own CRC check —
+     * a byte flipped directly inside the compressed stream would usually fail at decompression
+     * instead, testing a different (also real, but different) failure path.
+     */
     @Test
-    void aTamperedDataFileIsRejectedByChecksum() throws Exception {
-        String extractionId = "ext-tampered";
-        ExtractionManifest manifest;
-        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+    void aSwappedDataFileIsRejectedByChecksumMismatchNotJustAnyException() throws Exception {
+        String extractionIdA = "ext-a";
+        ExtractionManifest manifestA;
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionIdA)) {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
-            manifest = writer.finalizeExtract(
+            manifestA = writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
                     Instant.now(), "America/Sao_Paulo", "sha256:x", "0.1.0", "COMPLETE", "SNAPSHOT");
         }
 
-        // Tamper with the finalized, checksummed file.
-        Path dataFile = dir.resolve(extractionId + ".jsonl.gz");
-        Files.write(dataFile, new byte[]{0, 1, 2, 3}, StandardOpenOption.APPEND);
+        String extractionIdB = "ext-b";
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionIdB)) {
+            writer.write(encounter("1", CanonicalModality.ESPONTANEO));
+            writer.write(encounter("2", CanonicalModality.ESPONTANEO));
+            writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.now(), "America/Sao_Paulo", "sha256:x", "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
 
-        assertThatThrownBy(() -> reader.readEncounters(dir, manifest))
-                .isInstanceOf(Exception.class); // gzip corruption or checksum mismatch — either way, refused
+        // Overwrite A's finalized data file with B's — valid gzip, wrong content relative to
+        // manifestA's recorded checksum.
+        Files.copy(dir.resolve(extractionIdB + ".jsonl.gz"), dir.resolve(extractionIdA + ".jsonl.gz"),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+        assertThatThrownBy(() -> reader.readEncounters(dir, manifestA))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Checksum mismatch");
     }
 
     private CanonicalEncounter encounter(String recordId, CanonicalModality modality) {
