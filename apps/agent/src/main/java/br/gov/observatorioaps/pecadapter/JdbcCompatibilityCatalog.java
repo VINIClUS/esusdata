@@ -59,6 +59,10 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         List<String> signatureParts = new ArrayList<>();
         signatureParts.add(object);
         for (String requested : columnsUsed) {
+            if (requested.startsWith("LEAF_SEMANTICS=")) {
+                signatureParts.add(verifyFrozenLeafSemantics(connection, object, requested, columns));
+                continue;
+            }
             if (requested.startsWith("LEAF_IDS=")) {
                 verifyFrozenLeafIds(connection, requested);
                 signatureParts.add(requested);
@@ -75,6 +79,76 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
                     + "|" + column.ordinalPosition());
         }
         return sha256(String.join("\n", signatureParts));
+    }
+
+    private static String verifyFrozenLeafSemantics(
+            Connection connection, String object, String marker, Map<String, Column> columns) throws SQLException {
+        if (!"tb_dim_tipo_atendimento".equals(object)) {
+            throw new SQLException("Leaf semantics marker is only supported for tb_dim_tipo_atendimento");
+        }
+        requireColumnMetadata(columns, "co_seq_dim_tipo_atendimento");
+        requireColumnMetadata(columns, "ds_tipo_atendimento");
+        requireColumnMetadata(columns, "co_dim_tipo_atendimento_pai");
+
+        Set<Integer> expected = parseLeafIds(marker, "LEAF_SEMANTICS=");
+        String placeholders = "?,".repeat(expected.size());
+        placeholders = placeholders.substring(0, placeholders.length() - 1);
+        String query = "SELECT co_seq_dim_tipo_atendimento, ds_tipo_atendimento, "
+                + "co_dim_tipo_atendimento_pai FROM public.tb_dim_tipo_atendimento "
+                + "WHERE co_seq_dim_tipo_atendimento IN (" + placeholders + ") "
+                + "ORDER BY co_seq_dim_tipo_atendimento";
+        Set<Integer> found = new HashSet<>();
+        List<String> semanticRows = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            int index = 1;
+            for (Integer value : expected) statement.setInt(index++, value);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    int id = result.getInt(1);
+                    String description = result.getString(2);
+                    int parentId = result.getInt(3);
+                    Integer parent = result.wasNull() ? null : parentId;
+                    if (description == null || description.isBlank()) {
+                        throw new SQLException("Mapped leaf description is blank for id " + id);
+                    }
+                    found.add(id);
+                    semanticRows.add(id + "|" + utf8Length(description) + ":" + description + "|"
+                            + (parent == null ? "NULL" : parent));
+                }
+            }
+        }
+        if (!found.equals(expected)) {
+            throw new SQLException("Frozen leaf semantic set changed: expected " + expected + " but found " + found);
+        }
+        return marker + "\n" + String.join("\n", semanticRows);
+    }
+
+    private static Set<Integer> parseLeafIds(String marker, String prefix) throws SQLException {
+        if (!marker.startsWith(prefix)) throw new SQLException("Invalid leaf semantic marker: " + marker);
+        Set<Integer> expected = new HashSet<>();
+        for (String value : marker.substring(prefix.length()).split(",")) {
+            try {
+                if (!expected.add(Integer.valueOf(value))) {
+                    throw new SQLException("Duplicate frozen leaf id in marker: " + marker);
+                }
+            } catch (NumberFormatException e) {
+                throw new SQLException("Invalid frozen leaf semantic marker: " + marker, e);
+            }
+        }
+        if (expected.isEmpty()) throw new SQLException("Frozen leaf semantic marker is empty: " + marker);
+        return expected;
+    }
+
+    private static void requireColumnMetadata(Map<String, Column> columns, String column) throws SQLException {
+        Column metadata = columns.get(column);
+        if (metadata == null || metadata.dataType() == null || metadata.udtName() == null
+                || metadata.ordinalPosition() <= 0) {
+            throw new SQLException("Incomplete compatibility metadata for tb_dim_tipo_atendimento." + column);
+        }
+    }
+
+    private static int utf8Length(String value) {
+        return value.getBytes(StandardCharsets.UTF_8).length;
     }
 
     private static void verifyFrozenLeafIds(Connection connection, String marker) throws SQLException {

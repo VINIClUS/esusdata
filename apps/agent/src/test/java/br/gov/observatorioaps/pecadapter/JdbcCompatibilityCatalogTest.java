@@ -38,6 +38,45 @@ class JdbcCompatibilityCatalogTest {
                         + "care_date|date|date|2"));
     }
 
+    @Test
+    void fingerprintsIncludeMappedLeafDescriptionsAndParents() throws Exception {
+        Connection connection = mock(Connection.class);
+        PreparedStatement metadataStatement = mock(PreparedStatement.class);
+        PreparedStatement semanticsStatement = mock(PreparedStatement.class);
+        ResultSet metadata = mock(ResultSet.class);
+        ResultSet semantics = mock(ResultSet.class);
+        when(connection.prepareStatement(anyString())).thenReturn(metadataStatement, semanticsStatement);
+        when(metadataStatement.executeQuery()).thenReturn(metadata);
+        when(semanticsStatement.executeQuery()).thenReturn(semantics);
+
+        when(metadata.next()).thenReturn(true, true, true, false);
+        when(metadata.getString("column_name")).thenReturn(
+                "co_seq_dim_tipo_atendimento", "ds_tipo_atendimento", "co_dim_tipo_atendimento_pai");
+        when(metadata.getString("data_type")).thenReturn("bigint", "character varying", "bigint");
+        when(metadata.getString("udt_name")).thenReturn("int8", "varchar", "int8");
+        when(metadata.getInt("ordinal_position")).thenReturn(1, 2, 3);
+
+        when(semantics.next()).thenReturn(true, true, false);
+        when(semantics.getInt(1)).thenReturn(2, 3);
+        when(semantics.getString(2)).thenReturn("Consulta agendada", "Consulta no dia");
+        when(semantics.getInt(3)).thenReturn(1, 4);
+        when(semantics.wasNull()).thenReturn(false, false);
+
+        String fingerprint = new JdbcCompatibilityCatalog().fingerprint(
+                connection, "tb_dim_tipo_atendimento",
+                List.of("co_seq_dim_tipo_atendimento", "ds_tipo_atendimento",
+                        "co_dim_tipo_atendimento_pai", "LEAF_SEMANTICS=2,3"));
+
+        assertThat(fingerprint).isEqualTo(sha256(
+                "tb_dim_tipo_atendimento\n"
+                        + "co_seq_dim_tipo_atendimento|bigint|int8|1\n"
+                        + "ds_tipo_atendimento|character varying|varchar|2\n"
+                        + "co_dim_tipo_atendimento_pai|bigint|int8|3\n"
+                        + "LEAF_SEMANTICS=2,3\n"
+                        + "2|17:Consulta agendada|1\n"
+                        + "3|15:Consulta no dia|4"));
+    }
+
     private static String sha256(String value) throws Exception {
         return "sha256:" + java.util.HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));

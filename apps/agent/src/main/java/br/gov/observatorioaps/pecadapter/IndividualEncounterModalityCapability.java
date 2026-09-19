@@ -85,18 +85,6 @@ public final class IndividualEncounterModalityCapability {
             LocalDate periodStart,
             LocalDate periodEndExclusive,
             BudgetGuard guard,
-            Consumer<RawEncounterRecord> consumer
-    ) throws SQLException {
-        stream(connection, municipalityIbge, periodStart, periodEndExclusive, guard, consumer,
-                null, new JdbcCompatibilityCatalog());
-    }
-
-    public static void stream(
-            Connection connection,
-            String municipalityIbge,
-            LocalDate periodStart,
-            LocalDate periodEndExclusive,
-            BudgetGuard guard,
             Consumer<RawEncounterRecord> consumer,
             PecSourceIdentity sourceIdentity
     ) throws SQLException {
@@ -121,6 +109,7 @@ public final class IndividualEncounterModalityCapability {
             CompatibilityCatalog catalog
     ) throws SQLException {
         validateAdapterCompatibility(connection, sourceIdentity, catalog);
+        guard.checkDuration();
 
         try (PreparedStatement ps = connection.prepareStatement(
                 QUERY, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
@@ -143,6 +132,7 @@ public final class IndividualEncounterModalityCapability {
                             rs.getInt(8)
                     ));
                 }
+                guard.checkDuration();
             }
         }
     }

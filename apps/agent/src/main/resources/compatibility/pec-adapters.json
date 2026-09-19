@@ -39,8 +39,8 @@
         },
         {
           "object": "tb_dim_tipo_atendimento",
-          "columns_used": ["co_seq_dim_tipo_atendimento", "co_dim_tipo_atendimento_pai", "LEAF_IDS=2,3,5,6,7"],
-          "signature_fingerprint": "sha256:1765ccc3434d5c489aced6a200c1facf97ffecc97b25dd22ed4929f7ab328aed"
+          "columns_used": ["co_seq_dim_tipo_atendimento", "ds_tipo_atendimento", "co_dim_tipo_atendimento_pai", "LEAF_SEMANTICS=2,3,5,6,7"],
+          "signature_fingerprint": "sha256:0f668936916cf875c0ba6ef2b698d3647d8534fb8ea1ced05bac7907caaa6e1e"
         }
       ],
       "municipal_isolation_evidence": {

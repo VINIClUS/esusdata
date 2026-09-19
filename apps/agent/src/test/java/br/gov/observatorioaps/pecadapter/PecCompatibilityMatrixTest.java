@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -107,5 +108,13 @@ class PecCompatibilityMatrixTest {
                 null, CT133_IDENTITY, catalog, matrix))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Query checksum mismatch");
+    }
+
+    @Test
+    void compatibilityAwareStreamDoesNotExposeAnIdentityFreeOverload() {
+        assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("stream"))
+                .map(java.lang.reflect.Method::getParameterCount))
+                .doesNotContain(6);
     }
 }
