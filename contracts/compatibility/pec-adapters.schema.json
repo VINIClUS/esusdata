@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://observatorio-aps.local/contracts/compatibility/pec-adapters.schema.json",
+  "title": "PEC adapter compatibility matrix",
+  "description": "Schema for contracts/compatibility/pec-adapters.json, per Tech Spec v0.4 §1.6.2. Validated at build time (ENG-43).",
+  "type": "object",
+  "required": ["schema_version", "validation_status", "tested_with"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string" },
+    "validation_status": {
+      "type": "string",
+      "enum": ["NOT_TESTED", "VALIDATED", "BLOCKED"],
+      "description": "Overall document status. Individual capability entries in tested_with carry their own status."
+    },
+    "tested_with": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/testedEntry" }
+    }
+  },
+  "$defs": {
+    "testedEntry": {
+      "type": "object",
+      "required": [
+        "pec_version",
+        "postgresql_version",
+        "adapter_version",
+        "read_model",
+        "installation_role",
+        "capability",
+        "status",
+        "objects_used",
+        "municipal_isolation_evidence",
+        "fixture_checksum",
+        "test_result",
+        "approved_at",
+        "approved_by"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "pec_version": { "type": "string", "description": "Exact PEC version, e.g. 5.4.37. Never a range." },
+        "postgresql_version": { "type": "string", "description": "Exact PostgreSQL version, e.g. 9.6.13. Never a range." },
+        "adapter_version": { "type": "string" },
+        "read_model": { "type": "string", "enum": ["PEC_DW", "PEC_OLTP"] },
+        "installation_role": { "type": "string", "enum": ["PRONTUARIO", "CENTRALIZADOR", "UNKNOWN"] },
+        "capability": { "type": "string", "description": "Adapter capability identifier, e.g. individual_encounter_modality. Not a fixed enum — the spec's capability list is explicitly non-exhaustive." },
+        "status": { "type": "string", "enum": ["NOT_TESTED", "VALIDATED", "BLOCKED"] },
+        "status_reason": { "type": "string", "description": "Required when status is BLOCKED or when a sub-case within the capability is NOT_TESTED." },
+        "objects_used": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["object", "signature_fingerprint"],
+            "properties": {
+              "object": { "type": "string" },
+              "columns_used": { "type": "array", "items": { "type": "string" } },
+              "signature_fingerprint": { "type": "string", "description": "Hash of object name + column names/types + any frozen value-set (e.g. leaf-id list) this capability depends on. A change blocks this capability, per ENG-02." }
+            }
+          }
+        },
+        "municipal_isolation_evidence": {
+          "type": "object",
+          "required": ["binding_column", "mechanism"],
+          "properties": {
+            "binding_column": { "type": "string", "description": "e.g. tb_dim_municipio.co_ibge — never an installation-local surrogate key." },
+            "mechanism": { "type": "string" },
+            "single_municipality_installation": { "type": "boolean" }
+          }
+        },
+        "query_checksum": { "type": "string" },
+        "fixture_checksum": { "type": "string" },
+        "test_result": { "type": "string", "enum": ["PASS", "FAIL", "NOT_RUN"] },
+        "test_evidence_ref": { "type": "string", "description": "Path to the discovery doc or test report backing this entry." },
+        "approved_at": { "type": "string", "format": "date" },
+        "approved_by": { "type": "string" }
+      }
+    }
+  }
+}
