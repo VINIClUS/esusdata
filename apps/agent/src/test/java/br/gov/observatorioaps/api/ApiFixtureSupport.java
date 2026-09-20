@@ -92,9 +92,17 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
      *     mutation bumps it, which would look like an authorization bug rather than a fixture one.
      */
     String sessionCookie(String userId) {
+        return SessionCookie.NAME + "=" + rawSessionToken(userId);
+    }
+
+    /**
+     * @return the raw opaque session token (not the {@code OBS_SESSION=...} cookie header) — for
+     *     tests that need to look up the underlying {@code sessions} row directly, via {@link
+     *     #sha256Hex}.
+     */
+    String rawSessionToken(String userId) {
         long authorizationVersion = userRepository.findById(userId).orElseThrow().authorizationVersion();
-        String rawToken = sessionService.create(userId, authorizationVersion, clock.instant());
-        return SessionCookie.NAME + "=" + rawToken;
+        return sessionService.create(userId, authorizationVersion, clock.instant());
     }
 
     /**
@@ -110,7 +118,7 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
         return SessionCookie.NAME + "=" + rawToken;
     }
 
-    private String sha256Hex(String rawToken) {
+    String sha256Hex(String rawToken) {
         try {
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
             return java.util.HexFormat.of().formatHex(
