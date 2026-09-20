@@ -26,4 +26,13 @@ public record SqliteProperties(String directory) {
     public Path lockFile() {
         return resolvedDirectory().resolve("observatorio.lock");
     }
+
+    /**
+     * Protected extract storage (§1.12.1: "Extratos locais protegidos"). Shares the data
+     * directory's owner-only hardening (applied by {@link SqliteDataSourceConfig}) rather than
+     * introducing a separately configured location — one canonical data root per installation.
+     */
+    public Path extractsDirectory() {
+        return resolvedDirectory().resolve("extracts");
+    }
 }

@@ -28,6 +28,8 @@ import java.time.format.DateTimeParseException;
  */
 public final class C1Rule {
 
+    /** Indicator pack identity — distinct from {@link #RULE_VERSION}, which versions the rule. */
+    public static final String INDICATOR_PACK = "c1-mais-acesso";
     public static final String RULE_VERSION = "c1-mais-acesso@0.1.0";
     public static final String CALCULATION_POLICY_VERSION = "c1-exact-ratio@1";
     public static final String DENOMINATOR_KIND = "PROGRAMADOS_MAIS_ESPONTANEOS";

@@ -45,10 +45,21 @@ class SqliteDataSourceConfigTest {
     }
 
     @Test
-    void startupAssertionPassesAndMigrationRuns() {
+    void startupAssertionPassesAndMigrationRuns() throws Exception {
         var migration = context.getBean(SqliteDataSourceConfig.FlywayMigrationResult.class);
         assertThat(migration.success()).isTrue();
-        assertThat(migration.migrationsExecuted()).isEqualTo(1);
+
+        // Explicit about which versions ran, rather than a bare count — the count alone would
+        // pass just as well if a later migration silently replaced an earlier one.
+        DataSource ds = context.getBean(DataSource.class);
+        try (Connection c = ds.getConnection(); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "select version from flyway_schema_history where success = 1 order by version")) {
+            java.util.List<String> appliedVersions = new java.util.ArrayList<>();
+            while (rs.next()) appliedVersions.add(rs.getString(1));
+            assertThat(appliedVersions).containsExactly("1", "2");
+        }
+        assertThat(migration.migrationsExecuted()).isEqualTo(2);
     }
 
     @Test

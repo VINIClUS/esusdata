@@ -68,4 +68,39 @@ class ModuleBoundaryTest {
                         "br.gov.observatorioaps.sourceconnector..")
                 .check(CLASSES);
     }
+
+    @Test
+    void indicatorEngineAndPacksDoNotDependOnJobRunnerOrResultStore() {
+        noClasses()
+                .that().resideInAnyPackage(
+                        "br.gov.observatorioaps.indicatorengine..",
+                        "br.gov.observatorioaps.indicatorpacks..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "br.gov.observatorioaps.jobrunner..",
+                        "br.gov.observatorioaps.resultstore..")
+                .check(CLASSES);
+    }
+
+    /**
+     * §1.12.1: result-store persists minimal evidence and results, but it is not the PEC
+     * boundary — it must stay readable (history, evidence) with the PEC entirely disconnected,
+     * exactly like extraction-store already is.
+     */
+    @Test
+    void resultStoreDoesNotDependOnPecAdapterOrSourceConnector() {
+        noClasses()
+                .that().resideInAPackage("br.gov.observatorioaps.resultstore..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "br.gov.observatorioaps.pecadapter..",
+                        "br.gov.observatorioaps.sourceconnector..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void indicatorEngineDoesNotDependOnServletApi() {
+        noClasses()
+                .that().resideInAPackage("br.gov.observatorioaps.indicatorengine..")
+                .should().dependOnClassesThat().resideInAnyPackage("jakarta.servlet..")
+                .check(CLASSES);
+    }
 }
