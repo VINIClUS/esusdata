@@ -1,6 +1,7 @@
 package br.gov.observatorioaps.extractionstore;
 
 import br.gov.observatorioaps.sourceconnector.ReadBudget;
+import br.gov.observatorioaps.sourceconnector.PecSourceAcquisition;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -25,6 +26,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HexFormat;
+import java.util.Objects;
 import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 
@@ -59,11 +61,11 @@ public final class ExtractWriter implements AutoCloseable {
     private LocalDate earliestCareDate;
     private LocalDate latestCareDate;
 
-    public ExtractWriter(Path baseDir, String extractionId) throws IOException {
-        this(baseDir, extractionId, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES, null);
+    ExtractWriter(Path baseDir, String extractionId) throws IOException {
+        this(baseDir, extractionId, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES, (ExtractionScope) null);
     }
 
-    public ExtractWriter(Path baseDir, String extractionId, ExtractionScope acquisitionScope)
+    ExtractWriter(Path baseDir, String extractionId, ExtractionScope acquisitionScope)
             throws IOException {
         this(baseDir, extractionId, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES, acquisitionScope);
     }
@@ -72,12 +74,22 @@ public final class ExtractWriter implements AutoCloseable {
      * Opens a bounded temporary extract. The limit applies to compressed bytes on disk, and the
      * constructor also reserves that capacity from the file store before creating the temp file.
      */
-    public ExtractWriter(Path baseDir, String extractionId, long maxTempFileBytes) throws IOException {
-        this(baseDir, extractionId, maxTempFileBytes, null);
+    ExtractWriter(Path baseDir, String extractionId, long maxTempFileBytes) throws IOException {
+        this(baseDir, extractionId, maxTempFileBytes, (ExtractionScope) null);
+    }
+
+    /** Opens a writer bound to the exact source, period, and read policy of one acquisition. */
+    public ExtractWriter(
+            Path baseDir,
+            String extractionId,
+            PecSourceAcquisition acquisition
+    ) throws IOException {
+        this(baseDir, extractionId, Objects.requireNonNull(acquisition, "acquisition is required")
+                .sourceConnection().readBudget().maxTempFileBytes(), scopeFor(acquisition));
     }
 
     /** Opens a bounded temporary extract bound to the source and period authorized for it. */
-    public ExtractWriter(
+    ExtractWriter(
             Path baseDir,
             String extractionId,
             long maxTempFileBytes,
@@ -132,6 +144,13 @@ public final class ExtractWriter implements AutoCloseable {
         }
     }
 
+    private static ExtractionScope scopeFor(PecSourceAcquisition acquisition) {
+        Objects.requireNonNull(acquisition, "acquisition is required");
+        return new ExtractionScope(
+                acquisition.sourceId(), acquisition.municipalityIbge(),
+                acquisition.periodStart().toString(), acquisition.periodEndExclusive().toString());
+    }
+
     public void write(CanonicalEncounter encounter) throws IOException {
         if (closed) throw new IllegalStateException("writer already finalized/closed");
         validateRecordForWrite(encounter);
@@ -149,7 +168,27 @@ public final class ExtractWriter implements AutoCloseable {
      * the data and manifest files. The manifest (the thing {@link ExtractReader} looks for) is
      * never published before the data file it describes is complete and named correctly.
      */
+    /** Finalizes using only the immutable scope captured by the acquisition session. */
     public ExtractionManifest finalizeExtract(
+            Instant startedAt,
+            String sourceZoneId,
+            String queryChecksum,
+            String adapterVersion,
+            String completenessStatus,
+            String consistencyLevel
+    ) throws IOException {
+        if (acquisitionScope == null) {
+            throw new IllegalStateException(
+                    "an acquisition-bound writer is required for public finalization");
+        }
+        return finalizeExtract(
+                acquisitionScope.sourceId(), acquisitionScope.municipalityIbge(),
+                acquisitionScope.periodStart(), acquisitionScope.periodEndExclusive(),
+                startedAt, sourceZoneId, queryChecksum, adapterVersion,
+                completenessStatus, consistencyLevel);
+    }
+
+    ExtractionManifest finalizeExtract(
             String sourceId,
             String municipalityIbge,
             String periodStart,

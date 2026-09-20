@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PecDataSourceFactoryTest {
 
     private static final PecSourceIdentity CT133_IDENTITY =
-            new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO");
+            new PecSourceIdentity("bound-identity-source", "5.4.37", "PEC_DW", "PRONTUARIO");
 
     @Test
     void rawPoolCreationIsNotPublic() throws Exception {
@@ -41,6 +41,15 @@ class PecDataSourceFactoryTest {
     }
 
     @Test
+    void sourceConnectionCreatesAnImmutablePeriodBoundAcquisition() {
+        assertThat(Arrays.stream(PecSourceConnection.class.getDeclaredMethods())
+                .anyMatch(method -> method.getName().equals("acquire")
+                        && method.getReturnType().getName().equals(
+                                "br.gov.observatorioaps.sourceconnector.PecSourceAcquisition")))
+                .isTrue();
+    }
+
+    @Test
     void missingDeploymentIdentityBlocksOpeningBeforeDestinationValidation() {
         var properties = new PecConnectionProperties(
                 "missing-identity-source", "127.0.0.1", 15433,
@@ -52,6 +61,40 @@ class PecDataSourceFactoryTest {
                 properties, null, ReadBudget.initialEngineeringProposal()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("PecSourceIdentity");
+    }
+
+    @Test
+    void identityForAnotherSourceCannotBePairedWithThisSourceProperties() {
+        var properties = new PecConnectionProperties(
+                "source-a", "127.0.0.1", 15433,
+                "esus", "reader", "DB_PASSWORD", "3541307");
+        var factory = new PecDataSourceFactory(
+                new AllowedDestinations(Set.of()), ignored -> "secret".toCharArray());
+
+        assertThatThrownBy(() -> factory.open(
+                properties,
+                new PecSourceIdentity("source-b", "5.4.37", "PEC_DW", "PRONTUARIO"),
+                ReadBudget.initialEngineeringProposal()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not match");
+    }
+
+    @Test
+    void periodAcquisitionCreatesItsGuardFromTheOpenedReadBudget() {
+        var budget = new ReadBudget(
+                1, Duration.ofSeconds(1), Duration.ofSeconds(1),
+                10_000, 10_000, 10_000, 10, 10_000, 10_000, 10_000);
+        var properties = new PecConnectionProperties(
+                "bound-budget-source", "127.0.0.1", 15433,
+                "esus", "reader", "DB_PASSWORD", "3541307");
+        var sourceConnection = PecSourceConnectionTestSupport.bind(
+                Mockito.mock(java.sql.Connection.class), properties,
+                new PecSourceIdentity("bound-budget-source", "5.4.37", "PEC_DW", "PRONTUARIO"), budget);
+
+        var acquisition = sourceConnection.acquire(
+                java.time.LocalDate.of(2026, 3, 1), java.time.LocalDate.of(2026, 4, 1));
+
+        assertThat(acquisition.budgetGuard().budget()).isSameAs(budget);
     }
 
     @Test
@@ -141,10 +184,14 @@ class PecDataSourceFactoryTest {
                 new AllowedDestinations(Set.of()), ignored -> "secret".toCharArray());
 
         assertThatThrownBy(() -> factory.open(
-                properties, CT133_IDENTITY, ReadBudget.initialEngineeringProposal()))
+                properties,
+                new PecSourceIdentity("permit-release-source", "5.4.37", "PEC_DW", "PRONTUARIO"),
+                ReadBudget.initialEngineeringProposal()))
                 .isInstanceOf(AllowedDestinations.DestinationNotAllowedException.class);
         assertThatThrownBy(() -> factory.open(
-                properties, CT133_IDENTITY, ReadBudget.initialEngineeringProposal()))
+                properties,
+                new PecSourceIdentity("permit-release-source", "5.4.37", "PEC_DW", "PRONTUARIO"),
+                ReadBudget.initialEngineeringProposal()))
                 .isInstanceOf(AllowedDestinations.DestinationNotAllowedException.class);
     }
 }

@@ -2,11 +2,15 @@ package br.gov.observatorioaps.sourceconnector;
 
 /** Trusted deployment-supplied identity for the connected PEC source. */
 public record PecSourceIdentity(
+        String sourceId,
         String pecVersion,
         String readModel,
         String installationRole
 ) {
     public PecSourceIdentity {
+        if (sourceId == null || sourceId.isBlank()) {
+            throw new IllegalArgumentException("sourceId must identify the deployment source");
+        }
         if (pecVersion == null || !pecVersion.matches("\\d+\\.\\d+\\.\\d+")) {
             throw new IllegalArgumentException("pecVersion must be an exact semantic PEC version");
         }

@@ -26,6 +26,11 @@ public final class BudgetGuard {
         this.startNanos = System.nanoTime();
     }
 
+    /** The immutable policy this guard enforces. */
+    public ReadBudget budget() {
+        return budget;
+    }
+
     /** Call once per row consumed. Throws {@link SourceBudgetExceededException} on breach. */
     public void onRow() {
         rowCount++;

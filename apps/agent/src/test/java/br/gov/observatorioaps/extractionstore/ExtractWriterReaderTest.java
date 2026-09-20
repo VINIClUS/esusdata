@@ -1,5 +1,9 @@
 package br.gov.observatorioaps.extractionstore;
 
+import br.gov.observatorioaps.sourceconnector.PecSourceAcquisition;
+import br.gov.observatorioaps.sourceconnector.PecSourceConnectionTestSupport;
+import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
+import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -9,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -16,6 +21,52 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ExtractWriterReaderTest {
+
+    @Test
+    void publicWriterApiRequiresAnAcquisitionBoundScope() {
+        assertThat(Arrays.stream(ExtractWriter.class.getConstructors())
+                .anyMatch(constructor -> Arrays.stream(constructor.getParameterTypes())
+                        .anyMatch(type -> type.getName().equals(
+                                "br.gov.observatorioaps.sourceconnector.PecSourceAcquisition"))))
+                .isTrue();
+        assertThat(Arrays.stream(ExtractWriter.class.getConstructors())
+                .noneMatch(constructor -> Arrays.asList(constructor.getParameterTypes())
+                        .contains(ExtractionScope.class)))
+                .isTrue();
+        assertThat(Arrays.stream(ExtractWriter.class.getMethods())
+                .filter(method -> method.getName().equals("finalizeExtract"))
+                .noneMatch(method -> method.getParameterTypes().length > 0
+                        && method.getParameterTypes()[0].equals(String.class)))
+                .isTrue();
+    }
+
+    @Test
+    void acquisitionBoundWriterDerivesItsManifestScopeFromTheSession() throws Exception {
+        var properties = new PecConnectionProperties(
+                "writer-source", "127.0.0.1", 5432,
+                "fixture", "reader", "unused", "3541307");
+        var sourceConnection = PecSourceConnectionTestSupport.bind(
+                org.mockito.Mockito.mock(java.sql.Connection.class), properties,
+                new PecSourceIdentity("writer-source", "5.4.37", "PEC_DW", "PRONTUARIO"));
+        PecSourceAcquisition acquisition = sourceConnection.acquire(
+                java.time.LocalDate.of(2026, 3, 1), java.time.LocalDate.of(2026, 4, 1));
+
+        ExtractionManifest manifest;
+        try (ExtractWriter writer = new ExtractWriter(dir, "ext-session-scope", acquisition)) {
+            writer.write(new CanonicalEncounter(
+                    new SourceRef("writer-source", "tb_fat_atendimento_individual", "1"),
+                    "3541307", "2026-03-15", CanonicalModality.PROGRAMADO,
+                    "2750325", "0000346268", "225142"));
+            manifest = writer.finalizeExtract(
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+
+        assertThat(manifest.sourceId()).isEqualTo("writer-source");
+        assertThat(manifest.municipalityIbge()).isEqualTo("3541307");
+        assertThat(manifest.periodStart()).isEqualTo("2026-03-01");
+        assertThat(manifest.periodEndExclusive()).isEqualTo("2026-04-01");
+    }
 
     @TempDir
     Path dir;

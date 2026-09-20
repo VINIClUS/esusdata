@@ -6,6 +6,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.net.InetAddress;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Objects;
 
 /**
  * The only place in this codebase that assembles a PEC JDBC URL string — always from
@@ -84,6 +85,11 @@ public final class PecDataSourceFactory {
         if (properties == null) {
             throw new IllegalArgumentException("Source connection properties are required");
         }
+        if (!properties.sourceId().equals(sourceIdentity.sourceId())) {
+            throw new IllegalArgumentException(
+                    "PecSourceIdentity sourceId does not match source connection properties");
+        }
+        Objects.requireNonNull(budget, "read budget is required");
         SourceAcquisitionLimiter.Permit permit =
                 SourceAcquisitionLimiter.acquireOrFail(properties.sourceId());
         HikariDataSource dataSource = null;
@@ -91,7 +97,7 @@ public final class PecDataSourceFactory {
         try {
             dataSource = create(properties, budget);
             PecSourceConnection sourceConnection = PecSourceConnection.fromPool(
-                    dataSource, properties, sourceIdentity, permit);
+                    dataSource, properties, sourceIdentity, budget, permit);
             ownershipTransferred = true;
             return sourceConnection;
         } finally {

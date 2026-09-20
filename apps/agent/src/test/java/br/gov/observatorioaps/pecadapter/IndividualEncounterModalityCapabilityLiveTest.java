@@ -60,15 +60,14 @@ class IndividualEncounterModalityCapabilityLiveTest {
 
         PecSourceConnection sourceConnection = factory.open(
                 properties,
-                new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                new PecSourceIdentity("pec-ct133-dev", "5.4.37", "PEC_DW", "PRONTUARIO"),
                 ReadBudget.initialEngineeringProposal());
         List<RawEncounterRecord> records = new ArrayList<>();
         try (sourceConnection) {
-            var guard = new BudgetGuard(ReadBudget.initialEngineeringProposal());
+            var acquisition = sourceConnection.acquire(
+                    LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1));
             IndividualEncounterModalityCapability.stream(
-                    sourceConnection,
-                    LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
-                    guard, records::add);
+                    acquisition, records::add);
         }
 
         long programados = records.stream().filter(r -> r.modality() == EncounterModality.PROGRAMADO).count();

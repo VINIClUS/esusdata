@@ -3,6 +3,7 @@ package br.gov.observatorioaps.pecadapter;
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
+import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
 import br.gov.observatorioaps.sourceconnector.PecSourceConnectionTestSupport;
 import br.gov.observatorioaps.sourceconnector.ReadBudget;
 import org.junit.jupiter.api.Test;
@@ -38,8 +39,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 class IndividualEncounterModalityCapabilityIsolationTest {
 
-    private static final PecSourceIdentity CT133_IDENTITY =
-            new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO");
+    private static final PecSourceIdentity CT133_IDENTITY_A =
+            new PecSourceIdentity("fixture-a", "5.4.37", "PEC_DW", "PRONTUARIO");
+    private static final PecSourceIdentity CT133_IDENTITY_B =
+            new PecSourceIdentity("fixture-b", "5.4.37", "PEC_DW", "PRONTUARIO");
 
     /** postgres:9.6 — matches the real server version this adapter targets (ENG-37). */
     @Container
@@ -60,22 +63,22 @@ class IndividualEncounterModalityCapabilityIsolationTest {
             c.setReadOnly(true);
 
             List<RawEncounterRecord> municipalityA = new ArrayList<>();
-            var guardA = new BudgetGuard(ReadBudget.initialEngineeringProposal());
             var sourceA = new PecConnectionProperties(
                     "fixture-a", "127.0.0.1", 5432, "esus_fixture", "fixture_user", "unused", "1100015");
+            PecSourceConnection sourceConnectionA =
+                    PecSourceConnectionTestSupport.bind(c, sourceA, CT133_IDENTITY_A);
             IndividualEncounterModalityCapability.stream(
-                    PecSourceConnectionTestSupport.bind(c, sourceA, CT133_IDENTITY),
-                    LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
-                    guardA, municipalityA::add, CompatibilityTestCatalog.productionEntry());
+                    sourceConnectionA.acquire(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1)),
+                    municipalityA::add, CompatibilityTestCatalog.productionEntry());
 
             List<RawEncounterRecord> municipalityB = new ArrayList<>();
-            var guardB = new BudgetGuard(ReadBudget.initialEngineeringProposal());
             var sourceB = new PecConnectionProperties(
                     "fixture-b", "127.0.0.1", 5432, "esus_fixture", "fixture_user", "unused", "3550308");
+            PecSourceConnection sourceConnectionB =
+                    PecSourceConnectionTestSupport.bind(c, sourceB, CT133_IDENTITY_B);
             IndividualEncounterModalityCapability.stream(
-                    PecSourceConnectionTestSupport.bind(c, sourceB, CT133_IDENTITY),
-                    LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
-                    guardB, municipalityB::add, CompatibilityTestCatalog.productionEntry());
+                    sourceConnectionB.acquire(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1)),
+                    municipalityB::add, CompatibilityTestCatalog.productionEntry());
 
             // Municipality A: 3 programados (ids 1,3, one more), 2 espontaneos -> 5 total.
             assertThat(municipalityA).hasSize(5);

@@ -12,6 +12,14 @@ public final class PecSourceConnectionTestSupport {
             Connection connection,
             PecConnectionProperties properties,
             PecSourceIdentity sourceIdentity) {
-        return PecSourceConnection.forTest(connection, properties, sourceIdentity);
+        return bind(connection, properties, sourceIdentity, ReadBudget.initialEngineeringProposal());
+    }
+
+    public static PecSourceConnection bind(
+            Connection connection,
+            PecConnectionProperties properties,
+            PecSourceIdentity sourceIdentity,
+            ReadBudget readBudget) {
+        return PecSourceConnection.forTest(connection, properties, sourceIdentity, readBudget);
     }
 }

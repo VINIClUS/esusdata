@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariDataSource;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -22,6 +23,7 @@ public final class PecSourceConnection implements AutoCloseable {
     private final Connection connection;
     private final PecConnectionProperties properties;
     private final PecSourceIdentity sourceIdentity;
+    private final ReadBudget readBudget;
     private final HikariDataSource owningPool;
     private final Runnable releasePermit;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -30,11 +32,13 @@ public final class PecSourceConnection implements AutoCloseable {
             Connection connection,
             PecConnectionProperties properties,
             PecSourceIdentity sourceIdentity,
+            ReadBudget readBudget,
             HikariDataSource owningPool,
             Runnable releasePermit) {
         this.connection = Objects.requireNonNull(connection, "connection is required");
         this.properties = Objects.requireNonNull(properties, "source properties are required");
         this.sourceIdentity = Objects.requireNonNull(sourceIdentity, "source identity is required");
+        this.readBudget = Objects.requireNonNull(readBudget, "read budget is required");
         this.owningPool = owningPool;
         this.releasePermit = releasePermit;
     }
@@ -43,18 +47,23 @@ public final class PecSourceConnection implements AutoCloseable {
             HikariDataSource pool,
             PecConnectionProperties properties,
             PecSourceIdentity sourceIdentity,
+            ReadBudget readBudget,
             SourceAcquisitionLimiter.Permit permit
     ) throws SQLException {
         return new PecSourceConnection(
                 pool.getConnection(), Objects.requireNonNull(properties, "source properties are required"),
                 sourceIdentity,
+                readBudget,
                 pool, permit::close);
     }
 
     /** Test-only binding for fixture connections; not part of the production API. */
     static PecSourceConnection forTest(
-            Connection connection, PecConnectionProperties properties, PecSourceIdentity sourceIdentity) {
-        return new PecSourceConnection(connection, properties, sourceIdentity, null, null);
+            Connection connection,
+            PecConnectionProperties properties,
+            PecSourceIdentity sourceIdentity,
+            ReadBudget readBudget) {
+        return new PecSourceConnection(connection, properties, sourceIdentity, readBudget, null, null);
     }
 
     public Connection jdbcConnection() {
@@ -68,6 +77,16 @@ public final class PecSourceConnection implements AutoCloseable {
     /** The immutable deployment identity validated with this source connection. */
     public PecSourceIdentity sourceIdentity() {
         return sourceIdentity;
+    }
+
+    public ReadBudget readBudget() {
+        return readBudget;
+    }
+
+    /** Starts one immutable period-bound acquisition using this connection's read policy. */
+    public PecSourceAcquisition acquire(LocalDate periodStart, LocalDate periodEndExclusive) {
+        return new PecSourceAcquisition(
+                this, periodStart, periodEndExclusive, new BudgetGuard(readBudget));
     }
 
     /**

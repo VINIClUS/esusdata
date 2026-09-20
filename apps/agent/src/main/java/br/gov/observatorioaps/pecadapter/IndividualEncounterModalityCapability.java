@@ -2,6 +2,7 @@ package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
+import br.gov.observatorioaps.sourceconnector.PecSourceAcquisition;
 import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
@@ -88,13 +89,10 @@ public final class IndividualEncounterModalityCapability {
      * — an unsupported source version or schema fingerprint blocks acquisition (ENG-43).
      */
     public static void stream(
-            PecSourceConnection sourceConnection,
-            LocalDate periodStart,
-            LocalDate periodEndExclusive,
-            BudgetGuard guard,
+            PecSourceAcquisition acquisition,
             Consumer<RawEncounterRecord> consumer
     ) throws SQLException {
-        stream(sourceConnection, periodStart, periodEndExclusive, guard, consumer,
+        stream(acquisition, consumer,
                 new JdbcCompatibilityCatalog());
     }
 
@@ -105,16 +103,17 @@ public final class IndividualEncounterModalityCapability {
      * PEC; validation itself is never bypassed.
      */
     public static void stream(
-            PecSourceConnection sourceConnection,
-            LocalDate periodStart,
-            LocalDate periodEndExclusive,
-            BudgetGuard guard,
+            PecSourceAcquisition acquisition,
             Consumer<RawEncounterRecord> consumer,
             CompatibilityCatalog catalog
     ) throws SQLException {
-        if (sourceConnection == null) {
-            throw new IllegalArgumentException("A source-bound PEC connection is required");
+        if (acquisition == null) {
+            throw new IllegalArgumentException("A source-bound PEC acquisition is required");
         }
+        PecSourceConnection sourceConnection = acquisition.sourceConnection();
+        LocalDate periodStart = acquisition.periodStart();
+        LocalDate periodEndExclusive = acquisition.periodEndExclusive();
+        BudgetGuard guard = acquisition.budgetGuard();
         Connection connection = sourceConnection.jdbcConnection();
         PecConnectionProperties sourceProperties = sourceConnection.properties();
         PecSourceIdentity sourceIdentity = sourceConnection.sourceIdentity();
@@ -264,7 +263,7 @@ public final class IndividualEncounterModalityCapability {
         return sourceProperties.municipalityIbge();
     }
 
-    public static void validateAdapterCompatibility(
+    static void validateAdapterCompatibility(
             Connection connection,
             PecSourceIdentity sourceIdentity,
             CompatibilityCatalog catalog
@@ -273,7 +272,7 @@ public final class IndividualEncounterModalityCapability {
                 PecCompatibilityMatrix.fromClasspathResource());
     }
 
-    public static void validateAdapterCompatibility(
+    static void validateAdapterCompatibility(
             Connection connection,
             PecSourceIdentity sourceIdentity,
             CompatibilityCatalog catalog,

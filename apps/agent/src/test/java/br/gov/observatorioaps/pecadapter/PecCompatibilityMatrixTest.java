@@ -3,9 +3,11 @@ package br.gov.observatorioaps.pecadapter;
 import org.junit.jupiter.api.Test;
 
 import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
+import br.gov.observatorioaps.sourceconnector.PecSourceAcquisition;
 import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import java.sql.Connection;
 import java.nio.charset.StandardCharsets;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -14,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PecCompatibilityMatrixTest {
 
     private static final PecSourceIdentity CT133_IDENTITY =
-            new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO");
+            new PecSourceIdentity("matrix-test", "5.4.37", "PEC_DW", "PRONTUARIO");
 
     @Test
     void loadsTheCompatibilityContractFromTheClasspath() {
@@ -78,7 +80,7 @@ class PecCompatibilityMatrixTest {
                 .hasMessageContaining("exact compatibility entry");
         assertThatThrownBy(() -> matrix.findExact(
                 "individual_encounter_modality", "0.1.0",
-                new PecSourceIdentity("5.4.38", "PEC_DW", "PRONTUARIO"), "9.6.13"))
+                new PecSourceIdentity("matrix-test", "5.4.38", "PEC_DW", "PRONTUARIO"), "9.6.13"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("exact compatibility entry");
     }
@@ -146,7 +148,18 @@ class PecCompatibilityMatrixTest {
     void compatibilityAwareStreamRequiresAConnectionBoundSourceIdentity() {
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
                 .filter(method -> method.getName().equals("stream"))
-                .allMatch(method -> method.getParameterTypes()[0].equals(PecSourceConnection.class)))
+                .allMatch(method -> method.getParameterTypes()[0].equals(PecSourceAcquisition.class)))
+                .isTrue();
+    }
+
+    @Test
+    void rawCompatibilityValidationIsNotAPublicUnboundAcquisitionApi() {
+        assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("validateAdapterCompatibility"))
+                .noneMatch(method -> Modifier.isPublic(method.getModifiers())
+                        && method.getParameterTypes().length > 1
+                        && method.getParameterTypes()[0].equals(Connection.class)
+                        && method.getParameterTypes()[1].equals(PecSourceIdentity.class)))
                 .isTrue();
     }
 }

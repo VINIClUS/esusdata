@@ -18,7 +18,7 @@ class PecAdaptersMatrixConsistencyTest {
         var entry = PecCompatibilityMatrix.fromClasspathResource().findExact(
                 IndividualEncounterModalityCapability.CAPABILITY,
                 IndividualEncounterModalityCapability.ADAPTER_VERSION,
-                new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                new PecSourceIdentity("matrix-test", "5.4.37", "PEC_DW", "PRONTUARIO"),
                 "9.6.13");
 
         assertThat(entry.capability()).isEqualTo("individual_encounter_modality");

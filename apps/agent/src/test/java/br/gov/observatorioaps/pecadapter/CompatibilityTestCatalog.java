@@ -20,7 +20,7 @@ final class CompatibilityTestCatalog implements CompatibilityCatalog {
         var entry = PecCompatibilityMatrix.fromClasspathResource().findExact(
                 IndividualEncounterModalityCapability.CAPABILITY,
                 IndividualEncounterModalityCapability.ADAPTER_VERSION,
-                new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                new PecSourceIdentity("matrix-test", "5.4.37", "PEC_DW", "PRONTUARIO"),
                 "9.6.13");
         return new CompatibilityTestCatalog("9.6.13", entry.objectFingerprints());
     }

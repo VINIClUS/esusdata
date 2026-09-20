@@ -3,7 +3,6 @@ package br.gov.observatorioaps.integration;
 import br.gov.observatorioaps.extractionstore.CanonicalEncounter;
 import br.gov.observatorioaps.extractionstore.CanonicalModality;
 import br.gov.observatorioaps.extractionstore.ExtractReader;
-import br.gov.observatorioaps.extractionstore.ExtractionScope;
 import br.gov.observatorioaps.extractionstore.ExtractWriter;
 import br.gov.observatorioaps.extractionstore.ExtractionManifest;
 import br.gov.observatorioaps.extractionstore.SourceRef;
@@ -14,10 +13,10 @@ import br.gov.observatorioaps.pecadapter.EncounterModality;
 import br.gov.observatorioaps.pecadapter.IndividualEncounterModalityCapability;
 import br.gov.observatorioaps.pecadapter.RawEncounterRecord;
 import br.gov.observatorioaps.sourceconnector.AllowedDestinations;
-import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.EnvFileSecretResolver;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.PecDataSourceFactory;
+import br.gov.observatorioaps.sourceconnector.PecSourceAcquisition;
 import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
 import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import br.gov.observatorioaps.sourceconnector.ReadBudget;
@@ -100,31 +99,33 @@ class Eng19ReproducibilityWithoutPecLiveTest {
 
         Instant startedAt = Instant.now();
         try (PecSourceConnection sourceConnection = factory.open(
-                properties, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"), budget);
-             ExtractWriter writer = new ExtractWriter(
-                     extractDir, extractionId, budget.maxTempFileBytes(),
-                     new ExtractionScope("pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01"))) {
-                var guard = new BudgetGuard(budget);
+                properties,
+                new PecSourceIdentity("pec-ct133-dev", "5.4.37", "PEC_DW", "PRONTUARIO"), budget)) {
+            var acquisition = sourceConnection.acquire(
+                    LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1));
+            try (ExtractWriter writer = new ExtractWriter(
+                    extractDir, extractionId, acquisition)) {
                 IndividualEncounterModalityCapability.stream(
-                        sourceConnection, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), guard,
-                        raw -> writeCanonical(writer, raw));
-            return writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01", startedAt,
-                    "America/Sao_Paulo",
-                    IndividualEncounterModalityCapability.QUERY_CHECKSUM,
-                    "0.1.0", "COMPLETE", "SNAPSHOT");
+                        acquisition, raw -> writeCanonical(writer, acquisition, raw));
+                return writer.finalizeExtract(
+                        startedAt, "America/Sao_Paulo",
+                        IndividualEncounterModalityCapability.QUERY_CHECKSUM,
+                        "0.1.0", "COMPLETE", "SNAPSHOT");
+            }
         }
     }
 
-    private void writeCanonical(ExtractWriter writer, RawEncounterRecord raw) {
+    private void writeCanonical(
+            ExtractWriter writer, PecSourceAcquisition acquisition, RawEncounterRecord raw) {
         CanonicalModality modality = switch (raw.modality()) {
             case PROGRAMADO -> CanonicalModality.PROGRAMADO;
             case ESPONTANEO -> CanonicalModality.ESPONTANEO;
             case UNMAPPED -> CanonicalModality.UNMAPPED;
         };
         CanonicalEncounter canonical = new CanonicalEncounter(
-                new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", String.valueOf(raw.pk())),
-                "3541307", raw.careDate().toString(), modality, raw.cnes(), raw.ine(), raw.cbo());
+                new SourceRef(acquisition.sourceId(), "tb_fat_atendimento_individual", String.valueOf(raw.pk())),
+                acquisition.municipalityIbge(), raw.careDate().toString(), modality,
+                raw.cnes(), raw.ine(), raw.cbo());
         try {
             writer.write(canonical);
         } catch (IOException e) {
