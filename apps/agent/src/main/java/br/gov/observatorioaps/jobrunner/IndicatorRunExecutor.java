@@ -10,6 +10,7 @@ import br.gov.observatorioaps.identityaccess.GrantRevalidator;
 import br.gov.observatorioaps.identityaccess.Permission;
 import br.gov.observatorioaps.indicatorengine.IndicatorResult;
 import br.gov.observatorioaps.indicatorpacks.c1.C1Rule;
+import br.gov.observatorioaps.pecadapter.CompatibilityCatalog;
 import br.gov.observatorioaps.pecadapter.EncounterModality;
 import br.gov.observatorioaps.pecadapter.IndividualEncounterModalityCapability;
 import br.gov.observatorioaps.pecadapter.RawEncounterRecord;
@@ -160,6 +161,19 @@ public final class IndicatorRunExecutor {
      * evidence" code path (the same invariant ENG-19 proves for replay).
      */
     public RunOutcome runLive(RunContext context, CancellationToken cancellation) throws SQLException, IOException {
+        return runLive(context, cancellation, new br.gov.observatorioaps.pecadapter.JdbcCompatibilityCatalog());
+    }
+
+    /**
+     * Same as {@link #runLive(RunContext, CancellationToken)}, with the compatibility catalog
+     * injectable — mirrors {@code IndividualEncounterModalityCapability.stream}'s own seam so a
+     * synthetic PostgreSQL fixture can supply probes for testing without ever weakening the
+     * validation a production run performs (ENG-43: the real {@link
+     * br.gov.observatorioaps.pecadapter.JdbcCompatibilityCatalog} is always what {@link
+     * #runLive(RunContext, CancellationToken)} uses).
+     */
+    RunOutcome runLive(RunContext context, CancellationToken cancellation, CompatibilityCatalog catalog)
+            throws SQLException, IOException {
         requireC1(context);
         grantRevalidator.requireCurrentlyAuthorized(
                 context.idempotencyPrincipal(), context.municipalityIbge(), Permission.RUN_INDICATOR);
@@ -198,7 +212,7 @@ public final class IndicatorRunExecutor {
                 IndividualEncounterModalityCapability.stream(
                         acquisition,
                         raw -> writeCanonical(writer, acquisition, raw),
-                        new br.gov.observatorioaps.pecadapter.JdbcCompatibilityCatalog(),
+                        catalog,
                         cancellation::bindStatement,
                         cancellation::checkCancelled);
                 manifest = writer.finalizeExtract(

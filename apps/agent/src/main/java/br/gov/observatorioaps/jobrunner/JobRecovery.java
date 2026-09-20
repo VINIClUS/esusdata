@@ -80,9 +80,11 @@ public final class JobRecovery {
             boolean retriable = retryPolicy.canRetry(job.attempt(), job.maxAttempts());
             Instant now = clock.instant();
 
-            if (job.sourceId() != null && job.state() == JobState.RUNNING) {
-                // A RUNNING job may have had a live PEC session open; a STAGED job's acquisition
-                // was already closed before staging began, so no guard is needed there.
+            if (!job.isImmutableExtract() && job.state() == JobState.RUNNING) {
+                // A RUNNING LIVE_READ_ONLY job may have had a live PEC session open; an
+                // IMMUTABLE_EXTRACT job never opens one (it only reads a finalized extract file),
+                // and a STAGED job's acquisition was already closed before staging began — neither
+                // needs the guard.
                 acquisitionGuard.block(job.sourceId(), now.plus(liveAcquisitionCooldownMargin),
                         "recovered abandoned RUNNING job " + job.jobId());
             }

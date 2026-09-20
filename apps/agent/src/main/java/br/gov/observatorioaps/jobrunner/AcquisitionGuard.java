@@ -14,11 +14,9 @@ import java.util.Optional;
  * remain able to act, not a guess. {@code IMMUTABLE_EXTRACT} never opens a PEC connection, so it
  * is never subject to this guard.
  *
- * <p><b>Status this phase:</b> {@link JobRecovery} writes the cooldown ({@link #block}); nothing
- * in {@code src/main} calls {@link #requireUnblocked} yet, because {@code LIVE_READ_ONLY}
- * acquisition (the only mode this guard would actually protect) is not implemented — see {@link
- * EnqueueRequest}. The mechanism and its bookkeeping are proven ({@code AcquisitionGuardTest},
- * {@code JobRecoveryTest}); wiring it into a real acquisition path is future work.
+ * <p>{@link JobRecovery} writes the cooldown ({@link #block}) for an abandoned RUNNING {@code
+ * LIVE_READ_ONLY} job; {@link IndicatorRunExecutor#runLive} calls {@link #requireUnblocked} before
+ * opening a PEC connection.
  */
 public final class AcquisitionGuard {
 

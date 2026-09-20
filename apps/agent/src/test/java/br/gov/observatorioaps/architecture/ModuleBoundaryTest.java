@@ -96,6 +96,18 @@ class ModuleBoundaryTest {
                 .check(CLASSES);
     }
 
+    /**
+     * §1.9.4 L365 revalidation at publish time goes through the {@code PublicationAuthorization}
+     * seam defined in resultstore, implemented by identityaccess — never the reverse.
+     */
+    @Test
+    void resultStoreDoesNotDependOnIdentityAccess() {
+        noClasses()
+                .that().resideInAPackage("br.gov.observatorioaps.resultstore..")
+                .should().dependOnClassesThat().resideInAPackage("br.gov.observatorioaps.identityaccess..")
+                .check(CLASSES);
+    }
+
     @Test
     void indicatorEngineDoesNotDependOnServletApi() {
         noClasses()

@@ -69,6 +69,15 @@ final class JobRunnerTestFixture implements AutoCloseable {
     final Clock clock;
 
     JobRunnerTestFixture(Path dataDir, Clock clock) {
+        this(dataDir, clock, null);
+    }
+
+    /**
+     * @param pecDataSourceFactory when non-null, used instead of the default no-destination-
+     *     allowed factory — lets a live-acquisition test point {@code runLive} at a real
+     *     Testcontainers PostgreSQL instance.
+     */
+    JobRunnerTestFixture(Path dataDir, Clock clock, PecDataSourceFactory pecDataSourceFactory) {
         this.clock = clock;
         this.extractsDir = dataDir.resolve("extracts");
 
@@ -95,14 +104,15 @@ final class JobRunnerTestFixture implements AutoCloseable {
         publicationService = new PublicationService(
                 jdbc, transactionTemplate, extractionManifestRepository, reproducibilityCheck,
                 extractsDir, grantRevalidator);
-        // No destination is ever allow-listed here — extract-only tests never call
+        // No destination is ever allow-listed by default — extract-only tests never call
         // PecDataSourceFactory.open, and EnvFileSecretResolver only touches this path lazily,
         // inside resolve(), which live-acquisition tests exercise with their own real secret file.
-        PecDataSourceFactory pecDataSourceFactory = new PecDataSourceFactory(
-                new AllowedDestinations(Set.of()), new EnvFileSecretResolver(dataDir.resolve("unused.env")));
+        PecDataSourceFactory factory = pecDataSourceFactory != null ? pecDataSourceFactory
+                : new PecDataSourceFactory(
+                        new AllowedDestinations(Set.of()), new EnvFileSecretResolver(dataDir.resolve("unused.env")));
         executor = new IndicatorRunExecutor(
                 extractsDir, jobRepository, stagingArea, publicationService, "test-build", clock,
-                grantRevalidator, sourceRepository, pecDataSourceFactory, acquisitionGuard());
+                grantRevalidator, sourceRepository, factory, acquisitionGuard());
     }
 
     JobRecovery jobRecovery() {
