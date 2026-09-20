@@ -96,6 +96,53 @@ class ModuleBoundaryTest {
                 .check(CLASSES);
     }
 
+    /**
+     * §1.9.4 L365 revalidation at publish time goes through the {@code PublicationAuthorization}
+     * seam defined in resultstore, implemented by identityaccess — never the reverse.
+     */
+    @Test
+    void resultStoreDoesNotDependOnIdentityAccess() {
+        noClasses()
+                .that().resideInAPackage("br.gov.observatorioaps.resultstore..")
+                .should().dependOnClassesThat().resideInAPackage("br.gov.observatorioaps.identityaccess..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void resultStoreAndIndicatorPacksDoNotDependOnServletApiOrApiPackage() {
+        noClasses()
+                .that().resideInAnyPackage(
+                        "br.gov.observatorioaps.resultstore..",
+                        "br.gov.observatorioaps.indicatorpacks..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "jakarta.servlet..", "br.gov.observatorioaps.api..")
+                .check(CLASSES);
+    }
+
+    /** {@code api} is the HTTP boundary — it must never reach past jobrunner/resultstore into
+     *  the PEC-facing layers directly (§1.5). */
+    @Test
+    void apiDoesNotDependOnPecAdapterOrSourceConnector() {
+        noClasses()
+                .that().resideInAPackage("br.gov.observatorioaps.api..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "br.gov.observatorioaps.pecadapter..",
+                        "br.gov.observatorioaps.sourceconnector..")
+                .check(CLASSES);
+    }
+
+    /** {@code identityaccess} stays framework-thin — no servlet type, ever. */
+    @Test
+    void identityAccessDoesNotDependOnServletApiOrPecAdapter() {
+        noClasses()
+                .that().resideInAPackage("br.gov.observatorioaps.identityaccess..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "jakarta.servlet..",
+                        "br.gov.observatorioaps.pecadapter..",
+                        "br.gov.observatorioaps.sourceconnector..")
+                .check(CLASSES);
+    }
+
     @Test
     void indicatorEngineDoesNotDependOnServletApi() {
         noClasses()

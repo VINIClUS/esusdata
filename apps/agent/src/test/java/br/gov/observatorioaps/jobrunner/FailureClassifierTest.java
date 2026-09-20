@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
 import java.sql.SQLTransientConnectionException;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -62,6 +63,18 @@ class FailureClassifierTest {
         SQLException busy = new SQLException("[SQLITE_BUSY] database is locked");
         var classification = FailureClassifier.classify(busy);
         assertThat(classification.category()).isEqualTo(FailureClassifier.Category.TRANSIENT);
+    }
+
+    @Test
+    void sourceAcquisitionBlockedIsTransientNotDefinitive() {
+        // Ordinary retry backoff starts far shorter than the ENG-51 cooldown — DEFINITIVE would
+        // fail the job outright the first time the guard is still active on retry, burning the
+        // retry budget on a wait condition instead of a real failure (JobWorker honours
+        // blockedUntil() when scheduling the next attempt).
+        var classification = FailureClassifier.classify(new SourceAcquisitionBlockedException(
+                "source src-1 is on cooldown", Instant.parse("2026-09-20T12:01:05Z")));
+        assertThat(classification.category()).isEqualTo(FailureClassifier.Category.TRANSIENT);
+        assertThat(classification.code()).isEqualTo("SOURCE_ACQUISITION_BLOCKED");
     }
 
     @Test

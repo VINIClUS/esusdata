@@ -46,6 +46,7 @@ public final class PublicationService {
     private final ExtractionManifestRepository extractionManifestRepository;
     private final ReproducibilityCheck reproducibilityCheck;
     private final Path extractsBaseDir;
+    private final PublicationAuthorization publicationAuthorization;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public PublicationService(
@@ -53,12 +54,14 @@ public final class PublicationService {
             TransactionTemplate transactionTemplate,
             ExtractionManifestRepository extractionManifestRepository,
             ReproducibilityCheck reproducibilityCheck,
-            Path extractsBaseDir) {
+            Path extractsBaseDir,
+            PublicationAuthorization publicationAuthorization) {
         this.jdbc = jdbc;
         this.transactionTemplate = transactionTemplate;
         this.extractionManifestRepository = extractionManifestRepository;
         this.reproducibilityCheck = reproducibilityCheck;
         this.extractsBaseDir = extractsBaseDir;
+        this.publicationAuthorization = publicationAuthorization;
     }
 
     public PublicationOutcome publish(PublicationRequest request) {
@@ -68,6 +71,12 @@ public final class PublicationService {
 
         PublicationOutcome outcome = transactionTemplate.execute(status -> {
             StagingSnapshot staging = requireOwnedSealedStaging(request);
+
+            // §1.9.4 L365: revalidated against CURRENT grants, not the session that made the
+            // original request — a revocation since acquisition began must still block this
+            // publish, without erasing any earlier published history.
+            publicationAuthorization.requireStillAuthorized(
+                    request.authorizedPrincipal(), request.authorizedMunicipalityIbge());
 
             if (!extractionManifestRepository.existsById(staging.extractionId())) {
                 extractionManifestRepository.save(request.extractionManifest(),

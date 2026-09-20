@@ -1,5 +1,7 @@
 package br.gov.observatorioaps.jobrunner;
 
+import br.gov.observatorioaps.identityaccess.GrantRevalidationException;
+import br.gov.observatorioaps.resultstore.PublicationAuthorizationRefusedException;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import br.gov.observatorioaps.sourceconnector.AllowedDestinations;
 
@@ -36,6 +38,23 @@ public final class FailureClassifier {
         }
         if (failure instanceof JobCancelledException e) {
             return new Classification(Category.DEFINITIVE, "CANCELLED", e.getMessage());
+        }
+        if (failure instanceof SourceAcquisitionBlockedException e) {
+            // ENG-51 cooldown — TRANSIENT, not DEFINITIVE: retrying immediately would defeat the
+            // guard, so JobWorker.handleFailure schedules the next attempt no earlier than
+            // e.blockedUntil(), never a tight loop against the same cooldown. Classifying this
+            // DEFINITIVE would fail the job outright the moment ordinary retry backoff (starting
+            // at seconds) is shorter than the guard's cooldown (tens of seconds, derived from the
+            // source's own statement/idle-in-transaction timeouts) — burning the job's retry
+            // budget on a wait condition instead of a real failure.
+            return new Classification(Category.TRANSIENT, "SOURCE_ACQUISITION_BLOCKED", e.getMessage());
+        }
+        if (failure instanceof GrantRevalidationException e) {
+            // §1.9.4 L365 — access revoked/blocked since the job was queued; never retried blindly.
+            return new Classification(Category.DEFINITIVE, "ACCESS_REVOKED", e.getMessage());
+        }
+        if (failure instanceof PublicationAuthorizationRefusedException e) {
+            return new Classification(Category.DEFINITIVE, "ACCESS_REVOKED_BEFORE_PUBLICATION", e.getMessage());
         }
         if (failure instanceof IllegalArgumentException e) {
             // Bad job scope, invalid extract record, malformed manifest arguments — never transient.

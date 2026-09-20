@@ -80,16 +80,28 @@ public final class JobRecovery {
             boolean retriable = retryPolicy.canRetry(job.attempt(), job.maxAttempts());
             Instant now = clock.instant();
 
-            if (job.sourceId() != null && job.state() == JobState.RUNNING) {
-                // A RUNNING job may have had a live PEC session open; a STAGED job's acquisition
-                // was already closed before staging began, so no guard is needed there.
-                acquisitionGuard.block(job.sourceId(), now.plus(liveAcquisitionCooldownMargin),
+            Instant blockedUntil = null;
+            if (!job.isImmutableExtract() && job.state() == JobState.RUNNING) {
+                // A RUNNING LIVE_READ_ONLY job may have had a live PEC session open; an
+                // IMMUTABLE_EXTRACT job never opens one (it only reads a finalized extract file),
+                // and a STAGED job's acquisition was already closed before staging began — neither
+                // needs the guard.
+                blockedUntil = now.plus(liveAcquisitionCooldownMargin);
+                acquisitionGuard.block(job.sourceId(), blockedUntil,
                         "recovered abandoned RUNNING job " + job.jobId());
             }
 
             boolean transitioned;
             if (retriable) {
                 Instant nextAttemptAt = retryPolicy.nextAttemptAt(now, job.attempt());
+                if (blockedUntil != null && blockedUntil.isAfter(nextAttemptAt)) {
+                    // Ordinary retry backoff starts far shorter than the cooldown just written
+                    // above — without this, the requeued attempt would fire while still blocked,
+                    // hit AcquisitionGuard, and burn retry budget on a wait condition instead of a
+                    // real failure (the same class of bug JobWorker.handleFailure guards against
+                    // for a live failure discovered at runtime, not at boot).
+                    nextAttemptAt = blockedUntil;
+                }
                 transitioned = jobRepository.requeueAbandoned(job.jobId(), job.state(), nextAttemptAt);
             } else {
                 transitioned = jobRepository.failAbandoned(job.jobId(), job.state(),
@@ -114,6 +126,14 @@ public final class JobRecovery {
                 stagingArea.neutralize(job.stagingId());
             }
             Instant now = clock.instant();
+            if (!job.isImmutableExtract()) {
+                // A CANCEL_REQUESTED LIVE_READ_ONLY job may still have been streaming from
+                // PostgreSQL when this process died — cancellation is cooperative and best-effort
+                // (CancellationToken's own contract), so an abandoned CANCEL_REQUESTED job is no
+                // more provably closed than an abandoned RUNNING one. Same cooldown, same reason.
+                acquisitionGuard.block(job.sourceId(), now.plus(liveAcquisitionCooldownMargin),
+                        "recovered abandoned CANCEL_REQUESTED job " + job.jobId());
+            }
             boolean transitioned = jobRepository.cancelAbandoned(job.jobId(), now);
             if (!transitioned) {
                 status.setRollbackOnly();

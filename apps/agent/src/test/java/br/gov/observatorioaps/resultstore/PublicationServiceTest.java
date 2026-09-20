@@ -64,7 +64,8 @@ class PublicationServiceTest {
                 Instant.EPOCH.toString()));
 
         publicationService = new PublicationService(jdbc, transactionTemplate,
-                extractionManifestRepository, new ReproducibilityCheck(extractsDir), extractsDir);
+                extractionManifestRepository, new ReproducibilityCheck(extractsDir), extractsDir,
+                PublicationAuthorization.allowAll());
     }
 
     @AfterEach
@@ -116,7 +117,7 @@ class PublicationServiceTest {
 
         PublicationOutcome outcome = publicationService.publish(new PublicationRequest(
                 jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now()));
+                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307"));
 
         assertThat(outcome.reproducibilityLevel()).isEqualTo("REPRODUCIBLE");
         assertThat(resultRepository.findByIdInScope(outcome.resultId(), "3541307")).isPresent();
@@ -139,7 +140,7 @@ class PublicationServiceTest {
 
         assertThatThrownBy(() -> publicationService.publish(new PublicationRequest(
                 jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now())))
+                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307")))
                 .isInstanceOf(PublicationRefusedException.class);
 
         assertThat(resultRepository.findPublished("3541307", "c1-mais-acesso", "2026-03")).isEmpty();
@@ -164,7 +165,7 @@ class PublicationServiceTest {
 
         assertThatThrownBy(() -> publicationService.publish(new PublicationRequest(
                 jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now())))
+                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307")))
                 .isInstanceOf(PublicationRefusedException.class);
     }
 
@@ -179,7 +180,7 @@ class PublicationServiceTest {
 
         assertThatThrownBy(() -> publicationService.publish(new PublicationRequest(
                 jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now())))
+                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307")))
                 .isInstanceOf(PublicationRefusedException.class);
 
         // The cancel request is preserved, not silently overwritten by a successful publish.
@@ -198,7 +199,7 @@ class PublicationServiceTest {
 
         PublicationOutcome outcome = publicationService.publish(new PublicationRequest(
                 jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now()));
+                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307"));
 
         assertThat(outcome.reproducibilityLevel()).isEqualTo("NOT_REPRODUCIBLE");
         // §1.9.5: "resultado apontando para arquivo perdido fica indisponível/limitado, nunca

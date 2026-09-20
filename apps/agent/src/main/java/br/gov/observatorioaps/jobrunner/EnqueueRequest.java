@@ -4,10 +4,11 @@ import java.time.Instant;
 
 /**
  * Inputs to create one job. {@code extractionId} present selects {@code IMMUTABLE_EXTRACT}
- * (§1.9.1) — the only acquisition mode this phase implements. {@code LIVE_READ_ONLY} (fresh PEC
- * acquisition from a queued job) is not implemented yet; rejecting a null {@code extractionId}
- * here, at request time, is deliberate — a request for an unsupported mode is refused where it is
- * made, not accepted and left to fail one poll cycle later inside {@code JobWorker}.
+ * (§1.9.1) — replay of an already-finalized extract. {@code extractionId} absent selects {@code
+ * LIVE_READ_ONLY} — a fresh PEC acquisition — and then {@code sourceId} is mandatory, since that
+ * is the only way {@link br.gov.observatorioaps.jobrunner.IndicatorRunExecutor} can reconstruct
+ * which PEC connection to open. A request naming neither is refused here, at request time, not
+ * accepted and left to fail one poll cycle later inside {@code JobWorker}.
  */
 public record EnqueueRequest(
         String jobId,
@@ -27,10 +28,11 @@ public record EnqueueRequest(
         Instant createdAt
 ) {
     public EnqueueRequest {
-        if (extractionId == null || extractionId.isBlank()) {
+        boolean hasExtractionId = extractionId != null && !extractionId.isBlank();
+        boolean hasSourceId = sourceId != null && !sourceId.isBlank();
+        if (!hasExtractionId && !hasSourceId) {
             throw new IllegalArgumentException(
-                    "LIVE_READ_ONLY acquisition is not implemented in this phase — "
-                            + "extractionId (IMMUTABLE_EXTRACT) is required");
+                    "either extractionId (IMMUTABLE_EXTRACT) or sourceId (LIVE_READ_ONLY) is required");
         }
     }
 }

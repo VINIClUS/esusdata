@@ -41,13 +41,26 @@ class JobRepositoryTest {
     }
 
     @Test
-    void enqueueRequestRejectsAMissingExtractionIdAtConstructionTime() {
-        // LIVE_READ_ONLY acquisition is not implemented this phase — a request for it is refused
-        // where it is made, not accepted and left to fail one poll cycle later in JobWorker.
-        assertThatThrownBy(() -> request("job-live", null))
+    void enqueueRequestRejectsNamingNeitherExtractionIdNorSourceId() {
+        // A request naming neither acquisition mode is refused where it is made, not accepted
+        // and left to fail one poll cycle later in JobWorker.
+        assertThatThrownBy(() -> new EnqueueRequest("job-neither", "run-job-neither", "3541307",
+                "c1-mais-acesso", "c1-mais-acesso@0.1.0", "2026-03", 3, null, null,
+                null, null, null, null, null, clock.instant()))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> request("job-live", "  "))
+        assertThatThrownBy(() -> new EnqueueRequest("job-neither", "run-job-neither", "3541307",
+                "c1-mais-acesso", "c1-mais-acesso@0.1.0", "2026-03", 3, "  ", "  ",
+                null, null, null, null, null, clock.instant()))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void enqueueRequestAcceptsSourceIdOnlyForLiveReadOnly() {
+        // extractionId absent + sourceId present selects LIVE_READ_ONLY (§1.9.1) — no longer
+        // refused now that live acquisition is implemented.
+        EnqueueRequest live = request("job-live", null);
+        assertThat(live.sourceId()).isEqualTo("src-1");
+        assertThat(live.extractionId()).isNull();
     }
 
     @Test

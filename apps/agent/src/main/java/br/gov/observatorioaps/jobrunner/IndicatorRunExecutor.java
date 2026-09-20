@@ -1,10 +1,19 @@
 package br.gov.observatorioaps.jobrunner;
 
 import br.gov.observatorioaps.extractionstore.CanonicalEncounter;
+import br.gov.observatorioaps.extractionstore.CanonicalModality;
 import br.gov.observatorioaps.extractionstore.ExtractReader;
+import br.gov.observatorioaps.extractionstore.ExtractWriter;
 import br.gov.observatorioaps.extractionstore.ExtractionManifest;
+import br.gov.observatorioaps.extractionstore.SourceRef;
+import br.gov.observatorioaps.identityaccess.GrantRevalidator;
+import br.gov.observatorioaps.identityaccess.Permission;
 import br.gov.observatorioaps.indicatorengine.IndicatorResult;
 import br.gov.observatorioaps.indicatorpacks.c1.C1Rule;
+import br.gov.observatorioaps.pecadapter.CompatibilityCatalog;
+import br.gov.observatorioaps.pecadapter.EncounterModality;
+import br.gov.observatorioaps.pecadapter.IndividualEncounterModalityCapability;
+import br.gov.observatorioaps.pecadapter.RawEncounterRecord;
 import br.gov.observatorioaps.resultstore.EvidenceEntry;
 import br.gov.observatorioaps.resultstore.InputFingerprint;
 import br.gov.observatorioaps.resultstore.PublicationOutcome;
@@ -12,11 +21,23 @@ import br.gov.observatorioaps.resultstore.PublicationRefusedException;
 import br.gov.observatorioaps.resultstore.PublicationRequest;
 import br.gov.observatorioaps.resultstore.PublicationService;
 import br.gov.observatorioaps.resultstore.ResultStagingArea;
+import br.gov.observatorioaps.resultstore.SourceRecord;
+import br.gov.observatorioaps.resultstore.SourceRepository;
 import br.gov.observatorioaps.resultstore.StagingRequest;
+import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
+import br.gov.observatorioaps.sourceconnector.PecDataSourceFactory;
+import br.gov.observatorioaps.sourceconnector.PecSourceAcquisition;
+import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
+import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
+import br.gov.observatorioaps.sourceconnector.ReadBudget;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,21 +46,22 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 /**
- * Orchestrates one job run over an already-finalized immutable extract: read → compute (C1) →
- * stage → publish. Today this class is C1-specific (the only indicator pack wired into the
- * pilot, §4.5.1) — a second pack would need either a small strategy seam here or its own
- * executor; premature to build before there is a second rule to generalize from.
+ * Orchestrates one job run: read (from an already-finalized extract, or from a fresh PEC
+ * acquisition) → compute (C1) → stage → publish. Today this class is C1-specific (the only
+ * indicator pack wired into the pilot, §4.5.1) — a second pack would need either a small strategy
+ * seam here or its own executor; premature to build before there is a second rule to generalize
+ * from.
  *
  * <p>C1's release gates are not complete (§4.4 Portões A/B/D/E {@code BLOCKED} — Q01 not
  * retrieved), so every result computed here is {@code status=BLOCKED} with exact counts, never a
- * fabricated value. {@link C1Rule#computeEvidenceOnly} is deliberately not used on this path —
- * it exists only to prove reproducibility in tests (ENG-19), not to publish a methodologically
+ * fabricated value. {@link C1Rule#computeEvidenceOnly} is deliberately not used on this path — it
+ * exists only to prove reproducibility in tests (ENG-19), not to publish a methodologically
  * unreleased indicator as if it had passed the gates.
  *
- * <p>{@code LIVE_READ_ONLY} acquisition (opening a fresh PEC connection from a queued job) is out
- * of scope for this phase. This executor only replays an already-finalized
- * {@code IMMUTABLE_EXTRACT}; {@link JobWorker} rejects a job whose {@code extractionId} is absent
- * rather than silently pretending to support live acquisition.
+ * <p>§1.9.4 L365 is checked at the start of BOTH {@link #runFromExtract} and {@link #runLive} —
+ * against the principal's CURRENT grants, not whatever authorized the original HTTP request.
+ * Closing a browser tab or letting the session expire does not cancel an already-authorized job;
+ * only an actual grant/account change does.
  */
 public final class IndicatorRunExecutor {
 
@@ -51,6 +73,7 @@ public final class IndicatorRunExecutor {
     private static final String RESULT_NATURE = "LOCAL_ESTIMATE";
     // C1's release gates (Portões A/B/D/E, §4.4) are not complete — see class javadoc.
     private static final String VALIDATION_STATUS = "NOT_VALIDATED";
+    private static final String SOURCE_ZONE_ID = "America/Sao_Paulo";
 
     private final Path extractsBaseDir;
     private final ExtractReader extractReader = new ExtractReader();
@@ -59,6 +82,11 @@ public final class IndicatorRunExecutor {
     private final PublicationService publicationService;
     private final String appBuild;
     private final Clock clock;
+    private final GrantRevalidator grantRevalidator;
+    private final SourceRepository sourceRepository;
+    private final PecDataSourceFactory pecDataSourceFactory;
+    private final AcquisitionGuard acquisitionGuard;
+    private final Duration liveAcquisitionCooldownMargin;
 
     public IndicatorRunExecutor(
             Path extractsBaseDir,
@@ -66,34 +94,39 @@ public final class IndicatorRunExecutor {
             ResultStagingArea stagingArea,
             PublicationService publicationService,
             String appBuild,
-            Clock clock) {
+            Clock clock,
+            GrantRevalidator grantRevalidator,
+            SourceRepository sourceRepository,
+            PecDataSourceFactory pecDataSourceFactory,
+            AcquisitionGuard acquisitionGuard,
+            Duration liveAcquisitionCooldownMargin) {
         this.extractsBaseDir = extractsBaseDir;
         this.jobRepository = jobRepository;
         this.stagingArea = stagingArea;
         this.publicationService = publicationService;
         this.appBuild = appBuild;
         this.clock = clock;
+        this.grantRevalidator = grantRevalidator;
+        this.sourceRepository = sourceRepository;
+        this.pecDataSourceFactory = pecDataSourceFactory;
+        this.acquisitionGuard = acquisitionGuard;
+        this.liveAcquisitionCooldownMargin = liveAcquisitionCooldownMargin;
     }
 
     public record RunContext(
             String jobId, String runId, String sourceId, long executionGeneration,
             String processInstanceId, String extractionId, String municipalityIbge,
-            String referencePeriod, String indicatorPack, String ruleVersion) {
+            String referencePeriod, String indicatorPack, String ruleVersion,
+            String idempotencyPrincipal) {
     }
 
     public record RunOutcome(String stagingId, String resultId, IndicatorResult result) {
     }
 
     public RunOutcome runFromExtract(RunContext context, CancellationToken cancellation) throws IOException {
-        // This executor only ever computes C1 — reject anything else before doing any I/O rather
-        // than silently publishing a C1 result under a different pack/version's name.
-        if (!C1Rule.INDICATOR_PACK.equals(context.indicatorPack())
-                || !C1Rule.RULE_VERSION.equals(context.ruleVersion())) {
-            throw new IllegalArgumentException(
-                    "job requests " + context.indicatorPack() + "@" + context.ruleVersion()
-                            + " but this executor only computes "
-                            + C1Rule.INDICATOR_PACK + "@" + C1Rule.RULE_VERSION);
-        }
+        requireC1(context);
+        grantRevalidator.requireCurrentlyAuthorized(
+                context.idempotencyPrincipal(), context.municipalityIbge(), Permission.RUN_INDICATOR);
 
         ExtractionManifest manifest = extractReader.readManifest(extractsBaseDir, context.extractionId());
         YearMonth requestedPeriod = YearMonth.parse(context.referencePeriod());
@@ -121,6 +154,118 @@ public final class IndicatorRunExecutor {
         List<CanonicalEncounter> encounters = extractReader.readEncounters(extractsBaseDir, manifest);
         cancellation.checkCancelled();
 
+        return computeStageAndPublish(context, manifest, encounters, cancellation);
+    }
+
+    /**
+     * Acquires directly from the PEC: opens a source-bound connection, streams the frozen
+     * capability query, writes and finalizes a fresh extract, then computes from it exactly like
+     * {@link #runFromExtract} — reading the just-written extract back from disk rather than
+     * keeping the streamed rows in memory, so both paths share one "recompute from durable
+     * evidence" code path (the same invariant ENG-19 proves for replay).
+     */
+    public RunOutcome runLive(RunContext context, CancellationToken cancellation) throws SQLException, IOException {
+        return runLive(context, cancellation, new br.gov.observatorioaps.pecadapter.JdbcCompatibilityCatalog());
+    }
+
+    /**
+     * Same as {@link #runLive(RunContext, CancellationToken)}, with the compatibility catalog
+     * injectable — mirrors {@code IndividualEncounterModalityCapability.stream}'s own seam so a
+     * synthetic PostgreSQL fixture can supply probes for testing without ever weakening the
+     * validation a production run performs (ENG-43: the real {@link
+     * br.gov.observatorioaps.pecadapter.JdbcCompatibilityCatalog} is always what {@link
+     * #runLive(RunContext, CancellationToken)} uses).
+     */
+    RunOutcome runLive(RunContext context, CancellationToken cancellation, CompatibilityCatalog catalog)
+            throws SQLException, IOException {
+        requireC1(context);
+        grantRevalidator.requireCurrentlyAuthorized(
+                context.idempotencyPrincipal(), context.municipalityIbge(), Permission.RUN_INDICATOR);
+
+        SourceRecord source = sourceRepository.findById(context.sourceId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "source " + context.sourceId() + " is not registered"));
+        if (!source.municipalityIbge().equals(context.municipalityIbge())) {
+            throw new IllegalStateException(
+                    "source " + source.id() + " is authorized for municipality "
+                            + source.municipalityIbge() + " but job " + context.jobId()
+                            + " requested municipality " + context.municipalityIbge());
+        }
+        acquisitionGuard.requireUnblocked(context.sourceId());
+
+        PecConnectionProperties properties = new PecConnectionProperties(
+                source.id(), source.host(), source.port(), source.databaseName(),
+                source.dbUser(), source.secretRef(), source.municipalityIbge());
+        PecSourceIdentity sourceIdentity = new PecSourceIdentity(
+                source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole());
+        ReadBudget budget = ReadBudget.initialEngineeringProposal();
+
+        YearMonth requestedPeriod = YearMonth.parse(context.referencePeriod());
+        LocalDate periodStart = requestedPeriod.atDay(1);
+        LocalDate periodEndExclusive = requestedPeriod.plusMonths(1).atDay(1);
+        String extractionId = "live-" + context.jobId() + "-g" + context.executionGeneration();
+
+        Instant startedAt = clock.instant();
+        ExtractionManifest manifest;
+        try (PecSourceConnection sourceConnection =
+                pecDataSourceFactory.open(properties, sourceIdentity, budget)) {
+            jobRepository.markProgress(
+                    context.jobId(), context.processInstanceId(), context.executionGeneration(), clock.instant());
+            PecSourceAcquisition acquisition = sourceConnection.acquire(periodStart, periodEndExclusive);
+            try (ExtractWriter writer = new ExtractWriter(extractsBaseDir, extractionId, acquisition)) {
+                try {
+                    IndividualEncounterModalityCapability.stream(
+                            acquisition,
+                            raw -> writeCanonical(writer, acquisition, raw),
+                            catalog,
+                            cancellation::bindStatement,
+                            cancellation::checkCancelled);
+                } catch (RuntimeException | SQLException uncertainFailure) {
+                    // The read ended abnormally (cancellation, a transient SQL/network error, or a
+                    // local write failure mid-stream) while a statement was bound to this
+                    // connection. Closing the JDBC connection on the way out of this try-with-
+                    // resources block does not prove the PostgreSQL backend actually stopped
+                    // executing: a network partition lets the server keep running until its own
+                    // statement/idle-in-transaction timeouts expire (ENG-51). Block new
+                    // LIVE_READ_ONLY acquisitions on this source for the same timeout-derived
+                    // margin JobRecovery applies to an abandoned RUNNING job, rather than only
+                    // guarding against a process restart.
+                    acquisitionGuard.block(context.sourceId(), clock.instant().plus(liveAcquisitionCooldownMargin),
+                            "job " + context.jobId() + " ended a live acquisition with an uncertain outcome: "
+                                    + uncertainFailure);
+                    throw uncertainFailure;
+                }
+                manifest = writer.finalizeExtract(
+                        startedAt, SOURCE_ZONE_ID, IndividualEncounterModalityCapability.QUERY_CHECKSUM,
+                        IndividualEncounterModalityCapability.ADAPTER_VERSION, "COMPLETE", "SNAPSHOT");
+            }
+        } finally {
+            cancellation.unbindStatement();
+        }
+        jobRepository.markProgress(
+                context.jobId(), context.processInstanceId(), context.executionGeneration(), clock.instant());
+        cancellation.checkCancelled();
+
+        List<CanonicalEncounter> encounters = extractReader.readEncounters(extractsBaseDir, manifest);
+        return computeStageAndPublish(context, manifest, encounters, cancellation);
+    }
+
+    private void requireC1(RunContext context) {
+        // This executor only ever computes C1 — reject anything else before doing any I/O rather
+        // than silently publishing a C1 result under a different pack/version's name.
+        if (!C1Rule.INDICATOR_PACK.equals(context.indicatorPack())
+                || !C1Rule.RULE_VERSION.equals(context.ruleVersion())) {
+            throw new IllegalArgumentException(
+                    "job requests " + context.indicatorPack() + "@" + context.ruleVersion()
+                            + " but this executor only computes "
+                            + C1Rule.INDICATOR_PACK + "@" + C1Rule.RULE_VERSION);
+        }
+    }
+
+    private RunOutcome computeStageAndPublish(
+            RunContext context, ExtractionManifest manifest,
+            List<CanonicalEncounter> encounters, CancellationToken cancellation) {
+        YearMonth requestedPeriod = YearMonth.parse(context.referencePeriod());
         String dataCutoff = requestedPeriod.atEndOfMonth().toString();
         IndicatorResult result = C1Rule.compute(
                 encounters, context.municipalityIbge(), context.referencePeriod(), dataCutoff);
@@ -148,9 +293,27 @@ public final class IndicatorRunExecutor {
         PublicationOutcome outcome = publicationService.publish(new PublicationRequest(
                 context.jobId(), context.runId(), stagingId, context.sourceId(),
                 context.executionGeneration(), context.processInstanceId(), manifest,
-                RESULT_NATURE, VALIDATION_STATUS, appBuild, clock.instant()));
+                RESULT_NATURE, VALIDATION_STATUS, appBuild, clock.instant(),
+                context.idempotencyPrincipal(), context.municipalityIbge()));
 
         return new RunOutcome(stagingId, outcome.resultId(), result);
+    }
+
+    private void writeCanonical(ExtractWriter writer, PecSourceAcquisition acquisition, RawEncounterRecord raw) {
+        CanonicalModality modality = switch (raw.modality()) {
+            case PROGRAMADO -> CanonicalModality.PROGRAMADO;
+            case ESPONTANEO -> CanonicalModality.ESPONTANEO;
+            case UNMAPPED -> CanonicalModality.UNMAPPED;
+        };
+        CanonicalEncounter canonical = new CanonicalEncounter(
+                new SourceRef(acquisition.sourceId(), "tb_fat_atendimento_individual", String.valueOf(raw.pk())),
+                acquisition.municipalityIbge(), raw.careDate().toString(), modality,
+                raw.cnes(), raw.ine(), raw.cbo());
+        try {
+            writer.write(canonical);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String computeInputFingerprint(ExtractionManifest manifest, IndicatorResult result) {
@@ -159,7 +322,8 @@ public final class IndicatorRunExecutor {
         fields.put("municipality_ibge", manifest.municipalityIbge());
         fields.put("extraction_id", manifest.extractionId());
         fields.put("extraction_checksum", manifest.checksum());
-        fields.put("acquisition_plan", "IMMUTABLE_EXTRACT");
+        fields.put("acquisition_plan", manifest.extractionId().startsWith("live-")
+                ? "LIVE_READ_ONLY" : "IMMUTABLE_EXTRACT");
         fields.put("indicator_pack", C1Rule.INDICATOR_PACK);
         fields.put("rule_version", result.ruleVersion());
         fields.put("reference_period", result.referencePeriod());

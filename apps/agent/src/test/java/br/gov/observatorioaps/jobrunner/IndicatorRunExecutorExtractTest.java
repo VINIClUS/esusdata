@@ -1,6 +1,7 @@
 package br.gov.observatorioaps.jobrunner;
 
 import br.gov.observatorioaps.extractionstore.ExtractFixtures;
+import br.gov.observatorioaps.identityaccess.GrantRevalidationException;
 import br.gov.observatorioaps.extractionstore.ExtractionManifest;
 import br.gov.observatorioaps.indicatorengine.IndicatorResult;
 import br.gov.observatorioaps.indicatorpacks.c1.C1Rule;
@@ -38,6 +39,7 @@ class IndicatorRunExecutorExtractTest {
         clock = Clock.fixed(Instant.parse("2026-09-20T12:00:00Z"), ZoneOffset.UTC);
         fixture = new JobRunnerTestFixture(dataDir, clock);
         fixture.registerSource("src-1", "3541307");
+        fixture.registerPrincipal("test-principal", "3541307");
     }
 
     @AfterEach
@@ -54,7 +56,7 @@ class IndicatorRunExecutorExtractTest {
         Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-1", "run-1", "3541307", C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
                 "2026-03", 3, "src-1", manifest.extractionId(),
-                null, null, null, null, null, clock.instant()));
+                "test-principal", null, null, null, null, clock.instant()));
         Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
         assertThat(acquired.jobId()).isEqualTo(job.jobId());
 
@@ -62,7 +64,8 @@ class IndicatorRunExecutorExtractTest {
         var context = new IndicatorRunExecutor.RunContext(
                 acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
                 acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
-                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion());
+                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion(),
+                acquired.idempotencyPrincipal());
         var outcome = fixture.executor.runFromExtract(context, token);
 
         IndicatorResult result = outcome.result();
@@ -108,7 +111,7 @@ class IndicatorRunExecutorExtractTest {
         Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
                 "2026-03", 3, "src-1", manifest.extractionId(),
-                null, null, null, null, null, clock.instant()));
+                "test-principal", null, null, null, null, clock.instant()));
         Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
 
         // The job itself requested the right pack/version — this proves the executor's own check
@@ -117,7 +120,8 @@ class IndicatorRunExecutorExtractTest {
         var mismatchedContext = new IndicatorRunExecutor.RunContext(
                 acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
                 acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
-                acquired.referencePeriod(), "some-other-pack", "some-other-pack@1.0.0");
+                acquired.referencePeriod(), "some-other-pack", "some-other-pack@1.0.0",
+                acquired.idempotencyPrincipal());
 
         assertThatThrownBy(() -> fixture.executor.runFromExtract(mismatchedContext, new CancellationToken()))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -132,13 +136,14 @@ class IndicatorRunExecutorExtractTest {
         Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-1", "run-1", "3541307", C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
                 "2026-03", 3, "src-1", manifest.extractionId(), // job claims src-1, extract is src-2
-                null, null, null, null, null, clock.instant()));
+                "test-principal", null, null, null, null, clock.instant()));
         Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
 
         var context = new IndicatorRunExecutor.RunContext(
                 acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
                 acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
-                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion());
+                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion(),
+                acquired.idempotencyPrincipal());
 
         assertThatThrownBy(() -> fixture.executor.runFromExtract(context, new CancellationToken()))
                 .isInstanceOf(IllegalStateException.class);
@@ -152,13 +157,14 @@ class IndicatorRunExecutorExtractTest {
         Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-1", "run-1", "3541307", C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
                 "2026-03", 3, "src-1", manifest.extractionId(), // job asks for 3541307, extract is 3541001
-                null, null, null, null, null, clock.instant()));
+                "test-principal", null, null, null, null, clock.instant()));
         Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
 
         var context = new IndicatorRunExecutor.RunContext(
                 acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
                 acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
-                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion());
+                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion(),
+                acquired.idempotencyPrincipal());
 
         assertThatThrownBy(() -> fixture.executor.runFromExtract(context, new CancellationToken()))
                 .isInstanceOf(IllegalStateException.class);
@@ -172,15 +178,39 @@ class IndicatorRunExecutorExtractTest {
         Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-1", "run-1", "3541307", C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
                 "2026-03", 3, "src-1", manifest.extractionId(), // job asks for 2026-03, extract is 2026-01
-                null, null, null, null, null, clock.instant()));
+                "test-principal", null, null, null, null, clock.instant()));
         Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
 
         var context = new IndicatorRunExecutor.RunContext(
                 acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
                 acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
-                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion());
+                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion(),
+                acquired.idempotencyPrincipal());
 
         assertThatThrownBy(() -> fixture.executor.runFromExtract(context, new CancellationToken()))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void refusesToRunForAPrincipalWithNoActiveGrant() throws Exception {
+        // §1.9.4 L365: revalidated against CURRENT grants, not a snapshot from enqueue time —
+        // a principal with no active grant at all must never be allowed to acquire or compute.
+        ExtractionManifest manifest = ExtractFixtures.write(
+                fixture.extractsDir, "ext-c1-no-grant", "src-1", "3541307", "2026-03", 7, 3, 2);
+
+        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+                "job-1", "run-1", "3541307", C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
+                "2026-03", 3, "src-1", manifest.extractionId(),
+                "principal-without-grant", null, null, null, null, clock.instant()));
+        Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
+
+        var context = new IndicatorRunExecutor.RunContext(
+                acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
+                acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
+                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion(),
+                acquired.idempotencyPrincipal());
+
+        assertThatThrownBy(() -> fixture.executor.runFromExtract(context, new CancellationToken()))
+                .isInstanceOf(GrantRevalidationException.class);
     }
 }

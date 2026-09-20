@@ -107,6 +107,23 @@ public final class IndividualEncounterModalityCapability {
             Consumer<RawEncounterRecord> consumer,
             CompatibilityCatalog catalog
     ) throws SQLException {
+        stream(acquisition, consumer, catalog, ps -> { }, () -> { });
+    }
+
+    /**
+     * Full form used by a live ({@code LIVE_READ_ONLY}) acquisition: {@code onStatementPrepared}
+     * lets the caller bind the {@link PreparedStatement} to a cooperative cancellation token
+     * (ENG-07: "tentar cancelar statement quando suportado") and {@code cancellationCheck} is
+     * polled once per row. Neither parameter introduces a dependency from this package on {@code
+     * jobrunner} — both are plain functional types the caller supplies.
+     */
+    public static void stream(
+            PecSourceAcquisition acquisition,
+            Consumer<RawEncounterRecord> consumer,
+            CompatibilityCatalog catalog,
+            Consumer<PreparedStatement> onStatementPrepared,
+            Runnable cancellationCheck
+    ) throws SQLException {
         if (acquisition == null) {
             throw new IllegalArgumentException("A source-bound PEC acquisition is required");
         }
@@ -130,9 +147,11 @@ public final class IndividualEncounterModalityCapability {
                 ps.setString(1, municipalityIbge);
                 ps.setDate(2, Date.valueOf(periodStart));
                 ps.setDate(3, Date.valueOf(periodEndExclusive));
+                onStatementPrepared.accept(ps);
 
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
+                        cancellationCheck.run();
                         guard.onRow();
                         LocalDate careDate = rs.getDate(3).toLocalDate();
                         guard.onPayloadBytes(fixedPayloadBytes(careDate));

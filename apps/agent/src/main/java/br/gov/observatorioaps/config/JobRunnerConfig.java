@@ -1,5 +1,6 @@
 package br.gov.observatorioaps.config;
 
+import br.gov.observatorioaps.identityaccess.GrantRevalidator;
 import br.gov.observatorioaps.jobrunner.AcquisitionGuard;
 import br.gov.observatorioaps.jobrunner.CancellationRegistry;
 import br.gov.observatorioaps.jobrunner.IdempotencyResolver;
@@ -15,10 +16,15 @@ import br.gov.observatorioaps.resultstore.ReproducibilityCheck;
 import br.gov.observatorioaps.resultstore.ResultRepository;
 import br.gov.observatorioaps.resultstore.ResultStagingArea;
 import br.gov.observatorioaps.resultstore.SourceRepository;
+import br.gov.observatorioaps.sourceconnector.AllowedDestinations;
+import br.gov.observatorioaps.sourceconnector.EnvFileSecretResolver;
+import br.gov.observatorioaps.sourceconnector.PecDataSourceFactory;
+import br.gov.observatorioaps.sourceconnector.PecSecretResolver;
 import br.gov.observatorioaps.sourceconnector.ReadBudget;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.context.annotation.Bean;
@@ -26,8 +32,12 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -37,6 +47,7 @@ import java.util.UUID;
  * accepted (§1.12.2).
  */
 @Configuration
+@EnableConfigurationProperties(SourceConnectionProperties.class)
 public class JobRunnerConfig {
 
     private static final Logger log = LoggerFactory.getLogger(JobRunnerConfig.class);
@@ -55,6 +66,52 @@ public class JobRunnerConfig {
     @Bean
     public TransactionTemplate sqliteTransactionTemplate(DataSourceTransactionManager sqliteTransactionManager) {
         return new TransactionTemplate(sqliteTransactionManager);
+    }
+
+    // --- sourceconnector (wiring only — the classes themselves stay framework-free) --------
+
+    /**
+     * §1.12.6/ENG-46: deployment-administered, never widened by a runtime call. Empty by default
+     * — a fresh install authorizes no destination until an operator configures
+     * {@code observatorio.source.allowed-destinations} (a list of {@code "host:port"} entries).
+     */
+    @Bean
+    public AllowedDestinations allowedDestinations(SourceConnectionProperties properties) {
+        Set<AllowedDestinations.HostPort> parsed = new HashSet<>();
+        for (String entry : orEmpty(properties.allowedDestinations())) {
+            int colon = entry.lastIndexOf(':');
+            if (colon <= 0 || colon == entry.length() - 1) {
+                throw new IllegalArgumentException(
+                        "observatorio.source.allowed-destinations entry must be host:port, got: " + entry);
+            }
+            String host = entry.substring(0, colon);
+            int port = Integer.parseInt(entry.substring(colon + 1));
+            parsed.add(new AllowedDestinations.HostPort(host, port));
+        }
+        return new AllowedDestinations(parsed);
+    }
+
+    /**
+     * Dev-only credential resolver (ADR-0002/0003) — the same env-file convention already used by
+     * the live PEC tests. Production secret storage remains a documented pending item (§1.12.7).
+     */
+    @Bean
+    public PecSecretResolver pecSecretResolver(SourceConnectionProperties properties) {
+        String configured = properties.secretFile();
+        Path secretFile = (configured == null || configured.isBlank())
+                ? Path.of(System.getProperty("user.home"), ".config", "observatorio-aps", "pec.env")
+                : Path.of(configured);
+        return new EnvFileSecretResolver(secretFile);
+    }
+
+    @Bean
+    public PecDataSourceFactory pecDataSourceFactory(
+            AllowedDestinations allowedDestinations, PecSecretResolver pecSecretResolver) {
+        return new PecDataSourceFactory(allowedDestinations, pecSecretResolver);
+    }
+
+    private static List<String> orEmpty(List<String> list) {
+        return list == null ? List.of() : list;
     }
 
     // --- resultstore -----------------------------------------------------------------------
@@ -89,9 +146,11 @@ public class JobRunnerConfig {
             TransactionTemplate sqliteTransactionTemplate,
             ExtractionManifestRepository extractionManifestRepository,
             ReproducibilityCheck reproducibilityCheck,
-            SqliteProperties properties) {
+            SqliteProperties properties,
+            GrantRevalidator grantRevalidator) {
         return new PublicationService(sqliteJdbcTemplate, sqliteTransactionTemplate,
-                extractionManifestRepository, reproducibilityCheck, properties.extractsDirectory());
+                extractionManifestRepository, reproducibilityCheck, properties.extractsDirectory(),
+                grantRevalidator);
     }
 
     @Bean
@@ -163,9 +222,14 @@ public class JobRunnerConfig {
 
     /**
      * Runs boot-time recovery eagerly, as a side effect of bean creation — before {@link
-     * JobWorker#start()} can ever run (Spring starts {@code SmartLifecycle} beans only after the
-     * context has finished refreshing, i.e. after every {@code @Bean} factory method here has
-     * already returned).
+     * JobWorker#start()} (or any HTTP request) can ever run. {@code finishBeanFactoryInitialization}
+     * (where every plain {@code @Bean} factory method, including this one, executes) always
+     * completes before {@code finishRefresh} starts {@code SmartLifecycle} beans — and Boot's
+     * embedded Tomcat only starts ACCEPTING connections from its own {@code SmartLifecycle}
+     * ({@code WebServerStartStopLifecycle}), not from context creation. So recovery finishing
+     * before the first HTTP byte is ever processed is a property of Spring's own initialization
+     * order, not a mechanism this class has to build — {@code ReadinessGateTest} documents and
+     * protects that ordering rather than gating anything itself.
      */
     @Bean
     @DependsOn({"flywayMigration", "jobRepository"})
@@ -183,9 +247,15 @@ public class JobRunnerConfig {
             ResultStagingArea resultStagingArea,
             PublicationService publicationService,
             @Value("${observatorio.app.build:dev}") String appBuild,
-            Clock clock) {
+            Clock clock,
+            GrantRevalidator grantRevalidator,
+            SourceRepository sourceRepository,
+            PecDataSourceFactory pecDataSourceFactory,
+            AcquisitionGuard acquisitionGuard,
+            Duration liveAcquisitionCooldownMargin) {
         return new IndicatorRunExecutor(properties.extractsDirectory(), jobRepository,
-                resultStagingArea, publicationService, appBuild, clock);
+                resultStagingArea, publicationService, appBuild, clock, grantRevalidator,
+                sourceRepository, pecDataSourceFactory, acquisitionGuard, liveAcquisitionCooldownMargin);
     }
 
     // JobWorker implements SmartLifecycle — Spring's lifecycle processor calls start()/stop()

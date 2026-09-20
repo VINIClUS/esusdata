@@ -1,8 +1,19 @@
 package br.gov.observatorioaps.jobrunner;
 
+import java.time.Instant;
+
 /** A source is on cooldown after an abandoned live acquisition (ENG-51). */
 public final class SourceAcquisitionBlockedException extends RuntimeException {
-    public SourceAcquisitionBlockedException(String message) {
+
+    private final Instant blockedUntil;
+
+    public SourceAcquisitionBlockedException(String message, Instant blockedUntil) {
         super(message);
+        this.blockedUntil = blockedUntil;
+    }
+
+    /** When the cooldown this exception was thrown for actually lifts — never before this instant. */
+    public Instant blockedUntil() {
+        return blockedUntil;
     }
 }

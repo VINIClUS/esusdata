@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -87,6 +88,11 @@ class JobRecoveryTest {
         assertThat(recovered.executionGeneration()).isEqualTo(2);
         assertThat(recovered.processInstanceId()).isNull();
         assertThat(recovered.nextAttemptAt()).isNotNull();
+        // Ordinary retry backoff (fixture: base 1ms) is far shorter than the cooldown just
+        // written to the guard (fixture: 1 minute) — the requeued attempt must not be scheduled
+        // to fire while the source is still blocked.
+        assertThat(recovered.nextAttemptAt())
+                .isAfterOrEqualTo(clock.instant().plus(fixture.liveAcquisitionCooldownMargin));
 
         assertThatThrownBy(() -> fixture.acquisitionGuard().requireUnblocked("src-1"))
                 .isInstanceOf(SourceAcquisitionBlockedException.class);
@@ -147,6 +153,35 @@ class JobRecoveryTest {
         Job recovered = fixture.jobRepository.findById("job-4").orElseThrow();
         assertThat(recovered.state()).isEqualTo(JobState.CANCELLED);
         assertThat(recovered.finishedAt()).isNotNull();
+
+        // Cancellation is cooperative/best-effort (CancellationToken's own contract) — this
+        // process died before ever observing the cancel, so the abandoned live session is exactly
+        // as unproven-closed as an abandoned RUNNING one, and must be guarded the same way.
+        assertThatThrownBy(() -> fixture.acquisitionGuard().requireUnblocked("src-1"))
+                .isInstanceOf(SourceAcquisitionBlockedException.class);
+    }
+
+    @Test
+    void abandonedRunningImmutableExtractJobDoesNotGuardTheSource() throws Exception {
+        // A RUNNING job with extraction_id set never opened a PEC connection at all — blocking
+        // the source's next LIVE_READ_ONLY acquisition on its account would be pure cost, no
+        // safety benefit (ENG-51 only protects an abandoned *live* session).
+        ExtractionManifest manifest = ExtractFixtures.write(
+                fixture.extractsDir, "ext-job-6", "src-1", "3541307", "2026-03", 5, 5, 0);
+        fixture.jdbc.update("""
+                INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
+                    reference_period, state, attempt, max_attempts, process_instance_id,
+                    execution_generation, created_at, started_at, source_id, extraction_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, "job-6", "run-job-6", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
+                "2026-03", "RUNNING", 1, 3, "proc-old", 1, clock.instant().toString(),
+                clock.instant().toString(), "src-1", manifest.extractionId());
+
+        var report = fixture.jobRecovery().reconcile("proc-new");
+        assertThat(report.requeued()).isEqualTo(1);
+
+        assertThatCode(() -> fixture.acquisitionGuard().requireUnblocked("src-1"))
+                .doesNotThrowAnyException();
     }
 
     @Test
