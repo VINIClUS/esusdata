@@ -5,8 +5,9 @@
 > data — não foi reescrito. O que a época chamava de "Fases 7–9" avançou substancialmente desde
 > então, na "Fase 3" da Tech Spec, entregue em fatias (`feat/observatorio-aps-mvp` e
 > `fase3/fatia-{a,b,c,d}`, PRs #4–#6 e adiante): `job-runner`/`result-store` completos,
-> `identity-access` completo (bootstrap, sessão, RBAC), e a superfície REST + SSE inteira
-> (`/api/v1/*`, incluindo administração de usuários/concessões e `GET /runs/{id}/events`). Os
+> `identity-access` completo (bootstrap, sessão, RBAC), e a superfície REST + SSE prevista para a
+> Fase 3 (as rotas registradas estão em `/api/v1/*`, incluindo administração de usuários/concessões
+> e `GET /runs/{id}/events`; importações/exportações continuam não implementadas). Os
 > itens de `NOT_IMPLEMENTED` no §9 e os passos 2–7 do §15 abaixo estão desatualizados por essa
 > razão — ver `docs/adr/0008-superficie-http-de-autenticacao.md` (decisões da superfície HTTP) e
 > `contracts/openapi/observatorio-v1.yaml` (contrato de rotas, verificado por `OpenApiContractTest`)
@@ -230,8 +231,10 @@ desta entrega (I1–I7, C2–C7, VAT, IGM).
 - ~~**identity-access**: autenticação, sessão, bootstrap do primeiro admin, RBAC.~~ **Implementado**:
   `BootstrapActivation`, `SessionService` (dois relógios de expiração independentes),
   `ScopeResolver`/RBAC municipal+CNES/INE (ADR 0007).
-- ~~**API REST / SSE** (`/api/v1/*` inteiro).~~ **Implementado**: ver
-  `contracts/openapi/observatorio-v1.yaml` e `docs/adr/0008-superficie-http-de-autenticacao.md`.
+- ~~**API REST / SSE** (superfície prevista para a Fase 3).~~ **Implementado para as rotas
+  registradas**: ver `contracts/openapi/observatorio-v1.yaml` e
+  `docs/adr/0008-superficie-http-de-autenticacao.md`; importações/exportações da Tech Spec seguem
+  não implementadas.
 - **UI** (frontend não iniciado — `apps/web` é um diretório vazio) — continua não implementado.
 - **audit-operations**, **quality-rules**, **external-data**: nenhum código.
 - **evidência mínima persistida** — ENG-19 prova valor/numerador/denominador/classificação

@@ -121,8 +121,14 @@ class LoginThrottleTest {
             recordFailures("user-" + account, "203.0.113.1", 4);
         }
 
-        assertThatThrownBy(() -> throttle.checkAllowed("user-999", "203.0.113.1", now))
-                .isInstanceOf(LoginThrottle.LoginThrottledException.class);
+        LoginThrottle.LoginThrottledException thrown = catchThrottled(() ->
+                throttle.checkAllowed("user-999", "203.0.113.1", now));
+
+        assertThat(thrown.retryAfter())
+                .isBeforeOrEqualTo(now.plus(Duration.ofMinutes(properties.throttleCeilingMinutes())));
+        assertThatCode(() -> throttle.checkAllowed(
+                "user-999", "203.0.113.1", thrown.retryAfter().plusSeconds(1)))
+                .doesNotThrowAnyException();
     }
 
     @Test

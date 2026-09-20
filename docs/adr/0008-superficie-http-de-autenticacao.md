@@ -4,13 +4,13 @@
 Accepted
 
 ## Contexto
-A Tech Spec define o **domínio** (papéis, permissões, ciclo de vida de sessão, taxonomia de erro
-de execução — §1.10, §1.12.6, §1.12.7) mas não define a **superfície HTTP** que o expõe: não há
-rotas de login/logout, não há rota de ativação do bootstrap, não há rota de administração de
-usuários/concessões, não há transporte de CSRF, e não há forma de acompanhar uma execução em
-andamento além de "consultar o job" (§1.10 L397). Cada uma dessas lacunas precisou de uma decisão
-de projeto para o piloto ser operável — este ADR reúne todas, para que nenhuma seja lida como
-exigência normativa da spec.
+A Tech Spec define o **domínio** e uma API proposta (§1.10 L383–409): fontes, catálogo de
+indicadores, execuções, SSE, resultados e evidências. Ela também deixa alguns detalhes de
+implementação em aberto e só expõe importações/exportações quando esses fluxos existirem. Não há
+rotas de login/logout, ativação do bootstrap ou administração de usuários/concessões, nem
+transporte de CSRF. Os códigos além de 202/404, a forma de autenticar e a forma de obter a sessão
+precisaram de decisões de projeto para o piloto ser operável — este ADR reúne essas decisões para
+que nenhuma seja lida como exigência normativa da spec.
 
 (O nome do arquivo permanece "autenticação" por razão histórica — cinco arquivos de código já
 o referenciam literalmente antes deste ADR existir; o escopo real, como o título acima deixa
@@ -24,7 +24,11 @@ administração, o único usuário que existe após a instalação não pode dis
 
 ## Decisão
 
-### 1. Rotas — nenhuma exigida pela spec, todas decisão de projeto
+### 1. Rotas — a spec define o núcleo de dados; este ADR define a superfície de suporte
+As rotas do núcleo seguem a tabela da §1.10 da Tech Spec: `POST /sources`, `POST
+/sources/{id}/test`, `GET /indicator-packs`, `POST /runs`, `GET /runs/{id}`, `GET
+/runs/{id}/events`, `POST /runs/{id}/cancel`, `GET /results` e `GET /results/{id}/evidence`.
+As rotas abaixo são decisões adicionais desta implementação:
 | Rota | Motivo |
 |---|---|
 | `GET /api/v1/ready` | `permitAll`; também a forma do cliente obter o cookie `XSRF-TOKEN` antes de qualquer chamada que muda estado. |
@@ -34,8 +38,9 @@ administração, o único usuário que existe após a instalação não pode dis
 | `GET /api/v1/runs/{id}/events` (SSE) | Ver seção 4. |
 
 ### 2. Códigos HTTP além de 202/404
-A spec (§1.10 L399) só fixa 202 (aceito) e a regra dos 404 idênticos (§1.10.1 L403). Todo outro
-código é decisão de projeto:
+A spec (§1.10 L399) fixa 202 (aceito) e a regra dos 404 idênticos (§1.10.1 L403). O contrato
+OpenAPI registra também os sucessos 200, 201 e 204 usados pelas rotas implementadas; os códigos
+abaixo são decisões de projeto para erros e controles que a spec não normatiza:
 - `400` — campo obrigatório ausente ou malformado (`BAD_REQUEST`), senha fraca
   (`WEAK_PASSWORD`), token de ativação inválido (`ACTIVATION_FAILED`), cursor de evidência
   malformado (`INVALID_CURSOR`).

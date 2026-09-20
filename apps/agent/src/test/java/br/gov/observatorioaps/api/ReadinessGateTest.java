@@ -1,20 +1,40 @@
 package br.gov.observatorioaps.api;
 
 import br.gov.observatorioaps.indicatorpacks.c1.C1Rule;
+import br.gov.observatorioaps.jobrunner.AcquisitionGuard;
+import br.gov.observatorioaps.jobrunner.JobRecovery;
+import br.gov.observatorioaps.jobrunner.JobRepository;
+import br.gov.observatorioaps.jobrunner.RetryPolicy;
+import br.gov.observatorioaps.resultstore.ResultStagingArea;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.sqlite.SQLiteDataSource;
+import org.mockito.Mockito;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,6 +58,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * had not genuinely completed synchronously during boot, the job would still read {@code RUNNING}.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@Import(ReadinessGateTest.RecoveryProbeConfiguration.class)
 class ReadinessGateTest extends SecuritySliceTestSupport {
 
     @Autowired
@@ -46,6 +67,47 @@ class ReadinessGateTest extends SecuritySliceTestSupport {
     private static final String MUNICIPALITY = "3541307";
     private static final String STALE_JOB_ID = "job-" + UUID.randomUUID();
     private static final String SOURCE_ID = "src-" + UUID.randomUUID();
+    private static final Duration READINESS_PROBE_WINDOW = Duration.ofSeconds(2);
+    private static final CountDownLatch READINESS_PROBE_FINISHED = new CountDownLatch(1);
+    private static final AtomicReference<Integer> EARLY_READY_STATUS = new AtomicReference<>();
+
+    /**
+     * Replaces the injected JobRecovery candidate with a spy that keeps the real recovery call
+     * behind a controllable probe. The probe runs concurrently with bean creation, while the
+     * application is still unable to serve traffic; if recovery ever becomes asynchronous, the
+     * probe can observe a premature 200 from /ready before the real recovery call is released.
+     */
+    @TestConfiguration(proxyBeanMethods = false)
+    static class RecoveryProbeConfiguration {
+
+        @Bean
+        @Primary
+        JobRecovery recoveryProbe(
+                JobRepository jobRepository,
+                TransactionTemplate sqliteTransactionTemplate,
+                ResultStagingArea resultStagingArea,
+                AcquisitionGuard acquisitionGuard,
+                RetryPolicy retryPolicy,
+                Clock clock,
+                Duration liveAcquisitionCooldownMargin) {
+            JobRecovery delegate = new JobRecovery(
+                    jobRepository, sqliteTransactionTemplate, resultStagingArea, acquisitionGuard,
+                    retryPolicy, clock, liveAcquisitionCooldownMargin);
+            JobRecovery probe = Mockito.spy(delegate);
+            Mockito.doAnswer(invocation -> {
+                Thread readinessProbe = new Thread(
+                        ReadinessGateTest::probeReadinessWhileRecoveryIsBlocked,
+                        "readiness-gate-probe");
+                readinessProbe.start();
+                if (!READINESS_PROBE_FINISHED.await(
+                        READINESS_PROBE_WINDOW.plusSeconds(1).toMillis(), TimeUnit.MILLISECONDS)) {
+                    throw new IllegalStateException("readiness probe did not finish while recovery was blocked");
+                }
+                return invocation.callRealMethod();
+            }).when(probe).reconcile(Mockito.anyString());
+            return probe;
+        }
+    }
 
     @DynamicPropertySource
     static void seedAStaleRunningJobBeforeTheRealContextStarts(DynamicPropertyRegistry registry) throws Exception {
@@ -75,11 +137,16 @@ class ReadinessGateTest extends SecuritySliceTestSupport {
     }
 
     @Test
-    void aJobAbandonedByAPreviousBootIsAlreadyRecoveredByTheTimeTheApplicationIsReady() {
-        // No polling, no sleep: by the time this test method runs at all, @SpringBootTest's
-        // context.refresh() has already returned and Tomcat is already listening on PORT — both
-        // strictly after jobRecoveryReport's bean method ran. If that ordering were ever broken,
-        // this job would still read RUNNING here.
+    void aJobAbandonedByAPreviousBootIsAlreadyRecoveredByTheTimeTheApplicationIsReady()
+            throws InterruptedException {
+        assertThat(READINESS_PROBE_FINISHED.await(1, TimeUnit.SECONDS))
+                .as("the recovery probe must run during context initialization")
+                .isTrue();
+        Integer earlyReadyStatus = EARLY_READY_STATUS.get();
+        assertThat(earlyReadyStatus == null || earlyReadyStatus != 200)
+                .as("/ready must not answer 200 while boot recovery is blocked")
+                .isTrue();
+
         String state = jdbc.queryForObject(
                 "select state from jobs where job_id = ?", String.class, STALE_JOB_ID);
 
@@ -87,5 +154,35 @@ class ReadinessGateTest extends SecuritySliceTestSupport {
         assertThat(jdbc.queryForObject(
                 "select process_instance_id from jobs where job_id = ?", String.class, STALE_JOB_ID))
                 .isNull();
+    }
+
+    private static void probeReadinessWhileRecoveryIsBlocked() {
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(100))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                .GET()
+                .build();
+        long deadline = System.nanoTime() + READINESS_PROBE_WINDOW.toNanos();
+        try {
+            while (System.nanoTime() < deadline) {
+                try {
+                    HttpResponse<String> response = client.send(
+                            request, HttpResponse.BodyHandlers.ofString());
+                    EARLY_READY_STATUS.set(response.statusCode());
+                    return;
+                } catch (java.io.IOException ignored) {
+                    // A closed port is expected while synchronous recovery holds context refresh.
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                Thread.sleep(25);
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        } finally {
+            READINESS_PROBE_FINISHED.countDown();
+        }
     }
 }

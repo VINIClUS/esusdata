@@ -9,7 +9,7 @@ info:
     Routes and status codes beyond those the Tech Spec itself specifies (the whole /api/v1/auth/*
     and /api/v1/ready surface, the /api/v1/users/* administration routes, and every HTTP status
     code that is not explicitly 202/404 in §1.10) are PROJECT DECISIONS, documented in
-    docs/adr/0008-superficie-http-de-autenticacao-e-administracao.md — never spec requirements.
+    docs/adr/0008-superficie-http-de-autenticacao.md — never spec requirements.
 security:
   - sessionCookie: []
 tags:
@@ -43,7 +43,9 @@ paths:
     post:
       tags: [auth]
       summary: Authenticate with username and password; sets the OBS_SESSION cookie.
-      security: []
+      security:
+        - csrfCookie: []
+          csrfHeader: []
       requestBody:
         required: true
         content:
@@ -77,6 +79,10 @@ paths:
     post:
       tags: [auth]
       summary: End the current session; clears the OBS_SESSION cookie.
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
       responses:
         "204":
           description: Logged out.
@@ -96,7 +102,9 @@ paths:
     post:
       tags: [auth]
       summary: Redeem a one-time activation token and set an initial password.
-      security: []
+      security:
+        - csrfCookie: []
+          csrfHeader: []
       requestBody:
         required: true
         content:
@@ -117,6 +125,10 @@ paths:
       summary: >-
         Re-verify the current password (§1.12.7 L539). Opens a short window in which
         MANAGE_ACCESS/MANAGE_SOURCE mutations are permitted.
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
       requestBody:
         required: true
         content:
@@ -135,6 +147,10 @@ paths:
     post:
       tags: [admin]
       summary: Provision a new user account (MANAGE_ACCESS, installation scope, + recent reauth).
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
       requestBody:
         required: true
         content:
@@ -165,6 +181,10 @@ paths:
       summary: >-
         Grant a role/scope to a user. Bumps the target's authorization_version and revokes all of
         their active sessions unconditionally (§1.12.7 L541).
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
       parameters:
         - $ref: "#/components/parameters/UserId"
       requestBody:
@@ -197,6 +217,10 @@ paths:
       summary: >-
         Revoke a grant. Bumps the target's authorization_version and revokes all of their active
         sessions unconditionally (§1.12.7 L541).
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
       parameters:
         - $ref: "#/components/parameters/UserId"
         - name: grantId
@@ -220,6 +244,10 @@ paths:
       summary: >-
         Block a user account. Bumps authorization_version and revokes all active sessions
         unconditionally (§1.12.7 L541).
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
       parameters:
         - $ref: "#/components/parameters/UserId"
       responses:
@@ -237,6 +265,10 @@ paths:
     post:
       tags: [sources]
       summary: Register or update a PEC source configuration (MANAGE_SOURCE + recent reauth).
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
       requestBody:
         required: true
         content:
@@ -260,6 +292,10 @@ paths:
     post:
       tags: [sources]
       summary: Connectivity/capability/budget diagnostic against a registered source.
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
       parameters:
         - name: id
           in: path
@@ -278,6 +314,10 @@ paths:
     post:
       tags: [runs]
       summary: Enqueue a run (§1.10, ENG-05/ENG-24 idempotent via Idempotency-Key).
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
       parameters:
         - name: Idempotency-Key
           in: header
@@ -331,6 +371,10 @@ paths:
     post:
       tags: [runs]
       summary: Request cooperative cancellation (§1.9.4). Idempotent while already cancelling.
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
       parameters:
         - $ref: "#/components/parameters/JobId"
       responses:
@@ -469,6 +513,18 @@ components:
         Opaque session token, never Spring's HttpSession-backed JSESSIONID. State-changing
         requests also require the CSRF double-submit pair: an XSRF-TOKEN cookie (set by any GET,
         e.g. /ready) echoed back in the X-XSRF-TOKEN header.
+    csrfCookie:
+      type: apiKey
+      in: cookie
+      name: XSRF-TOKEN
+      description: >-
+        CSRF token cookie issued by a GET such as /api/v1/ready. State-changing requests must
+        echo its value in X-XSRF-TOKEN.
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-XSRF-TOKEN
+      description: CSRF token header matching the XSRF-TOKEN cookie.
 
   parameters:
     UserId:
@@ -565,6 +621,7 @@ components:
 
     CreateSourceRequest:
       type: object
+      required: [id, sourceFamily, host, port, databaseName, dbUser, secretRef, municipalityIbge]
       properties:
         id: { type: string }
         sourceFamily: { type: string, example: PEC_POSTGRESQL }
