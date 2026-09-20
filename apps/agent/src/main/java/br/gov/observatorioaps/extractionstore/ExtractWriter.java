@@ -111,9 +111,6 @@ public final class ExtractWriter implements AutoCloseable {
         String checksum = HexFormat.of().formatHex(digestOut.getMessageDigest().digest());
         forceFile(tempFile);
 
-        publishNewFile(tempFile, finalFile);
-        forceDirectory(baseDir);
-
         Instant finishedAt = Instant.now();
         ExtractionManifest manifest = new ExtractionManifest(
                 extractionId, sourceId, municipalityIbge, periodStart, periodEndExclusive,
@@ -122,6 +119,9 @@ public final class ExtractWriter implements AutoCloseable {
                 rowCount, exclusionCount, checksum, queryChecksum, adapterVersion
         );
         ExtractValidation.validateManifest(manifest);
+
+        publishNewFile(tempFile, finalFile);
+        forceDirectory(baseDir);
 
         Path manifestTemp = baseDir.resolve(extractionId + ".manifest.json.tmp");
         ExtractValidation.rejectSymbolicLink(manifestTemp, "manifest temporary file");

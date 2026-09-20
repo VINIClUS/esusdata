@@ -108,7 +108,8 @@ public final class IndividualEncounterModalityCapability {
             PecSourceIdentity sourceIdentity,
             CompatibilityCatalog catalog
     ) throws SQLException {
-        validateAdapterCompatibility(connection, sourceIdentity, catalog);
+        validateAdapterCompatibility(connection, sourceIdentity, catalog,
+                PecCompatibilityMatrix.fromClasspathResource(), guard);
         guard.checkDuration();
 
         try (PreparedStatement ps = connection.prepareStatement(
@@ -152,6 +153,16 @@ public final class IndividualEncounterModalityCapability {
             CompatibilityCatalog catalog,
             PecCompatibilityMatrix matrix
     ) throws SQLException {
+        validateAdapterCompatibility(connection, sourceIdentity, catalog, matrix, null);
+    }
+
+    static void validateAdapterCompatibility(
+            Connection connection,
+            PecSourceIdentity sourceIdentity,
+            CompatibilityCatalog catalog,
+            PecCompatibilityMatrix matrix,
+            BudgetGuard guard
+    ) throws SQLException {
         if (sourceIdentity == null || !sourceIdentity.isComplete()) {
             throw new IllegalStateException(
                     "PecSourceIdentity is required before acquiring a PEC capability");
@@ -164,6 +175,9 @@ public final class IndividualEncounterModalityCapability {
         }
 
         String postgresVersion = catalog.postgresVersion(connection);
+        if (guard != null) {
+            guard.checkDuration();
+        }
         PecCompatibilityMatrix.Entry entry = matrix.findExact(
                 CAPABILITY, ADAPTER_VERSION, sourceIdentity, postgresVersion);
 
@@ -177,6 +191,9 @@ public final class IndividualEncounterModalityCapability {
         for (Map.Entry<String, String> expected : entry.objectFingerprints().entrySet()) {
             String object = expected.getKey();
             String actual = catalog.fingerprint(connection, object, entry.objectColumns().get(object));
+            if (guard != null) {
+                guard.checkDuration();
+            }
             if (!expected.getValue().equals(actual)) {
                 throw new IllegalStateException(
                         "Compatibility fingerprint mismatch for " + object

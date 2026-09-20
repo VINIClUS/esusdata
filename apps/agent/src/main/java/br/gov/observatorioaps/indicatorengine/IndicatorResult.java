@@ -23,6 +23,10 @@ public record IndicatorResult(
         List<String> limitations,
         String calculationPolicyVersion
 ) {
+    public IndicatorResult {
+        limitations = List.copyOf(limitations);
+    }
+
     public enum IndicatorStatus {
         COMPUTED,
         NO_DENOMINATOR,
