@@ -96,18 +96,32 @@ public final class IndicatorRunExecutor {
         }
 
         ExtractionManifest manifest = extractReader.readManifest(extractsBaseDir, context.extractionId());
-        if (!manifest.sourceId().equals(context.sourceId())) {
-            // The extract file matches the requested extractionId but belongs to a different
-            // source than the job claims — both FKs stay individually valid, so nothing else
-            // would catch this. Publishing anyway would silently corrupt source provenance.
+        YearMonth requestedPeriod = YearMonth.parse(context.referencePeriod());
+        String expectedPeriodStart = requestedPeriod.atDay(1).toString();
+        String expectedPeriodEndExclusive = requestedPeriod.plusMonths(1).atDay(1).toString();
+        if (!manifest.sourceId().equals(context.sourceId())
+                || !manifest.municipalityIbge().equals(context.municipalityIbge())
+                || !manifest.periodStart().equals(expectedPeriodStart)
+                || !manifest.periodEndExclusive().equals(expectedPeriodEndExclusive)) {
+            // The extract file matches the requested extractionId but its actual scope (source,
+            // municipality, or period) does not match what the job asked for — all FKs stay
+            // individually valid, so nothing else would catch this. This matters even for an
+            // extract with zero matching records: C1Rule's per-record checks never run on an
+            // empty extract, so a scope mismatch would otherwise publish a plausible-looking
+            // zero-count result under the wrong municipality/period with wrong provenance,
+            // silently — exactly what §1.10.1 forbids.
             throw new IllegalStateException(
-                    "extract " + context.extractionId() + " belongs to source " + manifest.sourceId()
-                            + " but job " + context.jobId() + " requested source " + context.sourceId());
+                    "extract " + context.extractionId() + " covers source " + manifest.sourceId()
+                            + "/municipality " + manifest.municipalityIbge() + "/period ["
+                            + manifest.periodStart() + ", " + manifest.periodEndExclusive()
+                            + ") but job " + context.jobId() + " requested source " + context.sourceId()
+                            + "/municipality " + context.municipalityIbge() + "/period "
+                            + context.referencePeriod());
         }
         List<CanonicalEncounter> encounters = extractReader.readEncounters(extractsBaseDir, manifest);
         cancellation.checkCancelled();
 
-        String dataCutoff = YearMonth.parse(context.referencePeriod()).atEndOfMonth().toString();
+        String dataCutoff = requestedPeriod.atEndOfMonth().toString();
         IndicatorResult result = C1Rule.compute(
                 encounters, context.municipalityIbge(), context.referencePeriod(), dataCutoff);
         cancellation.checkCancelled();

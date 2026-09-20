@@ -143,4 +143,44 @@ class IndicatorRunExecutorExtractTest {
         assertThatThrownBy(() -> fixture.executor.runFromExtract(context, new CancellationToken()))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void rejectsAnExtractWhoseMunicipalityDoesNotMatchTheJob() throws Exception {
+        ExtractionManifest manifest = ExtractFixtures.write(
+                fixture.extractsDir, "ext-c1-wrong-municipality", "src-1", "3541001", "2026-03", 7, 3, 2);
+
+        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+                "job-1", "run-1", "3541307", C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
+                "2026-03", 3, "src-1", manifest.extractionId(), // job asks for 3541307, extract is 3541001
+                null, null, null, null, null, clock.instant()));
+        Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
+
+        var context = new IndicatorRunExecutor.RunContext(
+                acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
+                acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
+                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion());
+
+        assertThatThrownBy(() -> fixture.executor.runFromExtract(context, new CancellationToken()))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void rejectsAnExtractWhosePeriodDoesNotMatchTheJob() throws Exception {
+        ExtractionManifest manifest = ExtractFixtures.write(
+                fixture.extractsDir, "ext-c1-wrong-period", "src-1", "3541307", "2026-01", 7, 3, 2);
+
+        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+                "job-1", "run-1", "3541307", C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
+                "2026-03", 3, "src-1", manifest.extractionId(), // job asks for 2026-03, extract is 2026-01
+                null, null, null, null, null, clock.instant()));
+        Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
+
+        var context = new IndicatorRunExecutor.RunContext(
+                acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
+                acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
+                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion());
+
+        assertThatThrownBy(() -> fixture.executor.runFromExtract(context, new CancellationToken()))
+                .isInstanceOf(IllegalStateException.class);
+    }
 }
