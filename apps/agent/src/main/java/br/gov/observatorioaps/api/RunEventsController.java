@@ -27,7 +27,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -61,7 +60,6 @@ class RunEventsController {
     private final Clock clock;
     private final long pollIntervalMs;
     private final long authorizationRevalidationIntervalMs;
-    private final long terminalAttemptWaitTicks;
 
     RunEventsController(
             JobRepository jobRepository, RunResponseFactory responseFactory, ApiAuthorization authorization,
@@ -81,11 +79,10 @@ class RunEventsController {
         this.reauthScheduler = sseReauthScheduler;
         this.clock = clock;
         this.pollIntervalMs = Math.max(1, pollIntervalMs);
-        this.authorizationRevalidationIntervalMs = Math.max(1,
-                TimeUnit.SECONDS.toMillis(Math.max(1, authorizationRevalidationIntervalSeconds)));
-        long effectivePollIntervalMs = Math.max(1, pollIntervalMs);
-        this.terminalAttemptWaitTicks = Math.max(1,
-                (TERMINAL_ATTEMPT_WAIT_MS + effectivePollIntervalMs - 1) / effectivePollIntervalMs);
+        long effectiveAuthorizationRevalidationIntervalSeconds = Math.min(30,
+                Math.max(1, authorizationRevalidationIntervalSeconds));
+        this.authorizationRevalidationIntervalMs = TimeUnit.SECONDS.toMillis(
+                effectiveAuthorizationRevalidationIntervalSeconds);
     }
 
     @GetMapping(value = "/api/v1/runs/{id}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -103,7 +100,7 @@ class RunEventsController {
         SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
         AtomicReference<ScheduledFuture<?>> pollFutureHolder = new AtomicReference<>();
         AtomicReference<ScheduledFuture<?>> reauthFutureHolder = new AtomicReference<>();
-        AtomicInteger terminalAttemptWaitTick = new AtomicInteger();
+        AtomicReference<Instant> terminalAttemptFirstObservedAt = new AtomicReference<>();
         AtomicReference<JobSnapshot> lastSent = new AtomicReference<>();
         Object emitterLock = new Object();
         // Guards against completion callbacks running more than once for the same connection —
@@ -135,7 +132,7 @@ class RunEventsController {
         // scheduleWithFixedDelay, not scheduleAtFixedRate: a poll blocking on SQLite's
         // busy_timeout=5000 must not queue up catch-up executions back-to-back once it returns.
         ScheduledFuture<?> pollFuture = scheduler.scheduleWithFixedDelay(
-                () -> poll(id, terminalAttemptWaitTick, lastSent, emitter, emitterLock, stopped, onDone),
+                () -> poll(id, terminalAttemptFirstObservedAt, lastSent, emitter, emitterLock, stopped, onDone),
                 0, pollIntervalMs, TimeUnit.MILLISECONDS);
         pollFutureHolder.set(pollFuture);
         if (stopped.get()) {
@@ -145,7 +142,7 @@ class RunEventsController {
             pollFuture.cancel(false);
         }
 
-        ScheduledFuture<?> reauthFuture = reauthScheduler.scheduleWithFixedDelay(
+        ScheduledFuture<?> reauthFuture = reauthScheduler.scheduleAtFixedRate(
                 () -> reauthorize(sessionId, userId, municipalityIbge, emitter, emitterLock, stopped, onDone),
                 authorizationRevalidationIntervalMs, authorizationRevalidationIntervalMs,
                 TimeUnit.MILLISECONDS);
@@ -158,7 +155,8 @@ class RunEventsController {
     }
 
     private void poll(
-            String jobId, AtomicInteger terminalAttemptWaitTick, AtomicReference<JobSnapshot> lastSent,
+            String jobId, AtomicReference<Instant> terminalAttemptFirstObservedAt,
+            AtomicReference<JobSnapshot> lastSent,
             SseEmitter emitter, Object emitterLock, AtomicBoolean stopped, Runnable onDone) {
         if (stopped.get()) {
             return;
@@ -176,14 +174,26 @@ class RunEventsController {
                     current.state(), current.attempt(), current.lastProgressAt(),
                     List.copyOf(jobRepository.findAttempts(jobId)));
             boolean terminal = TERMINAL.contains(current.state());
+            if (!terminal) {
+                terminalAttemptFirstObservedAt.set(null);
+            }
             if (!terminal && snapshot.equals(lastSent.get())) {
                 return;
             }
             RunResponse response = responseFactory.toResponse(current);
             boolean finalAttemptVisible = current.attempt() == 0
                     || response.attempts().stream().anyMatch(attempt -> attempt.attempt() == current.attempt());
-            boolean terminalAttemptWaitExpired = terminal && !finalAttemptVisible
-                    && terminalAttemptWaitTick.incrementAndGet() >= terminalAttemptWaitTicks;
+            boolean terminalAttemptWaitExpired = false;
+            if (terminal && !finalAttemptVisible) {
+                Instant now = clock.instant();
+                Instant firstObservedAt = terminalAttemptFirstObservedAt.get();
+                if (firstObservedAt == null && terminalAttemptFirstObservedAt.compareAndSet(null, now)) {
+                    firstObservedAt = now;
+                } else if (firstObservedAt == null) {
+                    firstObservedAt = terminalAttemptFirstObservedAt.get();
+                }
+                terminalAttemptWaitExpired = !now.isBefore(firstObservedAt.plusMillis(TERMINAL_ATTEMPT_WAIT_MS));
+            }
             if (terminal && !finalAttemptVisible && !terminalAttemptWaitExpired) {
                 return;
             }
