@@ -5,10 +5,13 @@ import br.gov.observatorioaps.identityaccess.UserAccount;
 import br.gov.observatorioaps.identityaccess.UserState;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 
 import java.net.URI;
 import java.net.http.HttpResponse;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,6 +21,9 @@ class ReauthThrottleApiTest extends ApiFixtureSupport {
 
     @Autowired
     Argon2Profile argon2Profile;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Test
     void wrongReauthenticationIsThrottledByAccountAndOrigin() throws Exception {
@@ -42,5 +48,17 @@ class ReauthThrottleApiTest extends ApiFixtureSupport {
                 "{\"password\":\"wrong-reauth-password\"}");
         assertThat(throttled.statusCode()).isEqualTo(429);
         assertThat(throttled.body()).contains("LOGIN_THROTTLED");
+
+        List<Map<String, Object>> reauthAudit = jdbc.queryForList(
+                "select outcome from auth_audit"
+                        + " where actor_user_id = ? and event_type = 'REAUTH' and target = ?",
+                userId, userId);
+        assertThat(reauthAudit).hasSize(6);
+        assertThat(reauthAudit).anyMatch(row -> "THROTTLED".equals(row.get("outcome")));
+
+        List<Map<String, Object>> attempts = jdbc.queryForList(
+                "select outcome from login_attempts where username = ?", userId);
+        assertThat(attempts).hasSize(6);
+        assertThat(attempts).anyMatch(row -> "THROTTLED".equals(row.get("outcome")));
     }
 }

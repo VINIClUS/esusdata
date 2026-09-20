@@ -74,7 +74,13 @@ public final class AuthenticationService {
             String sessionId, String userId, String password, String origin, Instant now) {
         UserAccount user = userRepository.findById(userId).orElse(null);
         String username = user == null ? userId : user.username();
-        loginThrottle.checkAllowed(username, origin, now);
+        try {
+            loginThrottle.checkAllowed(username, origin, now);
+        } catch (LoginThrottle.LoginThrottledException e) {
+            loginThrottle.recordThrottled(username, origin, now);
+            auditWriter.record(now, userId, "REAUTH", userId, "THROTTLED", null);
+            throw e;
+        }
         boolean success = false;
         try {
             if (user == null || user.state() != UserState.ACTIVE

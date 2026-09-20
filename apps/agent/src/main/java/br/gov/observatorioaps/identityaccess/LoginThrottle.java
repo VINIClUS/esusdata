@@ -45,11 +45,19 @@ public final class LoginThrottle {
     }
 
     public void recordAttempt(String username, String origin, boolean succeeded, Instant now) {
+        recordAttempt(username, origin, succeeded ? "SUCCEEDED" : "FAILED", now);
+    }
+
+    public void recordThrottled(String username, String origin, Instant now) {
+        recordAttempt(username, origin, "THROTTLED", now);
+    }
+
+    private void recordAttempt(String username, String origin, String outcome, Instant now) {
         jdbc.update("""
                 INSERT INTO login_attempts (attempt_id, username, origin, attempted_at, outcome)
                 VALUES (?,?,?,?,?)
                 """, "attempt-" + java.util.UUID.randomUUID(), username, origin, now.toString(),
-                succeeded ? "SUCCEEDED" : "FAILED");
+                outcome);
     }
 
     private Optional<Instant> delayUntil(
