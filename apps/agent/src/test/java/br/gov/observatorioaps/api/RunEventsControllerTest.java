@@ -19,6 +19,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -27,6 +28,24 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RunEventsControllerTest {
+
+    @Test
+    void unknownJobIsAuditedBeforeSseNotFound() {
+        Instant now = Instant.parse("2026-09-20T12:00:00Z");
+        JobRepository jobRepository = mock(JobRepository.class);
+        when(jobRepository.findById("missing")).thenReturn(Optional.empty());
+        ApiAuthorization authorization = mock(ApiAuthorization.class);
+        RunEventsController controller = new RunEventsController(
+                jobRepository, mock(RunResponseFactory.class), authorization, mock(ScopeResolver.class),
+                mock(SessionService.class), new SseConnectionLimiter(), mock(ScheduledExecutorService.class),
+                mock(ScheduledExecutorService.class), Clock.fixed(now, ZoneOffset.UTC), 1000, 30);
+
+        AuthenticatedSession session = sessionAt(now);
+        assertThatThrownBy(() -> controller.events(session, "missing"))
+                .isInstanceOf(ApiNotFoundException.class);
+
+        verify(authorization).auditDenied(session, Permission.RUN_INDICATOR, "unknown");
+    }
 
     @Test
     void terminalPollCancelsItsScheduledTaskEvenIfItRunsBeforeControllerReturns() {

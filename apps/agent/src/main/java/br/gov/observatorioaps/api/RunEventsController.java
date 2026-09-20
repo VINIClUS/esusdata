@@ -87,7 +87,11 @@ class RunEventsController {
 
     @GetMapping(value = "/api/v1/runs/{id}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     SseEmitter events(@AuthenticationPrincipal AuthenticatedSession session, @PathVariable("id") String id) {
-        Job job = jobRepository.findById(id).orElseThrow(() -> new ApiNotFoundException("unknown job: " + id));
+        Job job = jobRepository.findById(id).orElse(null);
+        if (job == null) {
+            authorization.auditDenied(session, Permission.RUN_INDICATOR, "unknown");
+            throw new ApiNotFoundException("unknown job: " + id);
+        }
         authorization.requireObjectScope(session, Permission.RUN_INDICATOR, job.municipalityIbge());
 
         // Captured into locals: the security context tied to this request thread does not survive

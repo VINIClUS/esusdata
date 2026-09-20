@@ -3,8 +3,8 @@ package br.gov.observatorioaps.api;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -18,7 +18,7 @@ class SseConfig {
 
     @Bean(destroyMethod = "shutdown")
     ScheduledExecutorService sseScheduler() {
-        return Executors.newScheduledThreadPool(4, threadFactory("sse-poll-"));
+        return scheduler(4, "sse-poll-");
     }
 
     /**
@@ -27,7 +27,14 @@ class SseConfig {
      */
     @Bean(name = "sseReauthScheduler", destroyMethod = "shutdown")
     ScheduledExecutorService sseReauthScheduler() {
-        return Executors.newScheduledThreadPool(50, threadFactory("sse-reauth-"));
+        return scheduler(50, "sse-reauth-");
+    }
+
+    private ScheduledExecutorService scheduler(int poolSize, String threadPrefix) {
+        ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(
+                poolSize, threadFactory(threadPrefix));
+        scheduler.setRemoveOnCancelPolicy(true);
+        return scheduler;
     }
 
     private ThreadFactory threadFactory(String prefix) {
