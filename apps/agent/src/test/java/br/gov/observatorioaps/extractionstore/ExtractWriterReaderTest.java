@@ -188,10 +188,10 @@ class ExtractWriterReaderTest {
     void aManifestStagingFailurePublishesNothing() throws Exception {
         String extractionId = "ext-stale-manifest-temp";
         Path manifestTemp = dir.resolve(extractionId + ".manifest.json.tmp");
-        Files.writeString(manifestTemp, "stale manifest staging file");
 
         try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
+            Files.writeString(manifestTemp, "stale manifest staging file");
 
             assertThatThrownBy(() -> writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
@@ -204,6 +204,48 @@ class ExtractWriterReaderTest {
         assertThat(Files.exists(dir.resolve(extractionId + ".manifest.json"))).isFalse();
         assertThat(Files.exists(dir.resolve(extractionId + ".jsonl.gz.tmp"))).isTrue();
         assertThat(Files.readString(manifestTemp)).isEqualTo("stale manifest staging file");
+    }
+
+    @Test
+    void startupRecoveryCompletesADataPublicationInterruptedBeforeManifestPublication() throws Exception {
+        String extractionId = "ext-recoverable-publication";
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+            writer.write(encounter("1", CanonicalModality.PROGRAMADO));
+            writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+
+        Path publishedManifest = dir.resolve(extractionId + ".manifest.json");
+        Path stagedManifest = dir.resolve(extractionId + ".manifest.json.tmp");
+        Files.move(publishedManifest, stagedManifest);
+        assertThat(Files.exists(dir.resolve(extractionId + ".jsonl.gz"))).isTrue();
+        assertThat(Files.exists(publishedManifest)).isFalse();
+
+        ExtractRecovery.reconcile(dir);
+
+        ExtractionManifest recovered = reader.readManifest(dir, extractionId);
+        assertThat(reader.readEncounters(dir, recovered)).hasSize(1);
+        assertThat(Files.exists(stagedManifest)).isFalse();
+    }
+
+    @Test
+    void startupRecoveryRemovesADataOnlyPublication() throws Exception {
+        String extractionId = "ext-remove-orphaned-data";
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+            writer.write(encounter("1", CanonicalModality.PROGRAMADO));
+            writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+        Files.delete(dir.resolve(extractionId + ".manifest.json"));
+
+        ExtractRecovery.reconcile(dir);
+
+        assertThat(Files.exists(dir.resolve(extractionId + ".jsonl.gz"))).isFalse();
+        assertThat(Files.exists(dir.resolve(extractionId + ".manifest.json"))).isFalse();
     }
 
     /**

@@ -1,6 +1,7 @@
 package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
+import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -8,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -34,12 +36,13 @@ class IndividualEncounterModalityCapabilityTest {
 
         BudgetGuard guard = mock(BudgetGuard.class);
         IndividualEncounterModalityCapability.stream(
-                connection, "3541307", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                connection, sourceProperties(), LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 guard, ignored -> {
                 }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
                 CompatibilityTestCatalog.productionEntry());
 
         verify(guard, atLeast(2)).checkDuration();
+        verify(statement).setString(1, "3541307");
     }
 
     @Test
@@ -79,7 +82,7 @@ class IndividualEncounterModalityCapabilityTest {
         }).when(guard).checkDuration();
 
         IndividualEncounterModalityCapability.stream(
-                connection, "3541307", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                connection, sourceProperties(), LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 guard, ignored -> {
                 }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"), catalog);
 
@@ -88,5 +91,24 @@ class IndividualEncounterModalityCapabilityTest {
                 assertThat(events.get(i + 1)).isEqualTo("budget");
             }
         }
+    }
+
+    @Test
+    void streamRequiresTheConfiguredPecMunicipalityInsteadOfAnArbitraryQueryScope() {
+        assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("stream"))
+                .anyMatch(method -> Arrays.asList(method.getParameterTypes())
+                        .contains(br.gov.observatorioaps.sourceconnector.PecConnectionProperties.class)))
+                .isTrue();
+        assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("stream"))
+                .anyMatch(method -> method.getParameterTypes().length > 1
+                        && method.getParameterTypes()[1].equals(String.class)))
+                .isFalse();
+    }
+
+    private PecConnectionProperties sourceProperties() {
+        return new PecConnectionProperties(
+                "test-source", "127.0.0.1", 5432, "fixture", "reader", "unused", "3541307");
     }
 }

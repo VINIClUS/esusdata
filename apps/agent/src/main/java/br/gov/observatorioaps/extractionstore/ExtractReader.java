@@ -68,6 +68,17 @@ public final class ExtractReader {
         manifest = publishedManifest;
 
         Path dataFile = baseDir.resolve(manifest.extractionId() + ".jsonl.gz");
+        return readDataFile(dataFile, manifest);
+    }
+
+    /**
+     * Validates a known manifest against a data path before either path is published as a
+     * finalized pair. Used by startup recovery for a data file whose manifest is still staged.
+     */
+    List<CanonicalEncounter> readDataFile(Path dataFile, ExtractionManifest manifest) throws IOException {
+        if (manifest == null) {
+            throw new IllegalStateException("Extraction manifest is required");
+        }
         ExtractValidation.rejectSymbolicLink(dataFile, "extract data file");
         if (!Files.exists(dataFile, LinkOption.NOFOLLOW_LINKS)) {
             throw new IllegalStateException("Manifest exists but data file is missing: " + dataFile);

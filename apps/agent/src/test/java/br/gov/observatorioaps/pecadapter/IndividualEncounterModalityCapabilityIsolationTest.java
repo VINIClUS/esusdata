@@ -1,6 +1,7 @@
 package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
+import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.ReadBudget;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
@@ -55,16 +56,20 @@ class IndividualEncounterModalityCapabilityIsolationTest {
 
             List<RawEncounterRecord> municipalityA = new ArrayList<>();
             var guardA = new BudgetGuard(ReadBudget.initialEngineeringProposal());
+            var sourceA = new PecConnectionProperties(
+                    "fixture-a", "127.0.0.1", 5432, "esus_fixture", "fixture_user", "unused", "1100015");
             IndividualEncounterModalityCapability.stream(
-                    c, "1100015", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                    c, sourceA, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                     guardA, municipalityA::add,
                     new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
                     CompatibilityTestCatalog.productionEntry());
 
             List<RawEncounterRecord> municipalityB = new ArrayList<>();
             var guardB = new BudgetGuard(ReadBudget.initialEngineeringProposal());
+            var sourceB = new PecConnectionProperties(
+                    "fixture-b", "127.0.0.1", 5432, "esus_fixture", "fixture_user", "unused", "3550308");
             IndividualEncounterModalityCapability.stream(
-                    c, "3550308", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                    c, sourceB, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                     guardB, municipalityB::add,
                     new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
                     CompatibilityTestCatalog.productionEntry());

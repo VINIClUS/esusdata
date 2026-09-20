@@ -63,7 +63,7 @@ class IndividualEncounterModalityCapabilityLiveTest {
             try (Connection c = ds.getConnection()) {
                 var guard = new BudgetGuard(ReadBudget.initialEngineeringProposal());
                 IndividualEncounterModalityCapability.stream(
-                        c, "3541307",
+                        c, properties,
                         LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                         guard, records::add,
                         new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"));

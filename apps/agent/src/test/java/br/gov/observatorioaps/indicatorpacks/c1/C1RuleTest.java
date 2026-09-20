@@ -121,14 +121,25 @@ class C1RuleTest {
     }
 
     @Test
-    void completeReleaseGatesPermitTheSameExactCalculation() {
-        IndicatorResult result = C1Rule.compute(
-                encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31",
-                C1Rule.ReleaseGates.allComplete());
+    void evidenceOnlyCalculationRemainsAvailableDespiteStandingLimitations() {
+        IndicatorResult result = C1Rule.computeEvidenceOnly(
+                encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.COMPUTED);
         assertThat(result.valueText()).isEqualTo("60.0000");
         assertThat(result.classification()).isEqualTo(Classification.OTIMO);
+    }
+
+    @Test
+    void allCompleteFlagsCannotOverrideKnownStandingLimitations() {
+        IndicatorResult result = C1Rule.compute(
+                encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31",
+                C1Rule.ReleaseGates.allComplete());
+
+        assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.BLOCKED);
+        assertThat(result.valueText()).isNull();
+        assertThat(result.classification()).isNull();
+        assertThat(result.limitations()).anyMatch(l -> l.contains("Portão A/B BLOCKED"));
     }
 
     @Test

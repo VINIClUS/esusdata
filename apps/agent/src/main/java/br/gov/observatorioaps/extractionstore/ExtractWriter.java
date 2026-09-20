@@ -53,6 +53,7 @@ public final class ExtractWriter implements AutoCloseable {
         this.extractionId = extractionId;
         ExtractValidation.validateExtractionId(baseDir, extractionId);
         Files.createDirectories(baseDir);
+        ExtractRecovery.reconcile(baseDir);
         ExtractValidation.validateExtractionId(baseDir, extractionId);
         this.tempFile = baseDir.resolve(extractionId + ".jsonl.gz.tmp");
         ExtractValidation.rejectSymbolicLink(tempFile, "extract temporary file");

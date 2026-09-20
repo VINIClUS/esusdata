@@ -42,6 +42,17 @@ class PecCompatibilityMatrixTest {
     }
 
     @Test
+    void frozenAcquisitionQueryUsesTheSchemaFingerprintedByTheCompatibilityCatalog() {
+        assertThat(IndividualEncounterModalityCapability.QUERY)
+                .contains("FROM public.tb_fat_atendimento_individual")
+                .contains("JOIN public.tb_dim_tempo")
+                .contains("JOIN public.tb_dim_municipio")
+                .contains("LEFT JOIN public.tb_dim_unidade_saude")
+                .contains("LEFT JOIN public.tb_dim_equipe")
+                .contains("LEFT JOIN public.tb_dim_cbo");
+    }
+
+    @Test
     void emptyMatrixCannotSelectAnAdapter() {
         PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromJson(
                 "{\"schema_version\":\"1\",\"validation_status\":\"VALIDATED\",\"tested_with\":[]}");

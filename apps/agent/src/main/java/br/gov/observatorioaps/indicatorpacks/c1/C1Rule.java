@@ -60,7 +60,7 @@ public final class C1Rule {
 
         public boolean isComplete() {
             return sourceAndValidity && calculationModel && adapter
-                    && reconciliation && pilotAndOperations;
+                    && reconciliation && pilotAndOperations && STANDING_LIMITATIONS.isEmpty();
         }
 
         public List<String> incompleteReasons() {

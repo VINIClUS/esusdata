@@ -103,7 +103,7 @@ class Eng19ReproducibilityWithoutPecLiveTest {
             try (Connection c = ds.getConnection()) {
                 var guard = new BudgetGuard(budget);
                 IndividualEncounterModalityCapability.stream(
-                        c, "3541307", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), guard,
+                        c, properties, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), guard,
                         raw -> writeCanonical(writer, raw),
                         new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"));
             }
