@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SourceApiTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
+    private static final String MUNICIPALITY_B = "3304557";
 
     @Test
     void creatingASourceReturnsTheSecretReferenceNeverASecretValue() throws Exception {
@@ -67,6 +68,21 @@ class SourceApiTest extends ApiFixtureSupport {
     }
 
     @Test
+    void aSourceIdOwnedByAnotherMunicipalityIsAnOpaqueNotFound() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String cookie = reauthenticatedSessionCookie(admin);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY_B);
+
+        HttpResponse<String> response = authenticatedPost(cookie,
+                URI.create(BASE_URL + "/api/v1/sources"), createSourceJson(sourceId, MUNICIPALITY));
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(response.body()).doesNotContain(sourceId).doesNotContain(MUNICIPALITY_B);
+    }
+
+    @Test
     void aCallerWithoutManageSourceInThatMunicipalityIsRefusedTheSame404() throws Exception {
         String outsider = createUser("outsider-" + System.nanoTime());
         String cookie = reauthenticatedSessionCookie(outsider);
@@ -80,11 +96,15 @@ class SourceApiTest extends ApiFixtureSupport {
     }
 
     private String createSourceJson(String sourceId) {
+        return createSourceJson(sourceId, MUNICIPALITY);
+    }
+
+    private String createSourceJson(String sourceId, String municipalityIbge) {
         return "{\"id\":\"" + sourceId + "\",\"sourceFamily\":\"PEC_POSTGRESQL\","
                 + "\"pecInstallationRole\":\"PRONTUARIO\",\"sourceLocationKind\":\"PRIMARY\","
                 + "\"host\":\"127.0.0.1\",\"port\":5432,\"databaseName\":\"esus\","
                 + "\"dbUser\":\"esus_leitura\",\"secretRef\":\"PEC_DB_PASSWORD\","
-                + "\"municipalityIbge\":\"" + MUNICIPALITY + "\",\"pecVersion\":\"5.4.37\","
+                + "\"municipalityIbge\":\"" + municipalityIbge + "\",\"pecVersion\":\"5.4.37\","
                 + "\"readModel\":\"PEC_DW\"}";
     }
 }
