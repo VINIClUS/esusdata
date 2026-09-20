@@ -1,5 +1,6 @@
 package br.gov.observatorioaps.config;
 
+import br.gov.observatorioaps.identityaccess.AccessAdministrationService;
 import br.gov.observatorioaps.identityaccess.Argon2Profile;
 import br.gov.observatorioaps.identityaccess.AuthenticationService;
 import br.gov.observatorioaps.identityaccess.AuthAuditWriter;
@@ -13,6 +14,7 @@ import br.gov.observatorioaps.identityaccess.ReauthenticationGuard;
 import br.gov.observatorioaps.identityaccess.ScopeResolver;
 import br.gov.observatorioaps.identityaccess.SecurityProperties;
 import br.gov.observatorioaps.identityaccess.SessionService;
+import br.gov.observatorioaps.identityaccess.UserProvisioning;
 import br.gov.observatorioaps.identityaccess.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,6 +112,22 @@ public class IdentityAccessConfig {
     @DependsOn("flywayMigration")
     public LoginThrottle loginThrottle(JdbcTemplate sqliteJdbcTemplate, SecurityProperties properties) {
         return new LoginThrottle(sqliteJdbcTemplate, properties);
+    }
+
+    @Bean
+    @DependsOn("flywayMigration")
+    public UserProvisioning userProvisioning(
+            UserRepository userRepository, JdbcTemplate sqliteJdbcTemplate,
+            TransactionTemplate sqliteTransactionTemplate, Clock clock, SecurityProperties properties) {
+        return new UserProvisioning(userRepository, sqliteJdbcTemplate, sqliteTransactionTemplate, clock, properties);
+    }
+
+    @Bean
+    @DependsOn("flywayMigration")
+    public AccessAdministrationService accessAdministrationService(
+            UserRepository userRepository, GrantRepository grantRepository,
+            AuthorizationVersionGuard authorizationVersionGuard, Clock clock) {
+        return new AccessAdministrationService(userRepository, grantRepository, authorizationVersionGuard, clock);
     }
 
     @Bean

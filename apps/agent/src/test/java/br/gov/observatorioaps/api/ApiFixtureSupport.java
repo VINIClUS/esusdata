@@ -22,6 +22,10 @@ import br.gov.observatorioaps.resultstore.SourceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -79,10 +83,39 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 null, null, null, clock.instant(), "test-fixture", null, null));
     }
 
-    /** @return an {@code OBS_SESSION=...} cookie header value ready to attach to an HttpRequest. */
+    /**
+     * @return an {@code OBS_SESSION=...} cookie header value ready to attach to an HttpRequest.
+     *     Reads the user's CURRENT {@code authorizationVersion} rather than assuming 1 — a session
+     *     minted with a stale version would fail authentication after any grant/revoke/block
+     *     mutation bumps it, which would look like an authorization bug rather than a fixture one.
+     */
     String sessionCookie(String userId) {
-        String rawToken = sessionService.create(userId, 1, clock.instant());
+        long authorizationVersion = userRepository.findById(userId).orElseThrow().authorizationVersion();
+        String rawToken = sessionService.create(userId, authorizationVersion, clock.instant());
         return SessionCookie.NAME + "=" + rawToken;
+    }
+
+    /**
+     * A session already reauthenticated "just now" — for MANAGE_ACCESS/MANAGE_SOURCE mutation
+     * tests where §1.12.7 L539's five-minute reauth gate must already be satisfied so the test
+     * exercises the mutation itself, not the gate.
+     */
+    String reauthenticatedSessionCookie(String userId) {
+        long authorizationVersion = userRepository.findById(userId).orElseThrow().authorizationVersion();
+        Instant now = clock.instant();
+        String rawToken = sessionService.create(userId, authorizationVersion, now);
+        sessionService.touchReauth(sha256Hex(rawToken), now);
+        return SessionCookie.NAME + "=" + rawToken;
+    }
+
+    private String sha256Hex(String rawToken) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            return java.util.HexFormat.of().formatHex(
+                    digest.digest(rawToken.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     void registerSource(String sourceId, String municipalityIbge) {
@@ -130,5 +163,49 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 jobId, "run-" + jobId, stagingId, sourceId, 1, "proc-test", manifest, "LOCAL_ESTIMATE",
                 "NOT_VALIDATED", "test-build", clock.instant(), publisherUserId, municipalityIbge));
         return outcome.resultId();
+    }
+
+    /**
+     * A CSRF-checked, cookie-authenticated POST — everything a real state-changing admin/source
+     * request needs: the session cookie (minted directly, not via login) plus a genuine
+     * {@code XSRF-TOKEN}/{@code X-XSRF-TOKEN} pair fetched from the running app itself, exactly as
+     * {@code CsrfAndOriginTest} proves the filter chain requires.
+     */
+    HttpResponse<String> authenticatedPost(String sessionCookie, URI uri, String jsonBody) throws Exception {
+        return authenticatedRequest(sessionCookie, uri, "POST", jsonBody);
+    }
+
+    HttpResponse<String> authenticatedDelete(String sessionCookie, URI uri) throws Exception {
+        return authenticatedRequest(sessionCookie, uri, "DELETE", null);
+    }
+
+    private HttpResponse<String> authenticatedRequest(
+            String sessionCookie, URI uri, String method, String jsonBody) throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        HttpResponse<String> ready = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        String csrfToken = csrfTokenFrom(ready);
+
+        HttpRequest.BodyPublisher body = jsonBody == null
+                ? HttpRequest.BodyPublishers.noBody()
+                : HttpRequest.BodyPublishers.ofString(jsonBody);
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
+                .header("Content-Type", "application/json")
+                .header("Cookie", sessionCookie + "; XSRF-TOKEN=" + csrfToken)
+                .header("X-XSRF-TOKEN", csrfToken)
+                .method(method, body);
+        return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private String csrfTokenFrom(HttpResponse<String> response) {
+        for (String setCookie : response.headers().allValues("Set-Cookie")) {
+            if (setCookie.startsWith("XSRF-TOKEN=")) {
+                String rest = setCookie.substring("XSRF-TOKEN=".length());
+                int semicolon = rest.indexOf(';');
+                return semicolon < 0 ? rest : rest.substring(0, semicolon);
+            }
+        }
+        throw new IllegalStateException("no XSRF-TOKEN cookie was issued");
     }
 }

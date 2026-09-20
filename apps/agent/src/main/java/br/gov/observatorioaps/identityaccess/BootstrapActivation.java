@@ -11,14 +11,9 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -36,7 +31,6 @@ import java.util.UUID;
  */
 public final class BootstrapActivation {
 
-    private static final SecureRandom RANDOM = new SecureRandom();
     private static final String UNUSABLE_PASSWORD_HASH = "UNSET";
     private static final RowMapper<TokenRow> TOKEN_MAPPER = (rs, rowNum) -> new TokenRow(
             rs.getString("token_hash"), rs.getString("user_id"),
@@ -80,7 +74,7 @@ public final class BootstrapActivation {
         }
         Instant now = clock.instant();
         String userId = "user-" + UUID.randomUUID();
-        String rawToken = newOpaqueToken();
+        String rawToken = ActivationTokens.newOpaqueToken();
         Instant expiresAt = now.plus(Duration.ofHours(properties.activationTokenValidityHours()));
 
         // The token file is written BEFORE any of this is persisted, and the DB writes below are
@@ -102,7 +96,7 @@ public final class BootstrapActivation {
             jdbc.update("""
                     INSERT INTO activation_tokens (token_hash, user_id, expires_at, consumed_at)
                     VALUES (?,?,?,null)
-                    """, hash(rawToken), userId, expiresAt.toString());
+                    """, ActivationTokens.hash(rawToken), userId, expiresAt.toString());
         });
         return Optional.of(tokenFile);
     }
@@ -112,7 +106,7 @@ public final class BootstrapActivation {
         if (rawToken == null || rawToken.isBlank()) {
             throw new ActivationFailedException("activation token is required");
         }
-        String tokenHash = hash(rawToken);
+        String tokenHash = ActivationTokens.hash(rawToken);
         // The claim (conditional consumed_at update) and the account activation happen inside one
         // transaction, with the claim's affected-row check as the sole authority on single use.
         // Two concurrent activations racing this method can both pass the earlier consumedAt()
@@ -159,21 +153,6 @@ public final class BootstrapActivation {
             Files.writeString(created, contents, StandardCharsets.UTF_8);
         } else {
             Files.writeString(tokenFile, contents, StandardCharsets.UTF_8);
-        }
-    }
-
-    private static String newOpaqueToken() {
-        byte[] bytes = new byte[32];
-        RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    private static String hash(String rawToken) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(rawToken.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
         }
     }
 

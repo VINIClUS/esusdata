@@ -1,5 +1,9 @@
 package br.gov.observatorioaps.api;
 
+import br.gov.observatorioaps.identityaccess.AccessAdministrationService;
+import br.gov.observatorioaps.identityaccess.ReauthenticationGuard;
+import br.gov.observatorioaps.identityaccess.UserProvisioning;
+import br.gov.observatorioaps.jobrunner.SourceNotFoundException;
 import br.gov.observatorioaps.resultstore.EvidenceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +24,11 @@ class ScopeCheckedAdvice {
      * 404." This handler MUST NOT vary status, body, or message by which of the three exceptions
      * it caught — the diagnostic difference lives only in {@code auth_audit}, not in the response.
      */
-    @ExceptionHandler({ScopeDeniedException.class, ApiNotFoundException.class, EvidenceNotFoundException.class})
+    @ExceptionHandler({
+            ScopeDeniedException.class, ApiNotFoundException.class, EvidenceNotFoundException.class,
+            AccessAdministrationService.UserNotFoundException.class,
+            AccessAdministrationService.GrantNotFoundException.class,
+            SourceNotFoundException.class})
     ResponseEntity<ApiError> handleNotFoundOrOutOfScope() {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiError("NOT_FOUND", "not found"));
     }
@@ -29,6 +37,33 @@ class ScopeCheckedAdvice {
     ResponseEntity<ApiError> handleInvalidCursor() {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiError("INVALID_CURSOR", "the evidence cursor is malformed or expired"));
+    }
+
+    /** ENG-45: refused unconditionally by {@code AccessAdministrationService}, never silently ignored. */
+    @ExceptionHandler(AccessAdministrationService.SelfGrantForbiddenException.class)
+    ResponseEntity<ApiError> handleSelfGrantForbidden(AccessAdministrationService.SelfGrantForbiddenException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiError("SELF_GRANT_FORBIDDEN", e.getMessage()));
+    }
+
+    /** A sole admin self-blocking would brick the installation — see {@code AccessAdministrationService.block}. */
+    @ExceptionHandler(AccessAdministrationService.SelfBlockForbiddenException.class)
+    ResponseEntity<ApiError> handleSelfBlockForbidden(AccessAdministrationService.SelfBlockForbiddenException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiError("SELF_BLOCK_FORBIDDEN", e.getMessage()));
+    }
+
+    @ExceptionHandler(UserProvisioning.UsernameAlreadyExistsException.class)
+    ResponseEntity<ApiError> handleUsernameAlreadyExists(UserProvisioning.UsernameAlreadyExistsException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiError("USERNAME_ALREADY_EXISTS", e.getMessage()));
+    }
+
+    /** §1.12.7 L539: the caller is authenticated but must step up with a fresh password check. */
+    @ExceptionHandler(ReauthenticationGuard.ReauthenticationRequiredException.class)
+    ResponseEntity<ApiError> handleReauthenticationRequired(ReauthenticationGuard.ReauthenticationRequiredException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ApiError("REAUTHENTICATION_REQUIRED", e.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

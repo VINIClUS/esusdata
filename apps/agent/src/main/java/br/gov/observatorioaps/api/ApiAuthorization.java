@@ -3,6 +3,7 @@ package br.gov.observatorioaps.api;
 import br.gov.observatorioaps.identityaccess.AuthAuditWriter;
 import br.gov.observatorioaps.identityaccess.AuthenticatedSession;
 import br.gov.observatorioaps.identityaccess.Permission;
+import br.gov.observatorioaps.identityaccess.ReauthenticationGuard;
 import br.gov.observatorioaps.identityaccess.ScopeKind;
 import br.gov.observatorioaps.identityaccess.ScopeResolver;
 import org.springframework.stereotype.Component;
@@ -20,11 +21,15 @@ import java.time.Clock;
 public final class ApiAuthorization {
 
     private final ScopeResolver scopeResolver;
+    private final ReauthenticationGuard reauthenticationGuard;
     private final AuthAuditWriter authAuditWriter;
     private final Clock clock;
 
-    public ApiAuthorization(ScopeResolver scopeResolver, AuthAuditWriter authAuditWriter, Clock clock) {
+    public ApiAuthorization(
+            ScopeResolver scopeResolver, ReauthenticationGuard reauthenticationGuard,
+            AuthAuditWriter authAuditWriter, Clock clock) {
         this.scopeResolver = scopeResolver;
+        this.reauthenticationGuard = reauthenticationGuard;
         this.authAuditWriter = authAuditWriter;
         this.clock = clock;
     }
@@ -40,6 +45,25 @@ public final class ApiAuthorization {
         if (!scopeResolver.hasPermission(session.userId(), permission, municipalityIbge, cnes, ine)) {
             deny(session, permission, municipalityIbge);
         }
+    }
+
+    /**
+     * §1.4.2 L140: the purely-technical permissions (manage_source, manage_access, audit) an
+     * {@code INSTALLATION}-scoped grant carries, with no municipality of their own — user/grant
+     * administration is an installation-wide action, not a per-municipality one.
+     */
+    public void requireInstallationPermission(AuthenticatedSession session, Permission permission) {
+        if (!scopeResolver.hasInstallationPermission(session.userId(), permission)) {
+            authAuditWriter.record(clock.instant(), session.userId(), "ACCESS_DENIED",
+                    "installation", "DENIED", "{\"permission\":\"" + permission.dbValue() + "\"}");
+            throw new ScopeDeniedException(
+                    "principal " + session.userId() + " lacks installation-scoped " + permission.dbValue());
+        }
+    }
+
+    /** §1.12.7 L539: reauthentication within the last few minutes, for grant/source-secret mutations. */
+    public void requireRecentReauth(AuthenticatedSession session) {
+        reauthenticationGuard.requireRecentReauth(session, clock.instant());
     }
 
     /**

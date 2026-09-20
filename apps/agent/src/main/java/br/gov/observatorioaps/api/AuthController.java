@@ -71,6 +71,16 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    /** §1.12.7 L539 explicit re-verification, ahead of a grant/revoke/source-secret action. */
+    @PostMapping("/api/v1/auth/reauth")
+    public ResponseEntity<Void> reauth(
+            @AuthenticationPrincipal br.gov.observatorioaps.identityaccess.AuthenticatedSession session,
+            @RequestBody ReauthRequest request) {
+        authenticationService.reauthenticate(
+                session.sessionId(), session.userId(), request.password(), clock.instant());
+        return ResponseEntity.noContent().build();
+    }
+
     private ResponseCookie newSessionCookie(String rawToken, HttpServletRequest httpRequest) {
         return ResponseCookie.from(SessionCookie.NAME, rawToken)
                 .httpOnly(true)
