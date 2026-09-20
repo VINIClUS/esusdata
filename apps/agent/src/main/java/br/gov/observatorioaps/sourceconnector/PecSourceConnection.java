@@ -21,6 +21,7 @@ public final class PecSourceConnection implements AutoCloseable {
 
     private final Connection connection;
     private final PecConnectionProperties properties;
+    private final PecSourceIdentity sourceIdentity;
     private final HikariDataSource owningPool;
     private final Runnable releasePermit;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -28,10 +29,12 @@ public final class PecSourceConnection implements AutoCloseable {
     private PecSourceConnection(
             Connection connection,
             PecConnectionProperties properties,
+            PecSourceIdentity sourceIdentity,
             HikariDataSource owningPool,
             Runnable releasePermit) {
         this.connection = Objects.requireNonNull(connection, "connection is required");
         this.properties = Objects.requireNonNull(properties, "source properties are required");
+        this.sourceIdentity = Objects.requireNonNull(sourceIdentity, "source identity is required");
         this.owningPool = owningPool;
         this.releasePermit = releasePermit;
     }
@@ -39,17 +42,19 @@ public final class PecSourceConnection implements AutoCloseable {
     static PecSourceConnection fromPool(
             HikariDataSource pool,
             PecConnectionProperties properties,
+            PecSourceIdentity sourceIdentity,
             SourceAcquisitionLimiter.Permit permit
     ) throws SQLException {
         return new PecSourceConnection(
                 pool.getConnection(), Objects.requireNonNull(properties, "source properties are required"),
+                sourceIdentity,
                 pool, permit::close);
     }
 
     /** Test-only binding for fixture connections; not part of the production API. */
     static PecSourceConnection forTest(
-            Connection connection, PecConnectionProperties properties) {
-        return new PecSourceConnection(connection, properties, null, null);
+            Connection connection, PecConnectionProperties properties, PecSourceIdentity sourceIdentity) {
+        return new PecSourceConnection(connection, properties, sourceIdentity, null, null);
     }
 
     public Connection jdbcConnection() {
@@ -58,6 +63,11 @@ public final class PecSourceConnection implements AutoCloseable {
 
     public PecConnectionProperties properties() {
         return properties;
+    }
+
+    /** The immutable deployment identity validated with this source connection. */
+    public PecSourceIdentity sourceIdentity() {
+        return sourceIdentity;
     }
 
     /**

@@ -1,5 +1,6 @@
 package br.gov.observatorioaps.pecadapter;
 
+import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 

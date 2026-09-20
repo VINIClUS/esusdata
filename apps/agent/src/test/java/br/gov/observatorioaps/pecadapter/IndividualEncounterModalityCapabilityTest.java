@@ -2,6 +2,7 @@ package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
+import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
 import br.gov.observatorioaps.sourceconnector.PecSourceConnectionTestSupport;
 import br.gov.observatorioaps.sourceconnector.ReadBudget;
@@ -32,6 +33,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class IndividualEncounterModalityCapabilityTest {
 
+    private static final PecSourceIdentity CT133_IDENTITY =
+            new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO");
+
     @Test
     void checksTheDurationBudgetAfterAnEmptyResultSet() throws Exception {
         Connection connection = mock(Connection.class);
@@ -45,14 +49,31 @@ class IndividualEncounterModalityCapabilityTest {
 
         BudgetGuard guard = mock(BudgetGuard.class);
         IndividualEncounterModalityCapability.stream(
-                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties(), CT133_IDENTITY),
                 LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 guard, ignored -> {
-                }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
-                CompatibilityTestCatalog.productionEntry());
+                }, CompatibilityTestCatalog.productionEntry());
 
         verify(guard, atLeast(2)).checkDuration();
         verify(statement).setString(1, "3541307");
+    }
+
+    @Test
+    void compatibilityUsesTheIdentityBoundToTheSourceConnection() throws Exception {
+        Connection connection = mock(Connection.class);
+        PecSourceIdentity unsupportedIdentity =
+                new PecSourceIdentity("5.4.38", "PEC_DW", "PRONTUARIO");
+
+        assertThatThrownBy(() -> IndividualEncounterModalityCapability.stream(
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties(), unsupportedIdentity),
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                mock(BudgetGuard.class), ignored -> {
+                }, CompatibilityTestCatalog.productionEntry()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("exact compatibility entry");
+
+        verify(connection, never()).prepareStatement(
+                anyString(), eq(ResultSet.TYPE_FORWARD_ONLY), eq(ResultSet.CONCUR_READ_ONLY));
     }
 
     @Test
@@ -69,7 +90,7 @@ class IndividualEncounterModalityCapabilityTest {
         var expected = PecCompatibilityMatrix.fromClasspathResource().findExact(
                 IndividualEncounterModalityCapability.CAPABILITY,
                 IndividualEncounterModalityCapability.ADAPTER_VERSION,
-                new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                CT133_IDENTITY,
                 "9.6.13");
         List<String> events = new ArrayList<>();
         CompatibilityCatalog catalog = new CompatibilityCatalog() {
@@ -92,10 +113,10 @@ class IndividualEncounterModalityCapabilityTest {
         }).when(guard).checkDuration();
 
         IndividualEncounterModalityCapability.stream(
-                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties(), CT133_IDENTITY),
                 LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 guard, ignored -> {
-                }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"), catalog);
+                }, catalog);
 
         for (int i = 0; i < events.size(); i++) {
             if (events.get(i).equals("version") || events.get(i).equals("fingerprint")) {
@@ -135,7 +156,7 @@ class IndividualEncounterModalityCapabilityTest {
         var expected = PecCompatibilityMatrix.fromClasspathResource().findExact(
                 IndividualEncounterModalityCapability.CAPABILITY,
                 IndividualEncounterModalityCapability.ADAPTER_VERSION,
-                new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                CT133_IDENTITY,
                 "9.6.13");
         CompatibilityCatalog catalog = new CompatibilityCatalog() {
             @Override
@@ -152,10 +173,10 @@ class IndividualEncounterModalityCapabilityTest {
         };
 
         IndividualEncounterModalityCapability.stream(
-                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties(), CT133_IDENTITY),
                 LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 mock(BudgetGuard.class), ignored -> {
-                }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"), catalog);
+                }, catalog);
 
         assertThat(events).containsSubsequence("autocommit", "readonly", "repeatable-read", "version-probe");
     }
@@ -181,11 +202,10 @@ class IndividualEncounterModalityCapabilityTest {
                 "I/O error while reading from backend", "08006", new SocketTimeoutException("socket timed out")));
 
         assertThatThrownBy(() -> IndividualEncounterModalityCapability.stream(
-                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties(), CT133_IDENTITY),
                 LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 mock(BudgetGuard.class), ignored -> {
-                }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
-                CompatibilityTestCatalog.productionEntry()))
+                }, CompatibilityTestCatalog.productionEntry()))
                 .isInstanceOf(SourceBudgetExceededException.class)
                 .hasMessageContaining(SourceBudgetExceededException.CODE);
     }
@@ -212,10 +232,9 @@ class IndividualEncounterModalityCapabilityTest {
         BudgetGuard guard = new BudgetGuard(budget);
 
         assertThatThrownBy(() -> IndividualEncounterModalityCapability.stream(
-                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties(), CT133_IDENTITY),
                 LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), guard, ignored -> {
-                }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
-                CompatibilityTestCatalog.productionEntry()))
+                }, CompatibilityTestCatalog.productionEntry()))
                 .isInstanceOf(SourceBudgetExceededException.class)
                 .hasMessageContaining("payload byte ceiling");
         verify(result, never()).getString(anyInt());
@@ -231,6 +250,11 @@ class IndividualEncounterModalityCapabilityTest {
                 .filter(method -> method.getName().equals("stream"))
                 .noneMatch(method -> Arrays.asList(method.getParameterTypes())
                         .contains(br.gov.observatorioaps.sourceconnector.PecConnectionProperties.class)))
+                .isTrue();
+        assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("stream"))
+                .noneMatch(method -> Arrays.asList(method.getParameterTypes())
+                        .contains(PecSourceIdentity.class)))
                 .isTrue();
     }
 
@@ -248,11 +272,10 @@ class IndividualEncounterModalityCapabilityTest {
         when(statement.executeQuery()).thenThrow(new java.sql.SQLException(message, sqlState));
 
         assertThatThrownBy(() -> IndividualEncounterModalityCapability.stream(
-                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties(), CT133_IDENTITY),
                 LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 mock(BudgetGuard.class), ignored -> {
-                }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
-                CompatibilityTestCatalog.productionEntry()))
+                }, CompatibilityTestCatalog.productionEntry()))
                 .isInstanceOf(SourceBudgetExceededException.class)
                 .hasMessageContaining(SourceBudgetExceededException.CODE)
                 .hasCauseInstanceOf(java.sql.SQLException.class);

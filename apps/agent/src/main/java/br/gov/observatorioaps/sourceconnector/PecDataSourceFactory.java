@@ -28,7 +28,7 @@ public final class PecDataSourceFactory {
         this.secretResolver = secretResolver;
     }
 
-    public HikariDataSource create(PecConnectionProperties properties, ReadBudget budget) {
+    HikariDataSource create(PecConnectionProperties properties, ReadBudget budget) {
         InetAddress validatedAddress = allowedDestinations.assertAllowed(properties.host(), properties.port());
 
         String jdbcUrl = "jdbc:postgresql://" + jdbcHostLiteral(validatedAddress) + ":" + properties.port()
@@ -75,15 +75,23 @@ public final class PecDataSourceFactory {
      * properties used to construct its pool, so adapters cannot accidentally combine this JDBC
      * connection with another source's municipality configuration.
      */
-    public PecSourceConnection open(PecConnectionProperties properties, ReadBudget budget)
+    public PecSourceConnection open(
+            PecConnectionProperties properties,
+            PecSourceIdentity sourceIdentity,
+            ReadBudget budget)
             throws SQLException {
+        requireCompleteSourceIdentity(sourceIdentity);
+        if (properties == null) {
+            throw new IllegalArgumentException("Source connection properties are required");
+        }
         SourceAcquisitionLimiter.Permit permit =
-                SourceAcquisitionLimiter.acquireOrFail(properties == null ? null : properties.sourceId());
+                SourceAcquisitionLimiter.acquireOrFail(properties.sourceId());
         HikariDataSource dataSource = null;
         boolean ownershipTransferred = false;
         try {
             dataSource = create(properties, budget);
-            PecSourceConnection sourceConnection = PecSourceConnection.fromPool(dataSource, properties, permit);
+            PecSourceConnection sourceConnection = PecSourceConnection.fromPool(
+                    dataSource, properties, sourceIdentity, permit);
             ownershipTransferred = true;
             return sourceConnection;
         } finally {
@@ -93,6 +101,13 @@ public final class PecDataSourceFactory {
                 }
                 permit.close();
             }
+        }
+    }
+
+    private static void requireCompleteSourceIdentity(PecSourceIdentity sourceIdentity) {
+        if (sourceIdentity == null || !sourceIdentity.isComplete()) {
+            throw new IllegalStateException(
+                    "PecSourceIdentity is required before opening a PEC source connection");
         }
     }
 

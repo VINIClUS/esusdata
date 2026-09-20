@@ -1,4 +1,4 @@
-package br.gov.observatorioaps.pecadapter;
+package br.gov.observatorioaps.sourceconnector;
 
 /** Trusted deployment-supplied identity for the connected PEC source. */
 public record PecSourceIdentity(

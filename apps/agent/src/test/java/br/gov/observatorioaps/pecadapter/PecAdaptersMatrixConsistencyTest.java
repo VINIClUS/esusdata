@@ -1,5 +1,6 @@
 package br.gov.observatorioaps.pecadapter;
 
+import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 

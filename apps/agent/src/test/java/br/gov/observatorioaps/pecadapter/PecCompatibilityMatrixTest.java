@@ -3,6 +3,7 @@ package br.gov.observatorioaps.pecadapter;
 import org.junit.jupiter.api.Test;
 
 import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
+import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import java.sql.Connection;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;

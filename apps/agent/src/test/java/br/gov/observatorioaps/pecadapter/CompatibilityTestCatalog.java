@@ -1,5 +1,6 @@
 package br.gov.observatorioaps.pecadapter;
 
+import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Map;

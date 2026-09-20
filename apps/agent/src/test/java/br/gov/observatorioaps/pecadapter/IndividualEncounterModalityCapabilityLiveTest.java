@@ -6,6 +6,7 @@ import br.gov.observatorioaps.sourceconnector.EnvFileSecretResolver;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.PecDataSourceFactory;
 import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
+import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import br.gov.observatorioaps.sourceconnector.ReadBudget;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -58,15 +59,16 @@ class IndividualEncounterModalityCapabilityLiveTest {
         var factory = new PecDataSourceFactory(allowlist, new EnvFileSecretResolver(ENV_FILE));
 
         PecSourceConnection sourceConnection = factory.open(
-                properties, ReadBudget.initialEngineeringProposal());
+                properties,
+                new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                ReadBudget.initialEngineeringProposal());
         List<RawEncounterRecord> records = new ArrayList<>();
         try (sourceConnection) {
             var guard = new BudgetGuard(ReadBudget.initialEngineeringProposal());
             IndividualEncounterModalityCapability.stream(
                     sourceConnection,
                     LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
-                    guard, records::add,
-                    new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"));
+                    guard, records::add);
         }
 
         long programados = records.stream().filter(r -> r.modality() == EncounterModality.PROGRAMADO).count();

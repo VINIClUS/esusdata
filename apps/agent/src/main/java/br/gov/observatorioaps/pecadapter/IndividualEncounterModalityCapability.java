@@ -2,6 +2,7 @@ package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
+import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import java.io.IOException;
@@ -91,11 +92,10 @@ public final class IndividualEncounterModalityCapability {
             LocalDate periodStart,
             LocalDate periodEndExclusive,
             BudgetGuard guard,
-            Consumer<RawEncounterRecord> consumer,
-            PecSourceIdentity sourceIdentity
+            Consumer<RawEncounterRecord> consumer
     ) throws SQLException {
         stream(sourceConnection, periodStart, periodEndExclusive, guard, consumer,
-                sourceIdentity, new JdbcCompatibilityCatalog());
+                new JdbcCompatibilityCatalog());
     }
 
     /**
@@ -110,7 +110,6 @@ public final class IndividualEncounterModalityCapability {
             LocalDate periodEndExclusive,
             BudgetGuard guard,
             Consumer<RawEncounterRecord> consumer,
-            PecSourceIdentity sourceIdentity,
             CompatibilityCatalog catalog
     ) throws SQLException {
         if (sourceConnection == null) {
@@ -118,6 +117,7 @@ public final class IndividualEncounterModalityCapability {
         }
         Connection connection = sourceConnection.jdbcConnection();
         PecConnectionProperties sourceProperties = sourceConnection.properties();
+        PecSourceIdentity sourceIdentity = sourceConnection.sourceIdentity();
         String municipalityIbge = requireAuthorizedMunicipality(sourceProperties);
         beginReadOnlyRepeatableReadTransaction(connection);
         try {

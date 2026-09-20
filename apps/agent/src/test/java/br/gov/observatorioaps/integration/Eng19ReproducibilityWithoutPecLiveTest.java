@@ -12,7 +12,6 @@ import br.gov.observatorioaps.indicatorengine.IndicatorResult;
 import br.gov.observatorioaps.indicatorpacks.c1.C1Rule;
 import br.gov.observatorioaps.pecadapter.EncounterModality;
 import br.gov.observatorioaps.pecadapter.IndividualEncounterModalityCapability;
-import br.gov.observatorioaps.pecadapter.PecSourceIdentity;
 import br.gov.observatorioaps.pecadapter.RawEncounterRecord;
 import br.gov.observatorioaps.sourceconnector.AllowedDestinations;
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
@@ -20,6 +19,7 @@ import br.gov.observatorioaps.sourceconnector.EnvFileSecretResolver;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.PecDataSourceFactory;
 import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
+import br.gov.observatorioaps.sourceconnector.PecSourceIdentity;
 import br.gov.observatorioaps.sourceconnector.ReadBudget;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -99,15 +99,15 @@ class Eng19ReproducibilityWithoutPecLiveTest {
         ReadBudget budget = ReadBudget.initialEngineeringProposal();
 
         Instant startedAt = Instant.now();
-        try (PecSourceConnection sourceConnection = factory.open(properties, budget);
+        try (PecSourceConnection sourceConnection = factory.open(
+                properties, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"), budget);
              ExtractWriter writer = new ExtractWriter(
                      extractDir, extractionId, budget.maxTempFileBytes(),
                      new ExtractionScope("pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01"))) {
                 var guard = new BudgetGuard(budget);
                 IndividualEncounterModalityCapability.stream(
                         sourceConnection, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), guard,
-                        raw -> writeCanonical(writer, raw),
-                        new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"));
+                        raw -> writeCanonical(writer, raw));
             return writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01", startedAt,
                     "America/Sao_Paulo",

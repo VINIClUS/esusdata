@@ -9,7 +9,9 @@ public final class PecSourceConnectionTestSupport {
     }
 
     public static PecSourceConnection bind(
-            Connection connection, PecConnectionProperties properties) {
-        return PecSourceConnection.forTest(connection, properties);
+            Connection connection,
+            PecConnectionProperties properties,
+            PecSourceIdentity sourceIdentity) {
+        return PecSourceConnection.forTest(connection, properties, sourceIdentity);
     }
 }

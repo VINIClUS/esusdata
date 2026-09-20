@@ -2,14 +2,69 @@ package br.gov.observatorioaps.sourceconnector;
 
 import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
+import java.lang.reflect.Modifier;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PecDataSourceFactoryTest {
+
+    private static final PecSourceIdentity CT133_IDENTITY =
+            new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO");
+
+    @Test
+    void rawPoolCreationIsNotPublic() throws Exception {
+        var create = PecDataSourceFactory.class.getDeclaredMethod(
+                "create", PecConnectionProperties.class, ReadBudget.class);
+
+        assertThat(Modifier.isPublic(create.getModifiers())).isFalse();
+    }
+
+    @Test
+    void acquisitionEntryPointRequiresTheDeploymentIdentity() {
+        assertThat(Arrays.stream(PecDataSourceFactory.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("open"))
+                .anyMatch(method -> Arrays.asList(method.getParameterTypes())
+                        .contains(PecSourceIdentity.class)))
+                .isTrue();
+    }
+
+    @Test
+    void sourceConnectionExposesItsBoundDeploymentIdentity() throws Exception {
+        assertThat(PecSourceConnection.class.getDeclaredMethod("sourceIdentity"))
+                .isNotNull();
+    }
+
+    @Test
+    void missingDeploymentIdentityBlocksOpeningBeforeDestinationValidation() {
+        var properties = new PecConnectionProperties(
+                "missing-identity-source", "127.0.0.1", 15433,
+                "esus", "reader", "DB_PASSWORD", "3541307");
+        var factory = new PecDataSourceFactory(
+                new AllowedDestinations(Set.of()), ignored -> "secret".toCharArray());
+
+        assertThatThrownBy(() -> factory.open(
+                properties, null, ReadBudget.initialEngineeringProposal()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("PecSourceIdentity");
+    }
+
+    @Test
+    void sourceConnectionReturnsTheIdentityWithWhichItWasBound() {
+        var connection = Mockito.mock(java.sql.Connection.class);
+        var properties = new PecConnectionProperties(
+                "bound-identity-source", "127.0.0.1", 15433,
+                "esus", "reader", "DB_PASSWORD", "3541307");
+
+        var bound = PecSourceConnectionTestSupport.bind(connection, properties, CT133_IDENTITY);
+
+        assertThat(bound.sourceIdentity()).isSameAs(CT133_IDENTITY);
+    }
 
     @Test
     void pinsTheValidatedLiteralAddressAndMapsTheTwoTimeoutsSeparately() {
@@ -85,9 +140,11 @@ class PecDataSourceFactoryTest {
         var factory = new PecDataSourceFactory(
                 new AllowedDestinations(Set.of()), ignored -> "secret".toCharArray());
 
-        assertThatThrownBy(() -> factory.open(properties, ReadBudget.initialEngineeringProposal()))
+        assertThatThrownBy(() -> factory.open(
+                properties, CT133_IDENTITY, ReadBudget.initialEngineeringProposal()))
                 .isInstanceOf(AllowedDestinations.DestinationNotAllowedException.class);
-        assertThatThrownBy(() -> factory.open(properties, ReadBudget.initialEngineeringProposal()))
+        assertThatThrownBy(() -> factory.open(
+                properties, CT133_IDENTITY, ReadBudget.initialEngineeringProposal()))
                 .isInstanceOf(AllowedDestinations.DestinationNotAllowedException.class);
     }
 }
