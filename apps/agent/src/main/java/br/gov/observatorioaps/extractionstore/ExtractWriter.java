@@ -46,6 +46,8 @@ public final class ExtractWriter implements AutoCloseable {
     private final ExtractRecovery.WriterLock writerLock;
     private final Path tempFile;
     private final long maxTempFileBytes;
+    private final BoundedOutputStream boundedOut;
+    private final ExtractionScope acquisitionScope;
     private final DigestOutputStream digestOut;
     private final GZIPOutputStream gzipOut;
 
@@ -58,7 +60,12 @@ public final class ExtractWriter implements AutoCloseable {
     private LocalDate latestCareDate;
 
     public ExtractWriter(Path baseDir, String extractionId) throws IOException {
-        this(baseDir, extractionId, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES);
+        this(baseDir, extractionId, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES, null);
+    }
+
+    public ExtractWriter(Path baseDir, String extractionId, ExtractionScope acquisitionScope)
+            throws IOException {
+        this(baseDir, extractionId, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES, acquisitionScope);
     }
 
     /**
@@ -66,12 +73,23 @@ public final class ExtractWriter implements AutoCloseable {
      * constructor also reserves that capacity from the file store before creating the temp file.
      */
     public ExtractWriter(Path baseDir, String extractionId, long maxTempFileBytes) throws IOException {
+        this(baseDir, extractionId, maxTempFileBytes, null);
+    }
+
+    /** Opens a bounded temporary extract bound to the source and period authorized for it. */
+    public ExtractWriter(
+            Path baseDir,
+            String extractionId,
+            long maxTempFileBytes,
+            ExtractionScope acquisitionScope
+    ) throws IOException {
         this.baseDir = baseDir;
         this.extractionId = extractionId;
         if (maxTempFileBytes <= 0) {
             throw new IllegalArgumentException("maxTempFileBytes must be positive");
         }
         this.maxTempFileBytes = maxTempFileBytes;
+        this.acquisitionScope = acquisitionScope;
         ExtractValidation.validateExtractionId(baseDir, extractionId);
         Files.createDirectories(baseDir);
         ExtractRecovery.WriterLock lock = ExtractRecovery.acquireWriterLock(baseDir, extractionId);
@@ -90,8 +108,9 @@ public final class ExtractWriter implements AutoCloseable {
             ensureTempSpace(baseDir, maxTempFileBytes);
             createOwnerOnlyFile(tempFile);
             FileChannel dataChannel = FileChannel.open(tempFile, StandardOpenOption.WRITE);
-            DigestOutputStream digestStream = new DigestOutputStream(
-                    new BoundedOutputStream(Channels.newOutputStream(dataChannel), maxTempFileBytes), digest);
+            BoundedOutputStream boundedStream = new BoundedOutputStream(
+                    Channels.newOutputStream(dataChannel), maxTempFileBytes);
+            DigestOutputStream digestStream = new DigestOutputStream(boundedStream, digest);
             GZIPOutputStream gzipStream;
             try {
                 gzipStream = new GZIPOutputStream(digestStream);
@@ -103,6 +122,7 @@ public final class ExtractWriter implements AutoCloseable {
                 }
                 throw failure;
             }
+            this.boundedOut = boundedStream;
             this.digestOut = digestStream;
             this.gzipOut = gzipStream;
             this.writerLock = lock;
@@ -115,7 +135,7 @@ public final class ExtractWriter implements AutoCloseable {
     public void write(CanonicalEncounter encounter) throws IOException {
         if (closed) throw new IllegalStateException("writer already finalized/closed");
         validateRecordForWrite(encounter);
-        ensureTempSpace(baseDir, maxTempFileBytes);
+        ensureTempSpace(baseDir, maxTempFileBytes - boundedOut.written());
         byte[] line = (mapper.writeValueAsString(encounter) + "\n").getBytes(StandardCharsets.UTF_8);
         gzipOut.write(line);
         rowCount++;
@@ -149,7 +169,7 @@ public final class ExtractWriter implements AutoCloseable {
         Path manifestFile = baseDir.resolve(extractionId + ".manifest.json");
         requirePublicationTargetAbsent(finalFile, "extract data file");
         requirePublicationTargetAbsent(manifestFile, "manifest file");
-        ensureTempSpace(baseDir, maxTempFileBytes);
+        ensureTempSpace(baseDir, maxTempFileBytes - boundedOut.written());
 
         gzipOut.close();
         closed = true;
@@ -215,6 +235,10 @@ public final class ExtractWriter implements AutoCloseable {
             careDate = LocalDate.parse(encounter.careDate());
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("encounter careDate must be an ISO local date", e);
+        }
+        if (acquisitionScope != null && !acquisitionScope.contains(
+                encounter.sourceRef().sourceId(), encounter.municipalityIbge(), careDate)) {
+            throw new IllegalArgumentException("record does not match the bound acquisition scope");
         }
         if (encounter.cnes() != null && encounter.cnes().isBlank()
                 || encounter.ine() != null && encounter.ine().isBlank()
@@ -285,7 +309,16 @@ public final class ExtractWriter implements AutoCloseable {
 
     private void ensureWrittenScopeMatches(
             String sourceId, String municipalityIbge, String periodStart, String periodEndExclusive) {
-        if (writtenSourceId == null) return;
+        if (acquisitionScope != null) {
+            acquisitionScope.requireMatches(sourceId, municipalityIbge, periodStart, periodEndExclusive);
+        }
+        if (writtenSourceId == null) {
+            if (acquisitionScope == null) {
+                throw new IllegalArgumentException(
+                        "an acquisition scope is required to finalize an empty extract");
+            }
+            return;
+        }
         if (!sourceId.equals(writtenSourceId)) {
             throw new IllegalArgumentException("manifest sourceId does not match written records");
         }
@@ -355,6 +388,10 @@ public final class ExtractWriter implements AutoCloseable {
     }
 
     private static void ensureTempSpace(Path directory, long maxTempFileBytes) throws IOException {
+        if (maxTempFileBytes < 0) {
+            throw new SourceBudgetExceededException(
+                    SourceBudgetExceededException.CODE + ": temporary extract byte ceiling exceeded");
+        }
         long reserveBytes = maxTempFileBytes > Long.MAX_VALUE - 1_048_576L
                 ? Long.MAX_VALUE
                 : maxTempFileBytes + 1_048_576L;
@@ -403,6 +440,10 @@ public final class ExtractWriter implements AutoCloseable {
         @Override
         public void close() throws IOException {
             delegate.close();
+        }
+
+        private long written() {
+            return written;
         }
 
         private void requireCapacity(long bytes) {

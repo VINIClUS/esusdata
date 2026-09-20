@@ -24,6 +24,39 @@ class ExtractWriterReaderTest {
     private static final String TEST_QUERY_CHECKSUM = "sha256:" + "0".repeat(64);
 
     @Test
+    void emptyExtractMustMatchItsBoundAcquisitionScope() throws Exception {
+        ExtractionScope scope = new ExtractionScope(
+                "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01");
+
+        assertThatThrownBy(() -> {
+            try (ExtractWriter writer = new ExtractWriter(dir, "ext-empty-scope", scope)) {
+                writer.finalizeExtract(
+                        "other-source", "3550308", "2026-04-01", "2026-05-01",
+                        Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                        TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+            }
+        }).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("acquisition scope");
+    }
+
+    @Test
+    void emptyExtractWithTheBoundAcquisitionScopeCanBeFinalized() throws Exception {
+        ExtractionScope scope = new ExtractionScope(
+                "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01");
+
+        ExtractionManifest manifest;
+        try (ExtractWriter writer = new ExtractWriter(dir, "ext-empty-scope-valid", scope)) {
+            manifest = writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+
+        assertThat(manifest.rowCount()).isZero();
+        assertThat(reader.readEncounters(dir, manifest)).isEmpty();
+    }
+
+    @Test
     void temporaryExtractCannotGrowPastItsConfiguredByteCeiling() throws Exception {
         String randomPayload = randomPayload();
 

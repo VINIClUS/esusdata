@@ -3,6 +3,7 @@ package br.gov.observatorioaps.integration;
 import br.gov.observatorioaps.extractionstore.CanonicalEncounter;
 import br.gov.observatorioaps.extractionstore.CanonicalModality;
 import br.gov.observatorioaps.extractionstore.ExtractReader;
+import br.gov.observatorioaps.extractionstore.ExtractionScope;
 import br.gov.observatorioaps.extractionstore.ExtractWriter;
 import br.gov.observatorioaps.extractionstore.ExtractionManifest;
 import br.gov.observatorioaps.extractionstore.SourceRef;
@@ -99,7 +100,9 @@ class Eng19ReproducibilityWithoutPecLiveTest {
 
         Instant startedAt = Instant.now();
         try (PecSourceConnection sourceConnection = factory.open(properties, budget);
-             ExtractWriter writer = new ExtractWriter(extractDir, extractionId, budget.maxTempFileBytes())) {
+             ExtractWriter writer = new ExtractWriter(
+                     extractDir, extractionId, budget.maxTempFileBytes(),
+                     new ExtractionScope("pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01"))) {
                 var guard = new BudgetGuard(budget);
                 IndividualEncounterModalityCapability.stream(
                         sourceConnection, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), guard,
