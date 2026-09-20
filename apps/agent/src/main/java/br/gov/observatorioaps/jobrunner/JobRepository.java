@@ -177,16 +177,18 @@ public final class JobRepository {
     /** Cancelling a job that never started — no attempt, no staging to neutralize. */
     public boolean cancelQueued(String jobId, Instant now) {
         return jdbc.update("""
-                UPDATE jobs SET state = 'CANCELLED', finished_at = ?
-                 WHERE job_id = ? AND state = 'QUEUED'
+                UPDATE jobs SET state = 'CANCELLED', finished_at = ?,
+                    failure_code = NULL, failure_detail = NULL
+                WHERE job_id = ? AND state = 'QUEUED'
                 """, now.toString(), jobId) == 1;
     }
 
     public boolean markCancelled(String jobId, String processInstanceId, long executionGeneration, Instant now) {
         return jdbc.update("""
-                UPDATE jobs SET state = 'CANCELLED', finished_at = ?
-                 WHERE job_id = ? AND state = 'CANCEL_REQUESTED'
-                   AND process_instance_id = ? AND execution_generation = ?
+                UPDATE jobs SET state = 'CANCELLED', finished_at = ?,
+                    failure_code = NULL, failure_detail = NULL
+                WHERE job_id = ? AND state = 'CANCEL_REQUESTED'
+                  AND process_instance_id = ? AND execution_generation = ?
                 """, now.toString(), jobId, processInstanceId, executionGeneration) == 1;
     }
 
@@ -233,7 +235,8 @@ public final class JobRepository {
                 jobId, processInstanceId, executionGeneration, JobState.CANCEL_REQUESTED, finishedAt,
                 "CANCELLED", "CANCELLED", "cooperative cancellation completed",
                 () -> jdbc.update("""
-                        UPDATE jobs SET state = 'CANCELLED', finished_at = ?
+                        UPDATE jobs SET state = 'CANCELLED', finished_at = ?,
+                            failure_code = NULL, failure_detail = NULL
                         WHERE job_id = ? AND state = 'CANCEL_REQUESTED'
                           AND process_instance_id = ? AND execution_generation = ?
                         """, finishedAt.toString(), jobId, processInstanceId, executionGeneration));
@@ -311,8 +314,9 @@ public final class JobRepository {
 
     public boolean cancelAbandoned(String jobId, Instant now) {
         return jdbc.update("""
-                UPDATE jobs SET state = 'CANCELLED', process_instance_id = NULL, finished_at = ?
-                 WHERE job_id = ? AND state = 'CANCEL_REQUESTED'
+                UPDATE jobs SET state = 'CANCELLED', process_instance_id = NULL, finished_at = ?,
+                    failure_code = NULL, failure_detail = NULL
+                WHERE job_id = ? AND state = 'CANCEL_REQUESTED'
                 """, now.toString(), jobId) == 1;
     }
 

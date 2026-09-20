@@ -173,6 +173,49 @@ class JobRepositoryTest {
     }
 
     @Test
+    void cancellationClearsFailureDiagnosticsLeftByAnEarlierRetry() {
+        fixture.jobRepository.enqueue(request("job-cancel-retry", "ext-1"));
+        Job firstAttempt = fixture.jobRepository.acquireNext("proc-a", clock.instant()).orElseThrow();
+        Instant retryAt = clock.instant().plusSeconds(60);
+        assertThat(fixture.jobRepository.requeueForRetryAndRecordAttempt(
+                firstAttempt.jobId(), firstAttempt.processInstanceId(), firstAttempt.executionGeneration(),
+                JobState.RUNNING, retryAt, "SOURCE_TIMEOUT", "temporary source failure", clock.instant()))
+                .isTrue();
+
+        Job retried = fixture.jobRepository.acquireNext("proc-b", retryAt).orElseThrow();
+        assertThat(retried.failureCode()).isEqualTo("SOURCE_TIMEOUT");
+        assertThat(fixture.jobRepository.requestCancel(
+                retried.jobId(), retried.processInstanceId(), retried.executionGeneration(), clock.instant()))
+                .isTrue();
+        assertThat(fixture.jobRepository.markCancelledAndRecordAttempt(
+                retried.jobId(), retried.processInstanceId(), retried.executionGeneration(), clock.instant()))
+                .isTrue();
+
+        Job cancelled = fixture.jobRepository.findById(retried.jobId()).orElseThrow();
+        assertThat(cancelled.state()).isEqualTo(JobState.CANCELLED);
+        assertThat(cancelled.failureCode()).isNull();
+        assertThat(cancelled.failureDetail()).isNull();
+    }
+
+    @Test
+    void queuedCancellationClearsFailureDiagnosticsLeftByAnEarlierRetry() {
+        fixture.jobRepository.enqueue(request("job-cancel-queued-retry", "ext-1"));
+        Job firstAttempt = fixture.jobRepository.acquireNext("proc-a", clock.instant()).orElseThrow();
+        Instant retryAt = clock.instant().plusSeconds(60);
+        assertThat(fixture.jobRepository.requeueForRetryAndRecordAttempt(
+                firstAttempt.jobId(), firstAttempt.processInstanceId(), firstAttempt.executionGeneration(),
+                JobState.RUNNING, retryAt, "SOURCE_TIMEOUT", "temporary source failure", clock.instant()))
+                .isTrue();
+
+        assertThat(fixture.jobRepository.cancelQueued(firstAttempt.jobId(), clock.instant())).isTrue();
+
+        Job cancelled = fixture.jobRepository.findById(firstAttempt.jobId()).orElseThrow();
+        assertThat(cancelled.state()).isEqualTo(JobState.CANCELLED);
+        assertThat(cancelled.failureCode()).isNull();
+        assertThat(cancelled.failureDetail()).isNull();
+    }
+
+    @Test
     void acquireNextRespectsNextAttemptAtBackoff() {
         fixture.jobRepository.enqueue(request("job-4", "ext-1"));
         Job acquired = fixture.jobRepository.acquireNext("proc-a", clock.instant()).orElseThrow();
