@@ -28,6 +28,7 @@ class JdbcCompatibilityCatalogTest {
         when(result.getString("column_name")).thenReturn("id", "care_date");
         when(result.getString("data_type")).thenReturn("bigint", "date");
         when(result.getString("udt_name")).thenReturn("int8", "date");
+        when(result.getString("is_nullable")).thenReturn("NO", "YES");
         when(result.getInt("ordinal_position")).thenReturn(1, 2);
 
         String fingerprint = new JdbcCompatibilityCatalog().fingerprint(
@@ -35,8 +36,8 @@ class JdbcCompatibilityCatalogTest {
 
         assertThat(fingerprint).isEqualTo(sha256(
                 "tb_test\n"
-                        + "id|bigint|int8|1\n"
-                        + "care_date|date|date|2"));
+                        + "id|bigint|int8|1|NO\n"
+                        + "care_date|date|date|2|YES"));
     }
 
     @Test
@@ -55,6 +56,7 @@ class JdbcCompatibilityCatalogTest {
                 "co_seq_dim_tipo_atendimento", "ds_tipo_atendimento", "co_dim_tipo_atendimento_pai");
         when(metadata.getString("data_type")).thenReturn("bigint", "character varying", "bigint");
         when(metadata.getString("udt_name")).thenReturn("int8", "varchar", "int8");
+        when(metadata.getString("is_nullable")).thenReturn("NO", "NO", "YES");
         when(metadata.getInt("ordinal_position")).thenReturn(1, 2, 3);
 
         when(semantics.next()).thenReturn(true, true, false);
@@ -70,9 +72,9 @@ class JdbcCompatibilityCatalogTest {
 
         assertThat(fingerprint).isEqualTo(sha256(
                 "tb_dim_tipo_atendimento\n"
-                        + "co_seq_dim_tipo_atendimento|bigint|int8|1\n"
-                        + "ds_tipo_atendimento|character varying|varchar|2\n"
-                        + "co_dim_tipo_atendimento_pai|bigint|int8|3\n"
+                        + "co_seq_dim_tipo_atendimento|bigint|int8|1|NO\n"
+                        + "ds_tipo_atendimento|character varying|varchar|2|NO\n"
+                        + "co_dim_tipo_atendimento_pai|bigint|int8|3|YES\n"
                         + "LEAF_SEMANTICS=2,3\n"
                         + "2|17:Consulta agendada|1\n"
                         + "3|15:Consulta no dia|4"));
@@ -93,6 +95,7 @@ class JdbcCompatibilityCatalogTest {
         when(metadata.getString("column_name")).thenReturn("co_seq_dim_unidade_saude", "nu_cnes");
         when(metadata.getString("data_type")).thenReturn("bigint", "character varying");
         when(metadata.getString("udt_name")).thenReturn("int8", "varchar");
+        when(metadata.getString("is_nullable")).thenReturn("NO", "YES");
         when(metadata.getInt("ordinal_position")).thenReturn(1, 2);
 
         when(constraint.next()).thenReturn(true, false);
@@ -107,8 +110,8 @@ class JdbcCompatibilityCatalogTest {
 
         assertThat(fingerprint).isEqualTo(sha256(
                 "tb_dim_unidade_saude\n"
-                        + "co_seq_dim_unidade_saude|bigint|int8|1\n"
-                        + "nu_cnes|character varying|varchar|2\n"
+                        + "co_seq_dim_unidade_saude|bigint|int8|1|NO\n"
+                        + "nu_cnes|character varying|varchar|2|YES\n"
                         + "UNIQUE_KEY=co_seq_dim_unidade_saude\n"
                         + "PRIMARY KEY|co_seq_dim_unidade_saude"));
     }

@@ -5,6 +5,7 @@ import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import org.junit.jupiter.api.Test;
 
+import java.net.SocketTimeoutException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -158,6 +159,25 @@ class IndividualEncounterModalityCapabilityTest {
     @Test
     void translatesPostgresLockTimeoutIntoTheBudgetException() throws Exception {
         assertPostgresBudgetCancellation("55P03", "canceling statement due to lock timeout");
+    }
+
+    @Test
+    void translatesPgJdbcSocketTimeoutIntoTheBudgetException() throws Exception {
+        Connection connection = mock(Connection.class);
+        PreparedStatement statement = mock(PreparedStatement.class);
+        when(connection.prepareStatement(
+                anyString(), eq(ResultSet.TYPE_FORWARD_ONLY), eq(ResultSet.CONCUR_READ_ONLY)))
+                .thenReturn(statement);
+        when(statement.executeQuery()).thenThrow(new java.sql.SQLException(
+                "I/O error while reading from backend", "08006", new SocketTimeoutException("socket timed out")));
+
+        assertThatThrownBy(() -> IndividualEncounterModalityCapability.stream(
+                connection, sourceProperties(), LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                mock(BudgetGuard.class), ignored -> {
+                }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                CompatibilityTestCatalog.productionEntry()))
+                .isInstanceOf(SourceBudgetExceededException.class)
+                .hasMessageContaining(SourceBudgetExceededException.CODE);
     }
 
     @Test

@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
@@ -13,12 +14,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.LinkOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HexFormat;
+import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 
 /**
@@ -67,8 +72,9 @@ public final class ExtractWriter implements AutoCloseable {
             } catch (NoSuchAlgorithmException e) {
                 throw new IllegalStateException("SHA-256 not available", e);
             }
-            OutputStream fileOut = Files.newOutputStream(tempFile,
-                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            createOwnerOnlyFile(tempFile);
+            OutputStream fileOut = Channels.newOutputStream(
+                    FileChannel.open(tempFile, StandardOpenOption.WRITE));
             this.digestOut = new DigestOutputStream(fileOut, digest);
             this.gzipOut = new GZIPOutputStream(digestOut);
             this.writerLock = lock;
@@ -270,11 +276,22 @@ public final class ExtractWriter implements AutoCloseable {
     }
 
     private static void writeAndForce(Path path, byte[] bytes) throws IOException {
-        try (FileChannel channel = FileChannel.open(path,
-                StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+        createOwnerOnlyFile(path);
+        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE)) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             while (buffer.hasRemaining()) channel.write(buffer);
             channel.force(true);
+        }
+    }
+
+    private static void createOwnerOnlyFile(Path path) throws IOException {
+        PosixFileAttributeView posixView = Files.getFileAttributeView(
+                path.getParent(), PosixFileAttributeView.class);
+        if (posixView != null) {
+            Files.createFile(path, PosixFilePermissions.asFileAttribute(Set.of(
+                    PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
+        } else {
+            Files.createFile(path);
         }
     }
 

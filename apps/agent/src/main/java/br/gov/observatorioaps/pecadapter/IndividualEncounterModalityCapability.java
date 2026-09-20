@@ -3,6 +3,7 @@ package br.gov.observatorioaps.pecadapter;
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -154,6 +155,9 @@ public final class IndividualEncounterModalityCapability {
 
     private static boolean isPostgresBudgetCancellation(SQLException failure) {
         for (SQLException current = failure; current != null; current = current.getNextException()) {
+            if (hasSocketTimeoutCause(current)) {
+                return true;
+            }
             String state = current.getSQLState();
             String message = current.getMessage() == null
                     ? "" : current.getMessage().toLowerCase(Locale.ROOT);
@@ -161,6 +165,15 @@ public final class IndividualEncounterModalityCapability {
                 return true;
             }
             if ("55P03".equals(state) && message.contains("lock timeout")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasSocketTimeoutCause(Throwable failure) {
+        for (Throwable current = failure; current != null; current = current.getCause()) {
+            if (current instanceof SocketTimeoutException) {
                 return true;
             }
         }

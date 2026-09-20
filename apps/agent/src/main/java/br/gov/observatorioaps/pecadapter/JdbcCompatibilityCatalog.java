@@ -21,7 +21,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
 
     private static final String VERSION_QUERY = "SELECT current_setting('server_version')";
     private static final String COLUMNS_QUERY = """
-            SELECT column_name, data_type, udt_name, ordinal_position
+            SELECT column_name, data_type, udt_name, is_nullable, ordinal_position
               FROM information_schema.columns
              WHERE table_schema = 'public' AND table_name = ?
             ORDER BY ordinal_position
@@ -65,6 +65,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
                 while (result.next()) {
                     columns.put(result.getString("column_name"), new Column(
                             result.getString("data_type"), result.getString("udt_name"),
+                            result.getString("is_nullable"),
                             result.getInt("ordinal_position")));
                 }
             }
@@ -94,11 +95,13 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
             if (column == null) {
                 throw new SQLException("Required compatibility column is missing: " + object + "." + requested);
             }
-            if (column.dataType() == null || column.udtName() == null || column.ordinalPosition() <= 0) {
+            if (column.dataType() == null || column.udtName() == null || column.isNullable() == null
+                    || column.ordinalPosition() <= 0
+                    || !("YES".equals(column.isNullable()) || "NO".equals(column.isNullable()))) {
                 throw new SQLException("Incomplete compatibility metadata for " + object + "." + requested);
             }
             signatureParts.add(requested + "|" + column.dataType() + "|" + column.udtName()
-                    + "|" + column.ordinalPosition());
+                    + "|" + column.ordinalPosition() + "|" + column.isNullable());
         }
         return sha256(String.join("\n", signatureParts));
     }
@@ -192,7 +195,8 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
             throws SQLException {
         Column metadata = columns.get(column);
         if (metadata == null || metadata.dataType() == null || metadata.udtName() == null
-                || metadata.ordinalPosition() <= 0) {
+                || metadata.isNullable() == null || metadata.ordinalPosition() <= 0
+                || !("YES".equals(metadata.isNullable()) || "NO".equals(metadata.isNullable()))) {
             throw new SQLException("Incomplete compatibility metadata for " + object + "." + column);
         }
     }
@@ -302,6 +306,6 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         }
     }
 
-    private record Column(String dataType, String udtName, int ordinalPosition) {
+    private record Column(String dataType, String udtName, String isNullable, int ordinalPosition) {
     }
 }

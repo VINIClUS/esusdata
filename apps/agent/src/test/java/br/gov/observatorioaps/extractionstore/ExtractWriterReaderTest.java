@@ -296,6 +296,28 @@ class ExtractWriterReaderTest {
         assertThat(Files.exists(manifestTemp)).isFalse();
     }
 
+    @Test
+    void publishedExtractFilesAreOwnerOnlyOnPosix() throws Exception {
+        if (Files.getFileAttributeView(dir, java.nio.file.attribute.PosixFileAttributeView.class) == null) {
+            return;
+        }
+        String extractionId = "ext-owner-only-files";
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+            writer.write(encounter("1", CanonicalModality.PROGRAMADO));
+            writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+
+        Set<PosixFilePermission> ownerOnly = Set.of(
+                PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
+        assertThat(Files.getPosixFilePermissions(dir.resolve(extractionId + ".jsonl.gz")))
+                .containsExactlyInAnyOrderElementsOf(ownerOnly);
+        assertThat(Files.getPosixFilePermissions(dir.resolve(extractionId + ".manifest.json")))
+                .containsExactlyInAnyOrderElementsOf(ownerOnly);
+    }
+
     /**
      * Swaps in a different, validly-gzipped extract's data file under extract A's finalized name.
      * Decompression succeeds (it's real gzip data, just the wrong content), so this specifically

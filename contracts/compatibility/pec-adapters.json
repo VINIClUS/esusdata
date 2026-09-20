@@ -27,37 +27,37 @@
             "UNIQUE_KEY=co_seq_fat_atd_ind",
             "REQUIRED_DIMENSIONS=tb_dim_tempo,tb_dim_municipio"
           ],
-          "signature_fingerprint": "sha256:1d6ae426e433f1815f1a6e165b9eaefd4dbc8a3572c41584f946d5697345ee26"
+          "signature_fingerprint": "sha256:dd3436b57cf4f67c35b0d23eba93bbceb079b7744cfb8f2d6bc675123d3e67b1"
         },
         {
           "object": "tb_dim_tempo",
           "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
-          "signature_fingerprint": "sha256:5e6871a6b9e51c1b227c7b978ccd3e31df9ec297b6d944cc218df5f0c2637b29"
+          "signature_fingerprint": "sha256:79d8034747b64c1169a9569b01940519b05bd1b859917e2187580c661e870b1b"
         },
         {
           "object": "tb_dim_municipio",
           "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
-          "signature_fingerprint": "sha256:205b41e5a08599ca8d56a6cc0aa2ebd38bda30af1b26a047deb0b1bf262931c9"
+          "signature_fingerprint": "sha256:832ac21599d121a45d42c101169d96bec515bd16c900414cfb70f2615f81280d"
         },
         {
           "object": "tb_dim_tipo_atendimento",
           "columns_used": ["co_seq_dim_tipo_atendimento", "ds_tipo_atendimento", "co_dim_tipo_atendimento_pai", "UNIQUE_KEY=co_seq_dim_tipo_atendimento", "LEAF_SEMANTICS=2,3,5,6,7"],
-          "signature_fingerprint": "sha256:3869924682b2ae0a04e1e60732ff35d962df5e9077c4a821493e6d44ac3cd7d2"
+          "signature_fingerprint": "sha256:34db0f5c6fa058c765bec2228f82dd36c83aa206c87a1cf8712fa082ad807491"
         },
         {
           "object": "tb_dim_unidade_saude",
           "columns_used": ["co_seq_dim_unidade_saude", "nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude"],
-          "signature_fingerprint": "sha256:35358ee8a1b84ebe69bf08fcb7ae26bf63471a34659118909022d51d836cbb4a"
+          "signature_fingerprint": "sha256:1a714cea48135d66db7b77be6e220bcc28e235b6cae2cb82639b09de9ed83e7b"
         },
         {
           "object": "tb_dim_equipe",
           "columns_used": ["co_seq_dim_equipe", "nu_ine", "UNIQUE_KEY=co_seq_dim_equipe"],
-          "signature_fingerprint": "sha256:1414599aab23c71837c0bb46f4833776163c67ef4672e97c4a2ab56619f6dadb"
+          "signature_fingerprint": "sha256:13fc0af0bac8543144eda7c262418a20d4547b63e17b4ae011f6c9cee2a6906f"
         },
         {
           "object": "tb_dim_cbo",
           "columns_used": ["co_seq_dim_cbo", "nu_cbo", "UNIQUE_KEY=co_seq_dim_cbo"],
-          "signature_fingerprint": "sha256:fcafac1a3b6992bb82b5c00750d330a1c8110d29499c866230dfe6d240825f0f"
+          "signature_fingerprint": "sha256:5569646b296645fce876d03823237d61c4726944fc813c077718b3724da3402e"
         }
       ],
       "municipal_isolation_evidence": {
