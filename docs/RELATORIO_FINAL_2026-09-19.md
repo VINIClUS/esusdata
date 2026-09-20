@@ -1,9 +1,22 @@
 # Observatório APS — Relatório técnico final (2026-09-19)
 
+> **Nota de atualização (2026-09-20):** este relatório é o registro histórico de UMA sessão
+> específica (10 commits, terminando em `353fc85`) e permanece fiel ao que era verdade naquela
+> data — não foi reescrito. O que a época chamava de "Fases 7–9" avançou substancialmente desde
+> então, na "Fase 3" da Tech Spec, entregue em fatias (`feat/observatorio-aps-mvp` e
+> `fase3/fatia-{a,b,c,d}`, PRs #4–#6 e adiante): `job-runner`/`result-store` completos,
+> `identity-access` completo (bootstrap, sessão, RBAC), e a superfície REST + SSE inteira
+> (`/api/v1/*`, incluindo administração de usuários/concessões e `GET /runs/{id}/events`). Os
+> itens de `NOT_IMPLEMENTED` no §9 e os passos 2–7 do §15 abaixo estão desatualizados por essa
+> razão — ver `docs/adr/0008-superficie-http-de-autenticacao.md` (decisões da superfície HTTP) e
+> `contracts/openapi/observatorio-v1.yaml` (contrato de rotas, verificado por `OpenApiContractTest`)
+> para o estado atual. UI (`apps/web`) e empacotamento continuam não iniciados.
+
 Autor: agente autônomo (Claude), sessão única, ambiente autorizado conforme missão recebida.
 Escopo entregue: descoberta real do PEC + vertical slice do MVP (Fases 0–6 da Tech Spec v0.4)
 provado ponta a ponta contra a instalação real, com testes automatizados. **Fases 7–9 (job-runner
-completo, REST/SSE, UI, empacotamento) não foram implementadas** — ver §9.
+completo, REST/SSE, UI, empacotamento) não foram implementadas nesta sessão** — ver §9 e a nota
+de atualização acima.
 
 ---
 
@@ -206,13 +219,20 @@ desta entrega (I1–I7, C2–C7, VAT, IGM).
 - Portões A, B, E de C1 (ficha Q01 não recuperada; revisão humana não é código).
 - Reconciliação com Siaps/SISAB (Portão D) — nenhuma referência disponível.
 
-### `NOT_IMPLEMENTED`
-- **job-runner**: máquina de estados, geração de execução, cancelamento cooperativo, recuperação
-  pós-restart — tabela existe, nenhum código escreve nela.
-- **result-store**: publicação atômica, histórico, comparação entre execuções.
-- **identity-access**: autenticação, sessão, bootstrap do primeiro admin, RBAC.
-- **API REST / SSE** (`/api/v1/*` inteiro).
-- **UI** (frontend não iniciado — `apps/web` é um diretório vazio).
+### `NOT_IMPLEMENTED` (nesta sessão — ver a nota de atualização de 2026-09-20 no topo)
+- ~~**job-runner**: máquina de estados, geração de execução, cancelamento cooperativo, recuperação
+  pós-restart — tabela existe, nenhum código escreve nela.~~ **Implementado** desde então (fase
+  posterior a este relatório): `JobRepository`/`JobWorker`/`JobRecovery`, cancelamento cooperativo
+  via `CancellationRegistry`, recuperação de jobs abandonados no boot (`ReadinessGateTest`).
+- ~~**result-store**: publicação atômica, histórico, comparação entre execuções.~~ **Implementado**:
+  `ResultStagingArea` → `PublicationService` (staging → transação curta → `SUCCEEDED`),
+  `ResultRepository`/`EvidenceRepository` com paginação por cursor opaco.
+- ~~**identity-access**: autenticação, sessão, bootstrap do primeiro admin, RBAC.~~ **Implementado**:
+  `BootstrapActivation`, `SessionService` (dois relógios de expiração independentes),
+  `ScopeResolver`/RBAC municipal+CNES/INE (ADR 0007).
+- ~~**API REST / SSE** (`/api/v1/*` inteiro).~~ **Implementado**: ver
+  `contracts/openapi/observatorio-v1.yaml` e `docs/adr/0008-superficie-http-de-autenticacao.md`.
+- **UI** (frontend não iniciado — `apps/web` é um diretório vazio) — continua não implementado.
 - **audit-operations**, **quality-rules**, **external-data**: nenhum código.
 - **evidência mínima persistida** — ENG-19 prova valor/numerador/denominador/classificação
   idênticos, mas não persiste evidência por pessoa (a cláusula "evidências" de ENG-19 é parcial).
@@ -343,18 +363,17 @@ endpoint HTTP nem processo de longa duração para consultar depois do boot.
 ## 15. Próximos passos, ordenados por dependência técnica
 
 1. **Recuperar e arquivar Q01** (nota metodológica oficial C1) para destravar os Portões A/B — sem
-   isso, C1 nunca deixa de ser uma prova técnica para virar um indicador "liberado".
-2. **`result-store` + publicação atômica** (staging → transação final curta → `SUCCEEDED`) — é o
-   próximo passo natural sobre o que já existe (`extraction_manifests`/`results` já no schema).
-3. **`job-runner` real**: máquina de estados sobre a tabela `jobs` já criada, lock de execução por
-   `execution_generation`, cancelamento cooperativo (ENG-06/07/21/23).
-4. **API REST mínima** (`POST /sources`, `POST /sources/{id}/test`, `POST /runs`, `GET
-   /runs/{id}`, `GET /results`) sobre o que já existe — sem isso não há como demonstrar o fluxo
-   fora de testes Java.
-5. **`identity-access`**: bootstrap do primeiro admin sem senha padrão, sessão Spring Security,
-   RBAC de escopo municipal.
-6. **SSE** para acompanhamento de job.
-7. **UI mínima** (`apps/web`, ainda vazio): login, fontes, execuções, resultado.
+   isso, C1 nunca deixa de ser uma prova técnica para virar um indicador "liberado". **Ainda
+   pendente** — os portões A/B/D/E de C1 seguem bloqueados (decisão deliberada, não regressão).
+2. ~~**`result-store` + publicação atômica**~~ — feito (ver a nota de atualização no topo).
+3. ~~**`job-runner` real**~~ — feito.
+4. ~~**API REST mínima**~~ — feito, e mais ampla do que a lista mínima original (administração de
+   usuários/concessões/fontes também).
+5. ~~**`identity-access`**~~ — feito.
+6. ~~**SSE** para acompanhamento de job.~~ — feito (`GET /runs/{id}/events`).
+7. **UI mínima** (`apps/web`, ainda vazio): login, fontes, execuções, resultado. **Ainda
+   pendente** — fora do recorte da Fase 3 (só REST + SSE), por decisão registrada no plano dessa
+   fase.
 8. **Perfil de carga aprovado** (P12) — os valores de `ReadBudget.initialEngineeringProposal()` são
    a proposta da própria spec, não uma política testada sob carga real.
 9. **Empacotamento** (`jpackage`), SBOM, assinatura de release — só depois de haver um produto
