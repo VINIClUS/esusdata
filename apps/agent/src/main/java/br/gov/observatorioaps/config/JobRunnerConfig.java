@@ -9,6 +9,7 @@ import br.gov.observatorioaps.jobrunner.JobRecovery;
 import br.gov.observatorioaps.jobrunner.JobRepository;
 import br.gov.observatorioaps.jobrunner.JobWorker;
 import br.gov.observatorioaps.jobrunner.RetryPolicy;
+import br.gov.observatorioaps.jobrunner.SourceDiagnosticsService;
 import br.gov.observatorioaps.resultstore.EvidenceRepository;
 import br.gov.observatorioaps.resultstore.ExtractionManifestRepository;
 import br.gov.observatorioaps.resultstore.PublicationService;
@@ -163,6 +164,14 @@ public class JobRunnerConfig {
     @DependsOn("flywayMigration")
     public EvidenceRepository evidenceRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new EvidenceRepository(sqliteJdbcTemplate);
+    }
+
+    @Bean
+    @DependsOn("flywayMigration")
+    public SourceDiagnosticsService sourceDiagnosticsService(
+            SourceRepository sourceRepository, AllowedDestinations allowedDestinations,
+            PecDataSourceFactory pecDataSourceFactory) {
+        return new SourceDiagnosticsService(sourceRepository, allowedDestinations, pecDataSourceFactory);
     }
 
     // --- jobrunner -------------------------------------------------------------------------

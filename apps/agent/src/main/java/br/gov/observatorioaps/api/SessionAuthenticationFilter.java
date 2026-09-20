@@ -15,14 +15,16 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.Optional;
-import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Populates the security context from the opaque {@value SessionCookie#NAME} cookie —
  * deliberately not {@code HttpSession}-based (see {@link SessionService}'s own javadoc). A
- * request whose path is in {@code nonInteractivePaths} (SSE, heartbeat, polling {@code GET
- * /runs/{id}}) is validated with {@code interactive=false} so it never advances {@code
- * last_interactive_at} (ENG-44).
+ * request matched by {@code nonInteractive} (SSE, heartbeat, polling {@code GET /runs/{id}}) is
+ * validated with {@code interactive=false} so it never advances {@code last_interactive_at}
+ * (ENG-44). The predicate — not a fixed set of exact paths — because a poll route like
+ * {@code /api/v1/runs/{id}} has a path variable a plain {@code Set<String>} of servlet paths could
+ * never match.
  *
  * <p>An absent or invalid cookie leaves the request anonymous — {@code SecurityConfig}'s
  * authorization rules are what actually reject it (401), not this filter.
@@ -39,15 +41,15 @@ public final class SessionAuthenticationFilter extends OncePerRequestFilter {
 
     private final SessionService sessionService;
     private final Clock clock;
-    private final Set<String> nonInteractivePaths;
+    private final Predicate<HttpServletRequest> nonInteractive;
     private final RequestAttributeSecurityContextRepository securityContextRepository;
 
     public SessionAuthenticationFilter(
-            SessionService sessionService, Clock clock, Set<String> nonInteractivePaths,
+            SessionService sessionService, Clock clock, Predicate<HttpServletRequest> nonInteractive,
             RequestAttributeSecurityContextRepository securityContextRepository) {
         this.sessionService = sessionService;
         this.clock = clock;
-        this.nonInteractivePaths = nonInteractivePaths;
+        this.nonInteractive = nonInteractive;
         this.securityContextRepository = securityContextRepository;
     }
 
@@ -57,7 +59,7 @@ public final class SessionAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String rawToken = readCookie(request);
         if (rawToken != null) {
-            boolean interactive = !nonInteractivePaths.contains(request.getServletPath());
+            boolean interactive = !nonInteractive.test(request);
             Optional<AuthenticatedSession> session =
                     sessionService.validate(rawToken, clock.instant(), interactive);
             session.ifPresent(s -> {

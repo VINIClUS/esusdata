@@ -1,6 +1,8 @@
 package br.gov.observatorioaps.api;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 
 import java.net.CookieManager;
@@ -12,6 +14,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,6 +26,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class AuthRoundTripTest extends SecuritySliceTestSupport {
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Test
     void activateLoginCallMeAndLogoutEndToEnd() throws Exception {
@@ -45,6 +52,7 @@ class AuthRoundTripTest extends SecuritySliceTestSupport {
         assertThat(login.statusCode()).isEqualTo(200);
         assertThat(login.headers().allValues("Set-Cookie"))
                 .anyMatch(cookie -> cookie.startsWith("OBS_SESSION=") && cookie.contains("HttpOnly"));
+        String adminUserId = extractField(login.body(), "userId");
 
         HttpResponse<String> me = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/me")).GET().build(),
@@ -57,6 +65,41 @@ class AuthRoundTripTest extends SecuritySliceTestSupport {
         assertThat(me.headers().allValues("Set-Cookie"))
                 .noneMatch(cookie -> cookie.startsWith("XSRF-TOKEN=")
                         && (cookie.contains("Max-Age=0") || cookie.contains("1970")));
+
+        // §1.12.7 L539: a sensitive admin mutation is refused until reauthentication, then
+        // proceeds — proving POST /api/v1/auth/reauth is genuinely wired to
+        // ReauthenticationGuard, not merely present and untested.
+        String grantBody = "{\"role\":\"MANAGER\",\"scopeKind\":\"MUNICIPALITY\",\"municipalityIbge\":\"3541307\"}";
+        HttpResponse<String> grantBeforeReauth =
+                post(client, "/api/v1/users/" + adminUserId + "/grants", csrfToken, grantBody);
+        assertThat(grantBeforeReauth.statusCode()).isEqualTo(401);
+        assertThat(grantBeforeReauth.body()).contains("REAUTHENTICATION_REQUIRED");
+
+        HttpResponse<String> wrongReauth = post(client, "/api/v1/auth/reauth", csrfToken,
+                "{\"password\":\"definitely-the-wrong-passphrase\"}");
+        assertThat(wrongReauth.statusCode()).isEqualTo(401);
+        assertThat(wrongReauth.body()).contains("AUTHENTICATION_FAILED");
+
+        HttpResponse<String> reauth = post(client, "/api/v1/auth/reauth", csrfToken,
+                "{\"password\":\"" + password + "\"}");
+        assertThat(reauth.statusCode()).isEqualTo(204);
+
+        // Refused for a DIFFERENT reason now (ENG-45 self-grant) — 403, not 401 — which is exactly
+        // how we know the reauth gate itself was actually passed, not merely bypassed by a bug.
+        HttpResponse<String> grantAfterReauth =
+                post(client, "/api/v1/users/" + adminUserId + "/grants", csrfToken, grantBody);
+        assertThat(grantAfterReauth.statusCode()).isEqualTo(403);
+        assertThat(grantAfterReauth.body()).contains("SELF_GRANT_FORBIDDEN");
+
+        List<Map<String, Object>> reauthAudit = jdbc.queryForList(
+                "select outcome, detail_json from auth_audit"
+                        + " where actor_user_id = ? and event_type = 'REAUTH' order by at",
+                adminUserId);
+        assertThat(reauthAudit).anyMatch(row -> "FAILED".equals(row.get("outcome")));
+        assertThat(reauthAudit).anyMatch(row -> "SUCCESS".equals(row.get("outcome")));
+        reauthAudit.forEach(row -> assertThat(String.valueOf(row.get("detail_json")))
+                .doesNotContain("definitely-the-wrong-passphrase")
+                .doesNotContain(password));
 
         HttpResponse<String> logout = post(client, "/api/v1/auth/logout", csrfToken, null);
         assertThat(logout.statusCode()).isEqualTo(204);
@@ -92,5 +135,12 @@ class AuthRoundTripTest extends SecuritySliceTestSupport {
         Path tokenFile = dataDir.resolve("bootstrap-activation.token");
         String firstLine = Files.readAllLines(tokenFile).get(0);
         return firstLine.trim();
+    }
+
+    private String extractField(String json, String field) {
+        String marker = "\"" + field + "\":\"";
+        int start = json.indexOf(marker) + marker.length();
+        int end = json.indexOf('"', start);
+        return json.substring(start, end);
     }
 }

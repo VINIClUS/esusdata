@@ -62,4 +62,21 @@ public final class AuthenticationService {
         sessionService.revoke(sessionId, now, "logout");
         auditWriter.record(now, userId, "LOGOUT", userId, "SUCCESS", null);
     }
+
+    /**
+     * §1.12.7 L539: the explicit re-verification a sensitive action (grant, revoke, source secret
+     * change) requires within the last five minutes. Advances only {@code reauth_at} on the
+     * CURRENT session row — the session's own inactivity/absolute-duration checks are untouched,
+     * and the effect is visible only on the NEXT request that re-validates the session (the
+     * {@link AuthenticatedSession} already materialized for THIS request is not mutated in place).
+     */
+    public void reauthenticate(String sessionId, String userId, String password, Instant now) {
+        UserAccount user = userRepository.findById(userId).orElse(null);
+        if (user == null || user.state() != UserState.ACTIVE || !argon2Profile.matches(password, user.passwordHash())) {
+            auditWriter.record(now, userId, "REAUTH", userId, "FAILED", null);
+            throw new AuthenticationFailedException("invalid password");
+        }
+        sessionService.touchReauth(sessionId, now);
+        auditWriter.record(now, userId, "REAUTH", userId, "SUCCESS", null);
+    }
 }

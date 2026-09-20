@@ -1,6 +1,7 @@
 package br.gov.observatorioaps.api;
 
 import br.gov.observatorioaps.identityaccess.SessionService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,9 +15,11 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.util.AntPathMatcher;
 
 import java.time.Clock;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * The one place the HTTP filter chain is assembled. No {@code permitAll} beyond login, activation
@@ -29,7 +32,12 @@ import java.util.Set;
 @EnableConfigurationProperties(WebSecurityProperties.class)
 public class SecurityConfig {
 
-    private static final Set<String> NON_INTERACTIVE_PATHS = Set.of();
+    /**
+     * ENG-44 (§1.12.7 L537): "polling, SSE e heartbeat não contam" toward session inactivity.
+     * Populated as later routes land (polling {@code GET /runs/{id}}, {@code GET
+     * /runs/{id}/events}) — empty here changes nothing for the routes this slice adds.
+     */
+    private static final Set<String> NON_INTERACTIVE_GET_PATTERNS = Set.of();
 
     /**
      * Suppresses Boot's {@code UserDetailsServiceAutoConfiguration} fallback, which activates
@@ -97,7 +105,7 @@ public class SecurityConfig {
                 .addFilterBefore(new CsrfCookieFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(
                         new SessionAuthenticationFilter(
-                                sessionService, clock, NON_INTERACTIVE_PATHS, securityContextRepository),
+                                sessionService, clock, nonInteractivePredicate(), securityContextRepository),
                         UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(
                         new OriginHostValidationFilter(
@@ -106,5 +114,11 @@ public class SecurityConfig {
                 .addFilterBefore(new NoStoreCacheControlFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    private static Predicate<HttpServletRequest> nonInteractivePredicate() {
+        AntPathMatcher matcher = new AntPathMatcher();
+        return request -> "GET".equals(request.getMethod())
+                && NON_INTERACTIVE_GET_PATTERNS.stream().anyMatch(pattern -> matcher.match(pattern, request.getServletPath()));
     }
 }
