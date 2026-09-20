@@ -7,11 +7,12 @@ import br.gov.observatorioaps.identityaccess.SessionService;
 import br.gov.observatorioaps.jobrunner.Job;
 import br.gov.observatorioaps.jobrunner.JobRepository;
 import br.gov.observatorioaps.jobrunner.JobState;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,11 +37,9 @@ import java.util.concurrent.atomic.AtomicReference;
  * subscribe, and keeps {@code jobrunner} entirely free of Spring Web (see {@code
  * ModuleBoundaryTest}).
  *
- * <p>One scheduled task per connection drives BOTH cadences: every tick re-reads the job
- * (progress, at {@code poll-interval-ms}); every Nth tick also revalidates session and scope (at
- * {@code authorizationRevalidationIntervalSeconds}). A single thread-of-control per emitter avoids
- * ever needing two threads to call {@code SseEmitter} methods on the same emitter concurrently —
- * behavior Boot 4.1's {@code SseEmitter} was not empirically verified for in this session.
+ * <p>Each connection has one polling task and one independently scheduled reauthorization task.
+ * The latter cannot be delayed by a slow SQLite progress poll; emitter operations are serialized
+ * per connection because the two tasks can legitimately reach the same emitter concurrently.
  */
 @RestController
 class RunEventsController {
@@ -57,15 +56,17 @@ class RunEventsController {
     private final SessionService sessionService;
     private final SseConnectionLimiter limiter;
     private final ScheduledExecutorService scheduler;
+    private final ScheduledExecutorService reauthScheduler;
     private final Clock clock;
     private final long pollIntervalMs;
-    private final long reauthEveryNTicks;
+    private final long authorizationRevalidationIntervalMs;
     private final long terminalAttemptWaitTicks;
 
     RunEventsController(
             JobRepository jobRepository, RunResponseFactory responseFactory, ApiAuthorization authorization,
             ScopeResolver scopeResolver, SessionService sessionService, SseConnectionLimiter limiter,
-            ScheduledExecutorService sseScheduler, Clock clock,
+            @Qualifier("sseScheduler") ScheduledExecutorService sseScheduler,
+            @Qualifier("sseReauthScheduler") ScheduledExecutorService sseReauthScheduler, Clock clock,
             @Value("${observatorio.job-runner.poll-interval-ms:2000}") long pollIntervalMs,
             @Value("${observatorio.security.authorization-revalidation-interval-seconds:30}")
                     long authorizationRevalidationIntervalSeconds) {
@@ -76,10 +77,11 @@ class RunEventsController {
         this.sessionService = sessionService;
         this.limiter = limiter;
         this.scheduler = sseScheduler;
+        this.reauthScheduler = sseReauthScheduler;
         this.clock = clock;
-        this.pollIntervalMs = pollIntervalMs;
-        this.reauthEveryNTicks = Math.max(1,
-                (authorizationRevalidationIntervalSeconds * 1000) / Math.max(1, pollIntervalMs));
+        this.pollIntervalMs = Math.max(1, pollIntervalMs);
+        this.authorizationRevalidationIntervalMs = Math.max(1,
+                TimeUnit.SECONDS.toMillis(Math.max(1, authorizationRevalidationIntervalSeconds)));
         long effectivePollIntervalMs = Math.max(1, pollIntervalMs);
         this.terminalAttemptWaitTicks = Math.max(1,
                 (TERMINAL_ATTEMPT_WAIT_MS + effectivePollIntervalMs - 1) / effectivePollIntervalMs);
@@ -98,10 +100,11 @@ class RunEventsController {
 
         limiter.acquire(userId);
         SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
-        AtomicReference<ScheduledFuture<?>> futureHolder = new AtomicReference<>();
-        AtomicInteger tick = new AtomicInteger();
+        AtomicReference<ScheduledFuture<?>> pollFutureHolder = new AtomicReference<>();
+        AtomicReference<ScheduledFuture<?>> reauthFutureHolder = new AtomicReference<>();
         AtomicInteger terminalAttemptWaitTick = new AtomicInteger();
         AtomicReference<JobSnapshot> lastSent = new AtomicReference<>();
+        Object emitterLock = new Object();
         // Guards against completion callbacks running more than once for the same connection —
         // Spring runs onCompletion after onTimeout/onError too, and a double release would drift
         // SseConnectionLimiter's counters below the true number of open connections.
@@ -111,78 +114,60 @@ class RunEventsController {
             if (!stopped.compareAndSet(false, true)) {
                 return;
             }
-            ScheduledFuture<?> future = futureHolder.get();
-            if (future != null) {
-                future.cancel(false);
+            ScheduledFuture<?> pollFuture = pollFutureHolder.get();
+            if (pollFuture != null) {
+                pollFuture.cancel(false);
+            }
+            ScheduledFuture<?> reauthFuture = reauthFutureHolder.get();
+            if (reauthFuture != null) {
+                reauthFuture.cancel(false);
             }
             limiter.release(userId);
         };
         emitter.onCompletion(onDone);
         emitter.onTimeout(() -> {
             onDone.run();
-            emitter.complete();
+            complete(emitter, emitterLock);
         });
         emitter.onError(e -> onDone.run());
 
         // scheduleWithFixedDelay, not scheduleAtFixedRate: a poll blocking on SQLite's
         // busy_timeout=5000 must not queue up catch-up executions back-to-back once it returns.
-        ScheduledFuture<?> future = scheduler.scheduleWithFixedDelay(
-                () -> poll(id, sessionId, userId, municipalityIbge, tick, terminalAttemptWaitTick,
-                        lastSent, emitter, stopped, futureHolder, onDone),
+        ScheduledFuture<?> pollFuture = scheduler.scheduleWithFixedDelay(
+                () -> poll(id, terminalAttemptWaitTick, lastSent, emitter, emitterLock, stopped, onDone),
                 0, pollIntervalMs, TimeUnit.MILLISECONDS);
-        futureHolder.set(future);
+        pollFutureHolder.set(pollFuture);
         if (stopped.get()) {
             // A zero-delay scheduler may run the first poll before this assignment. Completion is
-            // already owned by onDone in that case; make the future cancellation visible after
-            // the holder becomes available as well.
-            future.cancel(false);
+            // already owned by onDone in that case; make cancellation visible after the holder
+            // becomes available as well.
+            pollFuture.cancel(false);
+        }
+
+        ScheduledFuture<?> reauthFuture = reauthScheduler.scheduleWithFixedDelay(
+                () -> reauthorize(sessionId, userId, municipalityIbge, emitter, emitterLock, stopped, onDone),
+                authorizationRevalidationIntervalMs, authorizationRevalidationIntervalMs,
+                TimeUnit.MILLISECONDS);
+        reauthFutureHolder.set(reauthFuture);
+        if (stopped.get()) {
+            reauthFuture.cancel(false);
         }
 
         return emitter;
     }
 
     private void poll(
-            String jobId, String sessionId, String userId, String municipalityIbge, AtomicInteger tick,
-            AtomicInteger terminalAttemptWaitTick, AtomicReference<JobSnapshot> lastSent,
-            SseEmitter emitter, AtomicBoolean stopped, AtomicReference<ScheduledFuture<?>> futureHolder,
-            Runnable onDone) {
+            String jobId, AtomicInteger terminalAttemptWaitTick, AtomicReference<JobSnapshot> lastSent,
+            SseEmitter emitter, Object emitterLock, AtomicBoolean stopped, Runnable onDone) {
         if (stopped.get()) {
-            // The connection was already completed by an earlier tick, before futureHolder had
-            // been assigned (scheduleWithFixedDelay's first execution can start immediately, in a
-            // race with the calling thread's own futureHolder.set(future)) — self-heals within
-            // one extra tick instead of polling forever.
-            ScheduledFuture<?> future = futureHolder.get();
-            if (future != null) {
-                future.cancel(false);
-            }
             return;
         }
         try {
-            if (tick.incrementAndGet() % reauthEveryNTicks == 0) {
-                Instant now = clock.instant();
-                boolean stillValid = sessionService.revalidate(sessionId, now)
-                        && scopeResolver.hasPermission(userId, Permission.RUN_INDICATOR, municipalityIbge, null, null);
-                if (!stillValid) {
-                    // An expected outcome (§1.12.7 L541), not a server fault — a graceful close
-                    // lets the client learn it lost access ("o cliente o confirma por GET",
-                    // §1.10 L397), rather than surfacing as a dispatcher-level error.
-                    onDone.run();
-                    emitter.complete();
-                    return;
-                }
-                // A heartbeat on every revalidation tick, not only on change: without it, a
-                // client that silently disappears (closed tab, dropped connection) while the job
-                // sits in an unchanging state is never discovered — send() never runs, so the
-                // broken pipe never surfaces, and the scheduled task/limiter slot leak until the
-                // 30-minute emitter timeout. ENG-44's own wording ("polling, SSE e heartbeat não
-                // contam") anticipates exactly this heartbeat.
-                emitter.send(SseEmitter.event().comment("keep-alive"));
-            }
-
             Job current = jobRepository.findById(jobId).orElse(null);
             if (current == null) {
                 onDone.run();
-                emitter.completeWithError(new IllegalStateException("job " + jobId + " no longer exists"));
+                completeWithError(emitter, emitterLock,
+                        new IllegalStateException("job " + jobId + " no longer exists"));
                 return;
             }
 
@@ -199,23 +184,78 @@ class RunEventsController {
             if (terminal && !finalAttemptVisible && !terminalAttemptWaitExpired) {
                 return;
             }
-            if (!snapshot.equals(lastSent.get())) {
-                if (terminalAttemptWaitExpired) {
-                    log.warn("closing terminal SSE stream for job {} without final attempt history", jobId);
+            synchronized (emitterLock) {
+                if (stopped.get()) {
+                    return;
                 }
-                emitter.send(SseEmitter.event().name("run").data(response, MediaType.APPLICATION_JSON));
-                lastSent.set(snapshot);
+                if (!snapshot.equals(lastSent.get())) {
+                    if (terminalAttemptWaitExpired) {
+                        log.warn("closing terminal SSE stream for job {} without final attempt history", jobId);
+                    }
+                    emitter.send(SseEmitter.event().name("run").data(response, MediaType.APPLICATION_JSON));
+                    lastSent.set(snapshot);
+                }
             }
             if (terminal) {
                 onDone.run();
-                emitter.complete();
+                complete(emitter, emitterLock);
             }
         } catch (java.io.IOException e) {
             onDone.run();
-            emitter.completeWithError(e);
+            completeWithError(emitter, emitterLock, e);
         } catch (RuntimeException e) {
             onDone.run();
-            emitter.completeWithError(e);
+            completeWithError(emitter, emitterLock, e);
+        }
+    }
+
+    private void reauthorize(
+            String sessionId, String userId, String municipalityIbge, SseEmitter emitter, Object emitterLock,
+            AtomicBoolean stopped, Runnable onDone) {
+        if (stopped.get()) {
+            return;
+        }
+        try {
+            Instant now = clock.instant();
+            boolean stillValid = sessionService.revalidate(sessionId, now)
+                    && scopeResolver.hasPermission(userId, Permission.RUN_INDICATOR, municipalityIbge, null, null);
+            if (!stillValid) {
+                // An expected outcome (§1.12.7 L541), not a server fault — a graceful close
+                // lets the client learn it lost access ("o cliente o confirma por GET",
+                // §1.10 L397), rather than surfacing as a dispatcher-level error.
+                onDone.run();
+                complete(emitter, emitterLock);
+                return;
+            }
+            // A heartbeat on every revalidation tick, not only on change: without it, a
+            // client that silently disappears (closed tab, dropped connection) while the job
+            // sits in an unchanging state is never discovered — send() never runs, so the
+            // broken pipe never surfaces, and the scheduled task/limiter slot leak until the
+            // 30-minute emitter timeout. ENG-44's own wording ("polling, SSE e heartbeat não
+            // contam") anticipates exactly this heartbeat.
+            synchronized (emitterLock) {
+                if (!stopped.get()) {
+                    emitter.send(SseEmitter.event().comment("keep-alive"));
+                }
+            }
+        } catch (java.io.IOException e) {
+            onDone.run();
+            completeWithError(emitter, emitterLock, e);
+        } catch (RuntimeException e) {
+            onDone.run();
+            completeWithError(emitter, emitterLock, e);
+        }
+    }
+
+    private void complete(SseEmitter emitter, Object emitterLock) {
+        synchronized (emitterLock) {
+            emitter.complete();
+        }
+    }
+
+    private void completeWithError(SseEmitter emitter, Object emitterLock, Throwable error) {
+        synchronized (emitterLock) {
+            emitter.completeWithError(error);
         }
     }
 

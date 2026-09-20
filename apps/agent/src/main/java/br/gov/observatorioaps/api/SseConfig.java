@@ -9,21 +9,33 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * A dedicated scheduler for {@code RunEventsController}'s per-connection polling — kept separate
- * from {@code JobWorker}'s own thread (jobrunner has no Spring Web dependency, and never should,
- * per {@code ModuleBoundaryTest}) and shut down gracefully with the application context.
+ * Dedicated schedulers for {@code RunEventsController}'s per-connection work — kept separate from
+ * {@code JobWorker}'s own thread (jobrunner has no Spring Web dependency, and never should, per
+ * {@code ModuleBoundaryTest}) and shut down gracefully with the application context.
  */
 @Configuration
 class SseConfig {
 
     @Bean(destroyMethod = "shutdown")
     ScheduledExecutorService sseScheduler() {
+        return Executors.newScheduledThreadPool(4, threadFactory("sse-poll-"));
+    }
+
+    /**
+     * One slot per allowed connection keeps reauthorization from queuing behind progress polls or
+     * behind another slow reauthorization check. The pool remains bounded by the global stream cap.
+     */
+    @Bean(name = "sseReauthScheduler", destroyMethod = "shutdown")
+    ScheduledExecutorService sseReauthScheduler() {
+        return Executors.newScheduledThreadPool(50, threadFactory("sse-reauth-"));
+    }
+
+    private ThreadFactory threadFactory(String prefix) {
         AtomicInteger counter = new AtomicInteger();
-        ThreadFactory threadFactory = runnable -> {
-            Thread thread = new Thread(runnable, "sse-poll-" + counter.incrementAndGet());
+        return runnable -> {
+            Thread thread = new Thread(runnable, prefix + counter.incrementAndGet());
             thread.setDaemon(true);
             return thread;
         };
-        return Executors.newScheduledThreadPool(4, threadFactory);
     }
 }
