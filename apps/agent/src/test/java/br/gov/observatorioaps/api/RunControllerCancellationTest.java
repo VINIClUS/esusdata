@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -46,7 +47,8 @@ class RunControllerCancellationTest {
         when(jobRepository.findById("job-1"))
                 .thenReturn(Optional.of(queued), Optional.of(running), Optional.of(requested));
         when(jobRepository.cancelQueued(eq("job-1"), any(Instant.class))).thenReturn(false);
-        when(jobRepository.requestCancel(eq("job-1"), any(Instant.class))).thenReturn(true);
+        when(jobRepository.requestCancel(eq("job-1"), eq("proc-1"), eq(1L), any(Instant.class)))
+                .thenReturn(true);
         when(jobRepository.findAttempts("job-1")).thenReturn(List.of());
 
         RunController controller = new RunController(
@@ -57,9 +59,48 @@ class RunControllerCancellationTest {
 
         RunResponse response = controller.cancel(session, "job-1");
 
-        verify(jobRepository).requestCancel("job-1", NOW);
+        verify(jobRepository).requestCancel("job-1", "proc-1", 1L, NOW);
         assertThat(response.state()).isEqualTo(JobState.CANCEL_REQUESTED.name());
         assertThat(cancellationRegistry.find("job-1").orElseThrow().isCancelRequested()).isTrue();
+    }
+
+    @Test
+    void anAlreadyCancelRequestedJobIsReloadedBeforeReturningItsState() {
+        JobRepository jobRepository = mock(JobRepository.class);
+        ApiAuthorization authorization = mock(ApiAuthorization.class);
+        AuthenticatedSession session = session();
+        doNothing().when(authorization).requireObjectScope(session, Permission.RUN_INDICATOR, MUNICIPALITY);
+
+        when(jobRepository.findById("job-1"))
+                .thenReturn(Optional.of(job(JobState.CANCEL_REQUESTED)),
+                        Optional.of(job(JobState.SUCCEEDED)), Optional.of(job(JobState.SUCCEEDED)));
+
+        RunController controller = new RunController(
+                jobRepository, mock(IdempotencyResolver.class), new CancellationRegistry(),
+                mock(ResultRepository.class), mock(SourceRepository.class),
+                mock(ExtractionManifestRepository.class), authorization,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        assertThatThrownBy(() -> controller.cancel(session, "job-1"))
+                .isInstanceOf(JobNotCancellableException.class);
+    }
+
+    @Test
+    void anUnknownJobIsAuditedBeforeReturningNotFound() {
+        JobRepository jobRepository = mock(JobRepository.class);
+        ApiAuthorization authorization = mock(ApiAuthorization.class);
+        AuthenticatedSession session = session();
+        when(jobRepository.findById("missing")).thenReturn(Optional.empty());
+
+        RunController controller = new RunController(
+                jobRepository, mock(IdempotencyResolver.class), new CancellationRegistry(),
+                mock(ResultRepository.class), mock(SourceRepository.class),
+                mock(ExtractionManifestRepository.class), authorization,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        assertThatThrownBy(() -> controller.get(session, "missing"))
+                .isInstanceOf(ApiNotFoundException.class);
+        verify(authorization).auditDenied(session, Permission.RUN_INDICATOR, "unknown");
     }
 
     private AuthenticatedSession session() {

@@ -125,13 +125,17 @@ public class RunController {
                 // Idempotent: a client that polls and re-clicks cancel on an already-cancelling job
                 // gets the current (in-progress) state back, not an error for a cancel that is
                 // genuinely proceeding.
-                return toResponse(job);
+                job = findAuthorized(session, id);
+                if (job.state() == JobState.CANCEL_REQUESTED) {
+                    return toResponse(job);
+                }
             }
             Instant now = clock.instant();
             boolean cancelled = switch (job.state()) {
                 case QUEUED -> jobRepository.cancelQueued(id, now);
                 case RUNNING, STAGED -> {
-                    boolean requested = jobRepository.requestCancel(id, now);
+                    boolean requested = jobRepository.requestCancel(
+                            id, job.processInstanceId(), job.executionGeneration(), now);
                     if (requested) {
                         // Best-effort interrupt of an in-flight statement — the CAS above is what
                         // actually matters; this only shortens how long it takes to notice.
@@ -156,7 +160,11 @@ public class RunController {
     }
 
     private Job findAuthorized(AuthenticatedSession session, String id) {
-        Job job = jobRepository.findById(id).orElseThrow(() -> new ApiNotFoundException("unknown job: " + id));
+        Job job = jobRepository.findById(id).orElse(null);
+        if (job == null) {
+            authorization.auditDenied(session, Permission.RUN_INDICATOR, "unknown");
+            throw new ApiNotFoundException("unknown job: " + id);
+        }
         authorization.requireObjectScope(session, Permission.RUN_INDICATOR, job.municipalityIbge());
         return job;
     }

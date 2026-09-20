@@ -110,9 +110,29 @@ class JobRepositoryTest {
         fixture.jdbc.update(
                 "update jobs set state = 'SUCCEEDED' where job_id = ?", "job-3");
 
-        assertThat(fixture.jobRepository.requestCancel("job-3", clock.instant())).isFalse();
+        assertThat(fixture.jobRepository.requestCancel(
+                "job-3", acquired.processInstanceId(), acquired.executionGeneration(), clock.instant()))
+                .isFalse();
         assertThat(fixture.jobRepository.findById("job-3").orElseThrow().state())
                 .isEqualTo(JobState.SUCCEEDED);
+    }
+
+    @Test
+    void staleCancellationCannotCancelALaterExecutionGeneration() {
+        fixture.jobRepository.enqueue(request("job-5", "ext-1"));
+        Job firstAttempt = fixture.jobRepository.acquireNext("proc-a", clock.instant()).orElseThrow();
+        Instant retryAt = clock.instant().plusSeconds(60);
+        assertThat(fixture.jobRepository.requeueForRetry(
+                "job-5", "proc-a", firstAttempt.executionGeneration(), JobState.RUNNING,
+                retryAt, "TRANSIENT_SQL_ERROR", "retry")).isTrue();
+        Job laterAttempt = fixture.jobRepository.acquireNext("proc-b", retryAt).orElseThrow();
+
+        assertThat(fixture.jobRepository.requestCancel(
+                "job-5", firstAttempt.processInstanceId(), firstAttempt.executionGeneration(), clock.instant()))
+                .isFalse();
+        assertThat(fixture.jobRepository.findById("job-5").orElseThrow().state())
+                .isEqualTo(JobState.RUNNING);
+        assertThat(laterAttempt.processInstanceId()).isEqualTo("proc-b");
     }
 
     @Test
