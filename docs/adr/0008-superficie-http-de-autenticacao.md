@@ -65,12 +65,13 @@ Implementado como um agendador por conexão que relê `JobRepository` (nunca um 
 eventos in-process) — consistente com §1.10 L397 ("a consulta do job é a fonte de verdade" /
 "reconexão reenvia estado atual"). Decisões específicas, nenhuma exigida pela spec:
 
-- **Uma única tarefa agendada por conexão** conduz as duas cadências (progresso a cada
-  `poll-interval-ms`; reautorização a cada N-ésimo tick, na cadência de
-  `authorizationRevalidationIntervalSeconds`) — não dois agendadores independentes. Mantém toda
-  interação com `SseEmitter` em uma única thread de controle, porque o comportamento de
-  concorrência do `SseEmitter` sob Boot 4.1 não pôde ser verificado via Context7 (indisponível
-  durante toda a sessão) nem documentação — só empiricamente, contra um Tomcat real.
+- **Duas tarefas agendadas por conexão** conduzem as duas cadências: o progresso usa
+  `sseScheduler` a cada `poll-interval-ms` com `scheduleWithFixedDelay`, enquanto a
+  reautorização usa o `sseReauthScheduler` com `scheduleAtFixedRate` na cadência de
+  `authorizationRevalidationIntervalSeconds`. O segundo pool tem uma vaga por conexão permitida
+  (50), para que uma consulta lenta de progresso ou de outra conexão não atrase a verificação de
+  autorização. Como as tarefas podem alcançar o mesmo `SseEmitter` em paralelo, todas as
+  operações do emitter são serializadas por um lock por conexão.
 - **Heartbeat em todo tick de reautorização**, não só quando o job muda de estado — sem ele, um
   cliente que desconecta silenciosamente enquanto o job está em estado estável nunca é
   descoberto (`send()` nunca roda), vazando a tarefa agendada e a vaga de concorrência até o
@@ -81,15 +82,15 @@ eventos in-process) — consistente com §1.10 L397 ("a consulta do job é a fon
   cliente confirma a perda de acesso por `GET /runs/{id}` (§1.10 L397).
 - **Nomes/payload dos eventos**: eventos nomeados `run` carregam o mesmo `RunResponse` JSON que
   `GET /runs/{id}` devolveria — nunca uma forma paralela — enviados só quando
-  estado/tentativa/`lastProgressAt` mudam. Comentários SSE (`: keep-alive`) não nomeados carregam
-  o heartbeat.
+  estado/tentativa/`lastProgressAt` ou o histórico persistido de tentativas muda. Comentários SSE
+  (`: keep-alive`) não nomeados carregam o heartbeat.
 - **Limite de conexões concorrentes** (`SseConnectionLimiter`, 4 por usuário / 50 globais),
   dimensionado pela cadência RÁPIDA (progresso), não pela lenta — é a carga real contra o
   `busy_timeout=5000` do SQLite somada ao escritor único do `JobWorker`. Excedido, devolve 503
-  `TOO_MANY_EVENT_STREAMS`. Risco conhecido e não coberto por teste: com um `ScheduledExecutorService`
-  de 4 threads e até 50 streams, o pool pode ficar defasado sob carga, e a revalidação de
-  autorização poderia então ultrapassar o teto de 30 s do §1.12.7 sem que nada detecte — a serem
-  revisitados se o volume de conexões concorrentes em produção se aproximar desse teto.
+  `TOO_MANY_EVENT_STREAMS`. O pool de progresso tem 4 threads e pode ficar defasado sob carga;
+  o pool de reautorização tem 50 threads, uma por conexão permitida, e permanece independente.
+  Ambos devem ser revisitados junto com o limite de conexões se a carga SQLite ou o tempo das
+  consultas de reautorização crescer.
 
 ### 5. `EvidenceCursor` — chave por processo
 Cursor opaco (base64url + HMAC-SHA256) sobre `resultId | ordenação | escopo | seq` (§1.10.1 L405:
@@ -105,6 +106,6 @@ página de novo".
   mesma disciplina de revisão de qualquer outra.
 - `contracts/openapi/observatorio-v1.yaml` (`OpenApiContractTest`) é a fonte de verdade
   MECÂNICA de quais rotas existem; este ADR é a fonte de verdade do PORQUÊ cada uma existe.
-- O limite de conexões SSE (item 4) e o dimensionamento do `ScheduledExecutorService` que o serve
-  devem ser revisados juntos se o volume de conexões concorrentes em produção crescer — ver o
-  risco conhecido acima.
+- O limite de conexões SSE (item 4) e o dimensionamento dos dois schedulers que o servem devem
+  ser revisados juntos se o volume de conexões concorrentes em produção crescer — ver o risco
+  conhecido acima.

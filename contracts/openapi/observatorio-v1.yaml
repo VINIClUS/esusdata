@@ -405,10 +405,10 @@ paths:
         "200":
           description: >-
             text/event-stream. Named "run" events carry a RunResponse JSON payload, sent only when
-            state/attempt/lastProgressAt changes; unnamed comment lines (": keep-alive") are sent
-            on every reauthorization tick that still finds the session and scope valid. The stream
-            ends (graceful close, no error) when the session or the RUN_INDICATOR grant for the
-            job's municipality is no longer valid.
+            state/attempt/lastProgressAt or persisted attempt history changes; unnamed comment
+            lines (": keep-alive") are sent on every reauthorization tick that still finds the
+            session and scope valid. The stream ends (graceful close, no error) when the session or
+            the RUN_INDICATOR grant for the job's municipality is no longer valid.
           content:
             text/event-stream:
               schema: { type: string }
