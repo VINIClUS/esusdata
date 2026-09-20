@@ -7,13 +7,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CancellationRegistryTest {
 
     @Test
-    void cancellationRequestedBeforeWorkerRegistrationIsPreserved() {
+    void cancellationWithoutARegisteredAttemptDoesNotRetainAToken() {
         CancellationRegistry registry = new CancellationRegistry();
 
-        assertThat(registry.requestCancel("job-1")).isTrue();
-
-        CancellationToken token = registry.register("job-1");
-
-        assertThat(token.isCancelRequested()).isTrue();
+        assertThat(registry.requestCancel("job-1")).isFalse();
+        assertThat(registry.find("job-1")).isEmpty();
     }
 }

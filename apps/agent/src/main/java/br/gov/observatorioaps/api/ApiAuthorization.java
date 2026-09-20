@@ -47,6 +47,12 @@ public final class ApiAuthorization {
         }
     }
 
+    /** Records an authorization denial without throwing, for an existing object hidden as 404. */
+    public void auditDenied(AuthenticatedSession session, Permission permission, String municipalityIbge) {
+        authAuditWriter.record(clock.instant(), session.userId(), "ACCESS_DENIED",
+                municipalityIbge, "DENIED", "{\"permission\":\"" + permission.dbValue() + "\"}");
+    }
+
     /**
      * §1.4.2 L140: the purely-technical permissions (manage_source, manage_access, audit) an
      * {@code INSTALLATION}-scoped grant carries, with no municipality of their own — user/grant
@@ -120,8 +126,7 @@ public final class ApiAuthorization {
     }
 
     private void deny(AuthenticatedSession session, Permission permission, String municipalityIbge) {
-        authAuditWriter.record(clock.instant(), session.userId(), "ACCESS_DENIED",
-                municipalityIbge, "DENIED", "{\"permission\":\"" + permission.dbValue() + "\"}");
+        auditDenied(session, permission, municipalityIbge);
         throw new ScopeDeniedException(
                 "principal " + session.userId() + " lacks " + permission.dbValue()
                         + " for the requested scope");

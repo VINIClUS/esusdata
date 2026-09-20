@@ -49,6 +49,7 @@ class RunCancelHttpTest extends ApiFixtureSupport {
                 VALUES (?,?,?,?,?,?, 'RUNNING', 1, 3, 'proc-test-owns-nothing', 1, ?, ?)
                 """, jobId, "run-" + jobId, MUNICIPALITY, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
                 "2026-03", clock.instant().toString(), sourceId);
+        cancellationRegistry.register(jobId);
 
         HttpResponse<String> response = authenticatedPost(cookie,
                 URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/cancel"), null);

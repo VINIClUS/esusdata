@@ -128,4 +128,32 @@ class JobWorkerTest {
         assertThat(nextAttemptAt.getValue()).isEqualTo(blockedUntil);
         verify(jobRepository, never()).markFailed(any(), any(), anyLong(), any(), any(), any(), any());
     }
+
+    @Test
+    void rechecksPersistedCancellationImmediatelyAfterRegisteringTheToken() throws Exception {
+        Instant now = Instant.parse("2026-09-20T12:00:00Z");
+        Job acquired = new Job("job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
+                "2026-03", JobState.RUNNING, 1, 3, "proc-1", 1, null, null, now, now, null,
+                null, null, "ext-1", null, "src-1", null, "user-1", null, null, null, null);
+        Job persistedCancellation = new Job(
+                "job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
+                "2026-03", JobState.CANCEL_REQUESTED, 1, 3, "proc-1", 1, null, null, now, now, null,
+                null, null, "ext-1", null, "src-1", null, "user-1", null, null, null, now);
+
+        JobRepository jobRepository = mock(JobRepository.class);
+        when(jobRepository.acquireNext(anyString(), any(Instant.class))).thenReturn(Optional.of(acquired));
+        when(jobRepository.findById("job-1"))
+                .thenReturn(Optional.of(persistedCancellation), Optional.of(persistedCancellation));
+        when(jobRepository.markCancelled("job-1", "proc-1", 1, now)).thenReturn(true);
+
+        IndicatorRunExecutor executor = mock(IndicatorRunExecutor.class);
+        JobWorker worker = new JobWorker(
+                jobRepository, executor, mock(ResultStagingArea.class), new CancellationRegistry(),
+                RetryPolicy.defaultPolicy(), Clock.fixed(now, ZoneOffset.UTC), "proc-1", Duration.ofMillis(1));
+
+        worker.runOnce();
+
+        verify(executor, never()).runFromExtract(any(), any());
+        verify(jobRepository).markCancelled("job-1", "proc-1", 1, now);
+    }
 }

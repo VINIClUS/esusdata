@@ -163,12 +163,14 @@ public final class JobRepository {
                 processInstanceId, executionGeneration) == 1;
     }
 
-    /** A pending cancel request against a running/staged job — checked cooperatively by the worker. */
-    public boolean requestCancel(String jobId, Instant now) {
+    /** A pending cancel request against one observed running/staged attempt. */
+    public boolean requestCancel(
+            String jobId, String processInstanceId, long executionGeneration, Instant now) {
         return jdbc.update("""
                 UPDATE jobs SET state = 'CANCEL_REQUESTED', cancel_requested_at = ?
                  WHERE job_id = ? AND state IN ('RUNNING', 'STAGED')
-                """, now.toString(), jobId) == 1;
+                   AND process_instance_id = ? AND execution_generation = ?
+                """, now.toString(), jobId, processInstanceId, executionGeneration) == 1;
     }
 
     /** Cancelling a job that never started — no attempt, no staging to neutralize. */
