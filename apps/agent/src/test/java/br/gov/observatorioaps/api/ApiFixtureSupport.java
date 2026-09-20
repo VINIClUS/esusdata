@@ -22,6 +22,7 @@ import br.gov.observatorioaps.resultstore.SourceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -135,6 +136,17 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 municipalityIbge, "5.4.37", "PEC_DW", Instant.EPOCH.toString()));
     }
 
+    ExtractionManifest registerExtract(
+            String extractionId, String sourceId, String municipalityIbge, String referencePeriod,
+            int programado, int espontaneo, int unmapped) throws IOException {
+        ExtractionManifest manifest = ExtractFixtures.write(
+                dataDir.resolve("extracts"), extractionId, sourceId, municipalityIbge,
+                referencePeriod, programado, espontaneo, unmapped);
+        extractionManifestRepository.save(manifest,
+                dataDir.resolve("extracts").resolve(manifest.extractionId() + ".jsonl.gz"));
+        return manifest;
+    }
+
     /**
      * Publishes one result through the real {@link PublicationService}, exercising the real
      * {@code GrantRevalidator} — {@code publisherUserId} must hold {@code RUN_INDICATOR} for
@@ -182,15 +194,21 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
      * {@code CsrfAndOriginTest} proves the filter chain requires.
      */
     HttpResponse<String> authenticatedPost(String sessionCookie, URI uri, String jsonBody) throws Exception {
-        return authenticatedRequest(sessionCookie, uri, "POST", jsonBody);
+        return authenticatedRequest(sessionCookie, uri, "POST", jsonBody, null);
+    }
+
+    HttpResponse<String> authenticatedPostWithIdempotency(
+            String sessionCookie, String idempotencyKey, String jsonBody) throws Exception {
+        return authenticatedRequest(sessionCookie, URI.create(BASE_URL + "/api/v1/runs"), "POST",
+                jsonBody, idempotencyKey);
     }
 
     HttpResponse<String> authenticatedDelete(String sessionCookie, URI uri) throws Exception {
-        return authenticatedRequest(sessionCookie, uri, "DELETE", null);
+        return authenticatedRequest(sessionCookie, uri, "DELETE", null, null);
     }
 
     private HttpResponse<String> authenticatedRequest(
-            String sessionCookie, URI uri, String method, String jsonBody) throws Exception {
+            String sessionCookie, URI uri, String method, String jsonBody, String idempotencyKey) throws Exception {
         HttpClient client = HttpClient.newHttpClient();
         HttpResponse<String> ready = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
@@ -205,6 +223,9 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 .header("Cookie", sessionCookie + "; XSRF-TOKEN=" + csrfToken)
                 .header("X-XSRF-TOKEN", csrfToken)
                 .method(method, body);
+        if (idempotencyKey != null) {
+            builder.header("Idempotency-Key", idempotencyKey);
+        }
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
