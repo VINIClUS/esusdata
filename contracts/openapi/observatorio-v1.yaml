@@ -595,16 +595,38 @@ components:
 
     CreateGrantRequest:
       type: object
-      required: [role, scopeKind]
+      oneOf:
+        - $ref: "#/components/schemas/MunicipalityGrantRequest"
+        - $ref: "#/components/schemas/InstallationGrantRequest"
+      discriminator:
+        propertyName: scopeKind
+        mapping:
+          MUNICIPALITY: "#/components/schemas/MunicipalityGrantRequest"
+          INSTALLATION: "#/components/schemas/InstallationGrantRequest"
+
+    MunicipalityGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [role, scopeKind, municipalityIbge]
       properties:
         role: { type: string, enum: [TECHNICAL_ADMIN, MANAGER, TEAM_SCOPED_PROFESSIONAL, AUDITOR] }
-        scopeKind: { type: string, enum: [MUNICIPALITY, INSTALLATION] }
-        municipalityIbge: { type: string, nullable: true }
+        scopeKind: { type: string, enum: [MUNICIPALITY] }
+        municipalityIbge:
+          type: string
+          pattern: "^[0-9]{7}$"
         cnes:
           type: string
           nullable: true
           description: Narrows the grant to one team; null grants municipality-wide (§1.12 L427).
         ine: { type: string, nullable: true }
+
+    InstallationGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [role, scopeKind]
+      properties:
+        role: { type: string, enum: [TECHNICAL_ADMIN, MANAGER, TEAM_SCOPED_PROFESSIONAL, AUDITOR] }
+        scopeKind: { type: string, enum: [INSTALLATION] }
 
     GrantResponse:
       type: object
@@ -624,9 +646,18 @@ components:
       required: [id, sourceFamily, host, port, databaseName, dbUser, secretRef, municipalityIbge]
       properties:
         id: { type: string }
-        sourceFamily: { type: string, example: PEC_POSTGRESQL }
-        pecInstallationRole: { type: string }
-        sourceLocationKind: { type: string }
+        sourceFamily:
+          type: string
+          enum: [PEC_POSTGRESQL, EXTERNAL_DATASET]
+          example: PEC_POSTGRESQL
+        pecInstallationRole:
+          type: string
+          nullable: true
+          enum: [PRONTUARIO, CENTRALIZADOR, UNKNOWN]
+        sourceLocationKind:
+          type: string
+          nullable: true
+          enum: [PRIMARY, READ_REPLICA, RESTORED_COPY, INSTITUTIONAL_DW]
         host: { type: string }
         port: { type: integer }
         databaseName: { type: string }
@@ -634,7 +665,10 @@ components:
         secretRef: { type: string }
         municipalityIbge: { type: string }
         pecVersion: { type: string }
-        readModel: { type: string }
+        readModel:
+          type: string
+          nullable: true
+          enum: [PEC_DW, PEC_OLTP]
 
     SourceResponse:
       allOf:
