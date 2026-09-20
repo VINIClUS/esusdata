@@ -150,4 +150,18 @@ class ModuleBoundaryTest {
                 .should().dependOnClassesThat().resideInAnyPackage("jakarta.servlet..")
                 .check(CLASSES);
     }
+
+    /**
+     * {@code jobrunner} stays the HTTP-free worker/executor layer; the SSE controller (fatia D)
+     * must poll it through a plain method call, never by importing servlet types or reaching
+     * back into {@code api}.
+     */
+    @Test
+    void jobRunnerDoesNotDependOnServletApiOrApiPackage() {
+        noClasses()
+                .that().resideInAPackage("br.gov.observatorioaps.jobrunner..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "jakarta.servlet..", "br.gov.observatorioaps.api..")
+                .check(CLASSES);
+    }
 }

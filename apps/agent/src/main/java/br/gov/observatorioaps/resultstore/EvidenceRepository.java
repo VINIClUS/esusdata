@@ -3,6 +3,7 @@ package br.gov.observatorioaps.resultstore;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -29,6 +30,17 @@ public final class EvidenceRepository {
     }
 
     public EvidencePage page(String resultId, String municipalityIbge, Long afterSeq, int limit) {
+        return page(resultId, municipalityIbge, null, null, afterSeq, limit);
+    }
+
+    /**
+     * §1.12 L427 CNES/INE narrowing: a non-null {@code cnes}/{@code ine} filters the underlying
+     * rows in SQL, before pagination — filtering the page's Java list afterward would corrupt
+     * {@code hasMore}/{@code nextCursor} (a page could come back short of {@code limit} while more
+     * matching rows exist further down the {@code seq} order).
+     */
+    public EvidencePage page(
+            String resultId, String municipalityIbge, String cnes, String ine, Long afterSeq, int limit) {
         if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
             throw new IllegalArgumentException(
                     "a 7-digit municipality scope is required to read evidence");
@@ -43,10 +55,20 @@ public final class EvidenceRepository {
                         "result not found in scope: " + resultId));
 
         long cursor = afterSeq == null ? -1L : afterSeq;
-        List<EvidenceRecord> rows = jdbc.query("""
-                select * from evidence where staging_id = ? and seq > ?
-                 order by seq asc limit ?
-                """, MAPPER, stagingId, cursor, effectiveLimit + 1);
+        StringBuilder sql = new StringBuilder("select * from evidence where staging_id = ? and seq > ?");
+        List<Object> params = new ArrayList<>(List.of(stagingId, cursor));
+        if (cnes != null) {
+            sql.append(" and cnes = ?");
+            params.add(cnes);
+        }
+        if (ine != null) {
+            sql.append(" and ine = ?");
+            params.add(ine);
+        }
+        sql.append(" order by seq asc limit ?");
+        params.add(effectiveLimit + 1);
+
+        List<EvidenceRecord> rows = jdbc.query(sql.toString(), MAPPER, params.toArray());
 
         boolean hasMore = rows.size() > effectiveLimit;
         List<EvidenceRecord> page = hasMore ? rows.subList(0, effectiveLimit) : rows;
