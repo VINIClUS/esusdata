@@ -8,7 +8,6 @@ import br.gov.observatorioaps.jobrunner.IdempotencyResolver;
 import br.gov.observatorioaps.jobrunner.Job;
 import br.gov.observatorioaps.jobrunner.JobRepository;
 import br.gov.observatorioaps.jobrunner.JobState;
-import br.gov.observatorioaps.resultstore.ResultRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,7 +27,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -55,18 +53,18 @@ public class RunController {
     private final JobRepository jobRepository;
     private final IdempotencyResolver idempotencyResolver;
     private final CancellationRegistry cancellationRegistry;
-    private final ResultRepository resultRepository;
+    private final RunResponseFactory responseFactory;
     private final ApiAuthorization authorization;
     private final Clock clock;
 
     public RunController(
             JobRepository jobRepository, IdempotencyResolver idempotencyResolver,
-            CancellationRegistry cancellationRegistry, ResultRepository resultRepository,
+            CancellationRegistry cancellationRegistry, RunResponseFactory responseFactory,
             ApiAuthorization authorization, Clock clock) {
         this.jobRepository = jobRepository;
         this.idempotencyResolver = idempotencyResolver;
         this.cancellationRegistry = cancellationRegistry;
-        this.resultRepository = resultRepository;
+        this.responseFactory = responseFactory;
         this.authorization = authorization;
         this.clock = clock;
     }
@@ -98,13 +96,13 @@ public class RunController {
         Job job = idempotencyResolver.resolve(enqueueRequest);
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .location(URI.create("/api/v1/runs/" + job.jobId()))
-                .body(toResponse(job));
+                .body(responseFactory.toResponse(job));
     }
 
     @GetMapping("/api/v1/runs/{id}")
     public RunResponse get(@AuthenticationPrincipal AuthenticatedSession session, @PathVariable("id") String id) {
         Job job = findAuthorized(session, id);
-        return toResponse(job);
+        return responseFactory.toResponse(job);
     }
 
     @PostMapping("/api/v1/runs/{id}/cancel")
@@ -114,7 +112,7 @@ public class RunController {
             // Idempotent: a client that polls and re-clicks cancel on an already-cancelling job
             // gets the current (in-progress) state back, not an error for a cancel that is
             // genuinely proceeding.
-            return toResponse(job);
+            return responseFactory.toResponse(job);
         }
         Instant now = clock.instant();
         boolean cancelled = switch (job.state()) {
@@ -134,7 +132,7 @@ public class RunController {
             throw new JobNotCancellableException(
                     "job " + id + " cannot be cancelled from its current state (" + job.state() + ")");
         }
-        return toResponse(jobRepository.findById(id).orElseThrow());
+        return responseFactory.toResponse(jobRepository.findById(id).orElseThrow());
     }
 
     private Job findAuthorized(AuthenticatedSession session, String id) {
@@ -186,22 +184,4 @@ public class RunController {
         return value == null ? "" : value;
     }
 
-    private RunResponse toResponse(Job job) {
-        String resultId = job.state() == JobState.SUCCEEDED
-                ? resultRepository.findResultIdByJobId(job.jobId(), job.municipalityIbge()).orElse(null)
-                : null;
-        List<AttemptResponse> attempts = jobRepository.findAttempts(job.jobId()).stream()
-                .map(a -> new AttemptResponse(a.attempt(), a.startedAt().toString(),
-                        a.finishedAt() == null ? null : a.finishedAt().toString(), a.outcome(),
-                        a.failureCode(), a.failureDetail()))
-                .toList();
-        return new RunResponse(
-                job.jobId(), job.runId(), job.state().name(), job.attempt(), job.maxAttempts(),
-                job.municipalityIbge(), job.indicatorPack(), job.ruleVersion(), job.referencePeriod(),
-                job.sourceId(), job.extractionId(), job.createdAt() == null ? null : job.createdAt().toString(),
-                job.startedAt() == null ? null : job.startedAt().toString(),
-                job.finishedAt() == null ? null : job.finishedAt().toString(),
-                job.lastProgressAt() == null ? null : job.lastProgressAt().toString(),
-                job.failureCode(), job.failureDetail(), resultId, attempts);
-    }
 }

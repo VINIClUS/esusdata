@@ -69,25 +69,8 @@ public final class SessionService {
             return Optional.empty();
         }
         String sessionId = hash(rawToken);
-        Row row = jdbc.query("select * from sessions where session_id = ?", MAPPER, sessionId)
-                .stream().findFirst().orElse(null);
-        if (row == null || row.revokedAt() != null) {
-            return Optional.empty();
-        }
-        if (!row.absoluteExpiresAt().isAfter(now)) {
-            return Optional.empty();
-        }
-        Instant inactivityDeadline = row.lastInteractiveAt().plus(Duration.ofMinutes(properties.inactivityMinutes()));
-        if (!inactivityDeadline.isAfter(now)) {
-            return Optional.empty();
-        }
-        UserAccount user = userRepository.findById(row.userId()).orElse(null);
-        if (user == null || user.state() != UserState.ACTIVE) {
-            return Optional.empty();
-        }
-        if (user.authorizationVersion() != row.authorizationVersionAtLogin()) {
-            // §1.12.7 L541: a role/scope/reset/block change since login invalidates the session —
-            // revalidated here on every use, not only when AuthorizationVersionGuard runs.
+        Row row = findRow(sessionId);
+        if (row == null || !isCurrentlyValid(row, now)) {
             return Optional.empty();
         }
         if (interactive) {
@@ -97,6 +80,43 @@ public final class SessionService {
         return Optional.of(new AuthenticatedSession(
                 sessionId, row.userId(), row.loginAt(), interactive ? now : row.lastInteractiveAt(),
                 row.absoluteExpiresAt(), row.authorizationVersionAtLogin(), row.reauthAt()));
+    }
+
+    /**
+     * Same validity checks as {@link #validate}, addressed by {@code sessionId} rather than the
+     * raw token — for background revalidation (SSE, fatia D) where only the hashed session id
+     * survived the initial handshake. Never touches {@code last_interactive_at}: a periodic
+     * background check is exactly the "polling não prolonga sessão" case ENG-44 describes, not an
+     * interactive action.
+     */
+    public boolean revalidate(String sessionId, Instant now) {
+        Row row = findRow(sessionId);
+        return row != null && isCurrentlyValid(row, now);
+    }
+
+    private Row findRow(String sessionId) {
+        return jdbc.query("select * from sessions where session_id = ?", MAPPER, sessionId)
+                .stream().findFirst().orElse(null);
+    }
+
+    private boolean isCurrentlyValid(Row row, Instant now) {
+        if (row.revokedAt() != null) {
+            return false;
+        }
+        if (!row.absoluteExpiresAt().isAfter(now)) {
+            return false;
+        }
+        Instant inactivityDeadline = row.lastInteractiveAt().plus(Duration.ofMinutes(properties.inactivityMinutes()));
+        if (!inactivityDeadline.isAfter(now)) {
+            return false;
+        }
+        UserAccount user = userRepository.findById(row.userId()).orElse(null);
+        if (user == null || user.state() != UserState.ACTIVE) {
+            return false;
+        }
+        // §1.12.7 L541: a role/scope/reset/block change since login invalidates the session —
+        // revalidated here on every use, not only when AuthorizationVersionGuard runs.
+        return user.authorizationVersion() == row.authorizationVersionAtLogin();
     }
 
     public void touchReauth(String sessionId, Instant now) {
