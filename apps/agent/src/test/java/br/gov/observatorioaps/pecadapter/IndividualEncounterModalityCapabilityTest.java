@@ -2,6 +2,7 @@ package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
+import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -20,6 +21,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class IndividualEncounterModalityCapabilityTest {
 
@@ -149,6 +151,16 @@ class IndividualEncounterModalityCapabilityTest {
     }
 
     @Test
+    void translatesPostgresStatementTimeoutIntoTheBudgetException() throws Exception {
+        assertPostgresBudgetCancellation("57014", "canceling statement due to statement timeout");
+    }
+
+    @Test
+    void translatesPostgresLockTimeoutIntoTheBudgetException() throws Exception {
+        assertPostgresBudgetCancellation("55P03", "canceling statement due to lock timeout");
+    }
+
+    @Test
     void streamRequiresTheConfiguredPecMunicipalityInsteadOfAnArbitraryQueryScope() {
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
                 .filter(method -> method.getName().equals("stream"))
@@ -165,5 +177,23 @@ class IndividualEncounterModalityCapabilityTest {
     private PecConnectionProperties sourceProperties() {
         return new PecConnectionProperties(
                 "test-source", "127.0.0.1", 5432, "fixture", "reader", "unused", "3541307");
+    }
+
+    private void assertPostgresBudgetCancellation(String sqlState, String message) throws Exception {
+        Connection connection = mock(Connection.class);
+        PreparedStatement statement = mock(PreparedStatement.class);
+        when(connection.prepareStatement(
+                anyString(), eq(ResultSet.TYPE_FORWARD_ONLY), eq(ResultSet.CONCUR_READ_ONLY)))
+                .thenReturn(statement);
+        when(statement.executeQuery()).thenThrow(new java.sql.SQLException(message, sqlState));
+
+        assertThatThrownBy(() -> IndividualEncounterModalityCapability.stream(
+                connection, sourceProperties(), LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                mock(BudgetGuard.class), ignored -> {
+                }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                CompatibilityTestCatalog.productionEntry()))
+                .isInstanceOf(SourceBudgetExceededException.class)
+                .hasMessageContaining(SourceBudgetExceededException.CODE)
+                .hasCauseInstanceOf(java.sql.SQLException.class);
     }
 }

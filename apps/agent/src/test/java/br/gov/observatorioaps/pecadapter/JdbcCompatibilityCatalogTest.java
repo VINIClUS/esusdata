@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -110,6 +111,27 @@ class JdbcCompatibilityCatalogTest {
                         + "nu_cnes|character varying|varchar|2\n"
                         + "UNIQUE_KEY=co_seq_dim_unidade_saude\n"
                         + "PRIMARY KEY|co_seq_dim_unidade_saude"));
+    }
+
+    @Test
+    void rejectsFactsWithMissingRequiredDimensionReferences() throws Exception {
+        Connection connection = mock(Connection.class);
+        PreparedStatement metadataStatement = mock(PreparedStatement.class);
+        PreparedStatement coverageStatement = mock(PreparedStatement.class);
+        ResultSet metadata = mock(ResultSet.class);
+        ResultSet coverage = mock(ResultSet.class);
+        when(connection.prepareStatement(anyString())).thenReturn(metadataStatement, coverageStatement);
+        when(metadataStatement.executeQuery()).thenReturn(metadata);
+        when(coverageStatement.executeQuery()).thenReturn(coverage);
+        when(metadata.next()).thenReturn(false);
+        when(coverage.next()).thenReturn(true);
+
+        assertThatThrownBy(() -> new JdbcCompatibilityCatalog().fingerprint(
+                connection,
+                "tb_fat_atendimento_individual",
+                List.of("REQUIRED_DIMENSIONS=tb_dim_tempo,tb_dim_municipio")))
+                .isInstanceOf(java.sql.SQLException.class)
+                .hasMessageContaining("dimension reference");
     }
 
     private static String sha256(String value) throws Exception {

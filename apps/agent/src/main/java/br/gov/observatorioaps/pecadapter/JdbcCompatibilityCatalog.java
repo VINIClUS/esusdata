@@ -77,6 +77,10 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
                 signatureParts.add(verifyUniqueKey(connection, object, requested, columns));
                 continue;
             }
+            if (requested.startsWith("REQUIRED_DIMENSIONS=")) {
+                signatureParts.add(verifyRequiredDimensions(connection, object, requested));
+                continue;
+            }
             if (requested.startsWith("LEAF_SEMANTICS=")) {
                 signatureParts.add(verifyFrozenLeafSemantics(connection, object, requested, columns));
                 continue;
@@ -145,6 +149,33 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
             }
         }
         return marker + "\nUNIQUE_DATA|" + keyExpression;
+    }
+
+    private static String verifyRequiredDimensions(
+            Connection connection, String object, String marker) throws SQLException {
+        if (!"tb_fat_atendimento_individual".equals(object)
+                || !"REQUIRED_DIMENSIONS=tb_dim_tempo,tb_dim_municipio".equals(marker)) {
+            throw new SQLException("Unsupported required-dimensions marker: " + object + "." + marker);
+        }
+        String query = """
+                SELECT f.co_seq_fat_atd_ind
+                  FROM public.tb_fat_atendimento_individual f
+                  LEFT JOIN public.tb_dim_tempo t
+                    ON t.co_seq_dim_tempo = f.co_dim_tempo
+                  LEFT JOIN public.tb_dim_municipio m
+                    ON m.co_seq_dim_municipio = f.co_dim_municipio
+                 WHERE t.co_seq_dim_tempo IS NULL
+                    OR m.co_seq_dim_municipio IS NULL
+                 LIMIT 1
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(query);
+             ResultSet result = statement.executeQuery()) {
+            if (result.next()) {
+                throw new SQLException(
+                        "Required dimension reference is missing for fact event " + result.getLong(1));
+            }
+        }
+        return marker + "\nCOVERAGE_OK";
     }
 
     private static List<String> parseKeyColumns(String marker, String prefix) throws SQLException {

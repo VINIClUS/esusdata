@@ -24,9 +24,10 @@
             "co_dim_cbo_1",
             "nu_uuid_ficha",
             "nu_atendimento",
-            "UNIQUE_KEY=co_seq_fat_atd_ind"
+            "UNIQUE_KEY=co_seq_fat_atd_ind",
+            "REQUIRED_DIMENSIONS=tb_dim_tempo,tb_dim_municipio"
           ],
-          "signature_fingerprint": "sha256:a3589c6031fd57a3d27c836daad8c814f77bcf35632aa27a45ab09ddc34744d7"
+          "signature_fingerprint": "sha256:1d6ae426e433f1815f1a6e165b9eaefd4dbc8a3572c41584f946d5697345ee26"
         },
         {
           "object": "tb_dim_tempo",

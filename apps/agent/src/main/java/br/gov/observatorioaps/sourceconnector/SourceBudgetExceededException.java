@@ -12,4 +12,8 @@ public final class SourceBudgetExceededException extends RuntimeException {
     public SourceBudgetExceededException(String reason) {
         super(reason);
     }
+
+    public SourceBudgetExceededException(String reason, Throwable cause) {
+        super(reason, cause);
+    }
 }

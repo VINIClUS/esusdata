@@ -2,6 +2,7 @@ package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
+import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -12,6 +13,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -111,34 +113,58 @@ public final class IndividualEncounterModalityCapability {
     ) throws SQLException {
         String municipalityIbge = requireAuthorizedMunicipality(sourceProperties);
         beginReadOnlyRepeatableReadTransaction(connection);
-        validateAdapterCompatibility(connection, sourceIdentity, catalog,
-                PecCompatibilityMatrix.fromClasspathResource(), guard);
-        guard.checkDuration();
+        try {
+            validateAdapterCompatibility(connection, sourceIdentity, catalog,
+                    PecCompatibilityMatrix.fromClasspathResource(), guard);
+            guard.checkDuration();
 
-        try (PreparedStatement ps = connection.prepareStatement(
-                QUERY, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
-            ps.setFetchSize(FETCH_SIZE);
-            ps.setString(1, municipalityIbge);
-            ps.setDate(2, Date.valueOf(periodStart));
-            ps.setDate(3, Date.valueOf(periodEndExclusive));
+            try (PreparedStatement ps = connection.prepareStatement(
+                    QUERY, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
+                ps.setFetchSize(FETCH_SIZE);
+                ps.setString(1, municipalityIbge);
+                ps.setDate(2, Date.valueOf(periodStart));
+                ps.setDate(3, Date.valueOf(periodEndExclusive));
 
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    guard.onRow();
-                    consumer.accept(new RawEncounterRecord(
-                            rs.getLong(1),
-                            rs.getInt(2),
-                            rs.getDate(3).toLocalDate(),
-                            rs.getString(4),
-                            rs.getString(5),
-                            rs.getString(6),
-                            rs.getString(7),
-                            rs.getInt(8)
-                    ));
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        guard.onRow();
+                        consumer.accept(new RawEncounterRecord(
+                                rs.getLong(1),
+                                rs.getInt(2),
+                                rs.getDate(3).toLocalDate(),
+                                rs.getString(4),
+                                rs.getString(5),
+                                rs.getString(6),
+                                rs.getString(7),
+                                rs.getInt(8)
+                        ));
+                    }
+                    guard.checkDuration();
                 }
-                guard.checkDuration();
+            }
+        } catch (SQLException failure) {
+            if (isPostgresBudgetCancellation(failure)) {
+                throw new SourceBudgetExceededException(
+                        SourceBudgetExceededException.CODE + ": PostgreSQL read budget expired: "
+                                + failure.getMessage(), failure);
+            }
+            throw failure;
+        }
+    }
+
+    private static boolean isPostgresBudgetCancellation(SQLException failure) {
+        for (SQLException current = failure; current != null; current = current.getNextException()) {
+            String state = current.getSQLState();
+            String message = current.getMessage() == null
+                    ? "" : current.getMessage().toLowerCase(Locale.ROOT);
+            if ("57014".equals(state) && message.contains("statement timeout")) {
+                return true;
+            }
+            if ("55P03".equals(state) && message.contains("lock timeout")) {
+                return true;
             }
         }
+        return false;
     }
 
     private static void beginReadOnlyRepeatableReadTransaction(Connection connection) throws SQLException {
