@@ -1,6 +1,7 @@
 package br.gov.observatorioaps.config;
 
 import br.gov.observatorioaps.identityaccess.Argon2Profile;
+import br.gov.observatorioaps.identityaccess.AuthenticationService;
 import br.gov.observatorioaps.identityaccess.AuthAuditWriter;
 import br.gov.observatorioaps.identityaccess.AuthorizationVersionGuard;
 import br.gov.observatorioaps.identityaccess.BootstrapActivation;
@@ -79,6 +80,15 @@ public class IdentityAccessConfig {
     @Bean
     public ReauthenticationGuard reauthenticationGuard(SessionService sessionService) {
         return new ReauthenticationGuard(sessionService);
+    }
+
+    @Bean
+    @DependsOn("flywayMigration")
+    public AuthenticationService authenticationService(
+            UserRepository userRepository, Argon2Profile argon2Profile, SessionService sessionService,
+            LoginThrottle loginThrottle, AuthAuditWriter authAuditWriter, Clock clock) {
+        return new AuthenticationService(
+                userRepository, argon2Profile, sessionService, loginThrottle, authAuditWriter, clock);
     }
 
     @Bean
