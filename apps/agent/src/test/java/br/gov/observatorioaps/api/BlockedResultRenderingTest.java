@@ -50,6 +50,12 @@ class BlockedResultRenderingTest extends ApiFixtureSupport {
         assertThat(body).contains("\"denominator\":\"3\"");
         assertThat(body).contains("\"resultNature\":\"LOCAL_ESTIMATE\"");
         assertThat(body).contains("\"validationStatus\":\"NOT_VALIDATED\"");
+        assertThat(body).contains("\"jobId\":\"job-");
+        assertThat(body).contains("\"runId\":\"run-");
+        assertThat(body).contains("\"extractionId\":\"ext-");
+        assertThat(body).contains("\"adapterVersion\":\"test-adapter@1\"");
+        assertThat(body).contains("\"calculationPolicyVersion\":\"c1-exact-ratio@1\"");
+        assertThat(body).contains("\"inputFingerprint\":\"sha256:");
         // Never a disguised 0% — "value":null above is the honest state; a JSON number 0 here
         // would be exactly the silent-zero failure §4.4 L1802 forbids.
         assertThat(body).doesNotContain("\"value\":0");

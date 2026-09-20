@@ -11,6 +11,12 @@ import java.util.List;
  */
 public record ResultResponse(
         String resultId,
+        String jobId,
+        String runId,
+        String extractionId,
+        String adapterVersion,
+        String calculationPolicyVersion,
+        String inputFingerprint,
         String indicatorPack,
         String ruleVersion,
         ScopeResponse scope,
