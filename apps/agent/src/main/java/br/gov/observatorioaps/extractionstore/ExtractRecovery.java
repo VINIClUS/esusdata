@@ -170,7 +170,7 @@ public final class ExtractRecovery {
                 if (dataTempExists) delete(dataTemp);
                 forceDirectory(baseDir);
             } catch (IOException | RuntimeException failure) {
-                removePartialPublication(dataFile, manifestTemp, baseDir, failure);
+                removePartialPublication(dataFile, dataTemp, manifestTemp, baseDir, failure);
             }
             return;
         }
@@ -198,9 +198,11 @@ public final class ExtractRecovery {
     }
 
     private static void removePartialPublication(
-            Path dataFile, Path manifestTemp, Path baseDir, Throwable failure) throws IOException {
+            Path dataFile, Path dataTemp, Path manifestTemp, Path baseDir, Throwable failure)
+            throws IOException {
         try {
             delete(dataFile);
+            delete(dataTemp);
             delete(manifestTemp);
             forceDirectory(baseDir);
         } catch (IOException cleanupFailure) {

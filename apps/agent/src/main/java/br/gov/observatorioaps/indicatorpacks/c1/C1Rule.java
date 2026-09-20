@@ -9,6 +9,9 @@ import br.gov.observatorioaps.indicatorengine.IndicatorResult;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 
 /**
  * C1 — Mais acesso (Tech Spec §2.4, verbatim formula): {@code 100 × programados /
@@ -102,6 +105,7 @@ public final class C1Rule {
             String dataCutoff,
             ReleaseGates releaseGates
     ) {
+        validateRequestedScope(encounters, municipalityIbge, referencePeriod);
         Computation computation = count(encounters);
         if (!releaseGates.isComplete()) {
             List<String> limitations = new ArrayList<>(computation.limitations());
@@ -134,7 +138,56 @@ public final class C1Rule {
             String referencePeriod,
             String dataCutoff
     ) {
+        validateRequestedScope(encounters, municipalityIbge, referencePeriod);
         return toResult(count(encounters), municipalityIbge, referencePeriod, dataCutoff);
+    }
+
+    private static void validateRequestedScope(
+            List<CanonicalEncounter> encounters,
+            String municipalityIbge,
+            String referencePeriod
+    ) {
+        if (encounters == null) {
+            throw new IllegalArgumentException("encounters are required");
+        }
+        if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
+            throw new IllegalArgumentException(
+                    "municipality must be a 7-digit IBGE code: " + municipalityIbge);
+        }
+        if (referencePeriod == null || !referencePeriod.matches("\\d{4}-\\d{2}")) {
+            throw new IllegalArgumentException(
+                    "referencePeriod must use YYYY-MM: " + referencePeriod);
+        }
+        YearMonth requestedMonth;
+        try {
+            requestedMonth = YearMonth.parse(referencePeriod);
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException(
+                    "referencePeriod must be a valid YYYY-MM competency: " + referencePeriod, e);
+        }
+
+        for (CanonicalEncounter encounter : encounters) {
+            if (encounter == null) {
+                throw new IllegalArgumentException("encounters cannot contain null records");
+            }
+            if (!municipalityIbge.equals(encounter.municipalityIbge())) {
+                throw new IllegalArgumentException(
+                        "encounter municipality does not match requested municipality: "
+                                + encounter.municipalityIbge());
+            }
+            LocalDate careDate;
+            try {
+                careDate = LocalDate.parse(encounter.careDate());
+            } catch (DateTimeParseException e) {
+                throw new IllegalArgumentException(
+                        "encounter careDate is invalid: " + encounter.careDate(), e);
+            }
+            if (!requestedMonth.equals(YearMonth.from(careDate))) {
+                throw new IllegalArgumentException(
+                        "encounter careDate does not match referencePeriod " + referencePeriod
+                                + ": " + encounter.careDate());
+            }
+        }
     }
 
     private static Computation count(List<CanonicalEncounter> encounters) {

@@ -31,8 +31,10 @@ class PecCompatibilityMatrixTest {
                 "individual_encounter_modality", "0.1.0", CT133_IDENTITY, "9.6.13");
 
         assertThat(entry.objectFingerprints()).containsKeys(
-                "tb_dim_tempo", "tb_dim_municipio", "tb_dim_tipo_atendimento",
+                "tb_fat_atendimento_individual", "tb_dim_tempo", "tb_dim_municipio", "tb_dim_tipo_atendimento",
                 "tb_dim_unidade_saude", "tb_dim_equipe", "tb_dim_cbo");
+        assertThat(entry.objectColumns().get("tb_fat_atendimento_individual"))
+                .contains("UNIQUE_KEY=co_seq_fat_atd_ind");
         assertThat(entry.objectColumns().get("tb_dim_unidade_saude"))
                 .contains("nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude");
         assertThat(entry.objectColumns().get("tb_dim_equipe"))

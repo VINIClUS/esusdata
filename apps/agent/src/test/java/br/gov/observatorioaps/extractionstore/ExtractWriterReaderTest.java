@@ -270,6 +270,32 @@ class ExtractWriterReaderTest {
         assertThat(Files.exists(dir.resolve(extractionId + ".manifest.json"))).isFalse();
     }
 
+    @Test
+    void invalidStagedRecoveryRemovesBothFinalizedAndDuplicateDataFiles() throws Exception {
+        String extractionId = "ext-invalid-staged-pair";
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+            writer.write(encounter("1", CanonicalModality.PROGRAMADO));
+            writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+
+        Path dataFile = dir.resolve(extractionId + ".jsonl.gz");
+        Path dataTemp = dir.resolve(extractionId + ".jsonl.gz.tmp");
+        Path manifestFile = dir.resolve(extractionId + ".manifest.json");
+        Path manifestTemp = dir.resolve(extractionId + ".manifest.json.tmp");
+        Files.copy(dataFile, dataTemp);
+        Files.delete(manifestFile);
+        Files.writeString(manifestTemp, "not a manifest");
+
+        ExtractRecovery.reconcile(dir);
+
+        assertThat(Files.exists(dataFile)).isFalse();
+        assertThat(Files.exists(dataTemp)).isFalse();
+        assertThat(Files.exists(manifestTemp)).isFalse();
+    }
+
     /**
      * Swaps in a different, validly-gzipped extract's data file under extract A's finalized name.
      * Decompression succeeds (it's real gzip data, just the wrong content), so this specifically

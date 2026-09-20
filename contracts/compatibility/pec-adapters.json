@@ -23,9 +23,10 @@
             "co_dim_equipe_1",
             "co_dim_cbo_1",
             "nu_uuid_ficha",
-            "nu_atendimento"
+            "nu_atendimento",
+            "UNIQUE_KEY=co_seq_fat_atd_ind"
           ],
-          "signature_fingerprint": "sha256:f50af7ce617cfa68de192564cedd19b6e1cedecbbd3f2ef716cef3173bc3eadb"
+          "signature_fingerprint": "sha256:a3589c6031fd57a3d27c836daad8c814f77bcf35632aa27a45ab09ddc34744d7"
         },
         {
           "object": "tb_dim_tempo",

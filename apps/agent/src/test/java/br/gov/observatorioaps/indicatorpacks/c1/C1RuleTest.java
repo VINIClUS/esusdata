@@ -50,11 +50,13 @@ class C1RuleTest {
     @Test
     void met18_60PercentIsOtimoAnd80PercentIsRegular() {
         // 60 programados, 40 espontaneos -> 60/(60+40) = 60%
-        IndicatorResult sixty = C1Rule.computeEvidenceOnly(encounters(60, 40, 0), "3541307", "2026-01", "2026-01-31");
+        IndicatorResult sixty = C1Rule.computeEvidenceOnly(
+                encounters(60, 40, 0, "2026-01-15"), "3541307", "2026-01", "2026-01-31");
         assertThat(sixty.classification()).isEqualTo(Classification.OTIMO);
 
         // 80 programados, 20 espontaneos -> 80%
-        IndicatorResult eighty = C1Rule.computeEvidenceOnly(encounters(80, 20, 0), "3541307", "2026-02", "2026-02-28");
+        IndicatorResult eighty = C1Rule.computeEvidenceOnly(
+                encounters(80, 20, 0, "2026-02-15"), "3541307", "2026-02", "2026-02-28");
         assertThat(eighty.classification()).isEqualTo(Classification.REGULAR);
     }
 
@@ -143,6 +145,22 @@ class C1RuleTest {
     }
 
     @Test
+    void evidenceOutsideTheRequestedMunicipalityIsRejectedBeforeCounting() {
+        assertThatThrownBy(() -> C1Rule.computeEvidenceOnly(
+                encounters(1, 0, 0), "3550308", "2026-03", "2026-03-31"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("municipality");
+    }
+
+    @Test
+    void evidenceOutsideTheRequestedCompetencyIsRejectedBeforeCounting() {
+        assertThatThrownBy(() -> C1Rule.computeEvidenceOnly(
+                encounters(1, 0, 0), "3541307", "2026-04", "2026-04-30"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("referencePeriod");
+    }
+
+    @Test
     void quadrimestralAverageKeepsAValueJustAboveTheFiftyBoundary() {
         Classification result = C1Rule.classifyQuadrimestral(
                 ExactRatio.of(500001, 10000),
@@ -161,16 +179,31 @@ class C1RuleTest {
     }
 
     private List<CanonicalEncounter> encounters(int programados, int espontaneos, int unmapped) {
+        return encounters(programados, espontaneos, unmapped, "2026-03-15");
+    }
+
+    private List<CanonicalEncounter> encounters(
+            int programados, int espontaneos, int unmapped, String careDate) {
         List<CanonicalEncounter> list = new ArrayList<>();
-        for (int i = 0; i < programados; i++) list.add(encounter("p" + i, CanonicalModality.PROGRAMADO));
-        for (int i = 0; i < espontaneos; i++) list.add(encounter("e" + i, CanonicalModality.ESPONTANEO));
-        for (int i = 0; i < unmapped; i++) list.add(encounter("u" + i, CanonicalModality.UNMAPPED));
+        for (int i = 0; i < programados; i++) {
+            list.add(encounter("p" + i, CanonicalModality.PROGRAMADO, careDate));
+        }
+        for (int i = 0; i < espontaneos; i++) {
+            list.add(encounter("e" + i, CanonicalModality.ESPONTANEO, careDate));
+        }
+        for (int i = 0; i < unmapped; i++) {
+            list.add(encounter("u" + i, CanonicalModality.UNMAPPED, careDate));
+        }
         return list;
     }
 
     private CanonicalEncounter encounter(String recordId, CanonicalModality modality) {
+        return encounter(recordId, modality, "2026-03-15");
+    }
+
+    private CanonicalEncounter encounter(String recordId, CanonicalModality modality, String careDate) {
         return new CanonicalEncounter(
                 new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", recordId),
-                "3541307", "2026-03-15", modality, "2750325", "0000346268", "225142");
+                "3541307", careDate, modality, "2750325", "0000346268", "225142");
     }
 }
