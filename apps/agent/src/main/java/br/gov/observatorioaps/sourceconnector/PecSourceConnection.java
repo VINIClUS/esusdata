@@ -5,6 +5,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A JDBC connection together with the immutable source configuration that authorized it.
@@ -21,24 +22,34 @@ public final class PecSourceConnection implements AutoCloseable {
     private final Connection connection;
     private final PecConnectionProperties properties;
     private final HikariDataSource owningPool;
+    private final Runnable releasePermit;
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     private PecSourceConnection(
-            Connection connection, PecConnectionProperties properties, HikariDataSource owningPool) {
+            Connection connection,
+            PecConnectionProperties properties,
+            HikariDataSource owningPool,
+            Runnable releasePermit) {
         this.connection = Objects.requireNonNull(connection, "connection is required");
         this.properties = Objects.requireNonNull(properties, "source properties are required");
         this.owningPool = owningPool;
+        this.releasePermit = releasePermit;
     }
 
     static PecSourceConnection fromPool(
-            HikariDataSource pool, PecConnectionProperties properties) throws SQLException {
+            HikariDataSource pool,
+            PecConnectionProperties properties,
+            SourceAcquisitionLimiter.Permit permit
+    ) throws SQLException {
         return new PecSourceConnection(
-                pool.getConnection(), Objects.requireNonNull(properties, "source properties are required"), pool);
+                pool.getConnection(), Objects.requireNonNull(properties, "source properties are required"),
+                pool, permit::close);
     }
 
     /** Test-only binding for fixture connections; not part of the production API. */
     static PecSourceConnection forTest(
             Connection connection, PecConnectionProperties properties) {
-        return new PecSourceConnection(connection, properties, null);
+        return new PecSourceConnection(connection, properties, null, null);
     }
 
     public Connection jdbcConnection() {
@@ -56,14 +67,23 @@ public final class PecSourceConnection implements AutoCloseable {
      */
     @Override
     public void close() throws SQLException {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
         SQLException failure = null;
         try {
             connection.close();
         } catch (SQLException e) {
             failure = e;
         } finally {
-            if (owningPool != null) {
-                owningPool.close();
+            try {
+                if (owningPool != null) {
+                    owningPool.close();
+                }
+            } finally {
+                if (releasePermit != null) {
+                    releasePermit.run();
+                }
             }
         }
         if (failure != null) {

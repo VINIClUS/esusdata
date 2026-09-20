@@ -77,12 +77,22 @@ public final class PecDataSourceFactory {
      */
     public PecSourceConnection open(PecConnectionProperties properties, ReadBudget budget)
             throws SQLException {
-        HikariDataSource dataSource = create(properties, budget);
+        SourceAcquisitionLimiter.Permit permit =
+                SourceAcquisitionLimiter.acquireOrFail(properties == null ? null : properties.sourceId());
+        HikariDataSource dataSource = null;
+        boolean ownershipTransferred = false;
         try {
-            return PecSourceConnection.fromPool(dataSource, properties);
-        } catch (SQLException | RuntimeException failure) {
-            dataSource.close();
-            throw failure;
+            dataSource = create(properties, budget);
+            PecSourceConnection sourceConnection = PecSourceConnection.fromPool(dataSource, properties, permit);
+            ownershipTransferred = true;
+            return sourceConnection;
+        } finally {
+            if (!ownershipTransferred) {
+                if (dataSource != null) {
+                    dataSource.close();
+                }
+                permit.close();
+            }
         }
     }
 

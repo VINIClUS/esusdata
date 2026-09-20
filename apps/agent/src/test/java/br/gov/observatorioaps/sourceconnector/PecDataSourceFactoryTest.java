@@ -76,4 +76,18 @@ class PecDataSourceFactoryTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maxDurationMs");
     }
+
+    @Test
+    void releasesTheSourcePermitWhenPoolCreationFailsBeforeAConnectionIsOpened() {
+        var properties = new PecConnectionProperties(
+                "permit-release-source", "127.0.0.1", 15433,
+                "esus", "reader", "DB_PASSWORD", "3541307");
+        var factory = new PecDataSourceFactory(
+                new AllowedDestinations(Set.of()), ignored -> "secret".toCharArray());
+
+        assertThatThrownBy(() -> factory.open(properties, ReadBudget.initialEngineeringProposal()))
+                .isInstanceOf(AllowedDestinations.DestinationNotAllowedException.class);
+        assertThatThrownBy(() -> factory.open(properties, ReadBudget.initialEngineeringProposal()))
+                .isInstanceOf(AllowedDestinations.DestinationNotAllowedException.class);
+    }
 }
