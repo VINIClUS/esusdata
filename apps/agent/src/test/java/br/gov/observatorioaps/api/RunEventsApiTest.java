@@ -157,6 +157,26 @@ class RunEventsApiTest extends ApiFixtureSupport {
     }
 
     @Test
+    void terminalStreamWaitsForTheFinalAttemptBeforeClosing() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String cookie = sessionCookie(manager);
+        String jobId = insertTerminalJobWithoutAttempt(MUNICIPALITY);
+
+        try (Stream<String> stream = openEventStream(cookie, jobId)) {
+            // The job state becomes terminal before JobWorker records the final attempt. The
+            // stream must not close with the incomplete response from that small visibility gap.
+            Thread.sleep(500);
+            insertAttempt(jobId, "SUCCEEDED");
+
+            String data = readNextDataLine(stream.iterator());
+            assertThat(data).contains("\"state\":\"SUCCEEDED\"")
+                    .contains("\"attempts\":[{\"attempt\":1")
+                    .contains("\"outcome\":\"SUCCEEDED\"");
+        }
+    }
+
+    @Test
     void aJobAlreadyTerminalAtConnectClosesAfterOneEventAndDoesNotLeakTheScheduledPollOrTheSlot()
             throws Exception {
         String manager = createUser("manager-" + System.nanoTime());
@@ -212,6 +232,12 @@ class RunEventsApiTest extends ApiFixtureSupport {
     }
 
     private String insertTerminalJob(String municipalityIbge) {
+        String jobId = insertTerminalJobWithoutAttempt(municipalityIbge);
+        insertAttempt(jobId, "SUCCEEDED");
+        return jobId;
+    }
+
+    private String insertTerminalJobWithoutAttempt(String municipalityIbge) {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, municipalityIbge);
         String jobId = "job-" + UUID.randomUUID();
@@ -223,6 +249,14 @@ class RunEventsApiTest extends ApiFixtureSupport {
                 """, jobId, "run-" + jobId, municipalityIbge, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
                 "2026-03", Instant.now().toString(), sourceId, Instant.now().toString());
         return jobId;
+    }
+
+    private void insertAttempt(String jobId, String outcome) {
+        jdbc.update("""
+                INSERT INTO job_attempts (job_id, attempt, process_instance_id, execution_generation,
+                    started_at, finished_at, outcome, failure_code, failure_detail)
+                VALUES (?, 1, 'proc-test-owns-nothing', 1, ?, ?, ?, NULL, NULL)
+                """, jobId, Instant.now().toString(), Instant.now().toString(), outcome);
     }
 
     private String insertRunningJob(String municipalityIbge) {

@@ -168,13 +168,18 @@ class RunEventsController {
             }
 
             JobSnapshot snapshot = new JobSnapshot(current.state(), current.attempt(), current.lastProgressAt());
-            if (!snapshot.equals(lastSent.get())) {
-                emitter.send(SseEmitter.event().name("run").data(responseFactory.toResponse(current), MediaType.APPLICATION_JSON));
-                lastSent.set(snapshot);
-            }
-
-            if (TERMINAL.contains(current.state())) {
-                emitter.complete();
+            boolean terminal = TERMINAL.contains(current.state());
+            if (!snapshot.equals(lastSent.get()) || terminal) {
+                RunResponse response = responseFactory.toResponse(current);
+                boolean finalAttemptVisible = current.attempt() == 0
+                        || response.attempts().stream().anyMatch(attempt -> attempt.attempt() == current.attempt());
+                if (!terminal || finalAttemptVisible) {
+                    emitter.send(SseEmitter.event().name("run").data(response, MediaType.APPLICATION_JSON));
+                    lastSent.set(snapshot);
+                }
+                if (terminal && finalAttemptVisible) {
+                    emitter.complete();
+                }
             }
         } catch (java.io.IOException e) {
             emitter.completeWithError(e);
