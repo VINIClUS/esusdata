@@ -46,7 +46,7 @@ public final class AcquisitionGuard {
         if (blockedUntil.isPresent() && blockedUntil.get().isAfter(clock.instant())) {
             throw new SourceAcquisitionBlockedException(
                     "source " + sourceId + " is on cooldown until " + blockedUntil.get()
-                            + " after an abandoned acquisition (ENG-51)");
+                            + " after an abandoned acquisition (ENG-51)", blockedUntil.get());
         }
     }
 }

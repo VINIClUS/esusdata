@@ -237,6 +237,13 @@ public final class JobWorker implements SmartLifecycle {
         String outcome;
         if (retriable) {
             Instant nextAttemptAt = retryPolicy.nextAttemptAt(now, job.attempt());
+            if (failure instanceof SourceAcquisitionBlockedException blocked
+                    && blocked.blockedUntil().isAfter(nextAttemptAt)) {
+                // Ordinary retry backoff starts far shorter than the ENG-51 cooldown — without
+                // this, the retry would immediately re-trip the same guard and this classification
+                // would have accomplished nothing.
+                nextAttemptAt = blocked.blockedUntil();
+            }
             transitioned = jobRepository.requeueForRetry(job.jobId(), processInstanceId,
                     job.executionGeneration(), fromState, nextAttemptAt,
                     classification.code(), classification.detail());

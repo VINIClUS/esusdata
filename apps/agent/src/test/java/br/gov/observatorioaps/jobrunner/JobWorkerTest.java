@@ -2,6 +2,7 @@ package br.gov.observatorioaps.jobrunner;
 
 import br.gov.observatorioaps.resultstore.ResultStagingArea;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.TransientDataAccessResourceException;
 
 import java.time.Clock;
@@ -13,8 +14,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -83,5 +88,44 @@ class JobWorkerTest {
                 Duration.ofMillis(1));
 
         assertThatCode(worker::runOnce).doesNotThrowAnyException();
+    }
+
+    /**
+     * PR review regression: ordinary retry backoff starts at seconds, but the ENG-51 cooldown
+     * ({@link AcquisitionGuard}) can run to tens of seconds — without honouring
+     * {@link SourceAcquisitionBlockedException#blockedUntil()}, the retry would fire while still
+     * blocked, re-trip the guard, and get classified away as a hard failure before the job's
+     * retry budget was ever exhausted.
+     */
+    @Test
+    void handleFailureSchedulesTheRetryNoEarlierThanTheAcquisitionCooldown() throws Exception {
+        Instant now = Instant.parse("2026-09-20T12:00:00Z");
+        Instant blockedUntil = now.plusSeconds(65); // outlives the default policy's first backoff
+        Job job = new Job("job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
+                "2026-03", JobState.RUNNING, 0, 3, "proc-1", 1, null, null, now, now, null,
+                null, null, null, null, "src-1", null, null, null, null, null, null);
+
+        JobRepository jobRepository = mock(JobRepository.class);
+        when(jobRepository.acquireNext(anyString(), any(Instant.class))).thenReturn(Optional.of(job));
+        when(jobRepository.findById("job-1")).thenReturn(Optional.of(job));
+        when(jobRepository.requeueForRetry(any(), any(), anyLong(), any(), any(), any(), any()))
+                .thenReturn(true);
+
+        IndicatorRunExecutor executor = mock(IndicatorRunExecutor.class);
+        when(executor.runLive(any(), any())).thenThrow(new SourceAcquisitionBlockedException(
+                "source src-1 is on cooldown until " + blockedUntil, blockedUntil));
+
+        JobWorker worker = new JobWorker(
+                jobRepository, executor, mock(ResultStagingArea.class), new CancellationRegistry(),
+                RetryPolicy.defaultPolicy(), Clock.fixed(now, ZoneOffset.UTC), "proc-1", Duration.ofMillis(1));
+
+        worker.runOnce();
+
+        ArgumentCaptor<Instant> nextAttemptAt = ArgumentCaptor.forClass(Instant.class);
+        verify(jobRepository).requeueForRetry(
+                eq("job-1"), eq("proc-1"), eq(1L), eq(JobState.RUNNING), nextAttemptAt.capture(),
+                eq("SOURCE_ACQUISITION_BLOCKED"), any());
+        assertThat(nextAttemptAt.getValue()).isEqualTo(blockedUntil);
+        verify(jobRepository, never()).markFailed(any(), any(), anyLong(), any(), any(), any(), any());
     }
 }

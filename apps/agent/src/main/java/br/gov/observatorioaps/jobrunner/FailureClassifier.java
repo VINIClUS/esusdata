@@ -40,9 +40,14 @@ public final class FailureClassifier {
             return new Classification(Category.DEFINITIVE, "CANCELLED", e.getMessage());
         }
         if (failure instanceof SourceAcquisitionBlockedException e) {
-            // ENG-51 cooldown — retrying immediately would defeat the guard; the job simply waits
-            // for the next scheduled attempt window via ordinary retry backoff, not a tight loop.
-            return new Classification(Category.DEFINITIVE, "SOURCE_ACQUISITION_BLOCKED", e.getMessage());
+            // ENG-51 cooldown — TRANSIENT, not DEFINITIVE: retrying immediately would defeat the
+            // guard, so JobWorker.handleFailure schedules the next attempt no earlier than
+            // e.blockedUntil(), never a tight loop against the same cooldown. Classifying this
+            // DEFINITIVE would fail the job outright the moment ordinary retry backoff (starting
+            // at seconds) is shorter than the guard's cooldown (tens of seconds, derived from the
+            // source's own statement/idle-in-transaction timeouts) — burning the job's retry
+            // budget on a wait condition instead of a real failure.
+            return new Classification(Category.TRANSIENT, "SOURCE_ACQUISITION_BLOCKED", e.getMessage());
         }
         if (failure instanceof GrantRevalidationException e) {
             // §1.9.4 L365 — access revoked/blocked since the job was queued; never retried blindly.
