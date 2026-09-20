@@ -44,7 +44,11 @@ import java.util.UUID;
 public final class IndicatorRunExecutor {
 
     private static final String EVIDENCE_GRAIN = "SOURCE_EVENT";
-    private static final String RESULT_NATURE = "OBSERVED";
+    // §1.2/§1.10.1: LOCAL_ESTIMATE | OFFICIAL_IMPORTED | SIMULATION — a calculation from a local
+    // immutable PEC extract is never OFFICIAL_IMPORTED (that label is reserved for results
+    // imported from an official source with its own provenance, never earned by numeric
+    // resemblance) and never SIMULATION.
+    private static final String RESULT_NATURE = "LOCAL_ESTIMATE";
     // C1's release gates (Portões A/B/D/E, §4.4) are not complete — see class javadoc.
     private static final String VALIDATION_STATUS = "NOT_VALIDATED";
 
@@ -74,14 +78,32 @@ public final class IndicatorRunExecutor {
     public record RunContext(
             String jobId, String runId, String sourceId, long executionGeneration,
             String processInstanceId, String extractionId, String municipalityIbge,
-            String referencePeriod) {
+            String referencePeriod, String indicatorPack, String ruleVersion) {
     }
 
     public record RunOutcome(String stagingId, String resultId, IndicatorResult result) {
     }
 
     public RunOutcome runFromExtract(RunContext context, CancellationToken cancellation) throws IOException {
+        // This executor only ever computes C1 — reject anything else before doing any I/O rather
+        // than silently publishing a C1 result under a different pack/version's name.
+        if (!C1Rule.INDICATOR_PACK.equals(context.indicatorPack())
+                || !C1Rule.RULE_VERSION.equals(context.ruleVersion())) {
+            throw new IllegalArgumentException(
+                    "job requests " + context.indicatorPack() + "@" + context.ruleVersion()
+                            + " but this executor only computes "
+                            + C1Rule.INDICATOR_PACK + "@" + C1Rule.RULE_VERSION);
+        }
+
         ExtractionManifest manifest = extractReader.readManifest(extractsBaseDir, context.extractionId());
+        if (!manifest.sourceId().equals(context.sourceId())) {
+            // The extract file matches the requested extractionId but belongs to a different
+            // source than the job claims — both FKs stay individually valid, so nothing else
+            // would catch this. Publishing anyway would silently corrupt source provenance.
+            throw new IllegalStateException(
+                    "extract " + context.extractionId() + " belongs to source " + manifest.sourceId()
+                            + " but job " + context.jobId() + " requested source " + context.sourceId());
+        }
         List<CanonicalEncounter> encounters = extractReader.readEncounters(extractsBaseDir, manifest);
         cancellation.checkCancelled();
 

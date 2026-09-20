@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * End-to-end over a synthetic extract, without any PEC involved: job → staging → publication.
@@ -61,7 +62,7 @@ class IndicatorRunExecutorExtractTest {
         var context = new IndicatorRunExecutor.RunContext(
                 acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
                 acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
-                acquired.referencePeriod());
+                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion());
         var outcome = fixture.executor.runFromExtract(context, token);
 
         IndicatorResult result = outcome.result();
@@ -83,6 +84,8 @@ class IndicatorRunExecutorExtractTest {
         assertThat(published.validationStatus()).isEqualTo("NOT_VALIDATED");
         assertThat(published.evidenceGrain()).isEqualTo("SOURCE_EVENT");
         assertThat(published.reproducibilityLevel()).isEqualTo("REPRODUCIBLE");
+        // §1.2/§1.10.1: a local calculation is LOCAL_ESTIMATE, never OFFICIAL_IMPORTED/SIMULATION.
+        assertThat(published.resultNature()).isEqualTo("LOCAL_ESTIMATE");
 
         // ENG-36: the extract lets the population be reconstructed, not just positive evidence —
         // all 12 encounters (7 numerator + 3 denominator-only + 2 excluded) are present.
@@ -96,5 +99,48 @@ class IndicatorRunExecutorExtractTest {
                 .isEqualTo(3);
         assertThat(page.items().stream().filter(e -> e.decision().equals("EXCLUDED_UNMAPPED")).count())
                 .isEqualTo(2);
+    }
+
+    @Test
+    void rejectsAJobRequestingAnIndicatorPackThisExecutorDoesNotCompute() throws Exception {
+        ExtractionManifest manifest = ExtractFixtures.write(
+                fixture.extractsDir, "ext-c1-wrong-pack", "src-1", "3541307", "2026-03", 7, 3, 2);
+        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+                "job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
+                "2026-03", 3, "src-1", manifest.extractionId(),
+                null, null, null, null, null, clock.instant()));
+        Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
+
+        // The job itself requested the right pack/version — this proves the executor's own check
+        // rejects a mismatch, independent of what the job row says, by building a context that
+        // claims a different one (the situation a future second-pack caller would create).
+        var mismatchedContext = new IndicatorRunExecutor.RunContext(
+                acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
+                acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
+                acquired.referencePeriod(), "some-other-pack", "some-other-pack@1.0.0");
+
+        assertThatThrownBy(() -> fixture.executor.runFromExtract(mismatchedContext, new CancellationToken()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsAnExtractThatBelongsToADifferentSourceThanTheJob() throws Exception {
+        fixture.registerSource("src-2", "3541307");
+        ExtractionManifest manifest = ExtractFixtures.write(
+                fixture.extractsDir, "ext-c1-wrong-source", "src-2", "3541307", "2026-03", 7, 3, 2);
+
+        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+                "job-1", "run-1", "3541307", C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
+                "2026-03", 3, "src-1", manifest.extractionId(), // job claims src-1, extract is src-2
+                null, null, null, null, null, clock.instant()));
+        Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
+
+        var context = new IndicatorRunExecutor.RunContext(
+                acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
+                acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
+                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion());
+
+        assertThatThrownBy(() -> fixture.executor.runFromExtract(context, new CancellationToken()))
+                .isInstanceOf(IllegalStateException.class);
     }
 }

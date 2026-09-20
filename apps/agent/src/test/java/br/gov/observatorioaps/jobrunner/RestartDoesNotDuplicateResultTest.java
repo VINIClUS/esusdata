@@ -51,6 +51,13 @@ class RestartDoesNotDuplicateResultTest {
         int resultsBeforeRestart = countResults();
         assertThat(resultsBeforeRestart).isEqualTo(1);
 
+        // §1.9.4: a completed job's attempt history includes its final (successful) attempt too,
+        // not just failures/cancellations — only JobWorker (not IndicatorRunExecutor directly)
+        // records it, since attempt bookkeeping is worker-level, not executor-level.
+        var attempts = fixture.jobRepository.findAttempts("job-1");
+        assertThat(attempts).hasSize(1);
+        assertThat(attempts.get(0).outcome()).isEqualTo("SUCCEEDED");
+
         // Simulate a process restart: a fresh process instance runs recovery.
         var report = fixture.jobRecovery().reconcile("proc-2");
         assertThat(report.requeued()).isEqualTo(0);

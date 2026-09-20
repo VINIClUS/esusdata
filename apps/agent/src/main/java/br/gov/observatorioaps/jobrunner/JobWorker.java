@@ -2,7 +2,10 @@ package br.gov.observatorioaps.jobrunner;
 
 import br.gov.observatorioaps.resultstore.PublicationRefusedException;
 import br.gov.observatorioaps.resultstore.ResultStagingArea;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
+import org.springframework.dao.DataAccessException;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -19,6 +22,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * immediately (no server, no scheduler keeping it up).
  */
 public final class JobWorker implements SmartLifecycle {
+
+    private static final Logger log = LoggerFactory.getLogger(JobWorker.class);
 
     private final JobRepository jobRepository;
     private final IndicatorRunExecutor executor;
@@ -111,11 +116,38 @@ public final class JobWorker implements SmartLifecycle {
 
     /** Runs one job to completion if one is available. Returns {@code true} if it did work. */
     boolean runOnce() {
-        Optional<Job> maybeJob = jobRepository.acquireNext(processInstanceId, clock.instant());
+        Optional<Job> maybeJob;
+        try {
+            maybeJob = jobRepository.acquireNext(processInstanceId, clock.instant());
+        } catch (DataAccessException transientFailure) {
+            // acquireNext is a single CAS query — its only realistic failure mode is raw SQLite
+            // write contention (SQLITE_BUSY), exactly what SingleWorkerConcurrencyTest treats as
+            // retryable for any other caller. Letting it escape here would kill this process's
+            // only worker thread while `running` stays true — every queued job would then sit
+            // forever until a restart. Treat it as "no work this cycle"; the next poll retries.
+            log.warn("acquireNext failed transiently; will retry on the next poll cycle", transientFailure);
+            return false;
+        }
         if (maybeJob.isEmpty()) {
             return false;
         }
-        processJob(maybeJob.get());
+        Job job = maybeJob.get();
+        try {
+            processJob(job);
+        } catch (RuntimeException unexpected) {
+            // processJob's own catch blocks (handleFailure, finalizeCancellationIfOwned) make
+            // their own unguarded DB calls — findById, neutralize, requeueForRetry/markFailed,
+            // recordAttempt — to resolve the job's outcome. If any of those hits transient
+            // contention (especially likely during a failure storm, when several are writing at
+            // once), letting it escape here would kill this process's only worker thread while
+            // `running` stays true, exactly like an unguarded acquireNext would (§1.9.4: "um
+            // worker de cálculo ativo por instalação" is not satisfied by a dead thread the
+            // process still thinks is running). The job is left wherever its own CAS updates last
+            // landed it — never silently marked done — for the next poll cycle or JobRecovery to
+            // resolve.
+            log.error("processing job " + job.jobId() + " failed unexpectedly; worker continues polling",
+                    unexpected);
+        }
         return true;
     }
 
@@ -135,8 +167,14 @@ public final class JobWorker implements SmartLifecycle {
             executor.runFromExtract(new IndicatorRunExecutor.RunContext(
                     job.jobId(), job.runId(), job.sourceId(), job.executionGeneration(),
                     job.processInstanceId(), job.extractionId(), job.municipalityIbge(),
-                    job.referencePeriod()), token);
-            // Success — PublicationService already moved the job to SUCCEEDED.
+                    job.referencePeriod(), job.indicatorPack(), job.ruleVersion()), token);
+            // Success — PublicationService already moved the job to SUCCEEDED. job_attempts still
+            // needs its own row here, or a normally completed job's attempt history silently omits
+            // its final (successful) attempt despite the schema explicitly supporting it.
+            Instant now = clock.instant();
+            jobRepository.recordAttempt(job.jobId(), job.attempt(), processInstanceId,
+                    job.executionGeneration(), job.startedAt() == null ? now : job.startedAt(), now,
+                    "SUCCEEDED", null, null);
         } catch (JobCancelledException | PublicationRefusedException cancelledOrRaced) {
             finalizeCancellationIfOwned(job);
         } catch (Exception failure) {
