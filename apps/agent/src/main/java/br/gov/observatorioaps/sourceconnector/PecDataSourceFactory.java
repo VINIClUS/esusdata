@@ -41,6 +41,7 @@ public final class PecDataSourceFactory {
             config.setPassword(new String(password));
             config.setReadOnly(true);
             config.setAutoCommit(false);
+            config.setTransactionIsolation("TRANSACTION_REPEATABLE_READ");
             config.setMaximumPoolSize(budget.poolMaxSize());
             config.setMinimumIdle(0);
             // Configuration creation must not perform an unbounded/fail-fast network attempt;

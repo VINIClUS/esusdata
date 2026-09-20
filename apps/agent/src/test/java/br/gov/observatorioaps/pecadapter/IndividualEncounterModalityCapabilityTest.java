@@ -94,6 +94,61 @@ class IndividualEncounterModalityCapabilityTest {
     }
 
     @Test
+    void startsAReadOnlyRepeatableReadTransactionBeforeCompatibilityProbing() throws Exception {
+        Connection connection = mock(Connection.class);
+        PreparedStatement statement = mock(PreparedStatement.class);
+        ResultSet result = mock(ResultSet.class);
+        when(connection.getAutoCommit()).thenReturn(true);
+        when(connection.isReadOnly()).thenReturn(false);
+        when(connection.getTransactionIsolation()).thenReturn(Connection.TRANSACTION_READ_COMMITTED);
+        when(connection.prepareStatement(
+                anyString(), eq(ResultSet.TYPE_FORWARD_ONLY), eq(ResultSet.CONCUR_READ_ONLY)))
+                .thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(result);
+        when(result.next()).thenReturn(false);
+
+        List<String> events = new ArrayList<>();
+        doAnswer(invocation -> {
+            events.add("autocommit");
+            return null;
+        }).when(connection).setAutoCommit(false);
+        doAnswer(invocation -> {
+            events.add("readonly");
+            return null;
+        }).when(connection).setReadOnly(true);
+        doAnswer(invocation -> {
+            events.add("repeatable-read");
+            return null;
+        }).when(connection).setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+
+        var expected = PecCompatibilityMatrix.fromClasspathResource().findExact(
+                IndividualEncounterModalityCapability.CAPABILITY,
+                IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                "9.6.13");
+        CompatibilityCatalog catalog = new CompatibilityCatalog() {
+            @Override
+            public String postgresVersion(Connection ignored) {
+                events.add("version-probe");
+                return "9.6.13";
+            }
+
+            @Override
+            public String fingerprint(Connection ignored, String object, List<String> columnsUsed) {
+                events.add("fingerprint-probe");
+                return expected.objectFingerprints().get(object);
+            }
+        };
+
+        IndividualEncounterModalityCapability.stream(
+                connection, sourceProperties(), LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                mock(BudgetGuard.class), ignored -> {
+                }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"), catalog);
+
+        assertThat(events).containsSubsequence("autocommit", "readonly", "repeatable-read", "version-probe");
+    }
+
+    @Test
     void streamRequiresTheConfiguredPecMunicipalityInsteadOfAnArbitraryQueryScope() {
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
                 .filter(method -> method.getName().equals("stream"))

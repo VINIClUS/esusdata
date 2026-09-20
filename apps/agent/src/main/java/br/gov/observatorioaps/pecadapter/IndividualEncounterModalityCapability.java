@@ -110,6 +110,7 @@ public final class IndividualEncounterModalityCapability {
             CompatibilityCatalog catalog
     ) throws SQLException {
         String municipalityIbge = requireAuthorizedMunicipality(sourceProperties);
+        beginReadOnlyRepeatableReadTransaction(connection);
         validateAdapterCompatibility(connection, sourceIdentity, catalog,
                 PecCompatibilityMatrix.fromClasspathResource(), guard);
         guard.checkDuration();
@@ -137,6 +138,21 @@ public final class IndividualEncounterModalityCapability {
                 }
                 guard.checkDuration();
             }
+        }
+    }
+
+    private static void beginReadOnlyRepeatableReadTransaction(Connection connection) throws SQLException {
+        if (connection == null) {
+            throw new SQLException("A connected PostgreSQL session is required");
+        }
+        if (connection.getAutoCommit()) {
+            connection.setAutoCommit(false);
+        }
+        if (!connection.isReadOnly()) {
+            connection.setReadOnly(true);
+        }
+        if (connection.getTransactionIsolation() != Connection.TRANSACTION_REPEATABLE_READ) {
+            connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
         }
     }
 

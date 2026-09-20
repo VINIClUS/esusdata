@@ -26,6 +26,8 @@ class PecDataSourceFactoryTest {
         try {
             assertThat(dataSource.getJdbcUrl())
                     .isEqualTo("jdbc:postgresql://127.0.0.1:15433/esus");
+            assertThat(dataSource.getTransactionIsolation())
+                    .isEqualTo("TRANSACTION_REPEATABLE_READ");
             assertThat(dataSource.getConnectionTimeout()).isEqualTo(7_000);
             assertThat(dataSource.getDataSourceProperties().get("connectTimeout")).isEqualTo(3);
             assertThat(dataSource.getDataSourceProperties().get("socketTimeout")).isEqualTo(60);
