@@ -126,8 +126,10 @@ public class IdentityAccessConfig {
     @DependsOn("flywayMigration")
     public AccessAdministrationService accessAdministrationService(
             UserRepository userRepository, GrantRepository grantRepository,
-            AuthorizationVersionGuard authorizationVersionGuard, Clock clock) {
-        return new AccessAdministrationService(userRepository, grantRepository, authorizationVersionGuard, clock);
+            AuthorizationVersionGuard authorizationVersionGuard, TransactionTemplate sqliteTransactionTemplate,
+            Clock clock) {
+        return new AccessAdministrationService(
+                userRepository, grantRepository, authorizationVersionGuard, sqliteTransactionTemplate, clock);
     }
 
     @Bean
