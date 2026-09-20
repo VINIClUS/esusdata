@@ -1,5 +1,6 @@
 package br.gov.observatorioaps.pecadapter;
 
+import br.gov.observatorioaps.jobrunner.JobCancelledException;
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.PecSourceAcquisition;
@@ -172,6 +173,28 @@ class IndividualEncounterModalityCapabilityTest {
                 }, catalog);
 
         assertThat(events).containsSubsequence("autocommit", "readonly", "repeatable-read", "version-probe");
+    }
+
+    @Test
+    void checksCancellationAfterBindingBeforeExecutingTheSourceQuery() throws Exception {
+        Connection connection = mock(Connection.class);
+        PreparedStatement statement = mock(PreparedStatement.class);
+        ResultSet result = mock(ResultSet.class);
+        when(connection.prepareStatement(
+                anyString(), eq(ResultSet.TYPE_FORWARD_ONLY), eq(ResultSet.CONCUR_READ_ONLY)))
+                .thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(result);
+        when(result.next()).thenReturn(false);
+
+        assertThatThrownBy(() -> IndividualEncounterModalityCapability.stream(
+                acquisition(connection, mock(BudgetGuard.class)), ignored -> {
+                }, CompatibilityTestCatalog.productionEntry(), ignored -> {
+                }, () -> {
+                    throw new JobCancelledException("job cancellation requested before query execution");
+                }))
+                .isInstanceOf(JobCancelledException.class);
+
+        verify(statement, never()).executeQuery();
     }
 
     @Test
