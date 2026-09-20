@@ -8,6 +8,8 @@ import br.gov.observatorioaps.jobrunner.IdempotencyResolver;
 import br.gov.observatorioaps.jobrunner.Job;
 import br.gov.observatorioaps.jobrunner.JobRepository;
 import br.gov.observatorioaps.jobrunner.JobState;
+import br.gov.observatorioaps.resultstore.ExtractionManifestRepository;
+import br.gov.observatorioaps.resultstore.SourceRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -54,17 +57,22 @@ public class RunController {
     private final IdempotencyResolver idempotencyResolver;
     private final CancellationRegistry cancellationRegistry;
     private final RunResponseFactory responseFactory;
+    private final SourceRepository sourceRepository;
+    private final ExtractionManifestRepository extractionManifestRepository;
     private final ApiAuthorization authorization;
     private final Clock clock;
 
     public RunController(
             JobRepository jobRepository, IdempotencyResolver idempotencyResolver,
             CancellationRegistry cancellationRegistry, RunResponseFactory responseFactory,
+            SourceRepository sourceRepository, ExtractionManifestRepository extractionManifestRepository,
             ApiAuthorization authorization, Clock clock) {
         this.jobRepository = jobRepository;
         this.idempotencyResolver = idempotencyResolver;
         this.cancellationRegistry = cancellationRegistry;
         this.responseFactory = responseFactory;
+        this.sourceRepository = sourceRepository;
+        this.extractionManifestRepository = extractionManifestRepository;
         this.authorization = authorization;
         this.clock = clock;
     }
@@ -82,6 +90,8 @@ public class RunController {
                     + request.referencePeriod());
         }
         authorization.requireObjectScope(session, Permission.RUN_INDICATOR, request.municipalityIbge());
+        requireIdempotencyKey(idempotencyKey);
+        requireReferencedObjectsInScope(request);
 
         Instant now = clock.instant();
         String requestHash = computeRequestHash(request);
@@ -150,11 +160,40 @@ public class RunController {
      * LIVE_READ_ONLY acquisition — it is not an alternative to {@code sourceId}.
      */
     private void requireFieldsPresent(CreateRunRequest request) {
-        if (request.municipalityIbge() == null || request.indicatorPack() == null
-                || request.ruleVersion() == null || request.referencePeriod() == null
+        if (request.municipalityIbge() == null || request.municipalityIbge().isBlank()
+                || request.indicatorPack() == null || request.indicatorPack().isBlank()
+                || request.ruleVersion() == null || request.ruleVersion().isBlank()
+                || request.referencePeriod() == null || request.referencePeriod().isBlank()
                 || request.sourceId() == null || request.sourceId().isBlank()) {
             throw new IllegalArgumentException(
-                    "municipalityIbge, indicatorPack, ruleVersion, referencePeriod, and sourceId are required");
+                "municipalityIbge, indicatorPack, ruleVersion, referencePeriod, and sourceId are required");
+        }
+        if (request.extractionId() != null && request.extractionId().isBlank()) {
+            throw new IllegalArgumentException("extractionId must not be blank when supplied");
+        }
+    }
+
+    private void requireIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException("Idempotency-Key is required");
+        }
+    }
+
+    /**
+     * Resolve every persisted object named by the request before creating the job. A missing or
+     * differently-scoped reference is deliberately reported as the same external 404, so the
+     * caller cannot use a job failure detail as a cross-municipality metadata oracle.
+     */
+    private void requireReferencedObjectsInScope(CreateRunRequest request) {
+        sourceRepository.findById(request.sourceId())
+                .filter(source -> request.municipalityIbge().equals(source.municipalityIbge()))
+                .orElseThrow(() -> new ApiNotFoundException("source not found"));
+
+        if (request.extractionId() != null) {
+            extractionManifestRepository.findById(request.extractionId())
+                    .filter(stored -> request.municipalityIbge().equals(stored.manifest().municipalityIbge()))
+                    .filter(stored -> request.sourceId().equals(stored.manifest().sourceId()))
+                    .orElseThrow(() -> new ApiNotFoundException("extraction not found"));
         }
     }
 
@@ -168,20 +207,30 @@ public class RunController {
      * must still conflict under a reused key, never silently adopt the first job.
      */
     private String computeRequestHash(CreateRunRequest request) {
-        String canonical = String.join("|",
-                nullToEmpty(request.municipalityIbge()), nullToEmpty(request.indicatorPack()),
-                nullToEmpty(request.ruleVersion()), nullToEmpty(request.referencePeriod()),
-                nullToEmpty(request.sourceId()), nullToEmpty(request.extractionId()));
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(canonical.getBytes(StandardCharsets.UTF_8)));
+            updateCanonicalField(digest, request.municipalityIbge());
+            updateCanonicalField(digest, request.indicatorPack());
+            updateCanonicalField(digest, request.ruleVersion());
+            updateCanonicalField(digest, request.referencePeriod());
+            updateCanonicalField(digest, request.sourceId());
+            updateCanonicalField(digest, request.extractionId());
+            return HexFormat.of().formatHex(digest.digest());
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
     }
 
-    private String nullToEmpty(String value) {
-        return value == null ? "" : value;
+    /** Length-prefixed UTF-8 fields make delimiters data, not structure, and preserve null vs empty. */
+    private void updateCanonicalField(MessageDigest digest, String value) {
+        if (value == null) {
+            digest.update((byte) 0);
+            return;
+        }
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        digest.update((byte) 1);
+        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+        digest.update(bytes);
     }
 
 }

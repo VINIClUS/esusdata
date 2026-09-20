@@ -41,7 +41,7 @@ class ErrorTaxonomyTest extends ApiFixtureSupport {
         // authorizes no destination").
         registerSource(sourceId, MUNICIPALITY);
 
-        HttpResponse<String> created = authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs"),
+        HttpResponse<String> created = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
                 "{\"municipalityIbge\":\"" + MUNICIPALITY + "\",\"indicatorPack\":\"" + C1Rule.INDICATOR_PACK
                         + "\",\"ruleVersion\":\"" + C1Rule.RULE_VERSION + "\",\"referencePeriod\":\"2026-03\","
                         + "\"sourceId\":\"" + sourceId + "\"}");
@@ -62,10 +62,10 @@ class ErrorTaxonomyTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
 
-        HttpResponse<String> created = authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs"),
+        HttpResponse<String> created = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
                 "{\"municipalityIbge\":\"" + MUNICIPALITY + "\",\"indicatorPack\":\"unknown-pack\","
                         + "\"ruleVersion\":\"unknown-pack@1\",\"referencePeriod\":\"2026-03\","
-                        + "\"sourceId\":\"" + sourceId + "\",\"extractionId\":\"ext-does-not-exist\"}");
+                        + "\"sourceId\":\"" + sourceId + "\"}");
         assertThat(created.statusCode()).isEqualTo(202);
         String jobId = extractField(created.body(), "jobId");
 

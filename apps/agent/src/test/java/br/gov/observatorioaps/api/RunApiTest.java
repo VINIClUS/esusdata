@@ -1,6 +1,5 @@
 package br.gov.observatorioaps.api;
 
-import br.gov.observatorioaps.extractionstore.ExtractFixtures;
 import br.gov.observatorioaps.extractionstore.ExtractionManifest;
 import br.gov.observatorioaps.identityaccess.Role;
 import br.gov.observatorioaps.indicatorpacks.c1.C1Rule;
@@ -39,11 +38,10 @@ class RunApiTest extends ApiFixtureSupport {
 
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
-        ExtractionManifest manifest = ExtractFixtures.write(
-                dataDir.resolve("extracts"), "ext-" + System.nanoTime(), sourceId, MUNICIPALITY,
-                "2026-03", 7, 3, 2);
+        ExtractionManifest manifest = registerExtract(
+                "ext-" + System.nanoTime(), sourceId, MUNICIPALITY, "2026-03", 7, 3, 2);
 
-        HttpResponse<String> created = authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs"),
+        HttpResponse<String> created = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
                 createRunJson(sourceId, manifest.extractionId(), "2026-03"));
         assertThat(created.statusCode()).isEqualTo(202);
         assertThat(created.headers().firstValue("Location")).isPresent();
@@ -61,9 +59,8 @@ class RunApiTest extends ApiFixtureSupport {
         String cookie = sessionCookie(manager);
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
-        ExtractionManifest manifest = ExtractFixtures.write(
-                dataDir.resolve("extracts"), "ext-" + System.nanoTime(), sourceId, MUNICIPALITY,
-                "2026-03", 1, 0, 0);
+        ExtractionManifest manifest = registerExtract(
+                "ext-" + System.nanoTime(), sourceId, MUNICIPALITY, "2026-03", 1, 0, 0);
         String idempotencyKey = "idem-" + System.nanoTime();
 
         HttpResponse<String> first = authenticatedPostWithIdempotency(cookie, idempotencyKey,
@@ -108,6 +105,132 @@ class RunApiTest extends ApiFixtureSupport {
     }
 
     @Test
+    void creatingARunWithoutAnIdempotencyKeyIsRefusedWith400() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String cookie = sessionCookie(manager);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+
+        HttpResponse<String> response = authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs"),
+                createRunJson(sourceId, null, "2026-03"));
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(response.body()).contains("BAD_REQUEST");
+    }
+
+    @Test
+    void creatingARunWithABlankIdempotencyKeyIsRefusedWith400() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String cookie = sessionCookie(manager);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+
+        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "   ",
+                createRunJson(sourceId, null, "2026-03"));
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(response.body()).contains("BAD_REQUEST");
+    }
+
+    @Test
+    void anUnknownSourceIsRefusedWith404BeforeTheJobIsEnqueued() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String cookie = sessionCookie(manager);
+
+        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
+                createRunJson("source-does-not-exist", null, "2026-03"));
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(response.body()).contains("NOT_FOUND");
+    }
+
+    @Test
+    void aSourceFromAnotherMunicipalityIsRefusedWith404() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String cookie = sessionCookie(manager);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, "3550308");
+
+        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
+                createRunJson(sourceId, null, "2026-03"));
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(response.body()).contains("NOT_FOUND");
+    }
+
+    @Test
+    void anExtractFromAnotherMunicipalityIsRefusedWith404() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String cookie = sessionCookie(manager);
+        String sourceInScope = "src-in-scope-" + System.nanoTime();
+        String sourceOutOfScope = "src-out-of-scope-" + System.nanoTime();
+        registerSource(sourceInScope, MUNICIPALITY);
+        registerSource(sourceOutOfScope, "3550308");
+        ExtractionManifest manifest = registerExtract(
+                "ext-" + System.nanoTime(), sourceOutOfScope, "3550308", "2026-03", 1, 0, 0);
+
+        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
+                createRunJson(sourceInScope, manifest.extractionId(), "2026-03"));
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(response.body()).contains("NOT_FOUND");
+    }
+
+    @Test
+    void anUnknownExtractIsRefusedWith404BeforeTheJobIsEnqueued() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String cookie = sessionCookie(manager);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+
+        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
+                createRunJson(sourceId, "extract-does-not-exist", "2026-03"));
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(response.body()).contains("NOT_FOUND");
+    }
+
+    @Test
+    void anEmptyOptionalExtractionIdIsRefusedInsteadOfCollidingWithAnOmittedId() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String cookie = sessionCookie(manager);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+
+        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
+                createRunJson(sourceId, "", "2026-03"));
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(response.body()).contains("BAD_REQUEST");
+    }
+
+    @Test
+    void delimiterCharactersInDifferentHashFieldsCannotReuseTheSameIdempotencyKey() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String cookie = sessionCookie(manager);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+        String idempotencyKey = "idem-" + System.nanoTime();
+
+        HttpResponse<String> first = authenticatedPostWithIdempotency(cookie, idempotencyKey,
+                createRunJson(sourceId, null, "2026-03", "a|b", "c"));
+        HttpResponse<String> conflicting = authenticatedPostWithIdempotency(cookie, idempotencyKey,
+                createRunJson(sourceId, null, "2026-03", "a", "b|c"));
+
+        assertThat(first.statusCode()).isEqualTo(202);
+        assertThat(conflicting.statusCode()).isEqualTo(409);
+        assertThat(conflicting.body()).contains("IDEMPOTENCY_KEY_CONFLICT");
+    }
+
+    @Test
     void anInvalidReferencePeriodIsRefusedWith400() throws Exception {
         String manager = createUser("manager-" + System.nanoTime());
         grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
@@ -149,38 +272,17 @@ class RunApiTest extends ApiFixtureSupport {
         throw new AssertionError("job " + jobId + " did not reach a terminal state in time; last body: " + body);
     }
 
-    private HttpResponse<String> authenticatedPostWithIdempotency(
-            String cookie, String idempotencyKey, String jsonBody) throws Exception {
-        String csrfToken = csrfTokenViaReady();
-        return java.net.http.HttpClient.newHttpClient().send(
-                java.net.http.HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs"))
-                        .header("Content-Type", "application/json")
-                        .header("Cookie", cookie + "; XSRF-TOKEN=" + csrfToken)
-                        .header("X-XSRF-TOKEN", csrfToken)
-                        .header("Idempotency-Key", idempotencyKey)
-                        .POST(java.net.http.HttpRequest.BodyPublishers.ofString(jsonBody))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-    }
-
-    private String csrfTokenViaReady() throws Exception {
-        HttpResponse<String> ready = java.net.http.HttpClient.newHttpClient().send(
-                java.net.http.HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
-        for (String setCookie : ready.headers().allValues("Set-Cookie")) {
-            if (setCookie.startsWith("XSRF-TOKEN=")) {
-                String rest = setCookie.substring("XSRF-TOKEN=".length());
-                int semicolon = rest.indexOf(';');
-                return semicolon < 0 ? rest : rest.substring(0, semicolon);
-            }
-        }
-        throw new IllegalStateException("no XSRF-TOKEN cookie was issued");
-    }
-
     private String createRunJson(String sourceId, String extractionId, String referencePeriod) {
+        return createRunJson(sourceId, extractionId, referencePeriod, C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION);
+    }
+
+    private String createRunJson(
+            String sourceId, String extractionId, String referencePeriod,
+            String indicatorPack, String ruleVersion) {
         String extractionField = extractionId == null ? "" : ",\"extractionId\":\"" + extractionId + "\"";
-        return "{\"municipalityIbge\":\"" + MUNICIPALITY + "\",\"indicatorPack\":\"" + C1Rule.INDICATOR_PACK
-                + "\",\"ruleVersion\":\"" + C1Rule.RULE_VERSION + "\",\"referencePeriod\":\"" + referencePeriod
+        return "{\"municipalityIbge\":\"" + MUNICIPALITY + "\",\"indicatorPack\":\"" + indicatorPack
+                + "\",\"ruleVersion\":\"" + ruleVersion + "\",\"referencePeriod\":\"" + referencePeriod
                 + "\",\"sourceId\":\"" + sourceId + "\"" + extractionField + "}";
     }
 
