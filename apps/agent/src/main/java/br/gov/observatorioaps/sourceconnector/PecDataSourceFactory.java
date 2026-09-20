@@ -48,6 +48,12 @@ public final class PecDataSourceFactory {
             config.setInitializationFailTimeout(-1);
             config.setConnectionTimeout(budget.acquisitionTimeout().toMillis());
             config.addDataSourceProperty("connectTimeout", pgConnectTimeoutSeconds(budget.connectionTimeout()));
+            config.addDataSourceProperty("socketTimeout", pgTimeoutSeconds(
+                    budget.maxDurationMs(), "maxDurationMs"));
+            config.addDataSourceProperty("cancelSignalTimeout", pgTimeoutSeconds(
+                    budget.connectionTimeout().toMillis(), "connectionTimeout"));
+            config.addDataSourceProperty("queryTimeout", pgTimeoutSeconds(
+                    budget.statementTimeoutMs(), "statementTimeoutMs"));
             config.setPoolName("pec-" + properties.sourceId());
             config.setConnectionInitSql(
                     "SET application_name = 'observatorio-aps'; "
@@ -68,10 +74,18 @@ public final class PecDataSourceFactory {
     }
 
     private static int pgConnectTimeoutSeconds(Duration timeout) {
-        long millis = timeout.toMillis();
-        long seconds = Math.max(1, (millis + 999) / 1000);
+        return pgTimeoutSeconds(timeout.toMillis(), "connectionTimeout");
+    }
+
+    private static int pgTimeoutSeconds(long millis, String setting) {
+        if (millis <= 0) {
+            throw new IllegalArgumentException(setting + " must be positive");
+        }
+        long seconds = millis / 1000;
+        if (millis % 1000 != 0) seconds++;
+        seconds = Math.max(1, seconds);
         if (seconds > Integer.MAX_VALUE) {
-            throw new IllegalArgumentException("connectionTimeout is too large for pgJDBC connectTimeout");
+            throw new IllegalArgumentException(setting + " is too large for pgJDBC timeout properties");
         }
         return (int) seconds;
     }

@@ -26,6 +26,22 @@ class PecCompatibilityMatrixTest {
     }
 
     @Test
+    void compatibilityContractFingerprintsEveryDimensionJoinedByTheCapability() {
+        var entry = PecCompatibilityMatrix.fromClasspathResource().findExact(
+                "individual_encounter_modality", "0.1.0", CT133_IDENTITY, "9.6.13");
+
+        assertThat(entry.objectFingerprints()).containsKeys(
+                "tb_dim_tempo", "tb_dim_municipio", "tb_dim_tipo_atendimento",
+                "tb_dim_unidade_saude", "tb_dim_equipe", "tb_dim_cbo");
+        assertThat(entry.objectColumns().get("tb_dim_unidade_saude"))
+                .contains("nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude");
+        assertThat(entry.objectColumns().get("tb_dim_equipe"))
+                .contains("nu_ine", "UNIQUE_KEY=co_seq_dim_equipe");
+        assertThat(entry.objectColumns().get("tb_dim_cbo"))
+                .contains("nu_cbo", "UNIQUE_KEY=co_seq_dim_cbo");
+    }
+
+    @Test
     void emptyMatrixCannotSelectAnAdapter() {
         PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromJson(
                 "{\"schema_version\":\"1\",\"validation_status\":\"VALIDATED\",\"tested_with\":[]}");

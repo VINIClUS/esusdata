@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PecDataSourceFactoryTest {
 
@@ -27,6 +28,8 @@ class PecDataSourceFactoryTest {
                     .isEqualTo("jdbc:postgresql://127.0.0.1:15433/esus");
             assertThat(dataSource.getConnectionTimeout()).isEqualTo(7_000);
             assertThat(dataSource.getDataSourceProperties().get("connectTimeout")).isEqualTo(3);
+            assertThat(dataSource.getDataSourceProperties().get("socketTimeout")).isEqualTo(60);
+            assertThat(dataSource.getDataSourceProperties().get("cancelSignalTimeout")).isEqualTo(3);
         } finally {
             dataSource.close();
         }
@@ -54,5 +57,21 @@ class PecDataSourceFactoryTest {
         } finally {
             dataSource.close();
         }
+    }
+
+    @Test
+    void rejectsTimeoutsThatCannotBeRepresentedByPgJdbc() {
+        var properties = new PecConnectionProperties(
+                "source-large-timeout", "127.0.0.1", 15433, "esus", "reader", "DB_PASSWORD", "3541307");
+        var allowlist = new AllowedDestinations(
+                Set.of(new AllowedDestinations.HostPort("127.0.0.1", 15433)));
+        var budget = new ReadBudget(
+                2, Duration.ofSeconds(3), Duration.ofSeconds(7), 30_000, 10_000, 30_000,
+                200_000, Long.MAX_VALUE);
+
+        assertThatThrownBy(() -> new PecDataSourceFactory(
+                allowlist, ignored -> "secret".toCharArray()).create(properties, budget))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxDurationMs");
     }
 }

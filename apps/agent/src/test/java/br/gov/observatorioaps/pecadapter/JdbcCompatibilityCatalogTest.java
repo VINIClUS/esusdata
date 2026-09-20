@@ -77,6 +77,41 @@ class JdbcCompatibilityCatalogTest {
                         + "3|15:Consulta no dia|4"));
     }
 
+    @Test
+    void fingerprintsIncludeTheDimensionPrimaryKeyConstraint() throws Exception {
+        Connection connection = mock(Connection.class);
+        PreparedStatement metadataStatement = mock(PreparedStatement.class);
+        PreparedStatement constraintStatement = mock(PreparedStatement.class);
+        ResultSet metadata = mock(ResultSet.class);
+        ResultSet constraint = mock(ResultSet.class);
+        when(connection.prepareStatement(anyString())).thenReturn(metadataStatement, constraintStatement);
+        when(metadataStatement.executeQuery()).thenReturn(metadata);
+        when(constraintStatement.executeQuery()).thenReturn(constraint);
+
+        when(metadata.next()).thenReturn(true, true, false);
+        when(metadata.getString("column_name")).thenReturn("co_seq_dim_unidade_saude", "nu_cnes");
+        when(metadata.getString("data_type")).thenReturn("bigint", "character varying");
+        when(metadata.getString("udt_name")).thenReturn("int8", "varchar");
+        when(metadata.getInt("ordinal_position")).thenReturn(1, 2);
+
+        when(constraint.next()).thenReturn(true, false);
+        when(constraint.getString("constraint_name")).thenReturn("tb_dim_unidade_saude_pkey");
+        when(constraint.getString("constraint_type")).thenReturn("PRIMARY KEY");
+        when(constraint.getString("column_name")).thenReturn("co_seq_dim_unidade_saude");
+        when(constraint.getInt("ordinal_position")).thenReturn(1);
+
+        String fingerprint = new JdbcCompatibilityCatalog().fingerprint(
+                connection, "tb_dim_unidade_saude",
+                List.of("co_seq_dim_unidade_saude", "nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude"));
+
+        assertThat(fingerprint).isEqualTo(sha256(
+                "tb_dim_unidade_saude\n"
+                        + "co_seq_dim_unidade_saude|bigint|int8|1\n"
+                        + "nu_cnes|character varying|varchar|2\n"
+                        + "UNIQUE_KEY=co_seq_dim_unidade_saude\n"
+                        + "PRIMARY KEY|co_seq_dim_unidade_saude"));
+    }
+
     private static String sha256(String value) throws Exception {
         return "sha256:" + java.util.HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
