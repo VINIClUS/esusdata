@@ -1,0 +1,8 @@
+observatorio:
+  data:
+    directory: ${OBSERVATORIO_DATA_DIR:${user.home}/.local/share/observatorio-aps}
+
+logging:
+  level:
+    root: INFO
+    br.gov.observatorioaps: INFO
