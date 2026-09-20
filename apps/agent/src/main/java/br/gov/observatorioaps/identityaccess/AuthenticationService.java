@@ -70,13 +70,25 @@ public final class AuthenticationService {
      * and the effect is visible only on the NEXT request that re-validates the session (the
      * {@link AuthenticatedSession} already materialized for THIS request is not mutated in place).
      */
-    public void reauthenticate(String sessionId, String userId, String password, Instant now) {
+    public void reauthenticate(
+            String sessionId, String userId, String password, String origin, Instant now) {
         UserAccount user = userRepository.findById(userId).orElse(null);
-        if (user == null || user.state() != UserState.ACTIVE || !argon2Profile.matches(password, user.passwordHash())) {
-            auditWriter.record(now, userId, "REAUTH", userId, "FAILED", null);
-            throw new AuthenticationFailedException("invalid password");
+        String username = user == null ? userId : user.username();
+        loginThrottle.checkAllowed(username, origin, now);
+        boolean success = false;
+        try {
+            if (user == null || user.state() != UserState.ACTIVE
+                    || !argon2Profile.matches(password, user.passwordHash())) {
+                throw new AuthenticationFailedException("invalid password");
+            }
+            success = true;
+            sessionService.touchReauth(sessionId, now);
+            auditWriter.record(now, userId, "REAUTH", userId, "SUCCESS", null);
+        } finally {
+            loginThrottle.recordAttempt(username, origin, success, now);
+            if (!success) {
+                auditWriter.record(now, userId, "REAUTH", userId, "FAILED", null);
+            }
         }
-        sessionService.touchReauth(sessionId, now);
-        auditWriter.record(now, userId, "REAUTH", userId, "SUCCESS", null);
     }
 }
