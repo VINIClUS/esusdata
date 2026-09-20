@@ -4,6 +4,7 @@ import br.gov.observatorioaps.identityaccess.AuthenticationFailedException;
 import br.gov.observatorioaps.identityaccess.AuthenticationService;
 import br.gov.observatorioaps.identityaccess.BootstrapActivation;
 import br.gov.observatorioaps.identityaccess.LoginThrottle;
+import br.gov.observatorioaps.identityaccess.PasswordPolicy;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Clock;
+import java.time.Duration;
 
 /**
  * The auth HTTP surface the spec leaves undefined (plan decision 5) —
@@ -96,8 +98,12 @@ public class AuthController {
 
     @ExceptionHandler(LoginThrottle.LoginThrottledException.class)
     public ResponseEntity<ApiError> handleThrottled(LoginThrottle.LoginThrottledException e) {
+        // Retry-After (RFC 7231 §7.1.3) accepts delta-seconds or an HTTP-date — never a plain
+        // ISO-8601 instant, which Instant#toString() produces and clients/intermediaries may
+        // reject or ignore outright.
+        long retryAfterSeconds = Math.max(0, Duration.between(clock.instant(), e.retryAfter()).toSeconds());
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .header("Retry-After", e.retryAfter().toString())
+                .header("Retry-After", Long.toString(retryAfterSeconds))
                 .body(new ApiError("LOGIN_THROTTLED", "too many failed attempts; try again later"));
     }
 
@@ -105,5 +111,11 @@ public class AuthController {
     public ResponseEntity<ApiError> handleActivationFailed(BootstrapActivation.ActivationFailedException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiError("ACTIVATION_FAILED", e.getMessage()));
+    }
+
+    @ExceptionHandler(PasswordPolicy.WeakPasswordException.class)
+    public ResponseEntity<ApiError> handleWeakPassword(PasswordPolicy.WeakPasswordException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiError("WEAK_PASSWORD", e.getMessage()));
     }
 }

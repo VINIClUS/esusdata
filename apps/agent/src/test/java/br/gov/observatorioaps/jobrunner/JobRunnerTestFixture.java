@@ -112,7 +112,7 @@ final class JobRunnerTestFixture implements AutoCloseable {
                         new AllowedDestinations(Set.of()), new EnvFileSecretResolver(dataDir.resolve("unused.env")));
         executor = new IndicatorRunExecutor(
                 extractsDir, jobRepository, stagingArea, publicationService, "test-build", clock,
-                grantRevalidator, sourceRepository, factory, acquisitionGuard());
+                grantRevalidator, sourceRepository, factory, acquisitionGuard(), liveAcquisitionCooldownMargin);
     }
 
     JobRecovery jobRecovery() {

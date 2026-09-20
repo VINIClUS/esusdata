@@ -116,10 +116,11 @@ public class IdentityAccessConfig {
     @DependsOn("flywayMigration")
     public BootstrapActivation bootstrapActivation(
             UserRepository userRepository, GrantRepository grantRepository, JdbcTemplate sqliteJdbcTemplate,
-            Clock clock, SecurityProperties properties, PasswordPolicy passwordPolicy,
-            Argon2Profile argon2Profile, SqliteProperties sqliteProperties) {
-        return new BootstrapActivation(userRepository, grantRepository, sqliteJdbcTemplate, clock,
-                properties, passwordPolicy, argon2Profile, sqliteProperties.resolvedDirectory());
+            TransactionTemplate sqliteTransactionTemplate, Clock clock, SecurityProperties properties,
+            PasswordPolicy passwordPolicy, Argon2Profile argon2Profile, SqliteProperties sqliteProperties) {
+        return new BootstrapActivation(userRepository, grantRepository, sqliteJdbcTemplate,
+                sqliteTransactionTemplate, clock, properties, passwordPolicy, argon2Profile,
+                sqliteProperties.resolvedDirectory());
     }
 
     /**

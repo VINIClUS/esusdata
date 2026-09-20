@@ -175,4 +175,22 @@ class LiveAcquisitionEndToEndTest {
         assertThat(fixture.jobRepository.findById("job-live-cancel").orElseThrow().state())
                 .isEqualTo(JobState.RUNNING);
     }
+
+    @Test
+    void cancellingDuringAcquisitionBlocksTheSourceOnCooldown() {
+        // Cancellation only sends a best-effort Statement#cancel() — this run ends without any
+        // proof the PostgreSQL backend actually stopped, the same uncertainty an abandoned RUNNING
+        // job leaves for JobRecovery. runLive must apply the same ENG-51 cooldown itself, not only
+        // on the next process restart.
+        var context = liveContext("job-live-cancel-guard", "1100015");
+        CancellationToken cancellation = new CancellationToken();
+        cancellation.requestCancel();
+
+        assertThatThrownBy(() -> fixture.executor.runLive(context, cancellation, fixtureCatalog))
+                .isInstanceOf(JobCancelledException.class);
+
+        var retryContext = liveContext("job-live-cancel-guard-retry", "1100015");
+        assertThatThrownBy(() -> fixture.executor.runLive(retryContext, new CancellationToken(), fixtureCatalog))
+                .isInstanceOf(SourceAcquisitionBlockedException.class);
+    }
 }

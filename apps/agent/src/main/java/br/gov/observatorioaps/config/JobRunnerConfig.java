@@ -251,10 +251,11 @@ public class JobRunnerConfig {
             GrantRevalidator grantRevalidator,
             SourceRepository sourceRepository,
             PecDataSourceFactory pecDataSourceFactory,
-            AcquisitionGuard acquisitionGuard) {
+            AcquisitionGuard acquisitionGuard,
+            Duration liveAcquisitionCooldownMargin) {
         return new IndicatorRunExecutor(properties.extractsDirectory(), jobRepository,
                 resultStagingArea, publicationService, appBuild, clock, grantRevalidator,
-                sourceRepository, pecDataSourceFactory, acquisitionGuard);
+                sourceRepository, pecDataSourceFactory, acquisitionGuard, liveAcquisitionCooldownMargin);
     }
 
     // JobWorker implements SmartLifecycle — Spring's lifecycle processor calls start()/stop()

@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -85,6 +86,7 @@ public final class IndicatorRunExecutor {
     private final SourceRepository sourceRepository;
     private final PecDataSourceFactory pecDataSourceFactory;
     private final AcquisitionGuard acquisitionGuard;
+    private final Duration liveAcquisitionCooldownMargin;
 
     public IndicatorRunExecutor(
             Path extractsBaseDir,
@@ -96,7 +98,8 @@ public final class IndicatorRunExecutor {
             GrantRevalidator grantRevalidator,
             SourceRepository sourceRepository,
             PecDataSourceFactory pecDataSourceFactory,
-            AcquisitionGuard acquisitionGuard) {
+            AcquisitionGuard acquisitionGuard,
+            Duration liveAcquisitionCooldownMargin) {
         this.extractsBaseDir = extractsBaseDir;
         this.jobRepository = jobRepository;
         this.stagingArea = stagingArea;
@@ -107,6 +110,7 @@ public final class IndicatorRunExecutor {
         this.sourceRepository = sourceRepository;
         this.pecDataSourceFactory = pecDataSourceFactory;
         this.acquisitionGuard = acquisitionGuard;
+        this.liveAcquisitionCooldownMargin = liveAcquisitionCooldownMargin;
     }
 
     public record RunContext(
@@ -209,12 +213,28 @@ public final class IndicatorRunExecutor {
                     context.jobId(), context.processInstanceId(), context.executionGeneration(), clock.instant());
             PecSourceAcquisition acquisition = sourceConnection.acquire(periodStart, periodEndExclusive);
             try (ExtractWriter writer = new ExtractWriter(extractsBaseDir, extractionId, acquisition)) {
-                IndividualEncounterModalityCapability.stream(
-                        acquisition,
-                        raw -> writeCanonical(writer, acquisition, raw),
-                        catalog,
-                        cancellation::bindStatement,
-                        cancellation::checkCancelled);
+                try {
+                    IndividualEncounterModalityCapability.stream(
+                            acquisition,
+                            raw -> writeCanonical(writer, acquisition, raw),
+                            catalog,
+                            cancellation::bindStatement,
+                            cancellation::checkCancelled);
+                } catch (RuntimeException | SQLException uncertainFailure) {
+                    // The read ended abnormally (cancellation, a transient SQL/network error, or a
+                    // local write failure mid-stream) while a statement was bound to this
+                    // connection. Closing the JDBC connection on the way out of this try-with-
+                    // resources block does not prove the PostgreSQL backend actually stopped
+                    // executing: a network partition lets the server keep running until its own
+                    // statement/idle-in-transaction timeouts expire (ENG-51). Block new
+                    // LIVE_READ_ONLY acquisitions on this source for the same timeout-derived
+                    // margin JobRecovery applies to an abandoned RUNNING job, rather than only
+                    // guarding against a process restart.
+                    acquisitionGuard.block(context.sourceId(), clock.instant().plus(liveAcquisitionCooldownMargin),
+                            "job " + context.jobId() + " ended a live acquisition with an uncertain outcome: "
+                                    + uncertainFailure);
+                    throw uncertainFailure;
+                }
                 manifest = writer.finalizeExtract(
                         startedAt, SOURCE_ZONE_ID, IndividualEncounterModalityCapability.QUERY_CHECKSUM,
                         IndividualEncounterModalityCapability.ADAPTER_VERSION, "COMPLETE", "SNAPSHOT");
