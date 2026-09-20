@@ -11,12 +11,17 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 
 import javax.sql.DataSource;
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Set;
 
 /**
  * Own persistence — SQLite. Tech Spec §1.12.1: WAL, {@code synchronous=FULL},
@@ -38,17 +43,14 @@ public class SqliteDataSourceConfig {
 
     @Bean(destroyMethod = "close")
     public ProcessLock processLock(SqliteProperties properties) {
+        ensureOwnerOnlyDataDirectory(properties.resolvedDirectory());
         return ProcessLock.acquireOrFail(properties.lockFile());
     }
 
     @Bean
     public DataSource sqliteDataSource(SqliteProperties properties) throws SQLException {
+        ensureOwnerOnlyDataDirectory(properties.resolvedDirectory());
         Path dbFile = properties.databaseFile();
-        try {
-            Files.createDirectories(dbFile.getParent());
-        } catch (Exception e) {
-            throw new IllegalStateException("Could not create data directory " + dbFile.getParent(), e);
-        }
 
         SQLiteConfig config = new SQLiteConfig();
         config.setJournalMode(SQLiteConfig.JournalMode.WAL);
@@ -59,6 +61,49 @@ public class SqliteDataSourceConfig {
         SQLiteDataSource dataSource = new SQLiteDataSource(config);
         dataSource.setUrl("jdbc:sqlite:" + dbFile);
         return dataSource;
+    }
+
+    /**
+     * SQLite creates the database, WAL, and shared-memory files inside this directory. Secure the
+     * directory before any SQLite connection can open a file; a normal {@code 022} umask would
+     * otherwise leave a newly-created directory traversable by every local account. Existing
+     * directories are tightened as well, so upgrading an installation does not preserve an
+     * accidentally broad mode from an earlier startup.
+     */
+    private static void ensureOwnerOnlyDataDirectory(Path directory) {
+        if (directory == null) {
+            throw new IllegalStateException("SQLite data directory is required");
+        }
+        try {
+            if (Files.isSymbolicLink(directory)) {
+                throw new IllegalStateException(
+                        "SQLite data directory must not be a symbolic link: " + directory);
+            }
+            Files.createDirectories(directory);
+            if (Files.isSymbolicLink(directory)
+                    || !Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IllegalStateException(
+                        "SQLite data path is not a real directory: " + directory);
+            }
+
+            PosixFileAttributeView posix = Files.getFileAttributeView(
+                    directory, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+            if (posix != null) {
+                Set<PosixFilePermission> ownerOnly = Set.of(
+                        PosixFilePermission.OWNER_READ,
+                        PosixFilePermission.OWNER_WRITE,
+                        PosixFilePermission.OWNER_EXECUTE);
+                posix.setPermissions(ownerOnly);
+                if (!posix.readAttributes().permissions().equals(ownerOnly)) {
+                    throw new IllegalStateException(
+                            "SQLite data directory is not owner-only after permission hardening: "
+                                    + directory);
+                }
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "Could not create or restrict SQLite data directory " + directory, e);
+        }
     }
 
     /**

@@ -7,10 +7,13 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import javax.sql.DataSource;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -103,5 +106,31 @@ class SqliteDataSourceConfigTest {
         try (ProcessLock ignored = ProcessLock.acquireOrFail(lockFile)) {
             assertThat(ignored).isNotNull();
         }
+    }
+
+    @Test
+    void existingDataDirectoryIsRestrictedBeforeSqliteCanOpenIt() throws Exception {
+        var posix = Files.getFileAttributeView(
+                tempDir, java.nio.file.attribute.PosixFileAttributeView.class);
+        org.junit.jupiter.api.Assumptions.assumeTrue(posix != null,
+                "POSIX permissions are required for this regression test");
+
+        Path dataDir = tempDir.resolve("existing-data");
+        Files.createDirectories(dataDir);
+        Files.setPosixFilePermissions(dataDir, Set.of(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.OWNER_EXECUTE,
+                PosixFilePermission.GROUP_READ,
+                PosixFilePermission.GROUP_EXECUTE,
+                PosixFilePermission.OTHERS_READ,
+                PosixFilePermission.OTHERS_EXECUTE));
+
+        new SqliteDataSourceConfig().sqliteDataSource(new SqliteProperties(dataDir.toString()));
+
+        assertThat(Files.getPosixFilePermissions(dataDir)).containsExactlyInAnyOrder(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.OWNER_EXECUTE);
     }
 }
