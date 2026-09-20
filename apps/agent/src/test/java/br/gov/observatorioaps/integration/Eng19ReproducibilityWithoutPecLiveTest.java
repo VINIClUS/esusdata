@@ -18,8 +18,8 @@ import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.EnvFileSecretResolver;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.PecDataSourceFactory;
+import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
 import br.gov.observatorioaps.sourceconnector.ReadBudget;
-import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -97,23 +97,19 @@ class Eng19ReproducibilityWithoutPecLiveTest {
         var factory = new PecDataSourceFactory(allowlist, new EnvFileSecretResolver(ENV_FILE));
         ReadBudget budget = ReadBudget.initialEngineeringProposal();
 
-        HikariDataSource ds = factory.create(properties, budget);
         Instant startedAt = Instant.now();
-        try (ExtractWriter writer = new ExtractWriter(extractDir, extractionId)) {
-            try (Connection c = ds.getConnection()) {
+        try (PecSourceConnection sourceConnection = factory.open(properties, budget);
+             ExtractWriter writer = new ExtractWriter(extractDir, extractionId)) {
                 var guard = new BudgetGuard(budget);
                 IndividualEncounterModalityCapability.stream(
-                        c, properties, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), guard,
+                        sourceConnection, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), guard,
                         raw -> writeCanonical(writer, raw),
                         new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"));
-            }
             return writer.finalizeExtract(
                     "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01", startedAt,
                     "America/Sao_Paulo",
                     IndividualEncounterModalityCapability.QUERY_CHECKSUM,
                     "0.1.0", "COMPLETE", "SNAPSHOT");
-        } finally {
-            ds.close(); // The PEC connection pool is fully torn down here — Phase B has nothing left.
         }
     }
 

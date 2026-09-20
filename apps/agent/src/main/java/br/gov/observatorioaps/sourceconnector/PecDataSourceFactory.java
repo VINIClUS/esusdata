@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 import java.net.InetAddress;
+import java.sql.SQLException;
 import java.time.Duration;
 
 /**
@@ -66,6 +67,22 @@ public final class PecDataSourceFactory {
             return new HikariDataSource(config);
         } finally {
             java.util.Arrays.fill(password, '\0');
+        }
+    }
+
+    /**
+     * Opens one source-bound acquisition session. The returned wrapper carries the exact
+     * properties used to construct its pool, so adapters cannot accidentally combine this JDBC
+     * connection with another source's municipality configuration.
+     */
+    public PecSourceConnection open(PecConnectionProperties properties, ReadBudget budget)
+            throws SQLException {
+        HikariDataSource dataSource = create(properties, budget);
+        try {
+            return PecSourceConnection.fromPool(dataSource, properties);
+        } catch (SQLException | RuntimeException failure) {
+            dataSource.close();
+            throw failure;
         }
     }
 

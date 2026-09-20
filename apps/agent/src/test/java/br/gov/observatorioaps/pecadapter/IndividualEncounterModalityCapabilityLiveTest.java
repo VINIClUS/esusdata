@@ -5,8 +5,8 @@ import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.EnvFileSecretResolver;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.PecDataSourceFactory;
+import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
 import br.gov.observatorioaps.sourceconnector.ReadBudget;
-import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
@@ -57,19 +57,16 @@ class IndividualEncounterModalityCapabilityLiveTest {
                 Set.of(new AllowedDestinations.HostPort(properties.host(), properties.port())));
         var factory = new PecDataSourceFactory(allowlist, new EnvFileSecretResolver(ENV_FILE));
 
-        HikariDataSource ds = factory.create(properties, ReadBudget.initialEngineeringProposal());
+        PecSourceConnection sourceConnection = factory.open(
+                properties, ReadBudget.initialEngineeringProposal());
         List<RawEncounterRecord> records = new ArrayList<>();
-        try {
-            try (Connection c = ds.getConnection()) {
-                var guard = new BudgetGuard(ReadBudget.initialEngineeringProposal());
-                IndividualEncounterModalityCapability.stream(
-                        c, properties,
-                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
-                        guard, records::add,
-                        new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"));
-            }
-        } finally {
-            ds.close();
+        try (sourceConnection) {
+            var guard = new BudgetGuard(ReadBudget.initialEngineeringProposal());
+            IndividualEncounterModalityCapability.stream(
+                    sourceConnection,
+                    LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                    guard, records::add,
+                    new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"));
         }
 
         long programados = records.stream().filter(r -> r.modality() == EncounterModality.PROGRAMADO).count();

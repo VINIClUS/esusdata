@@ -2,6 +2,7 @@ package br.gov.observatorioaps.pecadapter;
 
 import org.junit.jupiter.api.Test;
 
+import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
 import java.sql.Connection;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -141,10 +142,10 @@ class PecCompatibilityMatrixTest {
     }
 
     @Test
-    void compatibilityAwareStreamDoesNotExposeAnIdentityFreeOverload() {
+    void compatibilityAwareStreamRequiresAConnectionBoundSourceIdentity() {
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
                 .filter(method -> method.getName().equals("stream"))
-                .map(java.lang.reflect.Method::getParameterCount))
-                .doesNotContain(6);
+                .allMatch(method -> method.getParameterTypes()[0].equals(PecSourceConnection.class)))
+                .isTrue();
     }
 }

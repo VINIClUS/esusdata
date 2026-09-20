@@ -2,6 +2,8 @@ package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
+import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
+import br.gov.observatorioaps.sourceconnector.PecSourceConnectionTestSupport;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +41,8 @@ class IndividualEncounterModalityCapabilityTest {
 
         BudgetGuard guard = mock(BudgetGuard.class);
         IndividualEncounterModalityCapability.stream(
-                connection, sourceProperties(), LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 guard, ignored -> {
                 }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
                 CompatibilityTestCatalog.productionEntry());
@@ -85,7 +88,8 @@ class IndividualEncounterModalityCapabilityTest {
         }).when(guard).checkDuration();
 
         IndividualEncounterModalityCapability.stream(
-                connection, sourceProperties(), LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 guard, ignored -> {
                 }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"), catalog);
 
@@ -144,7 +148,8 @@ class IndividualEncounterModalityCapabilityTest {
         };
 
         IndividualEncounterModalityCapability.stream(
-                connection, sourceProperties(), LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 mock(BudgetGuard.class), ignored -> {
                 }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"), catalog);
 
@@ -172,7 +177,8 @@ class IndividualEncounterModalityCapabilityTest {
                 "I/O error while reading from backend", "08006", new SocketTimeoutException("socket timed out")));
 
         assertThatThrownBy(() -> IndividualEncounterModalityCapability.stream(
-                connection, sourceProperties(), LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 mock(BudgetGuard.class), ignored -> {
                 }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
                 CompatibilityTestCatalog.productionEntry()))
@@ -184,14 +190,13 @@ class IndividualEncounterModalityCapabilityTest {
     void streamRequiresTheConfiguredPecMunicipalityInsteadOfAnArbitraryQueryScope() {
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
                 .filter(method -> method.getName().equals("stream"))
-                .anyMatch(method -> Arrays.asList(method.getParameterTypes())
-                        .contains(br.gov.observatorioaps.sourceconnector.PecConnectionProperties.class)))
+                .allMatch(method -> method.getParameterTypes()[0].equals(PecSourceConnection.class)))
                 .isTrue();
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
                 .filter(method -> method.getName().equals("stream"))
-                .anyMatch(method -> method.getParameterTypes().length > 1
-                        && method.getParameterTypes()[1].equals(String.class)))
-                .isFalse();
+                .noneMatch(method -> Arrays.asList(method.getParameterTypes())
+                        .contains(br.gov.observatorioaps.sourceconnector.PecConnectionProperties.class)))
+                .isTrue();
     }
 
     private PecConnectionProperties sourceProperties() {
@@ -208,7 +213,8 @@ class IndividualEncounterModalityCapabilityTest {
         when(statement.executeQuery()).thenThrow(new java.sql.SQLException(message, sqlState));
 
         assertThatThrownBy(() -> IndividualEncounterModalityCapability.stream(
-                connection, sourceProperties(), LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
                 mock(BudgetGuard.class), ignored -> {
                 }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
                 CompatibilityTestCatalog.productionEntry()))

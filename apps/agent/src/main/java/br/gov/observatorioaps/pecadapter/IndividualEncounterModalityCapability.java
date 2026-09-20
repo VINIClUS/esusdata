@@ -2,6 +2,7 @@ package br.gov.observatorioaps.pecadapter;
 
 import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
+import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
@@ -77,22 +78,21 @@ public final class IndividualEncounterModalityCapability {
     /**
      * Streams matching encounters to {@code consumer}, checking the {@link BudgetGuard} once per
      * row so a runaway result set is interrupted rather than fully materialized. The caller owns
-     * the {@link Connection} — this method never closes it, and never opens one itself, keeping
-     * source-connector the single place that manages PEC connections (§1.5).
+     * the {@link PecSourceConnection} — this method never closes it, and never opens one itself,
+     * keeping source-connector the single place that manages PEC connections (§1.5).
      *
      * <p>Validates adapter compatibility against the frozen matrix entry before executing any query
      * — an unsupported source version or schema fingerprint blocks acquisition (ENG-43).
      */
     public static void stream(
-            Connection connection,
-            PecConnectionProperties sourceProperties,
+            PecSourceConnection sourceConnection,
             LocalDate periodStart,
             LocalDate periodEndExclusive,
             BudgetGuard guard,
             Consumer<RawEncounterRecord> consumer,
             PecSourceIdentity sourceIdentity
     ) throws SQLException {
-        stream(connection, sourceProperties, periodStart, periodEndExclusive, guard, consumer,
+        stream(sourceConnection, periodStart, periodEndExclusive, guard, consumer,
                 sourceIdentity, new JdbcCompatibilityCatalog());
     }
 
@@ -103,8 +103,7 @@ public final class IndividualEncounterModalityCapability {
      * PEC; validation itself is never bypassed.
      */
     public static void stream(
-            Connection connection,
-            PecConnectionProperties sourceProperties,
+            PecSourceConnection sourceConnection,
             LocalDate periodStart,
             LocalDate periodEndExclusive,
             BudgetGuard guard,
@@ -112,6 +111,11 @@ public final class IndividualEncounterModalityCapability {
             PecSourceIdentity sourceIdentity,
             CompatibilityCatalog catalog
     ) throws SQLException {
+        if (sourceConnection == null) {
+            throw new IllegalArgumentException("A source-bound PEC connection is required");
+        }
+        Connection connection = sourceConnection.jdbcConnection();
+        PecConnectionProperties sourceProperties = sourceConnection.properties();
         String municipalityIbge = requireAuthorizedMunicipality(sourceProperties);
         beginReadOnlyRepeatableReadTransaction(connection);
         try {
