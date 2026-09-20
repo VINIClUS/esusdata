@@ -154,6 +154,12 @@ public final class JobWorker implements SmartLifecycle {
     private void processJob(Job job) {
         CancellationToken token = cancellationRegistry.register(job.jobId());
         try {
+            Job persisted = jobRepository.findById(job.jobId()).orElse(null);
+            if (persisted != null && persisted.state() == JobState.CANCEL_REQUESTED
+                    && processInstanceId.equals(persisted.processInstanceId())
+                    && persisted.executionGeneration() == job.executionGeneration()) {
+                token.requestCancel();
+            }
             IndicatorRunExecutor.RunContext context = new IndicatorRunExecutor.RunContext(
                     job.jobId(), job.runId(), job.sourceId(), job.executionGeneration(),
                     job.processInstanceId(), job.extractionId(), job.municipalityIbge(),

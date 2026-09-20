@@ -145,6 +145,10 @@ class RunApiTest extends ApiFixtureSupport {
 
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(response.body()).contains("NOT_FOUND");
+        assertThat(jdbc.queryForObject(
+                "select count(*) from auth_audit where actor_user_id = ?"
+                        + " and event_type = 'ACCESS_DENIED' and outcome = 'DENIED'",
+                Integer.class, manager)).isEqualTo(1);
     }
 
     @Test
@@ -160,6 +164,10 @@ class RunApiTest extends ApiFixtureSupport {
 
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(response.body()).contains("NOT_FOUND");
+        assertThat(jdbc.queryForObject(
+                "select count(*) from auth_audit where actor_user_id = ?"
+                        + " and event_type = 'ACCESS_DENIED' and outcome = 'DENIED'",
+                Integer.class, manager)).isEqualTo(1);
     }
 
     @Test
@@ -179,6 +187,10 @@ class RunApiTest extends ApiFixtureSupport {
 
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(response.body()).contains("NOT_FOUND");
+        assertThat(jdbc.queryForObject(
+                "select count(*) from auth_audit where actor_user_id = ?"
+                        + " and event_type = 'ACCESS_DENIED' and outcome = 'DENIED'",
+                Integer.class, manager)).isEqualTo(1);
     }
 
     @Test

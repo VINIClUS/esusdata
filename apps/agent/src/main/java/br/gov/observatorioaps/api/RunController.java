@@ -93,7 +93,7 @@ public class RunController {
         }
         authorization.requireObjectScope(session, Permission.RUN_INDICATOR, request.municipalityIbge());
         requireIdempotencyKey(idempotencyKey);
-        requireReferencedObjectsInScope(request);
+        requireReferencedObjectsInScope(session, request);
 
         Instant now = clock.instant();
         String requestHash = computeRequestHash(request);
@@ -120,31 +120,39 @@ public class RunController {
     @PostMapping("/api/v1/runs/{id}/cancel")
     public RunResponse cancel(@AuthenticationPrincipal AuthenticatedSession session, @PathVariable("id") String id) {
         Job job = findAuthorized(session, id);
-        if (job.state() == JobState.CANCEL_REQUESTED) {
-            // Idempotent: a client that polls and re-clicks cancel on an already-cancelling job
-            // gets the current (in-progress) state back, not an error for a cancel that is
-            // genuinely proceeding.
-            return toResponse(job);
-        }
-        Instant now = clock.instant();
-        boolean cancelled = switch (job.state()) {
-            case QUEUED -> jobRepository.cancelQueued(id, now);
-            case RUNNING, STAGED -> {
-                boolean requested = jobRepository.requestCancel(id, now);
-                if (requested) {
-                    // Best-effort interrupt of an in-flight statement — the CAS above is what
-                    // actually matters; this only shortens how long it takes to notice.
-                    cancellationRegistry.requestCancel(id);
-                }
-                yield requested;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            if (job.state() == JobState.CANCEL_REQUESTED) {
+                // Idempotent: a client that polls and re-clicks cancel on an already-cancelling job
+                // gets the current (in-progress) state back, not an error for a cancel that is
+                // genuinely proceeding.
+                return toResponse(job);
             }
-            default -> false;
-        };
-        if (!cancelled) {
-            throw new JobNotCancellableException(
-                    "job " + id + " cannot be cancelled from its current state (" + job.state() + ")");
+            Instant now = clock.instant();
+            boolean cancelled = switch (job.state()) {
+                case QUEUED -> jobRepository.cancelQueued(id, now);
+                case RUNNING, STAGED -> {
+                    boolean requested = jobRepository.requestCancel(id, now);
+                    if (requested) {
+                        // Best-effort interrupt of an in-flight statement — the CAS above is what
+                        // actually matters; this only shortens how long it takes to notice.
+                        cancellationRegistry.requestCancel(id);
+                    }
+                    yield requested;
+                }
+                default -> false;
+            };
+            if (cancelled) {
+                return toResponse(jobRepository.findById(id).orElseThrow());
+            }
+            // A queued job may have been acquired between the read above and cancelQueued().
+            // Reload once so the request follows the new state instead of reporting a stale
+            // snapshot as non-cancellable.
+            if (attempt == 0) {
+                job = findAuthorized(session, id);
+            }
         }
-        return toResponse(jobRepository.findById(id).orElseThrow());
+        throw new JobNotCancellableException(
+                "job " + id + " cannot be cancelled from its current state (" + job.state() + ")");
     }
 
     private Job findAuthorized(AuthenticatedSession session, String id) {
@@ -186,16 +194,22 @@ public class RunController {
      * differently-scoped reference is deliberately reported as the same external 404, so the
      * caller cannot use a job failure detail as a cross-municipality metadata oracle.
      */
-    private void requireReferencedObjectsInScope(CreateRunRequest request) {
-        sourceRepository.findById(request.sourceId())
-                .filter(source -> request.municipalityIbge().equals(source.municipalityIbge()))
-                .orElseThrow(() -> new ApiNotFoundException("source not found"));
+    private void requireReferencedObjectsInScope(
+            AuthenticatedSession session, CreateRunRequest request) {
+        var source = sourceRepository.findById(request.sourceId()).orElse(null);
+        if (source == null || !request.municipalityIbge().equals(source.municipalityIbge())) {
+            authorization.auditDenied(session, Permission.RUN_INDICATOR, request.municipalityIbge());
+            throw new ApiNotFoundException("source not found");
+        }
 
         if (request.extractionId() != null) {
-            extractionManifestRepository.findById(request.extractionId())
-                    .filter(stored -> request.municipalityIbge().equals(stored.manifest().municipalityIbge()))
-                    .filter(stored -> request.sourceId().equals(stored.manifest().sourceId()))
-                    .orElseThrow(() -> new ApiNotFoundException("extraction not found"));
+            var stored = extractionManifestRepository.findById(request.extractionId()).orElse(null);
+            if (stored == null
+                    || !request.municipalityIbge().equals(stored.manifest().municipalityIbge())
+                    || !request.sourceId().equals(stored.manifest().sourceId())) {
+                authorization.auditDenied(session, Permission.RUN_INDICATOR, request.municipalityIbge());
+                throw new ApiNotFoundException("extraction not found");
+            }
         }
     }
 
