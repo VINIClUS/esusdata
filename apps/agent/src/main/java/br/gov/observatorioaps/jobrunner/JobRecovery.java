@@ -116,6 +116,14 @@ public final class JobRecovery {
                 stagingArea.neutralize(job.stagingId());
             }
             Instant now = clock.instant();
+            if (!job.isImmutableExtract()) {
+                // A CANCEL_REQUESTED LIVE_READ_ONLY job may still have been streaming from
+                // PostgreSQL when this process died — cancellation is cooperative and best-effort
+                // (CancellationToken's own contract), so an abandoned CANCEL_REQUESTED job is no
+                // more provably closed than an abandoned RUNNING one. Same cooldown, same reason.
+                acquisitionGuard.block(job.sourceId(), now.plus(liveAcquisitionCooldownMargin),
+                        "recovered abandoned CANCEL_REQUESTED job " + job.jobId());
+            }
             boolean transitioned = jobRepository.cancelAbandoned(job.jobId(), now);
             if (!transitioned) {
                 status.setRollbackOnly();

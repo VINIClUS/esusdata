@@ -148,6 +148,12 @@ class JobRecoveryTest {
         Job recovered = fixture.jobRepository.findById("job-4").orElseThrow();
         assertThat(recovered.state()).isEqualTo(JobState.CANCELLED);
         assertThat(recovered.finishedAt()).isNotNull();
+
+        // Cancellation is cooperative/best-effort (CancellationToken's own contract) — this
+        // process died before ever observing the cancel, so the abandoned live session is exactly
+        // as unproven-closed as an abandoned RUNNING one, and must be guarded the same way.
+        assertThatThrownBy(() -> fixture.acquisitionGuard().requireUnblocked("src-1"))
+                .isInstanceOf(SourceAcquisitionBlockedException.class);
     }
 
     @Test
