@@ -16,6 +16,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Iterator;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -173,6 +175,30 @@ class RunEventsApiTest extends ApiFixtureSupport {
             assertThat(data).contains("\"state\":\"SUCCEEDED\"")
                     .contains("\"attempts\":[{\"attempt\":1")
                     .contains("\"outcome\":\"SUCCEEDED\"");
+        }
+    }
+
+    @Test
+    void terminalStreamsWithoutFinalAttemptsEventuallyReleaseTheirSlots() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String cookie = sessionCookie(manager);
+        List<Stream<String>> streams = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < 4; i++) {
+                streams.add(openEventStream(cookie, insertTerminalJobWithoutAttempt(MUNICIPALITY)));
+            }
+
+            // A failed final-attempt write must not hold all four per-user slots until the
+            // emitter's 30-minute timeout. The controller's bounded fallback should close them.
+            Thread.sleep(6500);
+
+            try (Stream<String> replacement = openEventStream(cookie, insertRunningJob(MUNICIPALITY))) {
+                assertThat(readNextDataLine(replacement.iterator())).contains("\"state\":\"RUNNING\"");
+            }
+        } finally {
+            streams.forEach(Stream::close);
         }
     }
 

@@ -10,6 +10,8 @@ import br.gov.observatorioaps.jobrunner.JobState;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -43,8 +45,10 @@ import java.util.concurrent.atomic.AtomicReference;
 @RestController
 class RunEventsController {
 
+    private static final Logger log = LoggerFactory.getLogger(RunEventsController.class);
     private static final Set<JobState> TERMINAL = EnumSet.of(JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED);
     private static final long EMITTER_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(30);
+    private static final long TERMINAL_ATTEMPT_WAIT_MS = TimeUnit.SECONDS.toMillis(5);
 
     private final JobRepository jobRepository;
     private final RunResponseFactory responseFactory;
@@ -56,6 +60,7 @@ class RunEventsController {
     private final Clock clock;
     private final long pollIntervalMs;
     private final long reauthEveryNTicks;
+    private final long terminalAttemptWaitTicks;
 
     RunEventsController(
             JobRepository jobRepository, RunResponseFactory responseFactory, ApiAuthorization authorization,
@@ -75,6 +80,9 @@ class RunEventsController {
         this.pollIntervalMs = pollIntervalMs;
         this.reauthEveryNTicks = Math.max(1,
                 (authorizationRevalidationIntervalSeconds * 1000) / Math.max(1, pollIntervalMs));
+        long effectivePollIntervalMs = Math.max(1, pollIntervalMs);
+        this.terminalAttemptWaitTicks = Math.max(1,
+                (TERMINAL_ATTEMPT_WAIT_MS + effectivePollIntervalMs - 1) / effectivePollIntervalMs);
     }
 
     @GetMapping(value = "/api/v1/runs/{id}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -92,6 +100,7 @@ class RunEventsController {
         SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
         AtomicReference<ScheduledFuture<?>> futureHolder = new AtomicReference<>();
         AtomicInteger tick = new AtomicInteger();
+        AtomicInteger terminalAttemptWaitTick = new AtomicInteger();
         AtomicReference<JobSnapshot> lastSent = new AtomicReference<>();
         // Guards against completion callbacks running more than once for the same connection —
         // Spring runs onCompletion after onTimeout/onError too, and a double release would drift
@@ -118,17 +127,25 @@ class RunEventsController {
         // scheduleWithFixedDelay, not scheduleAtFixedRate: a poll blocking on SQLite's
         // busy_timeout=5000 must not queue up catch-up executions back-to-back once it returns.
         ScheduledFuture<?> future = scheduler.scheduleWithFixedDelay(
-                () -> poll(id, sessionId, userId, municipalityIbge, tick, lastSent, emitter, stopped, futureHolder),
+                () -> poll(id, sessionId, userId, municipalityIbge, tick, terminalAttemptWaitTick,
+                        lastSent, emitter, stopped, futureHolder, onDone),
                 0, pollIntervalMs, TimeUnit.MILLISECONDS);
         futureHolder.set(future);
+        if (stopped.get()) {
+            // A zero-delay scheduler may run the first poll before this assignment. Completion is
+            // already owned by onDone in that case; make the future cancellation visible after
+            // the holder becomes available as well.
+            future.cancel(false);
+        }
 
         return emitter;
     }
 
     private void poll(
             String jobId, String sessionId, String userId, String municipalityIbge, AtomicInteger tick,
-            AtomicReference<JobSnapshot> lastSent, SseEmitter emitter, AtomicBoolean stopped,
-            AtomicReference<ScheduledFuture<?>> futureHolder) {
+            AtomicInteger terminalAttemptWaitTick, AtomicReference<JobSnapshot> lastSent,
+            SseEmitter emitter, AtomicBoolean stopped, AtomicReference<ScheduledFuture<?>> futureHolder,
+            Runnable onDone) {
         if (stopped.get()) {
             // The connection was already completed by an earlier tick, before futureHolder had
             // been assigned (scheduleWithFixedDelay's first execution can start immediately, in a
@@ -149,6 +166,7 @@ class RunEventsController {
                     // An expected outcome (§1.12.7 L541), not a server fault — a graceful close
                     // lets the client learn it lost access ("o cliente o confirma por GET",
                     // §1.10 L397), rather than surfacing as a dispatcher-level error.
+                    onDone.run();
                     emitter.complete();
                     return;
                 }
@@ -163,27 +181,40 @@ class RunEventsController {
 
             Job current = jobRepository.findById(jobId).orElse(null);
             if (current == null) {
+                onDone.run();
                 emitter.completeWithError(new IllegalStateException("job " + jobId + " no longer exists"));
                 return;
             }
 
             JobSnapshot snapshot = new JobSnapshot(current.state(), current.attempt(), current.lastProgressAt());
             boolean terminal = TERMINAL.contains(current.state());
-            if (!snapshot.equals(lastSent.get()) || terminal) {
-                RunResponse response = responseFactory.toResponse(current);
-                boolean finalAttemptVisible = current.attempt() == 0
-                        || response.attempts().stream().anyMatch(attempt -> attempt.attempt() == current.attempt());
-                if (!terminal || finalAttemptVisible) {
-                    emitter.send(SseEmitter.event().name("run").data(response, MediaType.APPLICATION_JSON));
-                    lastSent.set(snapshot);
+            if (!terminal && snapshot.equals(lastSent.get())) {
+                return;
+            }
+            RunResponse response = responseFactory.toResponse(current);
+            boolean finalAttemptVisible = current.attempt() == 0
+                    || response.attempts().stream().anyMatch(attempt -> attempt.attempt() == current.attempt());
+            boolean terminalAttemptWaitExpired = terminal && !finalAttemptVisible
+                    && terminalAttemptWaitTick.incrementAndGet() >= terminalAttemptWaitTicks;
+            if (terminal && !finalAttemptVisible && !terminalAttemptWaitExpired) {
+                return;
+            }
+            if (!snapshot.equals(lastSent.get())) {
+                if (terminalAttemptWaitExpired) {
+                    log.warn("closing terminal SSE stream for job {} without final attempt history", jobId);
                 }
-                if (terminal && finalAttemptVisible) {
-                    emitter.complete();
-                }
+                emitter.send(SseEmitter.event().name("run").data(response, MediaType.APPLICATION_JSON));
+                lastSent.set(snapshot);
+            }
+            if (terminal) {
+                onDone.run();
+                emitter.complete();
             }
         } catch (java.io.IOException e) {
+            onDone.run();
             emitter.completeWithError(e);
         } catch (RuntimeException e) {
+            onDone.run();
             emitter.completeWithError(e);
         }
     }
