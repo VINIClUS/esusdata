@@ -1,5 +1,6 @@
 package br.gov.observatorioaps.resultstore;
 
+import br.gov.observatorioaps.jobrunner.JobRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -43,6 +44,7 @@ public final class PublicationService {
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactionTemplate;
+    private final JobRepository jobRepository;
     private final ExtractionManifestRepository extractionManifestRepository;
     private final ReproducibilityCheck reproducibilityCheck;
     private final Path extractsBaseDir;
@@ -52,12 +54,14 @@ public final class PublicationService {
     public PublicationService(
             JdbcTemplate jdbc,
             TransactionTemplate transactionTemplate,
+            JobRepository jobRepository,
             ExtractionManifestRepository extractionManifestRepository,
             ReproducibilityCheck reproducibilityCheck,
             Path extractsBaseDir,
             PublicationAuthorization publicationAuthorization) {
         this.jdbc = jdbc;
         this.transactionTemplate = transactionTemplate;
+        this.jobRepository = jobRepository;
         this.extractionManifestRepository = extractionManifestRepository;
         this.reproducibilityCheck = reproducibilityCheck;
         this.extractsBaseDir = extractsBaseDir;
@@ -118,15 +122,10 @@ public final class PublicationService {
                         "staging " + staging.stagingId() + " changed state during publication");
             }
 
-            int jobUpdated = jdbc.update("""
-                    UPDATE jobs SET state = 'SUCCEEDED', staging_id = ?, finished_at = ?,
-                        failure_code = NULL, failure_detail = NULL
-                    WHERE job_id = ? AND state = 'STAGED'
-                      AND process_instance_id = ? AND execution_generation = ?
-                    """,
-                    staging.stagingId(), request.publishedAt().toString(), request.jobId(),
-                    request.processInstanceId(), request.executionGeneration());
-            if (jobUpdated != 1) {
+            boolean jobUpdated = jobRepository.markSucceededAndRecordAttempt(
+                    request.jobId(), request.processInstanceId(), request.executionGeneration(),
+                    staging.stagingId(), request.publishedAt());
+            if (!jobUpdated) {
                 status.setRollbackOnly();
                 throw new PublicationRefusedException(
                         "job " + request.jobId() + " is no longer STAGED under this process/"

@@ -136,6 +136,43 @@ class JobRepositoryTest {
     }
 
     @Test
+    void failedTransitionRollsBackWhenAttemptHistoryCannotBeRecorded() {
+        fixture.jobRepository.enqueue(request("job-failed-atomic", "ext-1"));
+        Job acquired = fixture.jobRepository.acquireNext("proc-a", clock.instant()).orElseThrow();
+        insertConflictingAttempt(acquired, "FAILED_TRANSIENT");
+
+        assertThatThrownBy(() -> fixture.jobRepository.markFailedAndRecordAttempt(
+                acquired.jobId(), acquired.processInstanceId(), acquired.executionGeneration(),
+                JobState.RUNNING, "SOURCE_TIMEOUT", "temporary failure", clock.instant()))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+
+        Job unchanged = fixture.jobRepository.findById(acquired.jobId()).orElseThrow();
+        assertThat(unchanged.state()).isEqualTo(JobState.RUNNING);
+        assertThat(unchanged.failureCode()).isNull();
+        assertThat(fixture.jobRepository.findAttempts(acquired.jobId())).hasSize(1);
+    }
+
+    @Test
+    void cancellationTransitionRollsBackWhenAttemptHistoryCannotBeRecorded() {
+        fixture.jobRepository.enqueue(request("job-cancel-atomic", "ext-1"));
+        Job acquired = fixture.jobRepository.acquireNext("proc-a", clock.instant()).orElseThrow();
+        assertThat(fixture.jobRepository.requestCancel(
+                acquired.jobId(), acquired.processInstanceId(), acquired.executionGeneration(), clock.instant()))
+                .isTrue();
+        Job cancellationRequested = fixture.jobRepository.findById(acquired.jobId()).orElseThrow();
+        insertConflictingAttempt(cancellationRequested, "CANCELLED");
+
+        assertThatThrownBy(() -> fixture.jobRepository.markCancelledAndRecordAttempt(
+                cancellationRequested.jobId(), cancellationRequested.processInstanceId(),
+                cancellationRequested.executionGeneration(), clock.instant()))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+
+        assertThat(fixture.jobRepository.findById(cancellationRequested.jobId()).orElseThrow().state())
+                .isEqualTo(JobState.CANCEL_REQUESTED);
+        assertThat(fixture.jobRepository.findAttempts(cancellationRequested.jobId())).hasSize(1);
+    }
+
+    @Test
     void acquireNextRespectsNextAttemptAtBackoff() {
         fixture.jobRepository.enqueue(request("job-4", "ext-1"));
         Job acquired = fixture.jobRepository.acquireNext("proc-a", clock.instant()).orElseThrow();
@@ -149,5 +186,14 @@ class JobRepositoryTest {
         // Due now.
         assertThat(fixture.jobRepository.acquireNext("proc-a", future).orElseThrow().jobId())
                 .isEqualTo("job-4");
+    }
+
+    private void insertConflictingAttempt(Job job, String outcome) {
+        fixture.jdbc.update("""
+                INSERT INTO job_attempts (job_id, attempt, process_instance_id, execution_generation,
+                    started_at, finished_at, outcome, failure_code, failure_detail)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """, job.jobId(), job.attempt(), job.processInstanceId(), job.executionGeneration(),
+                clock.instant().toString(), clock.instant().toString(), outcome, "EXISTING", "existing");
     }
 }

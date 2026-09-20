@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.IntSupplier;
 
 /**
  * All SQL against {@code jobs} and {@code job_attempts}. Every state-changing method is a
@@ -187,6 +188,98 @@ public final class JobRepository {
                  WHERE job_id = ? AND state = 'CANCEL_REQUESTED'
                    AND process_instance_id = ? AND execution_generation = ?
                 """, now.toString(), jobId, processInstanceId, executionGeneration) == 1;
+    }
+
+    /**
+     * Publishes the terminal job transition and its successful attempt history in one transaction.
+     * The publication transaction calls this method while it is already open, so the result,
+     * staging row, job state, and attempt row commit or roll back together.
+     */
+    public boolean markSucceededAndRecordAttempt(
+            String jobId, String processInstanceId, long executionGeneration,
+            String stagingId, Instant finishedAt) {
+        return transitionAndRecordAttempt(
+                jobId, processInstanceId, executionGeneration, JobState.STAGED, finishedAt,
+                "SUCCEEDED", null, null,
+                () -> jdbc.update("""
+                        UPDATE jobs SET state = 'SUCCEEDED', staging_id = ?, finished_at = ?,
+                            failure_code = NULL, failure_detail = NULL
+                        WHERE job_id = ? AND state = 'STAGED'
+                          AND process_instance_id = ? AND execution_generation = ?
+                        """, stagingId, finishedAt.toString(), jobId, processInstanceId,
+                        executionGeneration));
+    }
+
+    /** Failed terminal transition plus its attempt history, atomically. */
+    public boolean markFailedAndRecordAttempt(
+            String jobId, String processInstanceId, long executionGeneration, JobState fromState,
+            String failureCode, String failureDetail, Instant finishedAt) {
+        return transitionAndRecordAttempt(
+                jobId, processInstanceId, executionGeneration, fromState, finishedAt,
+                "FAILED_DEFINITIVE", failureCode, failureDetail,
+                () -> jdbc.update("""
+                        UPDATE jobs SET state = 'FAILED', finished_at = ?, failure_code = ?,
+                            failure_detail = ?
+                        WHERE job_id = ? AND state = ? AND process_instance_id = ?
+                          AND execution_generation = ?
+                        """, finishedAt.toString(), failureCode, failureDetail, jobId,
+                        fromState.name(), processInstanceId, executionGeneration));
+    }
+
+    /** Cancellation terminal transition plus its attempt history, atomically. */
+    public boolean markCancelledAndRecordAttempt(
+            String jobId, String processInstanceId, long executionGeneration, Instant finishedAt) {
+        return transitionAndRecordAttempt(
+                jobId, processInstanceId, executionGeneration, JobState.CANCEL_REQUESTED, finishedAt,
+                "CANCELLED", "CANCELLED", "cooperative cancellation completed",
+                () -> jdbc.update("""
+                        UPDATE jobs SET state = 'CANCELLED', finished_at = ?
+                        WHERE job_id = ? AND state = 'CANCEL_REQUESTED'
+                          AND process_instance_id = ? AND execution_generation = ?
+                        """, finishedAt.toString(), jobId, processInstanceId, executionGeneration));
+    }
+
+    /** Retry transition plus its attempt history, atomically. */
+    public boolean requeueForRetryAndRecordAttempt(
+            String jobId, String processInstanceId, long executionGeneration, JobState fromState,
+            Instant nextAttemptAt, String failureCode, String failureDetail, Instant finishedAt) {
+        return transitionAndRecordAttempt(
+                jobId, processInstanceId, executionGeneration, fromState, finishedAt,
+                "FAILED_TRANSIENT", failureCode, failureDetail,
+                () -> jdbc.update("""
+                        UPDATE jobs SET state = 'QUEUED', process_instance_id = NULL, staging_id = NULL,
+                            next_attempt_at = ?, failure_code = ?, failure_detail = ?
+                        WHERE job_id = ? AND state = ? AND process_instance_id = ?
+                          AND execution_generation = ?
+                        """, nextAttemptAt.toString(), failureCode, failureDetail, jobId,
+                        fromState.name(), processInstanceId, executionGeneration));
+    }
+
+    /**
+     * Reads the owned attempt, applies a CAS transition, and records that attempt before the
+     * transaction can commit. Reading before the update preserves the old process id for retry
+     * transitions, which clear ownership on the jobs row.
+     */
+    private boolean transitionAndRecordAttempt(
+            String jobId, String processInstanceId, long executionGeneration, JobState expectedState,
+            Instant finishedAt, String outcome, String failureCode, String failureDetail,
+            IntSupplier transition) {
+        Boolean completed = transactionTemplate.execute(status -> {
+            Job current = findById(jobId).orElse(null);
+            if (current == null || current.state() != expectedState
+                    || !processInstanceId.equals(current.processInstanceId())
+                    || current.executionGeneration() != executionGeneration) {
+                return false;
+            }
+            if (transition.getAsInt() != 1) {
+                return false;
+            }
+            recordAttempt(jobId, current.attempt(), processInstanceId, executionGeneration,
+                    current.startedAt() == null ? finishedAt : current.startedAt(), finishedAt,
+                    outcome, failureCode, failureDetail);
+            return true;
+        });
+        return Boolean.TRUE.equals(completed);
     }
 
     // --- recovery-only CAS transitions (JobRecovery is the only caller) -----------------------

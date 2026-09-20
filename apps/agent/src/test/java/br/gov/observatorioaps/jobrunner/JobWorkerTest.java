@@ -108,7 +108,8 @@ class JobWorkerTest {
         JobRepository jobRepository = mock(JobRepository.class);
         when(jobRepository.acquireNext(anyString(), any(Instant.class))).thenReturn(Optional.of(job));
         when(jobRepository.findById("job-1")).thenReturn(Optional.of(job));
-        when(jobRepository.requeueForRetry(any(), any(), anyLong(), any(), any(), any(), any()))
+        when(jobRepository.requeueForRetryAndRecordAttempt(
+                any(), any(), anyLong(), any(), any(), any(), any(), any()))
                 .thenReturn(true);
 
         IndicatorRunExecutor executor = mock(IndicatorRunExecutor.class);
@@ -122,11 +123,12 @@ class JobWorkerTest {
         worker.runOnce();
 
         ArgumentCaptor<Instant> nextAttemptAt = ArgumentCaptor.forClass(Instant.class);
-        verify(jobRepository).requeueForRetry(
+        verify(jobRepository).requeueForRetryAndRecordAttempt(
                 eq("job-1"), eq("proc-1"), eq(1L), eq(JobState.RUNNING), nextAttemptAt.capture(),
-                eq("SOURCE_ACQUISITION_BLOCKED"), any());
+                eq("SOURCE_ACQUISITION_BLOCKED"), any(), eq(now));
         assertThat(nextAttemptAt.getValue()).isEqualTo(blockedUntil);
-        verify(jobRepository, never()).markFailed(any(), any(), anyLong(), any(), any(), any(), any());
+        verify(jobRepository, never()).markFailedAndRecordAttempt(
+                any(), any(), anyLong(), any(), any(), any(), any());
     }
 
     @Test
@@ -144,7 +146,7 @@ class JobWorkerTest {
         when(jobRepository.acquireNext(anyString(), any(Instant.class))).thenReturn(Optional.of(acquired));
         when(jobRepository.findById("job-1"))
                 .thenReturn(Optional.of(persistedCancellation), Optional.of(persistedCancellation));
-        when(jobRepository.markCancelled("job-1", "proc-1", 1, now)).thenReturn(true);
+        when(jobRepository.markCancelledAndRecordAttempt("job-1", "proc-1", 1, now)).thenReturn(true);
 
         IndicatorRunExecutor executor = mock(IndicatorRunExecutor.class);
         JobWorker worker = new JobWorker(
@@ -154,6 +156,6 @@ class JobWorkerTest {
         worker.runOnce();
 
         verify(executor, never()).runFromExtract(any(), any());
-        verify(jobRepository).markCancelled("job-1", "proc-1", 1, now);
+        verify(jobRepository).markCancelledAndRecordAttempt("job-1", "proc-1", 1, now);
     }
 }
