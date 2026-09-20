@@ -28,6 +28,7 @@ class RestartDoesNotDuplicateResultTest {
         clock = Clock.fixed(Instant.parse("2026-09-20T12:00:00Z"), ZoneOffset.UTC);
         fixture = new JobRunnerTestFixture(dataDir, clock);
         fixture.registerSource("src-1", "3541307");
+        fixture.registerPrincipal("test-principal", "3541307");
     }
 
     @AfterEach
@@ -41,7 +42,7 @@ class RestartDoesNotDuplicateResultTest {
                 fixture.extractsDir, "ext-restart", "src-1", "3541307", "2026-03", 4, 4, 0);
         fixture.jobRepository.enqueue(new EnqueueRequest("job-1", "run-1", "3541307",
                 C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION, "2026-03", 3, "src-1",
-                manifest.extractionId(), null, null, null, null, null, clock.instant()));
+                manifest.extractionId(), "test-principal", null, null, null, null, clock.instant()));
 
         JobWorker worker = fixture.worker("proc-1");
         assertThat(worker.runOnce()).isTrue(); // runs job-1 to completion (SUCCEEDED)

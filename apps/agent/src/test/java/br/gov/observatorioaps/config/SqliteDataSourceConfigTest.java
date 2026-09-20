@@ -57,9 +57,9 @@ class SqliteDataSourceConfigTest {
                      "select version from flyway_schema_history where success = 1 order by version")) {
             java.util.List<String> appliedVersions = new java.util.ArrayList<>();
             while (rs.next()) appliedVersions.add(rs.getString(1));
-            assertThat(appliedVersions).containsExactly("1", "2");
+            assertThat(appliedVersions).containsExactly("1", "2", "3");
         }
-        assertThat(migration.migrationsExecuted()).isEqualTo(2);
+        assertThat(migration.migrationsExecuted()).isEqualTo(3);
     }
 
     @Test

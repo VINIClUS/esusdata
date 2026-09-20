@@ -21,6 +21,8 @@ public record PublicationRequest(
         String resultNature,
         String validationStatus,
         String appBuild,
-        Instant publishedAt
+        Instant publishedAt,
+        String authorizedPrincipal,
+        String authorizedMunicipalityIbge
 ) {
 }

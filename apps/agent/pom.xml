@@ -30,7 +30,7 @@
   </properties>
 
   <dependencies>
-    <!-- Core Spring Boot — no web/security yet; added when Phase 7/8 lands -->
+    <!-- Core Spring Boot -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter</artifactId>
@@ -39,6 +39,36 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-jdbc</artifactId>
     </dependency>
+
+    <!-- HTTP surface (§1.10) and authenticated sessions (§1.12.7). Both versions come from the
+         Boot 4.1.1 BOM (Spring Security 7.1.1 / Tomcat 11.0.24 — confirmed against the resolved
+         spring-boot-dependencies POM, not assumed). -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
+    <!-- Spring Security's Argon2PasswordEncoder (§1.12.7's mandated algorithm) delegates to
+         BouncyCastle's Argon2BytesGenerator at the bytecode level (confirmed via javap on
+         spring-security-crypto-7.1.1.jar) — it is not optional at runtime. BouncyCastle is not
+         managed by the Boot 4.1.1 BOM, so §1.3's "dependências fora do BOM exigem versão explícita"
+         applies: pinned to the current Maven Central release, not a range. -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <version>1.86</version>
+    </dependency>
+
+    <!-- OpenAPI (§1.10.1 "documentar contratos em OpenAPI na implementação"): springdoc's latest
+         release (2.8.6) targets Spring Framework 6 / Jakarta EE 10; Boot 4.1.1 is Framework 7 /
+         Jakarta EE 11, so it is not binary-compatible. The contract lives hand-written at
+         contracts/openapi/observatorio-v1.yaml, checked against the registered routes by
+         OpenApiContractTest instead of generated. Revisit once a Framework-7-compatible springdoc
+         release exists. -->
 
     <!-- extraction-store manifest + JSON Lines serialization (§1.9.1). Version tracks the
          Boot 4.1.1 BOM's managed tools.jackson:jackson-databind. DTOs represent dates/instants
@@ -74,6 +104,11 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

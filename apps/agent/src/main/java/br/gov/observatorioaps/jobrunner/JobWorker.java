@@ -154,20 +154,24 @@ public final class JobWorker implements SmartLifecycle {
     private void processJob(Job job) {
         CancellationToken token = cancellationRegistry.register(job.jobId());
         try {
-            if (!job.isImmutableExtract()) {
-                // Unreachable through EnqueueRequest, which now rejects a null extractionId at
-                // creation time — kept as defense-in-depth against a job inserted by another path
-                // (a migration, a direct SQL fixture) that bypasses that constructor.
-                finalizeDefinitiveFailure(job, "UNSUPPORTED_ACQUISITION_MODE",
-                        "LIVE_READ_ONLY acquisition is not implemented in this phase — "
-                                + "job requires an IMMUTABLE_EXTRACT (extraction_id).");
-                return;
-            }
-            token.checkCancelled();
-            executor.runFromExtract(new IndicatorRunExecutor.RunContext(
+            IndicatorRunExecutor.RunContext context = new IndicatorRunExecutor.RunContext(
                     job.jobId(), job.runId(), job.sourceId(), job.executionGeneration(),
                     job.processInstanceId(), job.extractionId(), job.municipalityIbge(),
-                    job.referencePeriod(), job.indicatorPack(), job.ruleVersion()), token);
+                    job.referencePeriod(), job.indicatorPack(), job.ruleVersion(),
+                    job.idempotencyPrincipal());
+            token.checkCancelled();
+            if (job.isImmutableExtract()) {
+                executor.runFromExtract(context, token);
+            } else if (job.sourceId() != null && !job.sourceId().isBlank()) {
+                executor.runLive(context, token);
+            } else {
+                // Unreachable through EnqueueRequest, which requires one of extractionId/sourceId
+                // at creation time — kept as defense-in-depth against a job inserted by another
+                // path (a migration, a direct SQL fixture) that bypasses that constructor.
+                finalizeDefinitiveFailure(job, "UNSUPPORTED_ACQUISITION_MODE",
+                        "job has neither extraction_id (IMMUTABLE_EXTRACT) nor source_id (LIVE_READ_ONLY).");
+                return;
+            }
             // Success — PublicationService already moved the job to SUCCEEDED. job_attempts still
             // needs its own row here, or a normally completed job's attempt history silently omits
             // its final (successful) attempt despite the schema explicitly supporting it.

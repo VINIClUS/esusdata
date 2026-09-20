@@ -60,7 +60,7 @@ class ResultScopeIsolationTest {
         ResultStagingArea stagingArea = new ResultStagingArea(jdbc);
         ExtractionManifestRepository manifestRepository = new ExtractionManifestRepository(jdbc);
         PublicationService publicationService = new PublicationService(jdbc, tx, manifestRepository,
-                new ReproducibilityCheck(extractsDir), extractsDir);
+                new ReproducibilityCheck(extractsDir), extractsDir, PublicationAuthorization.allowAll());
         resultRepository = new ResultRepository(jdbc);
         evidenceRepository = new EvidenceRepository(jdbc);
 
@@ -99,7 +99,7 @@ class ResultScopeIsolationTest {
 
         PublicationOutcome outcome = publicationService.publish(new PublicationRequest(
                 jobId, "run-a", stagingId, "src-1", 1, "proc-1", manifest, "OBSERVED",
-                "NOT_VALIDATED", "test-build", Instant.now()));
+                "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307"));
         resultIdMunicipalityA = outcome.resultId();
     }
 
