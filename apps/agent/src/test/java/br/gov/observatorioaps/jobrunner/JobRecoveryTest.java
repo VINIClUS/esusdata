@@ -88,6 +88,11 @@ class JobRecoveryTest {
         assertThat(recovered.executionGeneration()).isEqualTo(2);
         assertThat(recovered.processInstanceId()).isNull();
         assertThat(recovered.nextAttemptAt()).isNotNull();
+        // Ordinary retry backoff (fixture: base 1ms) is far shorter than the cooldown just
+        // written to the guard (fixture: 1 minute) — the requeued attempt must not be scheduled
+        // to fire while the source is still blocked.
+        assertThat(recovered.nextAttemptAt())
+                .isAfterOrEqualTo(clock.instant().plus(fixture.liveAcquisitionCooldownMargin));
 
         assertThatThrownBy(() -> fixture.acquisitionGuard().requireUnblocked("src-1"))
                 .isInstanceOf(SourceAcquisitionBlockedException.class);

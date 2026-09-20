@@ -100,8 +100,12 @@ public class AuthController {
     public ResponseEntity<ApiError> handleThrottled(LoginThrottle.LoginThrottledException e) {
         // Retry-After (RFC 7231 §7.1.3) accepts delta-seconds or an HTTP-date — never a plain
         // ISO-8601 instant, which Instant#toString() produces and clients/intermediaries may
-        // reject or ignore outright.
-        long retryAfterSeconds = Math.max(0, Duration.between(clock.instant(), e.retryAfter()).toSeconds());
+        // reject or ignore outright. Ceiling (not floor) the remaining delay: truncating a
+        // sub-second remainder to 0 would tell a still-throttled client to retry immediately.
+        Duration remaining = Duration.between(clock.instant(), e.retryAfter());
+        long retryAfterSeconds = remaining.isPositive()
+                ? (remaining.toMillis() + 999) / 1000
+                : 0;
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header("Retry-After", Long.toString(retryAfterSeconds))
                 .body(new ApiError("LOGIN_THROTTLED", "too many failed attempts; try again later"));

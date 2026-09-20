@@ -80,18 +80,28 @@ public final class JobRecovery {
             boolean retriable = retryPolicy.canRetry(job.attempt(), job.maxAttempts());
             Instant now = clock.instant();
 
+            Instant blockedUntil = null;
             if (!job.isImmutableExtract() && job.state() == JobState.RUNNING) {
                 // A RUNNING LIVE_READ_ONLY job may have had a live PEC session open; an
                 // IMMUTABLE_EXTRACT job never opens one (it only reads a finalized extract file),
                 // and a STAGED job's acquisition was already closed before staging began — neither
                 // needs the guard.
-                acquisitionGuard.block(job.sourceId(), now.plus(liveAcquisitionCooldownMargin),
+                blockedUntil = now.plus(liveAcquisitionCooldownMargin);
+                acquisitionGuard.block(job.sourceId(), blockedUntil,
                         "recovered abandoned RUNNING job " + job.jobId());
             }
 
             boolean transitioned;
             if (retriable) {
                 Instant nextAttemptAt = retryPolicy.nextAttemptAt(now, job.attempt());
+                if (blockedUntil != null && blockedUntil.isAfter(nextAttemptAt)) {
+                    // Ordinary retry backoff starts far shorter than the cooldown just written
+                    // above — without this, the requeued attempt would fire while still blocked,
+                    // hit AcquisitionGuard, and burn retry budget on a wait condition instead of a
+                    // real failure (the same class of bug JobWorker.handleFailure guards against
+                    // for a live failure discovered at runtime, not at boot).
+                    nextAttemptAt = blockedUntil;
+                }
                 transitioned = jobRepository.requeueAbandoned(job.jobId(), job.state(), nextAttemptAt);
             } else {
                 transitioned = jobRepository.failAbandoned(job.jobId(), job.state(),

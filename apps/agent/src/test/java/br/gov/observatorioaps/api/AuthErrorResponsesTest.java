@@ -57,8 +57,10 @@ class AuthErrorResponsesTest extends SecuritySliceTestSupport {
         assertThat(throttled.statusCode()).isEqualTo(429);
         String retryAfter = throttled.headers().firstValue("Retry-After").orElseThrow();
         // Delta-seconds is a plain non-negative integer; an ISO-8601 instant would contain
-        // "T"/"Z"/":" and fail this parse instead.
-        assertThat(Long.parseLong(retryAfter)).isGreaterThanOrEqualTo(0);
+        // "T"/"Z"/":" and fail this parse instead. Strictly positive: the throttle is by
+        // definition still active when the 429 is returned, so a truncated-to-zero value (the
+        // pre-fix bug) would tell an already-blocked client to retry immediately.
+        assertThat(Long.parseLong(retryAfter)).isGreaterThan(0);
     }
 
     private HttpResponse<String> post(HttpClient client, String path, String csrfToken, String body)
