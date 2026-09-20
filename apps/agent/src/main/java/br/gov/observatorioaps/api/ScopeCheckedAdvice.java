@@ -85,4 +85,11 @@ class ScopeCheckedAdvice {
     ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiError("BAD_REQUEST", e.getMessage()));
     }
+
+    /** {@link SseConnectionLimiter} refused a new stream — the fast-cadence load bound from the plan. */
+    @ExceptionHandler(TooManyEventStreamsException.class)
+    ResponseEntity<ApiError> handleTooManyEventStreams(TooManyEventStreamsException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ApiError("TOO_MANY_EVENT_STREAMS", e.getMessage()));
+    }
 }
