@@ -58,6 +58,8 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
     JdbcTemplate jdbc;
     @Autowired
     Clock clock;
+    @Autowired
+    ApiAuthorization authorization;
 
     String createUser(String userId) {
         userRepository.insert(new UserAccount(

@@ -86,7 +86,9 @@ class ScopeIsolationApiTest extends ApiFixtureSupport {
     void anInstallationOnlyAuditGrantCannotReadEvidence() throws Exception {
         // AUDITOR carries both `audit` and `read_clinical` (ADR 0007) — but `read_clinical` is
         // NOT installation-eligible, so an INSTALLATION-scoped AUDITOR grant must not leak into
-        // evidence access. Pins the dead-code comment in ApiAuthorization.resolveEvidenceTeamFilter.
+        // evidence access. This denies at requireAnyMunicipalScope, before
+        // resolveEvidenceTeamFilter is ever reached — see the next test for that method's own
+        // fail-closed behavior.
         String manager = createUser("publisher-c-" + System.nanoTime());
         grantMunicipality(manager, Role.MANAGER, MUNICIPALITY_A);
         String resultId = publishResult(manager, MUNICIPALITY_A, "2026-03",
@@ -99,6 +101,37 @@ class ScopeIsolationApiTest extends ApiFixtureSupport {
 
         assertThat(evidence.statusCode()).isEqualTo(404);
         assertThat(evidence.body()).contains("NOT_FOUND");
+    }
+
+    /**
+     * Codex P1 on PR #4: {@code requireAnyMunicipalScope} and {@code resolveEvidenceTeamFilter}
+     * are two SEPARATE database reads. If the caller's only matching grant is revoked in the
+     * (however small) window between them, the old code fell through to
+     * {@code TeamScopeFilter.unrestricted()} — turning a just-lost authorization into "show every
+     * team's evidence" instead of denying it. Simulates the race deterministically by revoking the
+     * grant between the two real calls, rather than by chance under real concurrency.
+     */
+    @Test
+    void resolveEvidenceTeamFilterFailsClosedWhenTheMatchingGrantIsGoneByTheSecondRead() throws Exception {
+        String manager = createUser("publisher-d-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY_A);
+        publishResult(manager, MUNICIPALITY_A, "2026-03", computedResult(MUNICIPALITY_A), List.of());
+
+        String teamUser = createUser("team-race-" + System.nanoTime());
+        grantTeam(teamUser, Role.TEAM_SCOPED_PROFESSIONAL, MUNICIPALITY_A, "2750325", "0000346268");
+        var session = new br.gov.observatorioaps.identityaccess.AuthenticatedSession(
+                "unused-session-id", teamUser, clock.instant(), clock.instant(),
+                clock.instant().plusSeconds(3600), 1, null);
+
+        authorization.requireAnyMunicipalScope(
+                session, br.gov.observatorioaps.identityaccess.Permission.READ_CLINICAL, MUNICIPALITY_A);
+
+        String grantId = grantRepository.activeGrantsForUser(teamUser).get(0).grantId();
+        grantRepository.revoke(grantId, clock.instant(), "simulated-race");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> authorization.resolveEvidenceTeamFilter(
+                        session, br.gov.observatorioaps.identityaccess.Permission.READ_CLINICAL, MUNICIPALITY_A))
+                .isInstanceOf(ScopeDeniedException.class);
     }
 
     private IndicatorResult computedResult(String municipalityIbge) {

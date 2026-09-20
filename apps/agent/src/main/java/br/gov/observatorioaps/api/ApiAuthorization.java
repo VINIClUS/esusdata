@@ -100,14 +100,17 @@ public final class ApiAuthorization {
                 narrowed = new TeamScopeFilter(grant.cnes(), grant.ine());
             }
         }
-        // Reached only when NO municipality-scoped grant matched at all — meaning the gate this
-        // method is always called after (requireAnyMunicipalScope) must already have thrown for
-        // an INSTALLATION-only grant, since that gate does not accept INSTALLATION for
-        // READ_CLINICAL (only MANAGE_SOURCE/MANAGE_ACCESS/AUDIT are installation-eligible). This
-        // is NOT a safe "no grant → show everything" default; it is dead code kept because a
-        // caller bug that skips the gate would otherwise throw an NPE here instead of failing
-        // loudly. Guarded by ScopeIsolationApiTest.anInstallationOnlyAuditGrantCannotReadEvidence.
-        return narrowed == null ? TeamScopeFilter.unrestricted() : narrowed;
+        if (narrowed != null) {
+            return narrowed;
+        }
+        // Reached when NO municipality-scoped grant matches — normally because the gate this
+        // method is always called after (requireAnyMunicipalScope) already threw for an
+        // INSTALLATION-only grant. But this is a SEPARATE database read from that gate's, so a
+        // grant revoked between the two calls also lands here (Codex P1, PR #4): failing CLOSED
+        // is the only safe choice — returning TeamScopeFilter.unrestricted() would turn a
+        // just-lost authorization into "show every team's evidence" instead of denying it.
+        deny(session, permission, municipalityIbge);
+        throw new IllegalStateException("unreachable: deny() always throws");
     }
 
     public record TeamScopeFilter(String cnes, String ine) {
