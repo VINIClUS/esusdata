@@ -20,6 +20,8 @@ import java.time.Duration;
  * @param idleInTransactionTimeoutMs  PostgreSQL {@code idle_in_transaction_session_timeout}
  * @param maxRows                     row ceiling for a single acquisition; breach → SOURCE_BUDGET_EXCEEDED
  * @param maxDurationMs               wall-clock ceiling for a single acquisition
+ * @param maxPayloadBytes             UTF-8 source-payload ceiling for a single acquisition
+ * @param maxTempFileBytes            compressed temporary-extract ceiling for a single acquisition
  */
 public record ReadBudget(
         int poolMaxSize,
@@ -29,8 +31,29 @@ public record ReadBudget(
         long lockTimeoutMs,
         long idleInTransactionTimeoutMs,
         long maxRows,
-        long maxDurationMs
+        long maxDurationMs,
+        long maxPayloadBytes,
+        long maxTempFileBytes
 ) {
+    public static final long DEFAULT_MAX_PAYLOAD_BYTES = 64L * 1024 * 1024;
+    public static final long DEFAULT_MAX_TEMP_FILE_BYTES = 128L * 1024 * 1024;
+
+    /** Backward-compatible constructor using the conservative byte ceilings. */
+    public ReadBudget(
+            int poolMaxSize,
+            Duration connectionTimeout,
+            Duration acquisitionTimeout,
+            long statementTimeoutMs,
+            long lockTimeoutMs,
+            long idleInTransactionTimeoutMs,
+            long maxRows,
+            long maxDurationMs
+    ) {
+        this(poolMaxSize, connectionTimeout, acquisitionTimeout, statementTimeoutMs, lockTimeoutMs,
+                idleInTransactionTimeoutMs, maxRows, maxDurationMs,
+                DEFAULT_MAX_PAYLOAD_BYTES, DEFAULT_MAX_TEMP_FILE_BYTES);
+    }
+
     public ReadBudget {
         if (poolMaxSize <= 0) throw new IllegalArgumentException("poolMaxSize must be positive");
         if (connectionTimeout == null || connectionTimeout.isNegative() || connectionTimeout.isZero()) {
@@ -42,8 +65,9 @@ public record ReadBudget(
         if (statementTimeoutMs <= 0 || lockTimeoutMs <= 0 || idleInTransactionTimeoutMs <= 0) {
             throw new IllegalArgumentException("PostgreSQL timeout budgets must be positive");
         }
-        if (maxRows <= 0 || maxDurationMs <= 0) {
-            throw new IllegalArgumentException("acquisition ceilings must be positive");
+        if (maxRows <= 0 || maxDurationMs <= 0 || maxPayloadBytes <= 0 || maxTempFileBytes <= 0) {
+            throw new IllegalArgumentException(
+                    "acquisition row, duration, payload, and temp-file ceilings must be positive");
         }
     }
 
@@ -62,7 +86,9 @@ public record ReadBudget(
                 10_000,
                 30_000,
                 200_000,
-                60_000
+                60_000,
+                DEFAULT_MAX_PAYLOAD_BYTES,
+                DEFAULT_MAX_TEMP_FILE_BYTES
         );
     }
 }

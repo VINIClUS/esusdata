@@ -4,6 +4,7 @@ import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
 import br.gov.observatorioaps.sourceconnector.PecSourceConnectionTestSupport;
+import br.gov.observatorioaps.sourceconnector.ReadBudget;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import org.junit.jupiter.api.Test;
 
@@ -184,6 +185,35 @@ class IndividualEncounterModalityCapabilityTest {
                 CompatibilityTestCatalog.productionEntry()))
                 .isInstanceOf(SourceBudgetExceededException.class)
                 .hasMessageContaining(SourceBudgetExceededException.CODE);
+    }
+
+    @Test
+    void rejectsRowsWhenTheirUtf8PayloadExceedsTheReadBudget() throws Exception {
+        Connection connection = mock(Connection.class);
+        PreparedStatement statement = mock(PreparedStatement.class);
+        ResultSet result = mock(ResultSet.class);
+        when(connection.prepareStatement(
+                anyString(), eq(ResultSet.TYPE_FORWARD_ONLY), eq(ResultSet.CONCUR_READ_ONLY)))
+                .thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(result);
+        when(result.next()).thenReturn(true);
+        when(result.getLong(1)).thenReturn(1L);
+        when(result.getInt(2)).thenReturn(1);
+        when(result.getDate(3)).thenReturn(java.sql.Date.valueOf("2026-03-15"));
+        when(result.getInt(8)).thenReturn(1);
+
+        ReadBudget budget = new ReadBudget(
+                1, java.time.Duration.ofSeconds(1), java.time.Duration.ofSeconds(1),
+                10_000, 10_000, 10_000, 10, 10_000, 1, 1_000);
+        BudgetGuard guard = new BudgetGuard(budget);
+
+        assertThatThrownBy(() -> IndividualEncounterModalityCapability.stream(
+                PecSourceConnectionTestSupport.bind(connection, sourceProperties()),
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), guard, ignored -> {
+                }, new PecSourceIdentity("5.4.37", "PEC_DW", "PRONTUARIO"),
+                CompatibilityTestCatalog.productionEntry()))
+                .isInstanceOf(SourceBudgetExceededException.class)
+                .hasMessageContaining("payload byte ceiling");
     }
 
     @Test

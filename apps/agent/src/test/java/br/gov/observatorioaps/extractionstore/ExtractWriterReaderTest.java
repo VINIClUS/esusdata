@@ -1,5 +1,6 @@
 package br.gov.observatorioaps.extractionstore;
 
+import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -21,6 +22,23 @@ class ExtractWriterReaderTest {
 
     private final ExtractReader reader = new ExtractReader();
     private static final String TEST_QUERY_CHECKSUM = "sha256:" + "0".repeat(64);
+
+    @Test
+    void temporaryExtractCannotGrowPastItsConfiguredByteCeiling() throws Exception {
+        String randomPayload = randomPayload();
+
+        assertThatThrownBy(() -> {
+            try (ExtractWriter writer = new ExtractWriter(dir, "ext-payload-ceiling", 64)) {
+                writer.write(new CanonicalEncounter(
+                        new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", "large"),
+                        "3541307", "2026-03-15", CanonicalModality.PROGRAMADO,
+                        randomPayload, null, null));
+            }
+        }).isInstanceOf(SourceBudgetExceededException.class)
+                .hasMessageContaining("temporary extract byte ceiling");
+
+        assertThat(Files.size(dir.resolve("ext-payload-ceiling.jsonl.gz.tmp"))).isLessThanOrEqualTo(64);
+    }
 
     @Test
     void writeFinalizeAndReadBackRoundTrips() throws Exception {
@@ -486,5 +504,11 @@ class ExtractWriterReaderTest {
         return new CanonicalEncounter(
                 new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", recordId),
                 "3541307", "2026-03-15", modality, "2750325", "0000346268", "225142");
+    }
+
+    private String randomPayload() {
+        byte[] bytes = new byte[4096];
+        new java.util.Random(20260920L).nextBytes(bytes);
+        return java.util.HexFormat.of().formatHex(bytes);
     }
 }

@@ -133,7 +133,7 @@ public final class IndividualEncounterModalityCapability {
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         guard.onRow();
-                        consumer.accept(new RawEncounterRecord(
+                        RawEncounterRecord record = new RawEncounterRecord(
                                 rs.getLong(1),
                                 rs.getInt(2),
                                 rs.getDate(3).toLocalDate(),
@@ -142,7 +142,9 @@ public final class IndividualEncounterModalityCapability {
                                 rs.getString(6),
                                 rs.getString(7),
                                 rs.getInt(8)
-                        ));
+                        );
+                        guard.onPayloadBytes(estimatePayloadBytes(record));
+                        consumer.accept(record);
                     }
                     guard.checkDuration();
                 }
@@ -182,6 +184,26 @@ public final class IndividualEncounterModalityCapability {
             }
         }
         return false;
+    }
+
+    private static long estimatePayloadBytes(RawEncounterRecord record) {
+        try {
+            long bytes = Long.BYTES + Integer.BYTES + Integer.BYTES;
+            bytes = Math.addExact(bytes, utf8Length(record.careDate().toString()));
+            bytes = Math.addExact(bytes, utf8Length(record.cnes()));
+            bytes = Math.addExact(bytes, utf8Length(record.ine()));
+            bytes = Math.addExact(bytes, utf8Length(record.cbo()));
+            bytes = Math.addExact(bytes, utf8Length(record.uuidFicha()));
+            bytes = Math.addExact(bytes, Integer.BYTES);
+            return bytes;
+        } catch (ArithmeticException e) {
+            throw new SourceBudgetExceededException(
+                    SourceBudgetExceededException.CODE + ": payload byte count overflow", e);
+        }
+    }
+
+    private static long utf8Length(String value) {
+        return value == null ? 0 : value.getBytes(StandardCharsets.UTF_8).length;
     }
 
     private static void beginReadOnlyRepeatableReadTransaction(Connection connection) throws SQLException {

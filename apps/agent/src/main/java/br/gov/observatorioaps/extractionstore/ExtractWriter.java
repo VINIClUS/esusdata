@@ -1,5 +1,7 @@
 package br.gov.observatorioaps.extractionstore;
 
+import br.gov.observatorioaps.sourceconnector.ReadBudget;
+import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -43,6 +45,7 @@ public final class ExtractWriter implements AutoCloseable {
     private final String extractionId;
     private final ExtractRecovery.WriterLock writerLock;
     private final Path tempFile;
+    private final long maxTempFileBytes;
     private final DigestOutputStream digestOut;
     private final GZIPOutputStream gzipOut;
 
@@ -55,8 +58,20 @@ public final class ExtractWriter implements AutoCloseable {
     private LocalDate latestCareDate;
 
     public ExtractWriter(Path baseDir, String extractionId) throws IOException {
+        this(baseDir, extractionId, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES);
+    }
+
+    /**
+     * Opens a bounded temporary extract. The limit applies to compressed bytes on disk, and the
+     * constructor also reserves that capacity from the file store before creating the temp file.
+     */
+    public ExtractWriter(Path baseDir, String extractionId, long maxTempFileBytes) throws IOException {
         this.baseDir = baseDir;
         this.extractionId = extractionId;
+        if (maxTempFileBytes <= 0) {
+            throw new IllegalArgumentException("maxTempFileBytes must be positive");
+        }
+        this.maxTempFileBytes = maxTempFileBytes;
         ExtractValidation.validateExtractionId(baseDir, extractionId);
         Files.createDirectories(baseDir);
         ExtractRecovery.WriterLock lock = ExtractRecovery.acquireWriterLock(baseDir, extractionId);
@@ -72,11 +87,24 @@ public final class ExtractWriter implements AutoCloseable {
             } catch (NoSuchAlgorithmException e) {
                 throw new IllegalStateException("SHA-256 not available", e);
             }
+            ensureTempSpace(baseDir, maxTempFileBytes);
             createOwnerOnlyFile(tempFile);
-            OutputStream fileOut = Channels.newOutputStream(
-                    FileChannel.open(tempFile, StandardOpenOption.WRITE));
-            this.digestOut = new DigestOutputStream(fileOut, digest);
-            this.gzipOut = new GZIPOutputStream(digestOut);
+            FileChannel dataChannel = FileChannel.open(tempFile, StandardOpenOption.WRITE);
+            DigestOutputStream digestStream = new DigestOutputStream(
+                    new BoundedOutputStream(Channels.newOutputStream(dataChannel), maxTempFileBytes), digest);
+            GZIPOutputStream gzipStream;
+            try {
+                gzipStream = new GZIPOutputStream(digestStream);
+            } catch (IOException | RuntimeException failure) {
+                try {
+                    dataChannel.close();
+                } catch (IOException closeFailure) {
+                    failure.addSuppressed(closeFailure);
+                }
+                throw failure;
+            }
+            this.digestOut = digestStream;
+            this.gzipOut = gzipStream;
             this.writerLock = lock;
         } catch (IOException | RuntimeException failure) {
             lock.close();
@@ -87,6 +115,7 @@ public final class ExtractWriter implements AutoCloseable {
     public void write(CanonicalEncounter encounter) throws IOException {
         if (closed) throw new IllegalStateException("writer already finalized/closed");
         validateRecordForWrite(encounter);
+        ensureTempSpace(baseDir, maxTempFileBytes);
         byte[] line = (mapper.writeValueAsString(encounter) + "\n").getBytes(StandardCharsets.UTF_8);
         gzipOut.write(line);
         rowCount++;
@@ -120,6 +149,7 @@ public final class ExtractWriter implements AutoCloseable {
         Path manifestFile = baseDir.resolve(extractionId + ".manifest.json");
         requirePublicationTargetAbsent(finalFile, "extract data file");
         requirePublicationTargetAbsent(manifestFile, "manifest file");
+        ensureTempSpace(baseDir, maxTempFileBytes);
 
         gzipOut.close();
         closed = true;
@@ -321,6 +351,71 @@ public final class ExtractWriter implements AutoCloseable {
         } catch (UnsupportedOperationException | AccessDeniedException ignored) {
             // Directory fsync is unavailable on some platforms (notably Windows); file contents
             // were still forced, and real file-write failures have already propagated.
+        }
+    }
+
+    private static void ensureTempSpace(Path directory, long maxTempFileBytes) throws IOException {
+        long reserveBytes = maxTempFileBytes > Long.MAX_VALUE - 1_048_576L
+                ? Long.MAX_VALUE
+                : maxTempFileBytes + 1_048_576L;
+        long usableBytes = Files.getFileStore(directory).getUsableSpace();
+        if (usableBytes < reserveBytes) {
+            throw new SourceBudgetExceededException(
+                    SourceBudgetExceededException.CODE + ": insufficient free space for the temporary extract: "
+                            + usableBytes + " < " + reserveBytes + " bytes reserved");
+        }
+    }
+
+    private static final class BoundedOutputStream extends OutputStream {
+
+        private final OutputStream delegate;
+        private final long maxBytes;
+        private long written;
+
+        private BoundedOutputStream(OutputStream delegate, long maxBytes) {
+            this.delegate = delegate;
+            this.maxBytes = maxBytes;
+        }
+
+        @Override
+        public void write(int value) throws IOException {
+            requireCapacity(1);
+            delegate.write(value);
+            written++;
+        }
+
+        @Override
+        public void write(byte[] bytes, int offset, int length) throws IOException {
+            if (bytes == null) throw new NullPointerException("bytes");
+            if (offset < 0 || length < 0 || length > bytes.length - offset) {
+                throw new IndexOutOfBoundsException();
+            }
+            requireCapacity(length);
+            delegate.write(bytes, offset, length);
+            written += length;
+        }
+
+        @Override
+        public void flush() throws IOException {
+            delegate.flush();
+        }
+
+        @Override
+        public void close() throws IOException {
+            delegate.close();
+        }
+
+        private void requireCapacity(long bytes) {
+            if (bytes > maxBytes - written) {
+                throw new SourceBudgetExceededException(
+                        SourceBudgetExceededException.CODE + ": temporary extract byte ceiling exceeded: "
+                                + saturatingAdd(written, bytes) + " > " + maxBytes);
+            }
+        }
+
+        private static long saturatingAdd(long left, long right) {
+            if (right > Long.MAX_VALUE - left) return Long.MAX_VALUE;
+            return left + right;
         }
     }
 }

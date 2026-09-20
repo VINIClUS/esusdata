@@ -99,7 +99,7 @@ class Eng19ReproducibilityWithoutPecLiveTest {
 
         Instant startedAt = Instant.now();
         try (PecSourceConnection sourceConnection = factory.open(properties, budget);
-             ExtractWriter writer = new ExtractWriter(extractDir, extractionId)) {
+             ExtractWriter writer = new ExtractWriter(extractDir, extractionId, budget.maxTempFileBytes())) {
                 var guard = new BudgetGuard(budget);
                 IndividualEncounterModalityCapability.stream(
                         sourceConnection, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), guard,
