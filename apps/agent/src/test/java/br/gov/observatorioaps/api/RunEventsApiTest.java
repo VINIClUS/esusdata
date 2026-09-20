@@ -179,6 +179,28 @@ class RunEventsApiTest extends ApiFixtureSupport {
     }
 
     @Test
+    void queuedStreamReemitsWhenTheRetryAttemptAppears() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String cookie = sessionCookie(manager);
+        String jobId = insertQueuedJobWithoutAttempt(MUNICIPALITY);
+
+        try (Stream<String> stream = openEventStream(cookie, jobId)) {
+            Iterator<String> lines = stream.iterator();
+            assertThat(readNextDataLine(lines)).contains("\"state\":\"QUEUED\"")
+                    .contains("\"attempts\":[]");
+
+            // JobWorker requeues before recording the transiently failed attempt. The stream must
+            // emit again when that history row appears even though the job snapshot is unchanged.
+            insertAttempt(jobId, "FAILED_TRANSIENT");
+
+            assertThat(readNextDataLine(lines)).contains("\"state\":\"QUEUED\"")
+                    .contains("\"attempts\":[{\"attempt\":1")
+                    .contains("\"outcome\":\"FAILED_TRANSIENT\"");
+        }
+    }
+
+    @Test
     void terminalStreamsWithoutFinalAttemptsEventuallyReleaseTheirSlots() throws Exception {
         String manager = createUser("manager-" + System.nanoTime());
         grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
@@ -274,6 +296,20 @@ class RunEventsApiTest extends ApiFixtureSupport {
                 VALUES (?,?,?,?,?,?, 'SUCCEEDED', 1, 3, 'proc-test-owns-nothing', 1, ?, ?, ?)
                 """, jobId, "run-" + jobId, municipalityIbge, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
                 "2026-03", Instant.now().toString(), sourceId, Instant.now().toString());
+        return jobId;
+    }
+
+    private String insertQueuedJobWithoutAttempt(String municipalityIbge) {
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, municipalityIbge);
+        String jobId = "job-" + UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
+                    reference_period, state, attempt, max_attempts, process_instance_id,
+                    execution_generation, next_attempt_at, created_at, source_id)
+                VALUES (?,?,?,?,?,?, 'QUEUED', 1, 3, NULL, 1, ?, ?, ?)
+                """, jobId, "run-" + jobId, municipalityIbge, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
+                "2026-03", Instant.now().plusSeconds(3600).toString(), Instant.now().toString(), sourceId);
         return jobId;
     }
 

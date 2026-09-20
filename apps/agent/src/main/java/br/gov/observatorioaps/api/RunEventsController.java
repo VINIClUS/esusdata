@@ -21,6 +21,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -171,7 +172,9 @@ class RunEventsController {
                 return;
             }
 
-            JobSnapshot snapshot = new JobSnapshot(current.state(), current.attempt(), current.lastProgressAt());
+            JobSnapshot snapshot = new JobSnapshot(
+                    current.state(), current.attempt(), current.lastProgressAt(),
+                    List.copyOf(jobRepository.findAttempts(jobId)));
             boolean terminal = TERMINAL.contains(current.state());
             if (!terminal && snapshot.equals(lastSent.get())) {
                 return;
@@ -259,6 +262,7 @@ class RunEventsController {
         }
     }
 
-    private record JobSnapshot(JobState state, int attempt, Instant lastProgressAt) {
+    private record JobSnapshot(
+            JobState state, int attempt, Instant lastProgressAt, List<JobRepository.AttemptRecord> attempts) {
     }
 }
