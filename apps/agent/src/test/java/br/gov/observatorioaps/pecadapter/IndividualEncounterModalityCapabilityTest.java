@@ -8,6 +8,7 @@ import br.gov.observatorioaps.sourceconnector.ReadBudget;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
 import org.junit.jupiter.api.Test;
 
+import java.io.StringReader;
 import java.net.SocketTimeoutException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -18,10 +19,12 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -201,10 +204,11 @@ class IndividualEncounterModalityCapabilityTest {
         when(result.getInt(2)).thenReturn(1);
         when(result.getDate(3)).thenReturn(java.sql.Date.valueOf("2026-03-15"));
         when(result.getInt(8)).thenReturn(1);
+        when(result.getCharacterStream(4)).thenReturn(new StringReader("x".repeat(10_000)));
 
         ReadBudget budget = new ReadBudget(
                 1, java.time.Duration.ofSeconds(1), java.time.Duration.ofSeconds(1),
-                10_000, 10_000, 10_000, 10, 10_000, 1, 1_000);
+                10_000, 10_000, 10_000, 10, 10_000, 100, 1_000);
         BudgetGuard guard = new BudgetGuard(budget);
 
         assertThatThrownBy(() -> IndividualEncounterModalityCapability.stream(
@@ -214,6 +218,7 @@ class IndividualEncounterModalityCapabilityTest {
                 CompatibilityTestCatalog.productionEntry()))
                 .isInstanceOf(SourceBudgetExceededException.class)
                 .hasMessageContaining("payload byte ceiling");
+        verify(result, never()).getString(anyInt());
     }
 
     @Test

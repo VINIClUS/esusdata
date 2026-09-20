@@ -4,6 +4,8 @@ import br.gov.observatorioaps.sourceconnector.BudgetGuard;
 import br.gov.observatorioaps.sourceconnector.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.PecSourceConnection;
 import br.gov.observatorioaps.sourceconnector.SourceBudgetExceededException;
+import java.io.IOException;
+import java.io.Reader;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -133,17 +135,22 @@ public final class IndividualEncounterModalityCapability {
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         guard.onRow();
+                        LocalDate careDate = rs.getDate(3).toLocalDate();
+                        guard.onPayloadBytes(fixedPayloadBytes(careDate));
+                        String cnes = readBoundedString(rs, 4, guard);
+                        String ine = readBoundedString(rs, 5, guard);
+                        String cbo = readBoundedString(rs, 6, guard);
+                        String uuidFicha = readBoundedString(rs, 7, guard);
                         RawEncounterRecord record = new RawEncounterRecord(
                                 rs.getLong(1),
                                 rs.getInt(2),
-                                rs.getDate(3).toLocalDate(),
-                                rs.getString(4),
-                                rs.getString(5),
-                                rs.getString(6),
-                                rs.getString(7),
+                                careDate,
+                                cnes,
+                                ine,
+                                cbo,
+                                uuidFicha,
                                 rs.getInt(8)
                         );
-                        guard.onPayloadBytes(estimatePayloadBytes(record));
                         consumer.accept(record);
                     }
                     guard.checkDuration();
@@ -186,24 +193,52 @@ public final class IndividualEncounterModalityCapability {
         return false;
     }
 
-    private static long estimatePayloadBytes(RawEncounterRecord record) {
-        try {
-            long bytes = Long.BYTES + Integer.BYTES + Integer.BYTES;
-            bytes = Math.addExact(bytes, utf8Length(record.careDate().toString()));
-            bytes = Math.addExact(bytes, utf8Length(record.cnes()));
-            bytes = Math.addExact(bytes, utf8Length(record.ine()));
-            bytes = Math.addExact(bytes, utf8Length(record.cbo()));
-            bytes = Math.addExact(bytes, utf8Length(record.uuidFicha()));
-            bytes = Math.addExact(bytes, Integer.BYTES);
-            return bytes;
-        } catch (ArithmeticException e) {
-            throw new SourceBudgetExceededException(
-                    SourceBudgetExceededException.CODE + ": payload byte count overflow", e);
+    private static long fixedPayloadBytes(LocalDate careDate) {
+        return Long.BYTES + Integer.BYTES + Integer.BYTES + Integer.BYTES
+                + utf8Length(careDate.toString());
+    }
+
+    private static String readBoundedString(
+            ResultSet resultSet, int column, BudgetGuard guard) throws SQLException {
+        try (Reader reader = resultSet.getCharacterStream(column)) {
+            if (reader == null) {
+                return null;
+            }
+            StringBuilder value = new StringBuilder();
+            char[] buffer = new char[4096];
+            int read;
+            while ((read = reader.read(buffer)) != -1) {
+                guard.onPayloadBytes(utf8Length(buffer, 0, read));
+                value.append(buffer, 0, read);
+            }
+            return value.toString();
+        } catch (IOException e) {
+            throw new SQLException("Could not stream source text column " + column, e);
         }
     }
 
     private static long utf8Length(String value) {
         return value == null ? 0 : value.getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    private static long utf8Length(char[] value, int offset, int length) {
+        long bytes = 0;
+        int end = offset + length;
+        for (int i = offset; i < end; i++) {
+            char c = value[i];
+            if (c <= 0x7F) {
+                bytes++;
+            } else if (c <= 0x7FF) {
+                bytes += 2;
+            } else if (Character.isHighSurrogate(c) && i + 1 < end
+                    && Character.isLowSurrogate(value[i + 1])) {
+                bytes += 4;
+                i++;
+            } else {
+                bytes += 3;
+            }
+        }
+        return bytes;
     }
 
     private static void beginReadOnlyRepeatableReadTransaction(Connection connection) throws SQLException {
