@@ -166,6 +166,28 @@ class ExtractWriterReaderTest {
     }
 
     @Test
+    void retryAfterAnAbandonedDataTempCanPublishTheSameExtractionId() throws Exception {
+        String extractionId = "ext-retry-after-crash";
+        ExtractWriter abandoned = new ExtractWriter(dir, extractionId);
+        abandoned.write(encounter("abandoned", CanonicalModality.PROGRAMADO));
+        abandoned.close();
+        assertThat(Files.exists(dir.resolve(extractionId + ".jsonl.gz.tmp"))).isTrue();
+
+        try (ExtractWriter retry = new ExtractWriter(dir, extractionId)) {
+            retry.write(encounter("replacement", CanonicalModality.ESPONTANEO));
+            retry.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+        }
+
+        ExtractionManifest manifest = reader.readManifest(dir, extractionId);
+        assertThat(reader.readEncounters(dir, manifest)).extracting(CanonicalEncounter::sourceRef)
+                .extracting(SourceRef::recordId)
+                .containsExactly("replacement");
+    }
+
+    @Test
     void aManifestRejectedAfterClosingTheDataStreamPublishesNothing() throws Exception {
         String extractionId = "ext-future-started-at";
         try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {

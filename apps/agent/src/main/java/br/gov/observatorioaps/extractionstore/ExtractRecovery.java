@@ -7,9 +7,14 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -25,6 +30,7 @@ public final class ExtractRecovery {
     private static final String DATA_TEMP_SUFFIX = ".jsonl.gz.tmp";
     private static final String MANIFEST_SUFFIX = ".manifest.json";
     private static final String MANIFEST_TEMP_SUFFIX = ".manifest.json.tmp";
+    private static final String LOCK_SUFFIX = ".extract.lock";
 
     private ExtractRecovery() {
     }
@@ -34,6 +40,15 @@ public final class ExtractRecovery {
      * as empty; a symbolic-link base directory is rejected by the shared extraction boundary.
      */
     public static void reconcile(Path baseDir) throws IOException {
+        reconcile(baseDir, null);
+    }
+
+    /**
+     * Reconciles the directory while treating {@code ownedExtractionId} as locked by the caller.
+     * ExtractWriter uses this form after acquiring that id's lock, so abandoned temporary data
+     * can be removed without deleting a different writer's active temporary file.
+     */
+    static void reconcile(Path baseDir, String ownedExtractionId) throws IOException {
         if (baseDir == null) {
             throw new IllegalArgumentException("baseDir is required");
         }
@@ -55,12 +70,64 @@ public final class ExtractRecovery {
             }
         } catch (AccessDeniedException ignored) {
             // A deployment may allow file creation/fsync without directory reads. In that case
-            // reconciliation is deferred until a later startup with directory-read permission.
+            // reconcile the caller's known id by direct path and defer directory-wide cleanup
+            // until a later startup with directory-read permission.
+            if (ownedExtractionId != null) {
+                ExtractValidation.validateExtractionId(baseDir, ownedExtractionId);
+                reconcileOne(baseDir, ownedExtractionId);
+            }
             return;
         }
 
+        if (ownedExtractionId != null) {
+            ExtractValidation.validateExtractionId(baseDir, ownedExtractionId);
+            extractionIds.add(ownedExtractionId);
+        }
+
         for (String extractionId : extractionIds) {
-            reconcileOne(baseDir, extractionId);
+            if (extractionId.equals(ownedExtractionId)) {
+                reconcileOne(baseDir, extractionId);
+                continue;
+            }
+            try (WriterLock ignored = tryAcquireLock(baseDir, extractionId)) {
+                if (ignored != null) {
+                    reconcileOne(baseDir, extractionId);
+                }
+            }
+        }
+    }
+
+    static WriterLock acquireWriterLock(Path baseDir, String extractionId) throws IOException {
+        ExtractValidation.validateExtractionId(baseDir, extractionId);
+        WriterLock lock = tryAcquireLock(baseDir, extractionId);
+        if (lock == null) {
+            throw new FileAlreadyExistsException(
+                    baseDir.resolve(extractionId + LOCK_SUFFIX).toString(), null,
+                    "extract is already being written: " + extractionId);
+        }
+        return lock;
+    }
+
+    private static WriterLock tryAcquireLock(Path baseDir, String extractionId) throws IOException {
+        Path lockPath = baseDir.resolve(extractionId + LOCK_SUFFIX);
+        ExtractValidation.rejectSymbolicLink(lockPath, "extract writer lock");
+        FileChannel channel = null;
+        try {
+            channel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            try {
+                FileLock lock = channel.tryLock();
+                if (lock == null) {
+                    closeQuietly(channel);
+                    return null;
+                }
+                return new WriterLock(channel, lock);
+            } catch (OverlappingFileLockException e) {
+                closeQuietly(channel);
+                return null;
+            }
+        } catch (IOException e) {
+            closeQuietly(channel);
+            throw e;
         }
     }
 
@@ -72,17 +139,21 @@ public final class ExtractRecovery {
 
         rejectLinks(dataFile, dataTemp, manifestFile, manifestTemp);
         boolean dataExists = Files.exists(dataFile, LinkOption.NOFOLLOW_LINKS);
+        boolean dataTempExists = Files.exists(dataTemp, LinkOption.NOFOLLOW_LINKS);
         boolean manifestExists = Files.exists(manifestFile, LinkOption.NOFOLLOW_LINKS);
         boolean manifestTempExists = Files.exists(manifestTemp, LinkOption.NOFOLLOW_LINKS);
 
         if (manifestExists && dataExists) {
             if (manifestTempExists) delete(manifestTemp);
+            if (dataTempExists) delete(dataTemp);
+            if (manifestTempExists || dataTempExists) forceDirectory(baseDir);
             return;
         }
 
         if (manifestExists) {
             delete(manifestFile);
             if (manifestTempExists) delete(manifestTemp);
+            if (dataTempExists) delete(dataTemp);
             forceDirectory(baseDir);
             return;
         }
@@ -96,6 +167,7 @@ public final class ExtractRecovery {
                 }
                 new ExtractReader().readDataFile(dataFile, manifest);
                 publishNewFile(manifestTemp, manifestFile);
+                if (dataTempExists) delete(dataTemp);
                 forceDirectory(baseDir);
             } catch (IOException | RuntimeException failure) {
                 removePartialPublication(dataFile, manifestTemp, baseDir, failure);
@@ -105,10 +177,8 @@ public final class ExtractRecovery {
 
         if (dataExists) delete(dataFile);
         if (manifestTempExists) delete(manifestTemp);
-        // A data temp file is an active/incomplete writer artifact, not a finalized publication.
-        // It is deliberately left for the existing orphan cleanup policy rather than deleting a
-        // writer that may still be open in this process.
-        if (dataExists || manifestTempExists) forceDirectory(baseDir);
+        if (dataTempExists) delete(dataTemp);
+        if (dataExists || manifestTempExists || dataTempExists) forceDirectory(baseDir);
     }
 
     private static ExtractionManifest readStagedManifest(Path manifestTemp, String extractionId)
@@ -175,6 +245,35 @@ public final class ExtractRecovery {
             channel.force(true);
         } catch (UnsupportedOperationException | java.nio.file.AccessDeniedException ignored) {
             // Directory fsync is unavailable on some platforms; file contents are still forced.
+        }
+    }
+
+    private static void closeQuietly(FileChannel channel) {
+        if (channel != null) {
+            try {
+                channel.close();
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    static final class WriterLock implements AutoCloseable {
+
+        private final FileChannel channel;
+        private final FileLock lock;
+
+        private WriterLock(FileChannel channel, FileLock lock) {
+            this.channel = channel;
+            this.lock = lock;
+        }
+
+        @Override
+        public void close() {
+            try {
+                lock.release();
+            } catch (IOException ignored) {
+            }
+            closeQuietly(channel);
         }
     }
 }

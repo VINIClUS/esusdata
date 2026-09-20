@@ -36,6 +36,7 @@ public final class ExtractWriter implements AutoCloseable {
     private final ObjectMapper mapper = new ObjectMapper();
     private final Path baseDir;
     private final String extractionId;
+    private final ExtractRecovery.WriterLock writerLock;
     private final Path tempFile;
     private final DigestOutputStream digestOut;
     private final GZIPOutputStream gzipOut;
@@ -53,21 +54,28 @@ public final class ExtractWriter implements AutoCloseable {
         this.extractionId = extractionId;
         ExtractValidation.validateExtractionId(baseDir, extractionId);
         Files.createDirectories(baseDir);
-        ExtractRecovery.reconcile(baseDir);
-        ExtractValidation.validateExtractionId(baseDir, extractionId);
-        this.tempFile = baseDir.resolve(extractionId + ".jsonl.gz.tmp");
-        ExtractValidation.rejectSymbolicLink(tempFile, "extract temporary file");
-
-        MessageDigest digest;
+        ExtractRecovery.WriterLock lock = ExtractRecovery.acquireWriterLock(baseDir, extractionId);
         try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
+            ExtractRecovery.reconcile(baseDir, extractionId);
+            ExtractValidation.validateExtractionId(baseDir, extractionId);
+            this.tempFile = baseDir.resolve(extractionId + ".jsonl.gz.tmp");
+            ExtractValidation.rejectSymbolicLink(tempFile, "extract temporary file");
+
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException("SHA-256 not available", e);
+            }
+            OutputStream fileOut = Files.newOutputStream(tempFile,
+                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            this.digestOut = new DigestOutputStream(fileOut, digest);
+            this.gzipOut = new GZIPOutputStream(digestOut);
+            this.writerLock = lock;
+        } catch (IOException | RuntimeException failure) {
+            lock.close();
+            throw failure;
         }
-        OutputStream fileOut = Files.newOutputStream(tempFile,
-                StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
-        this.digestOut = new DigestOutputStream(fileOut, digest);
-        this.gzipOut = new GZIPOutputStream(digestOut);
     }
 
     public void write(CanonicalEncounter encounter) throws IOException {
@@ -130,19 +138,24 @@ public final class ExtractWriter implements AutoCloseable {
 
         publishNewFile(manifestTemp, manifestFile);
         forceDirectory(baseDir);
+        writerLock.close();
 
         return manifest;
     }
 
     @Override
     public void close() throws IOException {
-        if (!closed) {
-            gzipOut.close();
-            closed = true;
-            // Never finalized: this is an orphan .tmp file, harmless and not a valid extract.
-            // A startup reconciliation routine is responsible for cleaning these up (§1.9.3) —
-            // not implemented in this pass; the invariant this class guarantees is narrower:
-            // such a file can never be mistaken for a valid extract by ExtractReader.
+        try {
+            if (!closed) {
+                gzipOut.close();
+                closed = true;
+                // Never finalized: this is an orphan .tmp file, harmless and not a valid extract.
+                // Reconciliation removes it before a later writer retries this extraction id.
+                // The writer lock prevents reconciliation in this process from touching an active
+                // temporary file owned by another writer.
+            }
+        } finally {
+            writerLock.close();
         }
     }
 
