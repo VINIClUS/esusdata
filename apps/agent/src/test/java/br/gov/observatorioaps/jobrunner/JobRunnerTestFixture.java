@@ -102,7 +102,7 @@ final class JobRunnerTestFixture implements AutoCloseable {
         grantRevalidator = new GrantRevalidator(scopeResolver, userRepository);
 
         publicationService = new PublicationService(
-                jdbc, transactionTemplate, extractionManifestRepository, reproducibilityCheck,
+                jdbc, transactionTemplate, jobRepository, extractionManifestRepository, reproducibilityCheck,
                 extractsDir, grantRevalidator);
         // No destination is ever allow-listed by default — extract-only tests never call
         // PecDataSourceFactory.open, and EnvFileSecretResolver only touches this path lazily,

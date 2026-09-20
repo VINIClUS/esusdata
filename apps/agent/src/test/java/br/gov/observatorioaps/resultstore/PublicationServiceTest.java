@@ -4,6 +4,7 @@ import br.gov.observatorioaps.extractionstore.ExtractFixtures;
 import br.gov.observatorioaps.extractionstore.ExtractionManifest;
 import br.gov.observatorioaps.indicatorengine.Classification;
 import br.gov.observatorioaps.indicatorengine.IndicatorResult;
+import br.gov.observatorioaps.jobrunner.JobRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,7 @@ class PublicationServiceTest {
     private AnnotationConfigApplicationContext context;
     private JdbcTemplate jdbc;
     private TransactionTemplate transactionTemplate;
+    private JobRepository jobRepository;
     private ResultStagingArea stagingArea;
     private ExtractionManifestRepository extractionManifestRepository;
     private ResultRepository resultRepository;
@@ -53,6 +55,7 @@ class PublicationServiceTest {
 
         jdbc = context.getBean(JdbcTemplate.class);
         transactionTemplate = new TransactionTemplate(context.getBean(DataSourceTransactionManager.class));
+        jobRepository = new JobRepository(jdbc, transactionTemplate);
         stagingArea = new ResultStagingArea(jdbc);
         extractionManifestRepository = new ExtractionManifestRepository(jdbc);
         resultRepository = new ResultRepository(jdbc);
@@ -63,7 +66,7 @@ class PublicationServiceTest {
                 "esus", "esus_leitura", "PEC_DB_PASSWORD", "3541307", "5.4.37", "PEC_DW",
                 Instant.EPOCH.toString()));
 
-        publicationService = new PublicationService(jdbc, transactionTemplate,
+        publicationService = new PublicationService(jdbc, transactionTemplate, jobRepository,
                 extractionManifestRepository, new ReproducibilityCheck(extractsDir), extractsDir,
                 PublicationAuthorization.allowAll());
     }
@@ -127,6 +130,50 @@ class PublicationServiceTest {
         assertThat(jdbc.queryForObject(
                 "select state from result_staging where staging_id = ?", String.class, stagingId))
                 .isEqualTo("PUBLISHED");
+    }
+
+    @Test
+    void successfulPublicationClearsFailureDiagnosticsFromAPriorTransientAttempt() throws Exception {
+        ExtractionManifest manifest = fixtureExtract("ext-retry-success");
+        insertJob("STAGED", 2, "proc-1");
+        jdbc.update("update jobs set failure_code = ?, failure_detail = ? where job_id = ?",
+                "TRANSIENT_SQL_ERROR", "temporary source failure", jobId);
+        String stagingId = stageResult(manifest, 2, "proc-1");
+
+        PublicationOutcome outcome = publicationService.publish(new PublicationRequest(
+                jobId, "run-1", stagingId, "src-1", 2, "proc-1", manifest,
+                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307"));
+
+        assertThat(outcome).isNotNull();
+        assertThat(jdbc.queryForObject(
+                "select failure_code from jobs where job_id = ?", String.class, jobId)).isNull();
+        assertThat(jdbc.queryForObject(
+                "select failure_detail from jobs where job_id = ?", String.class, jobId)).isNull();
+    }
+
+    @Test
+    void rollsBackPublicationWhenTheFinalAttemptCannotBeRecorded() throws Exception {
+        ExtractionManifest manifest = fixtureExtract("ext-attempt-history-conflict");
+        insertJob("STAGED", 1, "proc-1");
+        String stagingId = stageResult(manifest, 1, "proc-1");
+        jdbc.update("""
+                INSERT INTO job_attempts (job_id, attempt, process_instance_id, execution_generation,
+                    started_at, finished_at, outcome, failure_code, failure_detail)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """, jobId, 1, "proc-1", 1, Instant.EPOCH.toString(), Instant.EPOCH.toString(),
+                "FAILED_TRANSIENT", "SOURCE_TIMEOUT", "already recorded");
+
+        assertThatThrownBy(() -> publicationService.publish(new PublicationRequest(
+                jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
+                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307")))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+
+        assertThat(resultRepository.findPublished("3541307", "c1-mais-acesso", "2026-03")).isEmpty();
+        assertThat(jdbc.queryForObject(
+                "select state from jobs where job_id = ?", String.class, jobId)).isEqualTo("STAGED");
+        assertThat(jdbc.queryForObject(
+                "select state from result_staging where staging_id = ?", String.class, stagingId))
+                .isEqualTo("SEALED");
     }
 
     @Test
