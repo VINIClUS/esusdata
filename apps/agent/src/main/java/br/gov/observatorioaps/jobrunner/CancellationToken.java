@@ -17,13 +17,7 @@ public final class CancellationToken {
     public void requestCancel() {
         cancelRequested.set(true);
         Statement statement = activeStatement;
-        if (statement != null) {
-            try {
-                statement.cancel();
-            } catch (Exception ignored) {
-                // Best-effort only — some drivers/states do not support statement cancellation.
-            }
-        }
+        cancelStatement(statement);
     }
 
     public boolean isCancelRequested() {
@@ -33,6 +27,9 @@ public final class CancellationToken {
     /** Lets a long-running query be reached by {@link #requestCancel()} from another thread. */
     public void bindStatement(Statement statement) {
         this.activeStatement = statement;
+        if (cancelRequested.get()) {
+            cancelStatement(statement);
+        }
     }
 
     public void unbindStatement() {
@@ -42,6 +39,17 @@ public final class CancellationToken {
     public void checkCancelled() {
         if (cancelRequested.get()) {
             throw new JobCancelledException("job cancellation requested cooperatively");
+        }
+    }
+
+    private void cancelStatement(Statement statement) {
+        if (statement == null) {
+            return;
+        }
+        try {
+            statement.cancel();
+        } catch (Exception ignored) {
+            // Best-effort only — some drivers/states do not support statement cancellation.
         }
     }
 }

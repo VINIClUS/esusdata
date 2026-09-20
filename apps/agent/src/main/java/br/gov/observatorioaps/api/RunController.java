@@ -54,6 +54,7 @@ public class RunController {
 
     private static final Duration IDEMPOTENCY_KEY_TTL = Duration.ofHours(24);
     private static final int DEFAULT_MAX_ATTEMPTS = 3;
+    private static final int MAX_CANCEL_ATTEMPTS = 4;
 
     private final JobRepository jobRepository;
     private final IdempotencyResolver idempotencyResolver;
@@ -120,7 +121,7 @@ public class RunController {
     @PostMapping("/api/v1/runs/{id}/cancel")
     public RunResponse cancel(@AuthenticationPrincipal AuthenticatedSession session, @PathVariable("id") String id) {
         Job job = findAuthorized(session, id);
-        for (int attempt = 0; attempt < 2; attempt++) {
+        for (int attempt = 0; attempt < MAX_CANCEL_ATTEMPTS; attempt++) {
             if (job.state() == JobState.CANCEL_REQUESTED) {
                 // Idempotent: a client that polls and re-clicks cancel on an already-cancelling job
                 // gets the current (in-progress) state back, not an error for a cancel that is
@@ -148,15 +149,21 @@ public class RunController {
             if (cancelled) {
                 return toResponse(jobRepository.findById(id).orElseThrow());
             }
-            // A queued job may have been acquired between the read above and cancelQueued().
-            // Reload once so the request follows the new state instead of reporting a stale
-            // snapshot as non-cancellable.
-            if (attempt == 0) {
+            // A worker may win more than one ownership CAS while this request is in flight.
+            // Reload while the job remains cancellable so the request follows the newest
+            // process/generation instead of dropping the cancellation after one race.
+            if (isCancellable(job.state()) && attempt + 1 < MAX_CANCEL_ATTEMPTS) {
                 job = findAuthorized(session, id);
+            } else {
+                break;
             }
         }
         throw new JobNotCancellableException(
                 "job " + id + " cannot be cancelled from its current state (" + job.state() + ")");
+    }
+
+    private boolean isCancellable(JobState state) {
+        return state == JobState.QUEUED || state == JobState.RUNNING || state == JobState.STAGED;
     }
 
     private Job findAuthorized(AuthenticatedSession session, String id) {

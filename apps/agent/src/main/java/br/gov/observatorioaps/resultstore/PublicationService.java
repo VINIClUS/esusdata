@@ -119,7 +119,8 @@ public final class PublicationService {
             }
 
             int jobUpdated = jdbc.update("""
-                    UPDATE jobs SET state = 'SUCCEEDED', staging_id = ?, finished_at = ?
+                    UPDATE jobs SET state = 'SUCCEEDED', staging_id = ?, finished_at = ?,
+                        failure_code = NULL, failure_detail = NULL
                     WHERE job_id = ? AND state = 'STAGED'
                       AND process_instance_id = ? AND execution_generation = ?
                     """,

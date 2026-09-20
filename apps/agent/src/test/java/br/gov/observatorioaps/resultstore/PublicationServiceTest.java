@@ -130,6 +130,25 @@ class PublicationServiceTest {
     }
 
     @Test
+    void successfulPublicationClearsFailureDiagnosticsFromAPriorTransientAttempt() throws Exception {
+        ExtractionManifest manifest = fixtureExtract("ext-retry-success");
+        insertJob("STAGED", 2, "proc-1");
+        jdbc.update("update jobs set failure_code = ?, failure_detail = ? where job_id = ?",
+                "TRANSIENT_SQL_ERROR", "temporary source failure", jobId);
+        String stagingId = stageResult(manifest, 2, "proc-1");
+
+        PublicationOutcome outcome = publicationService.publish(new PublicationRequest(
+                jobId, "run-1", stagingId, "src-1", 2, "proc-1", manifest,
+                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307"));
+
+        assertThat(outcome).isNotNull();
+        assertThat(jdbc.queryForObject(
+                "select failure_code from jobs where job_id = ?", String.class, jobId)).isNull();
+        assertThat(jdbc.queryForObject(
+                "select failure_detail from jobs where job_id = ?", String.class, jobId)).isNull();
+    }
+
+    @Test
     void refusesWhenExecutionGenerationChanged() throws Exception {
         ExtractionManifest manifest = fixtureExtract("ext-gen");
         insertJob("STAGED", 1, "proc-1");

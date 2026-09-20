@@ -86,6 +86,37 @@ class RunControllerCancellationTest {
     }
 
     @Test
+    void cancellationKeepsRetryingWhenOwnershipChangesTwiceDuringTheRequest() {
+        JobRepository jobRepository = mock(JobRepository.class);
+        ApiAuthorization authorization = mock(ApiAuthorization.class);
+        AuthenticatedSession session = session();
+        doNothing().when(authorization).requireObjectScope(session, Permission.RUN_INDICATOR, MUNICIPALITY);
+
+        when(jobRepository.findById("job-1"))
+                .thenReturn(Optional.of(job(JobState.RUNNING, "proc-1", 1)),
+                        Optional.of(job(JobState.QUEUED, null, 2)),
+                        Optional.of(job(JobState.RUNNING, "proc-2", 3)),
+                        Optional.of(job(JobState.CANCEL_REQUESTED, "proc-2", 3)));
+        when(jobRepository.requestCancel(eq("job-1"), eq("proc-1"), eq(1L), any(Instant.class)))
+                .thenReturn(false);
+        when(jobRepository.cancelQueued(eq("job-1"), any(Instant.class))).thenReturn(false);
+        when(jobRepository.requestCancel(eq("job-1"), eq("proc-2"), eq(3L), any(Instant.class)))
+                .thenReturn(true);
+        when(jobRepository.findAttempts("job-1")).thenReturn(List.of());
+
+        RunController controller = new RunController(
+                jobRepository, mock(IdempotencyResolver.class), new CancellationRegistry(),
+                mock(ResultRepository.class), mock(SourceRepository.class),
+                mock(ExtractionManifestRepository.class), authorization,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        RunResponse response = controller.cancel(session, "job-1");
+
+        verify(jobRepository).requestCancel("job-1", "proc-2", 3L, NOW);
+        assertThat(response.state()).isEqualTo(JobState.CANCEL_REQUESTED.name());
+    }
+
+    @Test
     void anUnknownJobIsAuditedBeforeReturningNotFound() {
         JobRepository jobRepository = mock(JobRepository.class);
         ApiAuthorization authorization = mock(ApiAuthorization.class);
@@ -109,9 +140,14 @@ class RunControllerCancellationTest {
     }
 
     private Job job(JobState state) {
+        return job(state, "proc-1", 1);
+    }
+
+    private Job job(JobState state, String processInstanceId, long executionGeneration) {
         return new Job(
                 "job-1", "run-1", MUNICIPALITY, "c1-mais-acesso", "c1-mais-acesso@0.1.0",
-                "2026-03", state, state == JobState.QUEUED ? 0 : 1, 3, "proc-1", 1,
+                "2026-03", state, state == JobState.QUEUED ? 0 : 1, 3, processInstanceId,
+                executionGeneration,
                 null, null, NOW, state == JobState.QUEUED ? null : NOW, null,
                 null, null, null, null, "src-1", null, "user-1", "hash-1", null, null, null);
     }
