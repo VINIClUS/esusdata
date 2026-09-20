@@ -143,7 +143,8 @@ class RunEventsController {
         }
 
         ScheduledFuture<?> reauthFuture = reauthScheduler.scheduleAtFixedRate(
-                () -> reauthorize(sessionId, userId, municipalityIbge, emitter, emitterLock, stopped, onDone),
+                () -> reauthorize(session, sessionId, userId, municipalityIbge, emitter, emitterLock, stopped,
+                        onDone),
                 authorizationRevalidationIntervalMs, authorizationRevalidationIntervalMs,
                 TimeUnit.MILLISECONDS);
         reauthFutureHolder.set(reauthFuture);
@@ -223,19 +224,23 @@ class RunEventsController {
     }
 
     private void reauthorize(
-            String sessionId, String userId, String municipalityIbge, SseEmitter emitter, Object emitterLock,
-            AtomicBoolean stopped, Runnable onDone) {
+            AuthenticatedSession session, String sessionId, String userId, String municipalityIbge,
+            SseEmitter emitter, Object emitterLock, AtomicBoolean stopped, Runnable onDone) {
         if (stopped.get()) {
             return;
         }
         try {
             Instant now = clock.instant();
-            boolean stillValid = sessionService.revalidate(sessionId, now)
-                    && scopeResolver.hasPermission(userId, Permission.RUN_INDICATOR, municipalityIbge, null, null);
-            if (!stillValid) {
+            if (!sessionService.revalidate(sessionId, now)) {
                 // An expected outcome (§1.12.7 L541), not a server fault — a graceful close
                 // lets the client learn it lost access ("o cliente o confirma por GET",
                 // §1.10 L397), rather than surfacing as a dispatcher-level error.
+                onDone.run();
+                complete(emitter, emitterLock);
+                return;
+            }
+            if (!scopeResolver.hasPermission(userId, Permission.RUN_INDICATOR, municipalityIbge, null, null)) {
+                authorization.auditDenied(session, Permission.RUN_INDICATOR, municipalityIbge);
                 onDone.run();
                 complete(emitter, emitterLock);
                 return;

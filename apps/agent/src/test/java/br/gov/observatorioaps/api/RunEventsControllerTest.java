@@ -1,6 +1,7 @@
 package br.gov.observatorioaps.api;
 
 import br.gov.observatorioaps.identityaccess.AuthenticatedSession;
+import br.gov.observatorioaps.identityaccess.Permission;
 import br.gov.observatorioaps.identityaccess.ScopeResolver;
 import br.gov.observatorioaps.identityaccess.SessionService;
 import br.gov.observatorioaps.jobrunner.Job;
@@ -129,6 +130,43 @@ class RunEventsControllerTest {
 
         verify(reauthScheduler).scheduleAtFixedRate(any(Runnable.class), eq(30_000L), eq(30_000L),
                 eq(TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    void revokedScopeIsAuditedBeforeSseTeardown() {
+        Instant now = Instant.parse("2026-09-20T12:00:00Z");
+        Job job = runningJob(now);
+        JobRepository jobRepository = mock(JobRepository.class);
+        when(jobRepository.findById("job-1")).thenReturn(Optional.of(job));
+        ScheduledExecutorService pollScheduler = mock(ScheduledExecutorService.class);
+        ScheduledExecutorService reauthScheduler = mock(ScheduledExecutorService.class);
+        ScheduledFuture<?> pollFuture = mock(ScheduledFuture.class);
+        ScheduledFuture<?> reauthFuture = mock(ScheduledFuture.class);
+        when(pollScheduler.scheduleWithFixedDelay(any(Runnable.class), eq(0L), eq(1000L), eq(TimeUnit.MILLISECONDS)))
+                .thenAnswer(invocation -> pollFuture);
+        AtomicReference<Runnable> reauthTask = new AtomicReference<>();
+        when(reauthScheduler.scheduleAtFixedRate(any(Runnable.class), eq(30_000L), eq(30_000L),
+                eq(TimeUnit.MILLISECONDS))).thenAnswer(invocation -> {
+                    reauthTask.set(invocation.getArgument(0));
+                    return reauthFuture;
+                });
+        ApiAuthorization authorization = mock(ApiAuthorization.class);
+        ScopeResolver scopeResolver = mock(ScopeResolver.class);
+        SessionService sessionService = mock(SessionService.class);
+        when(sessionService.revalidate("session-1", now)).thenReturn(true);
+        when(scopeResolver.hasPermission("user-1", Permission.RUN_INDICATOR, "3541307", null, null))
+                .thenReturn(false);
+
+        RunEventsController controller = new RunEventsController(
+                jobRepository, mock(RunResponseFactory.class), authorization, scopeResolver, sessionService,
+                new SseConnectionLimiter(), pollScheduler, reauthScheduler, Clock.fixed(now, ZoneOffset.UTC),
+                1000, 30);
+
+        controller.events(sessionAt(now), "job-1");
+        reauthTask.get().run();
+
+        verify(authorization).auditDenied(any(AuthenticatedSession.class), eq(Permission.RUN_INDICATOR),
+                eq("3541307"));
     }
 
     @Test

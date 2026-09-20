@@ -82,6 +82,25 @@ class OpenApiContractTest extends SecuritySliceTestSupport {
         }
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void runCreationDeclaresIdempotencyKeyAsRequired() throws Exception {
+        Map<String, Object> document;
+        try (InputStream in = new FileInputStream(CONTRACT_PATH.toFile())) {
+            document = new Yaml().load(in);
+        }
+        Map<String, Object> paths = (Map<String, Object>) document.get("paths");
+        Map<String, Object> runs = (Map<String, Object>) paths.get("/api/v1/runs");
+        Map<String, Object> post = (Map<String, Object>) runs.get("post");
+        List<Map<String, Object>> parameters = (List<Map<String, Object>>) post.get("parameters");
+        Map<String, Object> idempotencyKey = parameters.stream()
+                .filter(parameter -> "Idempotency-Key".equals(parameter.get("name")))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Idempotency-Key parameter is missing"));
+
+        assertThat(idempotencyKey.get("required")).isEqualTo(true);
+    }
+
     private static final ParameterNameDiscoverer PARAMETER_NAMES = new DefaultParameterNameDiscoverer();
 
     private Set<ParamRef> handlerParams(HandlerMethod handlerMethod) {

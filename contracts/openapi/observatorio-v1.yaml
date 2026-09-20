@@ -321,7 +321,7 @@ paths:
       parameters:
         - name: Idempotency-Key
           in: header
-          required: false
+          required: true
           schema: { type: string }
       requestBody:
         required: true
