@@ -184,6 +184,28 @@ class ExtractWriterReaderTest {
         assertThat(Files.exists(dir.resolve(extractionId + ".jsonl.gz.tmp"))).isTrue();
     }
 
+    @Test
+    void aManifestStagingFailurePublishesNothing() throws Exception {
+        String extractionId = "ext-stale-manifest-temp";
+        Path manifestTemp = dir.resolve(extractionId + ".manifest.json.tmp");
+        Files.writeString(manifestTemp, "stale manifest staging file");
+
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+            writer.write(encounter("1", CanonicalModality.PROGRAMADO));
+
+            assertThatThrownBy(() -> writer.finalizeExtract(
+                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT"))
+                    .isInstanceOf(IOException.class);
+        }
+
+        assertThat(Files.exists(dir.resolve(extractionId + ".jsonl.gz"))).isFalse();
+        assertThat(Files.exists(dir.resolve(extractionId + ".manifest.json"))).isFalse();
+        assertThat(Files.exists(dir.resolve(extractionId + ".jsonl.gz.tmp"))).isTrue();
+        assertThat(Files.readString(manifestTemp)).isEqualTo("stale manifest staging file");
+    }
+
     /**
      * Swaps in a different, validly-gzipped extract's data file under extract A's finalized name.
      * Decompression succeeds (it's real gzip data, just the wrong content), so this specifically

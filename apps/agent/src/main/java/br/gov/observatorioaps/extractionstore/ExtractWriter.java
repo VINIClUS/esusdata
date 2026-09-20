@@ -81,9 +81,9 @@ public final class ExtractWriter implements AutoCloseable {
     }
 
     /**
-     * Closes the stream, computes the checksum, renames the temp file to its final name, and
-     * writes the manifest — in that order, so the manifest (the thing {@link ExtractReader}
-     * looks for) never exists before the data file it describes is complete and named correctly.
+     * Closes the stream, computes the checksum, validates and stages the manifest, then publishes
+     * the data and manifest files. The manifest (the thing {@link ExtractReader} looks for) is
+     * never published before the data file it describes is complete and named correctly.
      */
     public ExtractionManifest finalizeExtract(
             String sourceId,
@@ -120,12 +120,13 @@ public final class ExtractWriter implements AutoCloseable {
         );
         ExtractValidation.validateManifest(manifest);
 
-        publishNewFile(tempFile, finalFile);
-        forceDirectory(baseDir);
-
         Path manifestTemp = baseDir.resolve(extractionId + ".manifest.json.tmp");
         ExtractValidation.rejectSymbolicLink(manifestTemp, "manifest temporary file");
         writeAndForce(manifestTemp, mapper.writeValueAsBytes(manifest));
+
+        publishNewFile(tempFile, finalFile);
+        forceDirectory(baseDir);
+
         publishNewFile(manifestTemp, manifestFile);
         forceDirectory(baseDir);
 
