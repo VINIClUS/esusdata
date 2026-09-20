@@ -31,7 +31,28 @@ import java.util.Optional;
  */
 public final class SourceDiagnosticsService {
 
-    public enum Outcome { DESTINATION_NOT_ALLOWED, SOURCE_BUSY, CONNECTION_FAILED, CONNECTED }
+    public enum Outcome {
+        DESTINATION_NOT_ALLOWED, SOURCE_BUSY, SOURCE_AUTHENTICATION_FAILED,
+        SOURCE_PERMISSION_DENIED, CONNECTION_FAILED, CONNECTED
+    }
+
+    static Outcome classifySqlState(String sqlState) {
+        if (sqlState != null && sqlState.startsWith("28")) {
+            return Outcome.SOURCE_AUTHENTICATION_FAILED;
+        }
+        if ("42501".equals(sqlState)) {
+            return Outcome.SOURCE_PERMISSION_DENIED;
+        }
+        return Outcome.CONNECTION_FAILED;
+    }
+
+    static String detailFor(SQLException failure) {
+        return switch (classifySqlState(failure.getSQLState())) {
+            case SOURCE_AUTHENTICATION_FAILED -> "source authentication failed";
+            case SOURCE_PERMISSION_DENIED -> "source permission denied";
+            default -> "source connection failed";
+        };
+    }
 
     /**
      * {@code detail} never contains the secret — only a connection-class message or null on
@@ -99,7 +120,7 @@ public final class SourceDiagnosticsService {
         } catch (SourceBudgetExceededException e) {
             return new Diagnostics(Outcome.SOURCE_BUSY, e.getMessage(), budget);
         } catch (SQLException e) {
-            return new Diagnostics(Outcome.CONNECTION_FAILED, e.getMessage(), budget);
+            return new Diagnostics(classifySqlState(e.getSQLState()), detailFor(e), budget);
         }
     }
 }

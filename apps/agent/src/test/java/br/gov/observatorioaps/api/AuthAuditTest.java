@@ -1,9 +1,13 @@
 package br.gov.observatorioaps.api;
 
 import br.gov.observatorioaps.identityaccess.Role;
+import br.gov.observatorioaps.indicatorengine.Classification;
+import br.gov.observatorioaps.indicatorengine.IndicatorResult;
+import br.gov.observatorioaps.resultstore.EvidenceEntry;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.annotation.DirtiesContext;
 
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -58,5 +62,36 @@ class AuthAuditTest extends ApiFixtureSupport {
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).get("outcome")).isEqualTo("DENIED");
         assertThat(String.valueOf(rows.get(0).get("detail_json"))).doesNotContain("c1-mais-acesso");
+    }
+
+    @Test
+    void successfulEvidenceReadIsAuditedWithoutClinicalData() throws Exception {
+        String manager = createUser("evidence-reader-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String resultId = publishResult(manager, MUNICIPALITY, "2026-08", new IndicatorResult(
+                IndicatorResult.IndicatorStatus.COMPUTED, "60.0000", BigInteger.valueOf(3),
+                BigInteger.valueOf(5), "PROGRAMADOS_MAIS_ESPONTANEOS", Classification.BOM,
+                "2026-08", "c1-mais-acesso@0.1.0", "2026-08-31", MUNICIPALITY, List.of(),
+                "c1-exact-ratio@1"),
+                List.of(new EvidenceEntry("tb_fat_atendimento_individual", "rec-clinical-1",
+                        "2026-08-05", "PROGRAMADO", "2750325", "0000346268", "225142",
+                        "IN_NUMERATOR", "c1@1")));
+
+        HttpResponse<String> evidence = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/results/" + resultId
+                                + "/evidence?municipalityIbge=" + MUNICIPALITY))
+                        .header("Cookie", sessionCookie(manager)).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(evidence.statusCode()).isEqualTo(200);
+
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "select outcome, target, detail_json from auth_audit"
+                        + " where actor_user_id = ? and event_type = 'EVIDENCE_READ'"
+                        + " and target = ?", manager, resultId);
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.get("outcome")).isEqualTo("SUCCESS");
+            assertThat(row.get("target")).isEqualTo(resultId);
+            assertThat(String.valueOf(row.get("detail_json"))).doesNotContain("rec-clinical-1");
+        });
     }
 }

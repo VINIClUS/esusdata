@@ -3,6 +3,7 @@ package br.gov.observatorioaps.identityaccess;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Grant/revoke/block mutations behind {@code POST /users/{id}/grants}, {@code DELETE
@@ -22,14 +23,17 @@ public final class AccessAdministrationService {
     private final UserRepository userRepository;
     private final GrantRepository grantRepository;
     private final AuthorizationVersionGuard authorizationVersionGuard;
+    private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
     public AccessAdministrationService(
             UserRepository userRepository, GrantRepository grantRepository,
-            AuthorizationVersionGuard authorizationVersionGuard, Clock clock) {
+            AuthorizationVersionGuard authorizationVersionGuard, TransactionTemplate transactionTemplate,
+            Clock clock) {
         this.userRepository = userRepository;
         this.grantRepository = grantRepository;
         this.authorizationVersionGuard = authorizationVersionGuard;
+        this.transactionTemplate = transactionTemplate;
         this.clock = clock;
     }
 
@@ -42,13 +46,15 @@ public final class AccessAdministrationService {
         requireExists(targetUserId);
         validateScopeShape(scopeKind, municipalityIbge, cnes, ine);
 
-        Grant newGrant = new Grant(
-                "grant-" + UUID.randomUUID(), targetUserId, role, scopeKind, municipalityIbge,
-                cnes, ine, clock.instant(), actorUserId, null, null);
-        grantRepository.insert(newGrant);
-        authorizationVersionGuard.bumpAndRevokeSessions(
-                targetUserId, "GRANT_ADDED", "role " + role + " granted by " + actorUserId, actorUserId);
-        return newGrant;
+        return transactionTemplate.execute(status -> {
+            Grant newGrant = new Grant(
+                    "grant-" + UUID.randomUUID(), targetUserId, role, scopeKind, municipalityIbge,
+                    cnes, ine, clock.instant(), actorUserId, null, null);
+            grantRepository.insert(newGrant);
+            authorizationVersionGuard.bumpAndRevokeSessions(
+                    targetUserId, "GRANT_ADDED", "role " + role + " granted by " + actorUserId, actorUserId);
+            return newGrant;
+        });
     }
 
     /**
@@ -70,9 +76,11 @@ public final class AccessAdministrationService {
         if (!belongsToTarget) {
             throw new GrantNotFoundException("no active grant " + grantId + " for user " + targetUserId);
         }
-        grantRepository.revoke(grantId, clock.instant(), actorUserId);
-        authorizationVersionGuard.bumpAndRevokeSessions(
-                targetUserId, "GRANT_REVOKED", "grant " + grantId + " revoked by " + actorUserId, actorUserId);
+        transactionTemplate.executeWithoutResult(status -> {
+            grantRepository.revoke(grantId, clock.instant(), actorUserId);
+            authorizationVersionGuard.bumpAndRevokeSessions(
+                    targetUserId, "GRANT_REVOKED", "grant " + grantId + " revoked by " + actorUserId, actorUserId);
+        });
     }
 
     /**
@@ -89,9 +97,11 @@ public final class AccessAdministrationService {
             throw new SelfBlockForbiddenException("a caller cannot block their own account");
         }
         requireExists(targetUserId);
-        userRepository.setState(targetUserId, UserState.BLOCKED);
-        authorizationVersionGuard.bumpAndRevokeSessions(
-                targetUserId, "USER_BLOCKED", "blocked by " + actorUserId, actorUserId);
+        transactionTemplate.executeWithoutResult(status -> {
+            userRepository.setState(targetUserId, UserState.BLOCKED);
+            authorizationVersionGuard.bumpAndRevokeSessions(
+                    targetUserId, "USER_BLOCKED", "blocked by " + actorUserId, actorUserId);
+        });
     }
 
     public List<Grant> activeGrants(String userId) {

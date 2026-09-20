@@ -75,9 +75,10 @@ public class AuthController {
     @PostMapping("/api/v1/auth/reauth")
     public ResponseEntity<Void> reauth(
             @AuthenticationPrincipal br.gov.observatorioaps.identityaccess.AuthenticatedSession session,
-            @RequestBody ReauthRequest request) {
+            @RequestBody ReauthRequest request, HttpServletRequest httpRequest) {
         authenticationService.reauthenticate(
-                session.sessionId(), session.userId(), request.password(), clock.instant());
+                session.sessionId(), session.userId(), request.password(),
+                httpRequest.getRemoteAddr(), clock.instant());
         return ResponseEntity.noContent().build();
     }
 

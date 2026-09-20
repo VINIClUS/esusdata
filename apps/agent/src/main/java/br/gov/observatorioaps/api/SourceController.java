@@ -48,8 +48,7 @@ public class SourceController {
 
         Optional<SourceRecord> existing = sourceRepository.findById(request.id());
         if (existing.isPresent() && !existing.get().municipalityIbge().equals(request.municipalityIbge())) {
-            throw new IllegalArgumentException(
-                    "source " + request.id() + " already belongs to a different municipality");
+            throw new ApiNotFoundException("source not found");
         }
         int version = existing.map(s -> s.sourceConfigurationVersion() + 1).orElse(1);
 

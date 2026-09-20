@@ -1,5 +1,6 @@
 package br.gov.observatorioaps.api;
 
+import br.gov.observatorioaps.identityaccess.AuthAuditWriter;
 import br.gov.observatorioaps.identityaccess.AuthenticatedSession;
 import br.gov.observatorioaps.identityaccess.Permission;
 import br.gov.observatorioaps.indicatorpacks.IndicatorPackCatalog;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Clock;
 import java.util.List;
 
 /**
@@ -29,14 +31,18 @@ public class ResultController {
     private final ResultRepository resultRepository;
     private final EvidenceRepository evidenceRepository;
     private final ApiAuthorization authorization;
+    private final AuthAuditWriter authAuditWriter;
+    private final Clock clock;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public ResultController(
             ResultRepository resultRepository, EvidenceRepository evidenceRepository,
-            ApiAuthorization authorization) {
+            ApiAuthorization authorization, AuthAuditWriter authAuditWriter, Clock clock) {
         this.resultRepository = resultRepository;
         this.evidenceRepository = evidenceRepository;
         this.authorization = authorization;
+        this.authAuditWriter = authAuditWriter;
+        this.clock = clock;
     }
 
     @GetMapping("/api/v1/results")
@@ -78,6 +84,9 @@ public class ResultController {
         String nextCursor = page.nextCursor() == null
                 ? null
                 : EvidenceCursor.of(id, EVIDENCE_ORDERING, scopeKey, page.nextCursor()).encode();
+        authAuditWriter.record(clock.instant(), session.userId(), "EVIDENCE_READ", id, "SUCCESS",
+                "{\"municipalityIbge\":\"" + municipalityIbge
+                        + "\",\"itemCount\":" + items.size() + "}");
         return new EvidenceResponse(items, nextCursor);
     }
 
@@ -86,7 +95,9 @@ public class ResultController {
                 .map(IndicatorPackCatalog.PackEntry::unit)
                 .orElse(null);
         return new ResultResponse(
-                result.resultId(), result.indicatorPack(), result.ruleVersion(),
+                result.resultId(), result.jobId(), result.runId(), result.extractionId(),
+                result.adapterVersion(), result.calculationPolicyVersion(), result.inputFingerprint(),
+                result.indicatorPack(), result.ruleVersion(),
                 new ScopeResponse(result.municipalityIbge(), null, null),
                 result.referencePeriod(), result.status(), result.valueText(), unit,
                 result.numeratorText(), result.denominatorText(), result.denominatorKind(),
