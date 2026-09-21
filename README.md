@@ -2,7 +2,9 @@
 
 Serviço local que lê o PEC e-SUS de um município em modo somente-leitura, calcula indicadores
 metodológicos versionados (piloto: C1 — Mais Acesso) e publica resultados com evidência mínima.
-Um processo por instalação; SQLite próprio; nunca escreve no PEC.
+Um processo de serviço por instalação; SQLite próprio; nunca escreve no PEC. A aquisição viva pode
+rodar num plano de execução efêmero em processo filho (ADR 0010) — o worker de cálculo continua
+único por instalação.
 
 - Especificação: [`Tech_Spec_Observatorio_APS_v0_4.md`](./Tech_Spec_Observatorio_APS_v0_4.md)
 - Vocabulário canônico: [`CONTEXT.md`](./CONTEXT.md)
@@ -13,6 +15,7 @@ Um processo por instalação; SQLite próprio; nunca escreve no PEC.
 ```
 apps/agent/      backend Java 21 / Spring Boot — um único projeto Maven (ADR 0001)
 apps/web/        frontend React + Vite + MUI ("Esusdata Helper")
+apps/execplane/  plano de execução em Rust — aquisição viva do PEC, IPC por stdin/stdout (ADR 0010)
 contracts/       contratos publicados: compatibilidade de adaptadores PEC e OpenAPI v1
 docs/adr/        registros de decisão
 docs/discovery/  investigação do PEC real (CT 133)
