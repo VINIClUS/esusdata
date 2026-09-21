@@ -6,7 +6,12 @@ import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadore
 import { isolamentoFixture } from '../fixtures/isolamento'
 import { painelFixture } from '../fixtures/painel'
 import { relatoriosFixture } from '../fixtures/relatorios'
-import { indicatorResultsPath, normalizeIndicatorPacks, normalizeIndicatorResult } from '../normalizers'
+import {
+  indicatorResultsPath,
+  normalizeIndicatorPacks,
+  normalizeIndicatorResult,
+  normalizePainelResumo,
+} from '../normalizers'
 import type {
   ExecucaoAtual,
   FonteConexao,
@@ -29,9 +34,15 @@ function resolveMockIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> 
   return resolveMock(detalhe)
 }
 
+function configuredApiScope() {
+  return {
+    municipalityIbge: import.meta.env.VITE_MUNICIPALITY_IBGE,
+    referencePeriod: import.meta.env.VITE_REFERENCE_PERIOD,
+  }
+}
+
 function resolveApiIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> {
-  const municipalityIbge = import.meta.env.VITE_MUNICIPALITY_IBGE
-  const referencePeriod = import.meta.env.VITE_REFERENCE_PERIOD
+  const { municipalityIbge, referencePeriod } = configuredApiScope()
   if (!municipalityIbge || !referencePeriod) {
     return Promise.reject(new Error('Configure VITE_MUNICIPALITY_IBGE e VITE_REFERENCE_PERIOD.'))
   }
@@ -45,8 +56,31 @@ function resolveApiIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> {
   })
 }
 
+async function resolveApiPainelResumo(): Promise<PainelResumo> {
+  const packs = await apiFetch<IndicatorPack[]>('/indicator-packs')
+  const { municipalityIbge, referencePeriod } = configuredApiScope()
+  if (!municipalityIbge || !referencePeriod) {
+    return normalizePainelResumo(packs, [], referencePeriod || 'período atual')
+  }
+
+  const results = (
+    await Promise.all(
+      packs.map((pack) =>
+        apiFetch<IndicatorResultResponse[]>(
+          indicatorResultsPath({ municipalityIbge, indicatorPack: pack.id, referencePeriod }),
+        ),
+      ),
+    )
+  ).flat()
+
+  return normalizePainelResumo(packs, results, referencePeriod)
+}
+
 export function usePainelResumo() {
-  return useQuery({ queryKey: ['painel'], queryFn: source<PainelResumo>(painelFixture, '/painel') })
+  return useQuery({
+    queryKey: ['painel', import.meta.env.VITE_MUNICIPALITY_IBGE, import.meta.env.VITE_REFERENCE_PERIOD],
+    queryFn: () => (USE_MOCKS ? resolveMock(painelFixture) : resolveApiPainelResumo()),
+  })
 }
 
 export function useIndicadores() {

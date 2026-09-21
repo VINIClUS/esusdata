@@ -10,7 +10,8 @@ export function formatInt(value: number): string {
 }
 
 /** 78.4 → "78,4%" (value already in percent units) */
-export function formatPercent(value: number, digits = 1): string {
+export function formatPercent(value: number | null, digits = 1): string {
+  if (value === null) return 'Indisponível'
   const f = digits === 1 ? decimalFormatter : new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,

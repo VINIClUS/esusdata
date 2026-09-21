@@ -6,7 +6,7 @@ export interface Kpi {
   label: string
   valor: string
   chip?: { label: string; valor: string }
-  tendencia: { texto: string; tom: 'up' | 'down' }
+  tendencia?: { texto: string; tom: 'up' | 'down' }
   tomValor?: 'default' | 'error'
 }
 
@@ -51,7 +51,7 @@ export interface ExecucaoResumo {
 export interface PainelResumo {
   kpis: Kpi[]
   evolucao: { series: SerieDef[]; pontos: SeriePonto[] }
-  qualidade: { percentual: number; titulo: string; descricao: string }
+  qualidade: { percentual: number | null; titulo: string; descricao: string }
   integridade: VerificacaoIntegridade[]
   alertas: Alerta[]
   maiorPendencia: IndicadorPendencia[]

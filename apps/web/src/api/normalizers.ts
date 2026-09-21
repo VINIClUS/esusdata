@@ -5,6 +5,7 @@ import type {
   IndicadorResumo,
   IndicadoresLista,
   IndicatorResultResponse,
+  PainelResumo,
 } from './types'
 
 type CategoryDefinition = {
@@ -72,6 +73,78 @@ export function normalizeIndicatorPacks(packs: IndicatorPack[]): IndicadoresList
   return { categorias, itens, total: itens.length }
 }
 
+/**
+ * Builds the panel from the API surfaces that exist today. The API has no aggregate panel route,
+ * so values that cannot be derived from the catalog/results contract remain explicitly unavailable.
+ */
+export function normalizePainelResumo(
+  packs: IndicatorPack[],
+  results: IndicatorResultResponse[],
+  referencePeriod: string,
+): PainelResumo {
+  const resultByPack = new Map<string, IndicatorResultResponse>()
+  for (const result of results) {
+    if (!resultByPack.has(result.indicatorPack)) resultByPack.set(result.indicatorPack, result)
+  }
+
+  const computedCount = packs.filter(
+    (pack) => resultByPack.get(pack.id)?.status === 'COMPUTED',
+  ).length
+  const pendingPacks = packs.filter(
+    (pack) => resultByPack.get(pack.id)?.status !== 'COMPUTED',
+  )
+  const computedPercent = packs.length === 0 ? null : Math.round((computedCount / packs.length) * 100)
+  const alertas: PainelResumo['alertas'] = pendingPacks.map((pack) => {
+    const result = resultByPack.get(pack.id)
+    const description =
+      result?.limitations[0] ??
+      pack.blockedGates[0] ??
+      `Nenhum resultado publicado para ${referencePeriod}.`
+
+    return {
+      id: `indicator-${pack.id}`,
+      severidade: result?.status === 'BLOCKED' ? 'warning' : 'info',
+      titulo: `${indicatorDisplayName(pack.id)} indisponível`,
+      descricao: description,
+      data: referencePeriod,
+      hora: '—',
+    }
+  })
+
+  return {
+    kpis: [
+      {
+        id: 'indicadores',
+        icone: 'indicadores',
+        label: 'Indicadores publicados',
+        valor: `${computedCount} / ${packs.length}`,
+        chip: computedPercent === null ? undefined : { label: '', valor: `${computedPercent}%` },
+        tendencia: { texto: `Competência ${referencePeriod}`, tom: 'up' },
+      },
+      { id: 'cobertura', icone: 'cobertura', label: 'Cobertura da população', valor: 'Indisponível' },
+      { id: 'cadastros', icone: 'cadastros', label: 'Cadastros ativos', valor: 'Indisponível' },
+      {
+        id: 'pendencias',
+        icone: 'pendencias',
+        label: 'Indicadores pendentes',
+        valor: String(pendingPacks.length),
+        chip: { label: '', valor: pendingPacks.length > 0 ? 'Requer análise' : 'Nenhuma' },
+        tomValor: pendingPacks.length > 0 ? 'error' : 'default',
+      },
+    ],
+    evolucao: { series: [], pontos: [] },
+    qualidade: {
+      percentual: null,
+      titulo: 'Resumo indisponível',
+      descricao: 'A API atual não fornece um agregado de qualidade dos dados.',
+    },
+    integridade: [],
+    alertas,
+    maiorPendencia: [],
+    ultimasExecucoes: [],
+  }
+}
+
 export function indicatorResultsPath({
   municipalityIbge,
   indicatorPack,
@@ -85,9 +158,14 @@ export function indicatorResultsPath({
   return `/results?${params.toString()}`
 }
 
-function numberFromApi(value: string | null): number {
+function numberFromApi(value: string | null): number | null {
+  if (value === null) return null
   const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : 0
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function requiredNumberFromApi(value: string | null): number {
+  return numberFromApi(value) ?? 0
 }
 
 function statusFromApi(status: string): IndicadorDetalhe['status'] {
@@ -113,12 +191,18 @@ export function normalizeIndicatorResult(result: IndicatorResultResponse): Indic
       meta: '—',
       tendencia: result.classification ? `Classificação: ${result.classification}` : 'Sem classificação',
     },
-    numerador: { valor: numberFromApi(result.numerator), label: 'Numerador' },
-    denominador: { valor: numberFromApi(result.denominator), label: result.denominatorKind || 'Denominador' },
+    numerador: { valor: requiredNumberFromApi(result.numerator), label: 'Numerador' },
+    denominador: {
+      valor: requiredNumberFromApi(result.denominator),
+      label: result.denominatorKind || 'Denominador',
+    },
     pendencias: { valor: 0, percentual: 0 },
-    evolucao: [{ mes: result.referencePeriod, valor: value }],
+    evolucao: value === null ? [] : [{ mes: result.referencePeriod, valor: value }],
     meta: 0,
-    distribuicao: [{ label: 'Resultado publicado', valor: value, percentual: 100, tom: tone }],
+    distribuicao:
+      value === null
+        ? []
+        : [{ label: 'Resultado publicado', valor: value, percentual: 100, tom: tone }],
     metodologia: [
       {
         icone: 'database',

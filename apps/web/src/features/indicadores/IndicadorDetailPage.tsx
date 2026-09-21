@@ -178,6 +178,7 @@ export function IndicadorDetailPage() {
   }
 
   const infoIcon = <Info size={18} color={colors.primary} />
+  const resultadoIndisponivel = data.resultado.valor === null
 
   return (
     <>
@@ -201,7 +202,7 @@ export function IndicadorDetailPage() {
           </Box>
         }
         title={phone ? `${data.codigo} – ${data.nome}` : `${data.codigo} – ${data.nome}`}
-        chip={<StatusChip status={phone ? 'calculado' : data.status} withIcon={false} />}
+        chip={<StatusChip status={data.status} withIcon={false} />}
         subtitle={data.descricao}
         actions={
           !phone && (
@@ -239,7 +240,7 @@ export function IndicadorDetailPage() {
             label="Resultado"
             infoIcon
             value={formatPercent(data.resultado.valor)}
-            valueColor={colors.success}
+            valueColor={resultadoIndisponivel ? colors.textSecondary : colors.success}
             chip={{ label: 'Meta', value: data.resultado.meta }}
             trend={{ text: data.resultado.tendencia, tone: 'up' }}
             compact={phone}
@@ -294,14 +295,20 @@ export function IndicadorDetailPage() {
                 }
                 sx={{ height: '100%' }}
               >
-                <LineChartCard
-                  data={phone ? data.evolucao.slice(-8) : data.evolucao}
-                  series={[{ key: 'valor', label: 'Resultado do indicador', cor: colors.primary }]}
-                  xKey="mes"
-                  height={phone ? 150 : 180}
-                  referenceLine={{ value: data.meta, label: `Meta (${data.meta}%)` }}
-                  legend={!phone}
-                />
+                {data.evolucao.length > 0 ? (
+                  <LineChartCard
+                    data={phone ? data.evolucao.slice(-8) : data.evolucao}
+                    series={[{ key: 'valor', label: 'Resultado do indicador', cor: colors.primary }]}
+                    xKey="mes"
+                    height={phone ? 150 : 180}
+                    referenceLine={{ value: data.meta, label: `Meta (${data.meta}%)` }}
+                    legend={!phone}
+                  />
+                ) : (
+                  <Typography sx={{ py: 7, textAlign: 'center', color: colors.textSecondary }}>
+                    Resultado indisponível para este período.
+                  </Typography>
+                )}
               </SectionCard>
             </Grid>
 
@@ -309,53 +316,61 @@ export function IndicadorDetailPage() {
               <>
                 <Grid size={{ xs: 12, md: 4.8 }}>
                   <SectionCard title="Distribuição por status" sx={{ height: '100%' }}>
-                    <DonutChart
-                      size={150}
-                      thickness={22}
-                      data={data.distribuicao.map((d) => ({
-                        name: d.label,
-                        value: d.valor,
-                        color: tom[d.tom],
-                      }))}
-                      centerValue={formatInt(data.denominador.valor)}
-                      centerLabel={
-                        <>
-                          Total de
-                          <br />
-                          gestantes
-                        </>
-                      }
-                    />
-                    <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                      {data.distribuicao.map((d) => (
-                        <Box
-                          key={d.label}
-                          sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}
-                        >
-                          <Box
-                            sx={{
-                              width: 18,
-                              height: 18,
-                              borderRadius: '50%',
-                              bgcolor: tom[d.tom],
-                              color: '#fff',
-                              display: 'grid',
-                              placeItems: 'center',
-                              fontSize: 11,
-                              fontWeight: 700,
-                            }}
-                          >
-                            ✓
-                          </Box>
-                          <Typography sx={{ flex: 1, fontSize: 12.5, color: colors.navy }}>
-                            {d.label} ({formatPercent(d.percentual)})
-                          </Typography>
-                          <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: colors.navy }}>
-                            {d.valor}
-                          </Typography>
+                    {data.distribuicao.length > 0 ? (
+                      <>
+                        <DonutChart
+                          size={150}
+                          thickness={22}
+                          data={data.distribuicao.map((d) => ({
+                            name: d.label,
+                            value: d.valor,
+                            color: tom[d.tom],
+                          }))}
+                          centerValue={formatInt(data.denominador.valor)}
+                          centerLabel={
+                            <>
+                              Total de
+                              <br />
+                              gestantes
+                            </>
+                          }
+                        />
+                        <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                          {data.distribuicao.map((d) => (
+                            <Box
+                              key={d.label}
+                              sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}
+                            >
+                              <Box
+                                sx={{
+                                  width: 18,
+                                  height: 18,
+                                  borderRadius: '50%',
+                                  bgcolor: tom[d.tom],
+                                  color: '#fff',
+                                  display: 'grid',
+                                  placeItems: 'center',
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                ✓
+                              </Box>
+                              <Typography sx={{ flex: 1, fontSize: 12.5, color: colors.navy }}>
+                                {d.label} ({formatPercent(d.percentual)})
+                              </Typography>
+                              <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: colors.navy }}>
+                                {d.valor}
+                              </Typography>
+                            </Box>
+                          ))}
                         </Box>
-                      ))}
-                    </Box>
+                      </>
+                    ) : (
+                      <Typography sx={{ py: 8, textAlign: 'center', color: colors.textSecondary }}>
+                        Distribuição indisponível para este período.
+                      </Typography>
+                    )}
                   </SectionCard>
                 </Grid>
 

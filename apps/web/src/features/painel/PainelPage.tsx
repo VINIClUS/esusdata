@@ -83,9 +83,30 @@ function AlertRow({ alerta }: { alerta: Alerta }) {
   )
 }
 
+function UnavailableValue({ children }: { children: string }) {
+  return (
+    <Typography sx={{ py: 4, textAlign: 'center', color: colors.textSecondary }}>
+      {children}
+    </Typography>
+  )
+}
+
 export function PainelPage() {
-  const { data, isPending } = usePainelResumo()
-  if (isPending || !data) return <PageSkeleton title="Painel Principal" />
+  const { data, error, isError, isPending } = usePainelResumo()
+  if (isPending) return <PageSkeleton title="Painel Principal" />
+  if (isError || !data) {
+    return (
+      <>
+        <PageHeader
+          title="Painel Principal"
+          subtitle="Visão geral dos indicadores e da qualidade dos dados do e-SUS PEC."
+        />
+        <Callout variant="error" title="Painel indisponível">
+          {error instanceof Error ? error.message : 'Não foi possível carregar os dados do painel.'}
+        </Callout>
+      </>
+    )
+  }
 
   return (
     <>
@@ -102,7 +123,7 @@ export function PainelPage() {
                 value={k.valor}
                 valueColor={k.tomValor === 'error' ? colors.error : colors.navy}
                 chip={k.chip ? { label: k.chip.label || undefined, value: k.chip.valor } : undefined}
-                trend={{ text: k.tendencia.texto, tone: k.tendencia.tom }}
+                trend={k.tendencia ? { text: k.tendencia.texto, tone: k.tendencia.tom } : undefined}
               />
             </Grid>
           )
@@ -115,29 +136,42 @@ export function PainelPage() {
             action={<FilterSelect value="Últimos 8 meses" options={['Últimos 8 meses', 'Últimos 12 meses']} size="sm" />}
             sx={{ height: '100%' }}
           >
-            <LineChartCard data={data.evolucao.pontos} series={data.evolucao.series} xKey="mes" height={172} />
+            {data.evolucao.pontos.length > 0 && data.evolucao.series.length > 0 ? (
+              <LineChartCard
+                data={data.evolucao.pontos}
+                series={data.evolucao.series}
+                xKey="mes"
+                height={172}
+              />
+            ) : (
+              <UnavailableValue>Histórico indisponível na API atual.</UnavailableValue>
+            )}
           </SectionCard>
         </Grid>
 
         <Grid size={{ xs: 12, md: 4.5, lg: 2.75 }}>
           <SectionCard title="Qualidade dos dados" subtitle="Índice geral de consistência e completude." sx={{ height: '100%' }}>
             <Box sx={{ mt: 0.5 }}>
-              <DonutChart
-                size={140}
-                thickness={18}
-                data={[
-                  { name: 'Qualidade', value: data.qualidade.percentual, color: colors.success },
-                  { name: 'Restante', value: 100 - data.qualidade.percentual, color: '#e6ecf5' },
-                ]}
-                centerValue={`${data.qualidade.percentual}%`}
-                centerLabel={
-                  <>
-                    Qualidade
-                    <br />
-                    dos dados
-                  </>
-                }
-              />
+              {data.qualidade.percentual === null ? (
+                <UnavailableValue>Qualidade indisponível na API atual.</UnavailableValue>
+              ) : (
+                <DonutChart
+                  size={140}
+                  thickness={18}
+                  data={[
+                    { name: 'Qualidade', value: data.qualidade.percentual, color: colors.success },
+                    { name: 'Restante', value: 100 - data.qualidade.percentual, color: '#e6ecf5' },
+                  ]}
+                  centerValue={`${data.qualidade.percentual}%`}
+                  centerLabel={
+                    <>
+                      Qualidade
+                      <br />
+                      dos dados
+                    </>
+                  }
+                />
+              )}
             </Box>
             <Box sx={{ mt: 2 }}>
               <Callout variant="success" dense title={data.qualidade.titulo} action={<ChevronRight size={18} color={colors.success} />}>
@@ -149,7 +183,11 @@ export function PainelPage() {
 
         <Grid size={{ xs: 12, md: 12, lg: 2.75 }}>
           <SectionCard title="Verificações de integridade" subtitle="Status dos principais itens de consistência." sx={{ height: '100%' }}>
-            <Checklist items={data.integridade.map((i) => ({ label: i.label, value: i.valor, ok: i.ok }))} divided />
+            {data.integridade.length > 0 ? (
+              <Checklist items={data.integridade.map((i) => ({ label: i.label, value: i.valor, ok: i.ok }))} divided />
+            ) : (
+              <UnavailableValue>Verificações indisponíveis na API atual.</UnavailableValue>
+            )}
             <Button variant="outlined" color="primary" fullWidth startIcon={<ExternalLink size={16} />} endIcon={<ChevronRight size={16} />} sx={{ mt: 1.5, fontSize: 12, justifyContent: 'space-between', whiteSpace: 'nowrap', px: 1.25 }}>
               Ver detalhes da qualidade dos dados
             </Button>
@@ -164,9 +202,11 @@ export function PainelPage() {
             action={<LinkButton>Ver todos</LinkButton>}
             sx={{ height: '100%' }}
           >
-            {data.alertas.map((a) => (
-              <AlertRow key={a.id} alerta={a} />
-            ))}
+            {data.alertas.length > 0 ? (
+              data.alertas.map((a) => <AlertRow key={a.id} alerta={a} />)
+            ) : (
+              <UnavailableValue>Nenhum alerta publicado.</UnavailableValue>
+            )}
           </SectionCard>
         </Grid>
 
@@ -178,7 +218,11 @@ export function PainelPage() {
             action={<LinkButton to="/indicadores">Ver todos</LinkButton>}
             sx={{ height: '100%' }}
           >
-            <DataTable columns={pendenciaColumns} rows={data.maiorPendencia} getRowKey={(r) => r.indicador} dense sx={{ '& td': { py: 0.55, fontSize: 12.5 }, '& th': { py: 0.9 } }} />
+            {data.maiorPendencia.length > 0 ? (
+              <DataTable columns={pendenciaColumns} rows={data.maiorPendencia} getRowKey={(r) => r.indicador} dense sx={{ '& td': { py: 0.55, fontSize: 12.5 }, '& th': { py: 0.9 } }} />
+            ) : (
+              <UnavailableValue>Pendências detalhadas indisponíveis.</UnavailableValue>
+            )}
           </SectionCard>
         </Grid>
 
@@ -190,7 +234,11 @@ export function PainelPage() {
             action={<LinkButton to="/execucao">Ver todas</LinkButton>}
             sx={{ height: '100%' }}
           >
-            <DataTable columns={execucaoColumns} rows={data.ultimasExecucoes} getRowKey={(r) => r.dataHora} dense sx={{ '& td': { py: 0.6, fontSize: 12.5, whiteSpace: 'nowrap' }, '& th': { py: 0.9 } }} />
+            {data.ultimasExecucoes.length > 0 ? (
+              <DataTable columns={execucaoColumns} rows={data.ultimasExecucoes} getRowKey={(r) => r.dataHora} dense sx={{ '& td': { py: 0.6, fontSize: 12.5, whiteSpace: 'nowrap' }, '& th': { py: 0.9 } }} />
+            ) : (
+              <UnavailableValue>Execuções indisponíveis na API atual.</UnavailableValue>
+            )}
             <Button
               fullWidth
               variant="outlined"

@@ -78,7 +78,7 @@ export interface IndicadorDetalhe {
   componente: string
   tipo: string
   ultimaExecucao: string
-  resultado: { valor: number; meta: string; tendencia: string }
+  resultado: { valor: number | null; meta: string; tendencia: string }
   numerador: { valor: number; label: string }
   denominador: { valor: number; label: string }
   pendencias: { valor: number; percentual: number }
