@@ -54,6 +54,12 @@ cd apps/agent && mvn verify -Dsurefire.reuseForks=false
 
 # frontend (dados mockados por padrão: VITE_USE_MOCKS)
 cd apps/web && npm install && npm run dev
+
+# plano de execução (ADR 0010) — build separado, opcional; sem o binário o backend usa o
+# adaptador JDBC in-process (observatorio.execution-plane.binary vazio). Hoje só o handshake
+# de compatibilidade está implementado — nunca aponte observatorio.execution-plane.binary
+# para este binário contra uma fonte real ainda.
+cd apps/execplane && cargo build --release && cargo test
 ```
 
 Testes com sufixo `LiveTest` exigem um PEC acessível e são pulados sem ele (ADR 0002, ADR 0003).
