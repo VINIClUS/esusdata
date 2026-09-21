@@ -2,7 +2,6 @@ package br.gov.observatorioaps.sourceconnector.infrastructure.process;
 
 import br.gov.observatorioaps.extractionstore.domain.CanonicalEncounter;
 import br.gov.observatorioaps.extractionstore.domain.ExtractionManifest;
-import br.gov.observatorioaps.extractionstore.domain.ExtractionScope;
 import br.gov.observatorioaps.extractionstore.infrastructure.file.ExtractWriter;
 import br.gov.observatorioaps.pecadapter.domain.ColumnMetadata;
 import br.gov.observatorioaps.pecadapter.domain.CompatibilityFingerprint;
@@ -160,8 +159,7 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
 
             ExtractWriter writer;
             try {
-                writer = new ExtractWriter(extractsBaseDir, acquisitionCommand.extractionId(),
-                        acquisitionCommand.budget().maxTempFileBytes(), scopeFor(acquisitionCommand));
+                writer = new ExtractWriter(extractsBaseDir, acquisitionCommand.extractionId(), acquisitionCommand);
             } catch (IOException cannotOpen) {
                 // The child already proved it can read the source (it sent a probe); it just never
                 // gets told to proceed. Uncertain all the same — a live connection was opened.
@@ -208,7 +206,7 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
             killProcess(process);
             throw new PecAcquisitionException("execution plane I/O failure: " + e.getMessage(), e);
         } catch (RuntimeException e) {
-            // A bad AcquisitionCommand (scopeFor), a budget/validation failure opening the writer,
+            // A bad AcquisitionCommand, a budget/validation failure opening the writer,
             // or a stdin write racing the child's exit can all throw unchecked after spawn. Every
             // one of those paths that should flag ENG-51 uncertainty already does so closer to its
             // source — this catch exists only to guarantee the child is never orphaned still
@@ -220,13 +218,6 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
         }
     }
 
-    private static ExtractionScope scopeFor(AcquisitionCommand acquisitionCommand) {
-        return new ExtractionScope(
-                acquisitionCommand.connectionProperties().sourceId(),
-                acquisitionCommand.connectionProperties().municipalityIbge(),
-                acquisitionCommand.periodStart().toString(),
-                acquisitionCommand.periodEndExclusive().toString());
-    }
 
     /**
      * Reads {@code progress}/{@code row}/{@code error} messages until the child closes its
