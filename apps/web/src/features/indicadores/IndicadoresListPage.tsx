@@ -258,14 +258,19 @@ export function IndicadoresListPage() {
       )}
 
       {phone ? (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          getRowKey={(r) => r.codigo}
-          cardMode
-          renderCard={(r) => <IndicadorCard item={r} />}
-          onRowClick={(r) => navigate(`/indicadores/${r.codigo}`)}
-        />
+        <>
+          <DataTable
+            columns={columns}
+            rows={rows}
+            getRowKey={(r) => r.codigo}
+            cardMode
+            renderCard={(r) => <IndicadorCard item={r} />}
+            onRowClick={(r) => navigate(`/indicadores/${r.codigo}`)}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+            <Pagination page={current} count={pageCount} onChange={setPage} />
+          </Box>
+        </>
       ) : (
         <Paper sx={{ overflow: 'hidden' }}>
           <DataTable

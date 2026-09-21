@@ -24,7 +24,7 @@ const features: { icon: LucideIcon; title: string; text: string }[] = [
 ]
 
 export function LoginPage() {
-  const { user, login } = useAuth()
+  const { user, isLoading, login } = useAuth()
   const navigate = useNavigate()
   const [usuario, setUsuario] = useState('')
   const [senha, setSenha] = useState('')
@@ -123,7 +123,7 @@ export function LoginPage() {
           </Typography>
         )}
 
-        <Button type="submit" variant="contained" size="large" fullWidth disabled={loading} sx={{ mt: 3.5, minHeight: 64, fontSize: 21, fontWeight: 500, borderRadius: '12px' }}>
+        <Button type="submit" variant="contained" size="large" fullWidth disabled={loading || isLoading} sx={{ mt: 3.5, minHeight: 64, fontSize: 21, fontWeight: 500, borderRadius: '12px' }}>
           Entrar
         </Button>
 

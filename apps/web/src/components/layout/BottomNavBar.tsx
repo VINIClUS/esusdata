@@ -80,7 +80,7 @@ export function BottomNavBar() {
           <ListItemIcon><CircleQuestionMark size={18} /></ListItemIcon>
           Ajuda
         </MenuItem>
-        <MenuItem onClick={() => { close(); logout(); navigate('/login') }}>
+        <MenuItem onClick={async () => { close(); await logout(); navigate('/login') }}>
           <ListItemIcon><LogOut size={18} /></ListItemIcon>
           Sair
         </MenuItem>

@@ -6,12 +6,13 @@ import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadore
 import { isolamentoFixture } from '../fixtures/isolamento'
 import { painelFixture } from '../fixtures/painel'
 import { relatoriosFixture } from '../fixtures/relatorios'
-import { normalizeIndicatorPacks } from '../normalizers'
+import { indicatorResultsPath, normalizeIndicatorPacks, normalizeIndicatorResult } from '../normalizers'
 import type {
   ExecucaoAtual,
   FonteConexao,
   IndicatorPack,
   IndicadorDetalhe,
+  IndicatorResultResponse,
   IsolamentoStatus,
   PainelResumo,
   RelatorioGerado,
@@ -26,6 +27,22 @@ function resolveMockIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> 
   const detalhe = findIndicadorDetalhe(codigo)
   if (!detalhe) return Promise.reject(new Error(`Detalhes indisponíveis para ${codigo}`))
   return resolveMock(detalhe)
+}
+
+function resolveApiIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> {
+  const municipalityIbge = import.meta.env.VITE_MUNICIPALITY_IBGE
+  const referencePeriod = import.meta.env.VITE_REFERENCE_PERIOD
+  if (!municipalityIbge || !referencePeriod) {
+    return Promise.reject(new Error('Configure VITE_MUNICIPALITY_IBGE e VITE_REFERENCE_PERIOD.'))
+  }
+
+  return apiFetch<IndicatorResultResponse[]>(
+    indicatorResultsPath({ municipalityIbge, indicatorPack: codigo, referencePeriod }),
+  ).then((results) => {
+    const result = results[0]
+    if (!result) throw new Error(`Nenhum resultado publicado para ${codigo}.`)
+    return normalizeIndicatorResult(result)
+  })
 }
 
 export function usePainelResumo() {
@@ -48,7 +65,7 @@ export function useIndicadorDetalhe(codigo: string) {
     queryFn: () =>
       USE_MOCKS
         ? resolveMockIndicadorDetalhe(codigo)
-        : apiFetch<IndicadorDetalhe>(`/results/${codigo}`),
+        : resolveApiIndicadorDetalhe(codigo),
   })
 }
 

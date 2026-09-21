@@ -110,8 +110,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         <NavRow
           label="Sair"
           icon={LogOut}
-          onClick={() => {
-            logout()
+          onClick={async () => {
+            await logout()
             navigate('/login')
           }}
         />

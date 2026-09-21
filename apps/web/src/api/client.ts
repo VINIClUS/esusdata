@@ -12,15 +12,39 @@ export class ApiError extends Error {
   }
 }
 
-/** Real same-origin fetch wrapper (cookie session). Unused while USE_MOCKS is on. */
+let apiReady: Promise<void> | null = null
+
+function xsrfToken(): string | null {
+  if (typeof document === 'undefined') return null
+  const cookie = document.cookie.split('; ').find((entry) => entry.startsWith('XSRF-TOKEN='))
+  return cookie ? decodeURIComponent(cookie.slice('XSRF-TOKEN='.length)) : null
+}
+
+/** Obtains the CSRF cookie before the first state-changing API request. */
+export function ensureApiReady(): Promise<void> {
+  if (!apiReady) {
+    apiReady = apiFetch<{ status: string }>('/ready')
+      .then(() => undefined)
+      .catch((error) => {
+        apiReady = null
+        throw error
+      })
+  }
+  return apiReady
+}
+
+/** Real same-origin fetch wrapper with the HttpOnly session cookie and CSRF header. */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api/v1${path}`, {
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-    ...init,
-  })
+  const headers = new Headers(init?.headers)
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  const token = xsrfToken()
+  if (token && !headers.has('X-XSRF-TOKEN')) headers.set('X-XSRF-TOKEN', token)
+
+  const res = await fetch(`/api/v1${path}`, { ...init, credentials: 'same-origin', headers })
   if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`)
-  return (await res.json()) as T
+  if (res.status === 204) return undefined as T
+  const body = await res.text()
+  return (body ? JSON.parse(body) : undefined) as T
 }
 
 /** Resolves a fixture after a short delay so loading states are exercised. */

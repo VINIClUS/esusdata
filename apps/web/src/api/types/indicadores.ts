@@ -34,6 +34,23 @@ export interface IndicatorPack {
   blockedGates: string[]
 }
 
+export interface IndicatorResultResponse {
+  resultId: string
+  indicatorPack: string
+  referencePeriod: string
+  status: string
+  value: string | null
+  unit: string | null
+  numerator: string
+  denominator: string
+  denominatorKind: string
+  classification: string | null
+  dataCutoff: string | null
+  limitations: string[]
+  scope: { municipalityIbge: string }
+  publishedAt: string | null
+}
+
 export interface EvidenciaMotivo {
   motivo: string
   quantidade: number
