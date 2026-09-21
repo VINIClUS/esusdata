@@ -9,6 +9,7 @@ import {
   indicatorResultsPath,
 } from '../src/api/normalizers.ts'
 import * as normalizers from '../src/api/normalizers.ts'
+import { configuredJobId } from '../src/api/run-config.ts'
 import { realContextForScope } from '../src/app/display-context.ts'
 import { matchesIndicatorTab } from '../src/features/indicadores/filter.ts'
 import { detailTabContent } from '../src/features/indicadores/detail-tabs.ts'
@@ -168,6 +169,40 @@ test('keeps unstarted stages pending when a run is cancelled before processing',
     execution.etapas.map((stage) => stage.status),
     ['concluido', 'pendente', 'pendente', 'pendente'],
   )
+})
+
+test('keeps publication pending while cancellation is requested', () => {
+  const execution = normalizers.normalizeRunResponse({
+    jobId: 'job-3',
+    runId: 'run-3',
+    state: 'CANCEL_REQUESTED',
+    attempt: 1,
+    maxAttempts: 3,
+    municipalityIbge: '3541307',
+    indicatorPack: 'c1-mais-acesso',
+    ruleVersion: 'c1-mais-acesso@0.1.0',
+    referencePeriod: '2026-08',
+    sourceId: 'source-1',
+    extractionId: null,
+    createdAt: '2026-08-16T10:00:00Z',
+    startedAt: '2026-08-16T10:01:00Z',
+    finishedAt: null,
+    lastProgressAt: '2026-08-16T10:02:00Z',
+    failureCode: null,
+    failureDetail: null,
+    resultId: null,
+    attempts: [],
+  })
+
+  assert.deepEqual(
+    execution.etapas.map((stage) => stage.status),
+    ['concluido', 'em_execucao', 'pendente', 'pendente'],
+  )
+})
+
+test('configures the execution endpoint with a backend job ID', () => {
+  assert.equal(configuredJobId({ VITE_JOB_ID: '  job-1  ' }), 'job-1')
+  assert.equal(configuredJobId({ VITE_RUN_ID: 'run-1' }), undefined)
 })
 
 test('keeps a blocked result unavailable instead of turning it into zero', () => {

@@ -6,6 +6,7 @@ import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadore
 import { isolamentoFixture } from '../fixtures/isolamento'
 import { painelFixture } from '../fixtures/painel'
 import { relatoriosFixture } from '../fixtures/relatorios'
+import { configuredJobId } from '../run-config'
 import {
   indicatorResultsPath,
   normalizeIndicatorPacks,
@@ -105,16 +106,16 @@ export function useIndicadorDetalhe(codigo: string) {
 }
 
 export function useExecucaoAtual() {
-  const runId = import.meta.env.VITE_RUN_ID
+  const jobId = configuredJobId({ VITE_JOB_ID: import.meta.env.VITE_JOB_ID })
   return useQuery({
-    queryKey: ['execucao', runId],
+    queryKey: ['execucao', jobId],
     queryFn: USE_MOCKS
       ? () => resolveMock(execucaoFixture)
-      : runId
+      : jobId
         ? () =>
-            apiFetch<RunResponse>(`/runs/${encodeURIComponent(runId)}`).then(normalizeRunResponse)
+            apiFetch<RunResponse>(`/runs/${encodeURIComponent(jobId)}`).then(normalizeRunResponse)
         : () =>
-            Promise.reject(new Error('Configure VITE_RUN_ID para consultar uma execução real.')),
+            Promise.reject(new Error('Configure VITE_JOB_ID para consultar uma execução real.')),
   })
 }
 

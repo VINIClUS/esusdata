@@ -173,7 +173,9 @@ const stageForRunState: Record<RunResponse['state'], number> = {
   QUEUED: 1,
   RUNNING: 2,
   STAGED: 3,
-  CANCEL_REQUESTED: 4,
+  // The API does not preserve whether cancellation was requested in RUNNING or STAGED;
+  // keep publication pending until a terminal response proves that it happened.
+  CANCEL_REQUESTED: 2,
   CANCELLED: 4,
   SUCCEEDED: 4,
   FAILED: 4,
