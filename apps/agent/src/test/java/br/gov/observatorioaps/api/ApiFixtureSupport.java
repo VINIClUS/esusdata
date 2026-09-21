@@ -1,24 +1,24 @@
 package br.gov.observatorioaps.api;
 
-import br.gov.observatorioaps.extractionstore.ExtractFixtures;
-import br.gov.observatorioaps.extractionstore.ExtractionManifest;
-import br.gov.observatorioaps.identityaccess.Grant;
-import br.gov.observatorioaps.identityaccess.GrantRepository;
-import br.gov.observatorioaps.identityaccess.Role;
-import br.gov.observatorioaps.identityaccess.ScopeKind;
-import br.gov.observatorioaps.identityaccess.SessionService;
-import br.gov.observatorioaps.identityaccess.UserAccount;
-import br.gov.observatorioaps.identityaccess.UserRepository;
-import br.gov.observatorioaps.identityaccess.UserState;
-import br.gov.observatorioaps.indicatorengine.IndicatorResult;
-import br.gov.observatorioaps.resultstore.EvidenceEntry;
-import br.gov.observatorioaps.resultstore.ExtractionManifestRepository;
-import br.gov.observatorioaps.resultstore.PublicationOutcome;
-import br.gov.observatorioaps.resultstore.PublicationRequest;
-import br.gov.observatorioaps.resultstore.PublicationService;
-import br.gov.observatorioaps.resultstore.ResultStagingArea;
-import br.gov.observatorioaps.resultstore.SourceRecord;
-import br.gov.observatorioaps.resultstore.SourceRepository;
+import br.gov.observatorioaps.extractionstore.infrastructure.file.ExtractFixtures;
+import br.gov.observatorioaps.extractionstore.domain.ExtractionManifest;
+import br.gov.observatorioaps.identityaccess.domain.Grant;
+import br.gov.observatorioaps.identityaccess.domain.GrantRepository;
+import br.gov.observatorioaps.identityaccess.domain.Role;
+import br.gov.observatorioaps.identityaccess.domain.ScopeKind;
+import br.gov.observatorioaps.identityaccess.application.SessionService;
+import br.gov.observatorioaps.identityaccess.domain.UserAccount;
+import br.gov.observatorioaps.identityaccess.domain.UserRepository;
+import br.gov.observatorioaps.identityaccess.domain.UserState;
+import br.gov.observatorioaps.indicatorengine.domain.IndicatorResult;
+import br.gov.observatorioaps.resultstore.domain.EvidenceEntry;
+import br.gov.observatorioaps.resultstore.domain.ExtractionManifestRepository;
+import br.gov.observatorioaps.resultstore.domain.PublicationOutcome;
+import br.gov.observatorioaps.resultstore.domain.PublicationRequest;
+import br.gov.observatorioaps.resultstore.application.PublicationService;
+import br.gov.observatorioaps.resultstore.domain.ResultStagingArea;
+import br.gov.observatorioaps.sourceconnector.domain.SourceRecord;
+import br.gov.observatorioaps.sourceconnector.domain.SourceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -31,6 +31,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import br.gov.observatorioaps.api.auth.AuthRoundTripTest;
+import br.gov.observatorioaps.api.security.ApiAuthorization;
+import br.gov.observatorioaps.api.security.CsrfAndOriginTest;
+import br.gov.observatorioaps.api.security.SessionCookie;
 
 /**
  * Shared plumbing for HTTP-level API tests: real users/grants/sessions and a real
@@ -39,48 +43,48 @@ import java.util.UUID;
  * SessionService#create} rather than a real login, since these tests are about authorization, not
  * about the login flow itself (already covered by {@code AuthRoundTripTest}).
  */
-abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
+public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
 
     @Autowired
-    UserRepository userRepository;
+    public UserRepository userRepository;
     @Autowired
-    GrantRepository grantRepository;
+    public GrantRepository grantRepository;
     @Autowired
-    SessionService sessionService;
+    public SessionService sessionService;
     @Autowired
-    SourceRepository sourceRepository;
+    public SourceRepository sourceRepository;
     @Autowired
-    ExtractionManifestRepository extractionManifestRepository;
+    public ExtractionManifestRepository extractionManifestRepository;
     @Autowired
-    ResultStagingArea resultStagingArea;
+    public ResultStagingArea resultStagingArea;
     @Autowired
-    PublicationService publicationService;
+    public PublicationService publicationService;
     @Autowired
-    JdbcTemplate jdbc;
+    public JdbcTemplate jdbc;
     @Autowired
-    Clock clock;
+    public Clock clock;
     @Autowired
-    ApiAuthorization authorization;
+    public ApiAuthorization authorization;
 
-    String createUser(String userId) {
+    public String createUser(String userId) {
         userRepository.insert(new UserAccount(
                 userId, userId, userId, "UNSET", "ARGON2ID", "{}", "v1", 1, UserState.ACTIVE,
                 clock.instant(), "test-fixture", null));
         return userId;
     }
 
-    void grantMunicipality(String userId, Role role, String municipalityIbge) {
+    public void grantMunicipality(String userId, Role role, String municipalityIbge) {
         grantTeam(userId, role, municipalityIbge, null, null);
     }
 
-    void grantTeam(String userId, Role role, String municipalityIbge, String cnes, String ine) {
+    public void grantTeam(String userId, Role role, String municipalityIbge, String cnes, String ine) {
         grantRepository.insert(new Grant(
                 "grant-" + UUID.randomUUID(), userId, role, ScopeKind.MUNICIPALITY,
                 municipalityIbge, cnes, ine, clock.instant(), "test-fixture", null, null));
     }
 
     /** §1.4.2 L140: INSTALLATION scope, for the purely-technical permissions only (ADR 0007). */
-    void grantInstallation(String userId, Role role) {
+    public void grantInstallation(String userId, Role role) {
         grantRepository.insert(new Grant(
                 "grant-" + UUID.randomUUID(), userId, role, ScopeKind.INSTALLATION,
                 null, null, null, clock.instant(), "test-fixture", null, null));
@@ -92,7 +96,7 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
      *     minted with a stale version would fail authentication after any grant/revoke/block
      *     mutation bumps it, which would look like an authorization bug rather than a fixture one.
      */
-    String sessionCookie(String userId) {
+    public String sessionCookie(String userId) {
         return SessionCookie.NAME + "=" + rawSessionToken(userId);
     }
 
@@ -101,7 +105,7 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
      *     tests that need to look up the underlying {@code sessions} row directly, via {@link
      *     #sha256Hex}.
      */
-    String rawSessionToken(String userId) {
+    public String rawSessionToken(String userId) {
         long authorizationVersion = userRepository.findById(userId).orElseThrow().authorizationVersion();
         return sessionService.create(userId, authorizationVersion, clock.instant());
     }
@@ -111,7 +115,7 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
      * tests where §1.12.7 L539's five-minute reauth gate must already be satisfied so the test
      * exercises the mutation itself, not the gate.
      */
-    String reauthenticatedSessionCookie(String userId) {
+    public String reauthenticatedSessionCookie(String userId) {
         long authorizationVersion = userRepository.findById(userId).orElseThrow().authorizationVersion();
         Instant now = clock.instant();
         String rawToken = sessionService.create(userId, authorizationVersion, now);
@@ -119,7 +123,7 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
         return SessionCookie.NAME + "=" + rawToken;
     }
 
-    String sha256Hex(String rawToken) {
+    public String sha256Hex(String rawToken) {
         try {
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
             return java.util.HexFormat.of().formatHex(
@@ -129,14 +133,14 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
         }
     }
 
-    void registerSource(String sourceId, String municipalityIbge) {
+    public void registerSource(String sourceId, String municipalityIbge) {
         sourceRepository.upsert(new SourceRecord(
                 sourceId, 1, "PEC_POSTGRESQL", "PRONTUARIO", "PRIMARY",
                 "127.0.0.1", 5432, "esus", "esus_leitura", "PEC_DB_PASSWORD",
                 municipalityIbge, "5.4.37", "PEC_DW", Instant.EPOCH.toString()));
     }
 
-    ExtractionManifest registerExtract(
+    public ExtractionManifest registerExtract(
             String extractionId, String sourceId, String municipalityIbge, String referencePeriod,
             int programado, int espontaneo, int unmapped) throws IOException {
         ExtractionManifest manifest = ExtractFixtures.write(
@@ -153,7 +157,7 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
      * {@code municipalityIbge} (a MANAGER grant) or publication is genuinely refused, exactly as
      * it would be in production.
      */
-    String publishResult(
+    public String publishResult(
             String publisherUserId, String municipalityIbge, String referencePeriod,
             IndicatorResult result, List<EvidenceEntry> evidence) throws Exception {
         String sourceId = "src-" + UUID.randomUUID();
@@ -172,7 +176,7 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 result.ruleVersion(), referencePeriod, "proc-test", clock.instant().toString(), sourceId);
 
         String stagingId = "stg-" + UUID.randomUUID();
-        resultStagingArea.open(new br.gov.observatorioaps.resultstore.StagingRequest(
+        resultStagingArea.open(new br.gov.observatorioaps.resultstore.domain.StagingRequest(
                 stagingId, jobId, 1, "proc-test", clock.instant(), "c1-mais-acesso", result,
                 manifest.extractionId(), manifest.adapterVersion(), "SOURCE_EVENT",
                 "sha256:" + "0".repeat(64)));
@@ -193,17 +197,17 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
      * {@code XSRF-TOKEN}/{@code X-XSRF-TOKEN} pair fetched from the running app itself, exactly as
      * {@code CsrfAndOriginTest} proves the filter chain requires.
      */
-    HttpResponse<String> authenticatedPost(String sessionCookie, URI uri, String jsonBody) throws Exception {
+    public HttpResponse<String> authenticatedPost(String sessionCookie, URI uri, String jsonBody) throws Exception {
         return authenticatedRequest(sessionCookie, uri, "POST", jsonBody, null);
     }
 
-    HttpResponse<String> authenticatedPostWithIdempotency(
+    public HttpResponse<String> authenticatedPostWithIdempotency(
             String sessionCookie, String idempotencyKey, String jsonBody) throws Exception {
         return authenticatedRequest(sessionCookie, URI.create(BASE_URL + "/api/v1/runs"), "POST",
                 jsonBody, idempotencyKey);
     }
 
-    HttpResponse<String> authenticatedDelete(String sessionCookie, URI uri) throws Exception {
+    public HttpResponse<String> authenticatedDelete(String sessionCookie, URI uri) throws Exception {
         return authenticatedRequest(sessionCookie, uri, "DELETE", null, null);
     }
 

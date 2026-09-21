@@ -1,6 +1,6 @@
 package br.gov.observatorioaps.api;
 
-import br.gov.observatorioaps.identityaccess.Role;
+import br.gov.observatorioaps.identityaccess.domain.Role;
 import br.gov.observatorioaps.indicatorpacks.c1.C1Rule;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.annotation.DirtiesContext;
@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code failureCode}, never collapsed into a generic error and never a fabricated success.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class ErrorTaxonomyTest extends ApiFixtureSupport {
+public class ErrorTaxonomyTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 

@@ -1,7 +1,7 @@
 package br.gov.observatorioaps;
 
-import br.gov.observatorioaps.jobrunner.JobRecovery;
-import br.gov.observatorioaps.jobrunner.JobWorker;
+import br.gov.observatorioaps.jobrunner.application.JobRecovery;
+import br.gov.observatorioaps.jobrunner.application.JobWorker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
