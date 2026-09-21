@@ -44,10 +44,11 @@ import java.util.concurrent.TimeUnit;
  * PecCompatibilityMatrix}, cancellation forwarding, and translating the child's outcome back into
  * the same unchecked types {@code FailureClassifier} already knows how to classify.
  *
- * <p>The child is trusted to run the frozen query and compute the same compatibility fingerprints
- * a {@code CompatibilityCatalog} would (ENG-43) — this class only ever compares what the child
- * reports against the packaged matrix, never re-derives it locally. A wrong fingerprint fails
- * closed (the comparison mismatches and acquisition is refused), never silently.
+ * <p>The child only ever reports the raw data it measured (column metadata, probe rows) — never a
+ * fingerprint string. This class derives the ENG-43 fingerprint itself via {@link
+ * CompatibilityFingerprint#compute} and compares it against the packaged matrix, so the signature
+ * algorithm exists in exactly one language (plan §2.2). A wrong fingerprint fails closed (the
+ * comparison mismatches and acquisition is refused), never silently.
  *
  * <p>{@link AcquisitionListener#onProgress()} fires only when the child sends its own {@code
  * progress} message, unlike {@code JdbcAcquisitionAdapter} which fires it at two fixed points
