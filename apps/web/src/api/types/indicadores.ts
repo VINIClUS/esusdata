@@ -1,6 +1,7 @@
 import type { StatusKey } from './common'
 
-export type CategoriaIndicador = 'Previne Brasil' | 'C1 – C7' | 'Vínculo / Acompanhamento' | 'IGM (Municipal)'
+export type CategoriaIndicador =
+  'Previne Brasil' | 'C1 – C7' | 'Vínculo / Acompanhamento' | 'IGM (Municipal)'
 
 export interface IndicadorResumo {
   codigo: string
@@ -21,6 +22,16 @@ export interface IndicadoresLista {
   categorias: CategoriaContagem[]
   itens: IndicadorResumo[]
   total: number
+}
+
+export interface IndicatorPack {
+  id: string
+  ruleVersion: string
+  family: string
+  unit: string
+  dependsOn: string[]
+  executionEnabled: boolean
+  blockedGates: string[]
 }
 
 export interface EvidenciaMotivo {
@@ -56,7 +67,12 @@ export interface IndicadorDetalhe {
   pendencias: { valor: number; percentual: number }
   evolucao: { mes: string; valor: number }[]
   meta: number
-  distribuicao: { label: string; valor: number; percentual: number; tom: 'success' | 'warning' | 'error' }[]
+  distribuicao: {
+    label: string
+    valor: number
+    percentual: number
+    tom: 'success' | 'warning' | 'error'
+  }[]
   metodologia: MetodologiaItem[]
   evidencias: EvidenciaMotivo[]
   infoAdicionais: InfoAdicional[]

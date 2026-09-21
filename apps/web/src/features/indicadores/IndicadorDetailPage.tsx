@@ -6,7 +6,22 @@ import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
-import { ArrowLeft, Building, Calendar, ChartColumn, Database, ExternalLink, FileText, Info, RefreshCw, Sigma, Target, User, Users, type LucideIcon } from 'lucide-react'
+import {
+  ArrowLeft,
+  Building,
+  Calendar,
+  ChartColumn,
+  Database,
+  ExternalLink,
+  FileText,
+  Info,
+  RefreshCw,
+  Sigma,
+  Target,
+  User,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useIndicadorDetalhe } from '@/api/hooks'
 import type { EvidenciaMotivo, InfoAdicional, MetodologiaItem } from '@/api/types'
@@ -25,8 +40,21 @@ import { UnderlineTabs } from '@/components/ui/Tabs'
 import { formatInt, formatPercent } from '@/lib/format'
 import { colors } from '@/theme/tokens'
 
-const metodologiaIcons: Record<MetodologiaItem['icone'], LucideIcon> = { target: Target, sigma: Sigma, users: Users, database: Database, file: FileText }
-const infoIcons: Record<InfoAdicional['icone'], LucideIcon> = { calendar: Calendar, building: Building, refresh: RefreshCw, users: Users, user: User, file: FileText }
+const metodologiaIcons: Record<MetodologiaItem['icone'], LucideIcon> = {
+  target: Target,
+  sigma: Sigma,
+  users: Users,
+  database: Database,
+  file: FileText,
+}
+const infoIcons: Record<InfoAdicional['icone'], LucideIcon> = {
+  calendar: Calendar,
+  building: Building,
+  refresh: RefreshCw,
+  users: Users,
+  user: User,
+  file: FileText,
+}
 const tom = { success: colors.success, warning: colors.warning, error: colors.error }
 
 const desktopTabs = [
@@ -43,26 +71,73 @@ const phoneTabs = [
 ]
 
 const evidenciaColumns: Column<EvidenciaMotivo>[] = [
-  { key: 'motivo', header: 'Motivo', render: (r) => <Typography sx={{ fontSize: 13, color: colors.navy }}>{r.motivo}</Typography> },
-  { key: 'qtd', header: 'Quantidade', align: 'center', render: (r) => <Typography sx={{ fontSize: 13, fontWeight: 700, color: colors.error }}>{r.quantidade}</Typography> },
-  { key: 'pct', header: 'Percentual', align: 'center', render: (r) => <Typography sx={{ fontSize: 13, color: colors.navy }}>{formatPercent(r.percentual)}</Typography> },
+  {
+    key: 'motivo',
+    header: 'Motivo',
+    render: (r) => <Typography sx={{ fontSize: 13, color: colors.navy }}>{r.motivo}</Typography>,
+  },
+  {
+    key: 'qtd',
+    header: 'Quantidade',
+    align: 'center',
+    render: (r) => (
+      <Typography sx={{ fontSize: 13, fontWeight: 700, color: colors.error }}>
+        {r.quantidade}
+      </Typography>
+    ),
+  },
+  {
+    key: 'pct',
+    header: 'Percentual',
+    align: 'center',
+    render: (r) => (
+      <Typography sx={{ fontSize: 13, color: colors.navy }}>
+        {formatPercent(r.percentual)}
+      </Typography>
+    ),
+  },
   {
     key: 'acao',
     header: 'Ação sugerida',
     render: (r) => (
-      <Box component="span" sx={{ display: 'inline-block', px: 1.5, py: 0.5, borderRadius: '8px', bgcolor: colors.primarySoft, color: colors.primary, fontSize: 12, fontWeight: 500 }}>
+      <Box
+        component="span"
+        sx={{
+          display: 'inline-block',
+          px: 1.5,
+          py: 0.5,
+          borderRadius: '8px',
+          bgcolor: colors.primarySoft,
+          color: colors.primary,
+          fontSize: 12,
+          fontWeight: 500,
+        }}
+      >
         {r.acao}
       </Box>
     ),
   },
 ]
 
-function MetaChip({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+function MetaChip({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon
+  label: string
+  value: string
+}) {
   return (
-    <Paper sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.75, py: 1, borderRadius: '10px' }}>
+    <Paper
+      sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.75, py: 1, borderRadius: '10px' }}
+    >
       <Icon size={18} color={colors.primary} />
       <Typography sx={{ fontSize: 13.5, color: colors.navy }}>
-        <strong>{label}:</strong> <Box component="span" sx={{ color: colors.primary }}>{value}</Box>
+        <strong>{label}:</strong>{' '}
+        <Box component="span" sx={{ color: colors.primary }}>
+          {value}
+        </Box>
       </Typography>
     </Paper>
   )
@@ -70,13 +145,37 @@ function MetaChip({ icon: Icon, label, value }: { icon: LucideIcon; label: strin
 
 export function IndicadorDetailPage() {
   const { codigo = 'PB-01' } = useParams()
-  const { data, isPending } = useIndicadorDetalhe(codigo)
+  const { data, isError, isPending } = useIndicadorDetalhe(codigo)
   const theme = useTheme()
   const phone = useMediaQuery(theme.breakpoints.down('md'))
   const navigate = useNavigate()
   const [tab, setTab] = useState('resultados')
 
-  if (isPending || !data) return <PageSkeleton title={codigo} />
+  if (isPending) return <PageSkeleton title={codigo} />
+
+  if (isError || !data) {
+    return (
+      <>
+        <PageHeader
+          title={codigo}
+          subtitle="Os detalhes deste indicador ainda não estão disponíveis."
+        />
+        <SectionCard title="Detalhes indisponíveis">
+          <Typography sx={{ color: colors.textSecondary }}>
+            Volte à lista de indicadores para escolher outro item.
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<ArrowLeft size={18} />}
+            sx={{ mt: 2 }}
+            onClick={() => navigate('/indicadores')}
+          >
+            Voltar aos indicadores
+          </Button>
+        </SectionCard>
+      </>
+    )
+  }
 
   const infoIcon = <Info size={18} color={colors.primary} />
 
@@ -84,7 +183,20 @@ export function IndicadorDetailPage() {
     <>
       <PageHeader
         above={
-          <Box component={Link} to="/indicadores" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, color: colors.primary, fontSize: 14, fontWeight: 500, textDecoration: 'none', mb: 1.5 }}>
+          <Box
+            component={Link}
+            to="/indicadores"
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.75,
+              color: colors.primary,
+              fontSize: 14,
+              fontWeight: 500,
+              textDecoration: 'none',
+              mb: 1.5,
+            }}
+          >
             <ArrowLeft size={18} /> Voltar aos indicadores
           </Box>
         }
@@ -93,7 +205,13 @@ export function IndicadorDetailPage() {
         subtitle={data.descricao}
         actions={
           !phone && (
-            <Button variant="contained" size="large" startIcon={<RefreshCw size={20} />} sx={{ minHeight: 52, px: 3, fontSize: 16 }} onClick={() => navigate('/execucao')}>
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<RefreshCw size={20} />}
+              sx={{ minHeight: 52, px: 3, fontSize: 16 }}
+              onClick={() => navigate('/execucao')}
+            >
               Executar novamente
             </Button>
           )
@@ -108,7 +226,12 @@ export function IndicadorDetailPage() {
         </Box>
       )}
 
-      <UnderlineTabs items={phone ? phoneTabs : desktopTabs} value={tab} onChange={setTab} sx={{ mb: 2 }} />
+      <UnderlineTabs
+        items={phone ? phoneTabs : desktopTabs}
+        value={tab}
+        onChange={setTab}
+        sx={{ mb: 2 }}
+      />
 
       <Grid container spacing={1.75}>
         <Grid size={{ xs: 6, md: 3 }}>
@@ -123,10 +246,24 @@ export function IndicadorDetailPage() {
           />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
-          <KpiCard label="Numerador" infoIcon value={formatInt(data.numerador.valor)} valueColor={colors.success} caption={data.numerador.label} compact={phone} />
+          <KpiCard
+            label="Numerador"
+            infoIcon
+            value={formatInt(data.numerador.valor)}
+            valueColor={colors.success}
+            caption={data.numerador.label}
+            compact={phone}
+          />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
-          <KpiCard label="Denominador" infoIcon value={formatInt(data.denominador.valor)} valueColor={colors.success} caption={data.denominador.label} compact={phone} />
+          <KpiCard
+            label="Denominador"
+            infoIcon
+            value={formatInt(data.denominador.valor)}
+            valueColor={colors.success}
+            caption={data.denominador.label}
+            compact={phone}
+          />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
           <KpiCard
@@ -134,7 +271,11 @@ export function IndicadorDetailPage() {
             infoIcon
             value={formatInt(data.pendencias.valor)}
             valueColor={colors.error}
-            caption={<Box component="span" sx={{ color: colors.error, fontSize: 16, fontWeight: 500 }}>({formatPercent(data.pendencias.percentual)})</Box>}
+            caption={
+              <Box component="span" sx={{ color: colors.error, fontSize: 16, fontWeight: 500 }}>
+                ({formatPercent(data.pendencias.percentual)})
+              </Box>
+            }
             compact={phone}
           />
         </Grid>
@@ -144,7 +285,13 @@ export function IndicadorDetailPage() {
             <Grid size={{ xs: 12, md: 7.2 }}>
               <SectionCard
                 title="Evolução temporal"
-                action={<FilterSelect value={phone ? 'Últimos 8 meses' : 'Últimos 12 meses'} options={['Últimos 12 meses', 'Últimos 8 meses']} size="sm" />}
+                action={
+                  <FilterSelect
+                    value={phone ? 'Últimos 8 meses' : 'Últimos 12 meses'}
+                    options={['Últimos 12 meses', 'Últimos 8 meses']}
+                    size="sm"
+                  />
+                }
                 sx={{ height: '100%' }}
               >
                 <LineChartCard
@@ -165,7 +312,11 @@ export function IndicadorDetailPage() {
                     <DonutChart
                       size={150}
                       thickness={22}
-                      data={data.distribuicao.map((d) => ({ name: d.label, value: d.valor, color: tom[d.tom] }))}
+                      data={data.distribuicao.map((d) => ({
+                        name: d.label,
+                        value: d.valor,
+                        color: tom[d.tom],
+                      }))}
                       centerValue={formatInt(data.denominador.valor)}
                       centerLabel={
                         <>
@@ -177,12 +328,31 @@ export function IndicadorDetailPage() {
                     />
                     <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                       {data.distribuicao.map((d) => (
-                        <Box key={d.label} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                          <Box sx={{ width: 18, height: 18, borderRadius: '50%', bgcolor: tom[d.tom], color: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700 }}>✓</Box>
+                        <Box
+                          key={d.label}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}
+                        >
+                          <Box
+                            sx={{
+                              width: 18,
+                              height: 18,
+                              borderRadius: '50%',
+                              bgcolor: tom[d.tom],
+                              color: '#fff',
+                              display: 'grid',
+                              placeItems: 'center',
+                              fontSize: 11,
+                              fontWeight: 700,
+                            }}
+                          >
+                            ✓
+                          </Box>
                           <Typography sx={{ flex: 1, fontSize: 12.5, color: colors.navy }}>
                             {d.label} ({formatPercent(d.percentual)})
                           </Typography>
-                          <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: colors.navy }}>{d.valor}</Typography>
+                          <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: colors.navy }}>
+                            {d.valor}
+                          </Typography>
                         </Box>
                       ))}
                     </Box>
@@ -198,7 +368,13 @@ export function IndicadorDetailPage() {
                     }
                     action={<LinkButton>Ver todas</LinkButton>}
                   >
-                    <DataTable columns={evidenciaColumns} rows={data.evidencias} getRowKey={(r) => r.motivo} dense sx={{ '& td': { py: 0.6 }, '& th': { py: 0.9 } }} />
+                    <DataTable
+                      columns={evidenciaColumns}
+                      rows={data.evidencias}
+                      getRowKey={(r) => r.motivo}
+                      dense
+                      sx={{ '& td': { py: 0.6 }, '& th': { py: 0.9 } }}
+                    />
                   </SectionCard>
                 </Grid>
               </>
@@ -210,12 +386,34 @@ export function IndicadorDetailPage() {
           <Grid size={{ xs: 12, lg: 3.6 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
               <SectionCard title="Metodologia (resumo)" action={infoIcon}>
-                <Box sx={{ bgcolor: colors.primarySoft, borderRadius: '12px', p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.1 }}>
+                <Box
+                  sx={{
+                    bgcolor: colors.primarySoft,
+                    borderRadius: '12px',
+                    p: 1.5,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1.1,
+                  }}
+                >
                   {data.metodologia.map((m) => {
                     const Icon = metodologiaIcons[m.icone]
-                    return <IconRow key={m.titulo} icon={<Icon size={15} strokeWidth={2.4} />} title={m.titulo} text={m.texto} size="sm" />
+                    return (
+                      <IconRow
+                        key={m.titulo}
+                        icon={<Icon size={15} strokeWidth={2.4} />}
+                        title={m.titulo}
+                        text={m.texto}
+                        size="sm"
+                      />
+                    )
                   })}
-                  <Button variant="outlined" fullWidth startIcon={<ExternalLink size={16} />} sx={{ mt: 0.25, fontSize: 13, minHeight: 36 }}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    startIcon={<ExternalLink size={16} />}
+                    sx={{ mt: 0.25, fontSize: 13, minHeight: 36 }}
+                  >
                     Ver metodologia completa
                   </Button>
                 </Box>
@@ -227,10 +425,27 @@ export function IndicadorDetailPage() {
                     const Icon = infoIcons[i.icone]
                     return (
                       <Box key={i.label} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                        <Icon size={16} color={colors.primary} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <Icon
+                          size={16}
+                          color={colors.primary}
+                          style={{ flexShrink: 0, marginTop: 2 }}
+                        />
                         <Box sx={{ minWidth: 0 }}>
-                          <Typography sx={{ fontSize: 11.5, color: colors.textSecondary, lineHeight: 1.3 }}>{i.label}</Typography>
-                          <Typography sx={{ fontSize: 12, fontWeight: 600, color: colors.navy, lineHeight: 1.3 }}>{i.valor}</Typography>
+                          <Typography
+                            sx={{ fontSize: 11.5, color: colors.textSecondary, lineHeight: 1.3 }}
+                          >
+                            {i.label}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: colors.navy,
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {i.valor}
+                          </Typography>
                         </Box>
                       </Box>
                     )

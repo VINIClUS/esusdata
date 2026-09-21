@@ -9,6 +9,7 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "oxlint",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" scripts",
+    "test:data": "node --experimental-strip-types --test scripts/data-contracts.test.mjs",
     "preview": "vite preview",
     "screenshot": "node scripts/screenshot.mjs"
   },
