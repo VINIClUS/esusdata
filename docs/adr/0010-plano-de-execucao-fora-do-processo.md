@@ -41,16 +41,21 @@ proposta futura que precise de fato desses mecanismos.
 ## Decisão
 Introduzir um plano de execução em Rust (`apps/execplane/`, binário `observatorio-execplane`), responsável
 **apenas** pela aquisição viva no PEC: abrir a conexão, provar a matriz de compatibilidade
-(ENG-43) na própria transação read-only repeatable-read, rodar a query congelada e escrever o
-extrato local. Java continua sendo o control plane inteiro: fila, gerações, retry, recuperação,
-staging e publicação.
+(ENG-43) na própria transação read-only repeatable-read, rodar a query congelada e transmitir cada
+registro canônico de volta ao Java. O filho nunca escreve o extrato em disco — quem grava é o
+mesmo `ExtractWriter` que o caminho JDBC já usa, com uma única implementação do formato de
+arquivo (lock de escrita, orçamento de bytes, publicação atômica por hard link). Java continua
+sendo o control plane inteiro: fila, gerações, retry, recuperação, staging e publicação.
 
 Por job reivindicado, `SubprocessAcquisitionAdapter`
 (`sourceconnector.infrastructure.process`) — segunda implementação de
 `sourceconnector.domain.AcquisitionPort`, ao lado de `JdbcAcquisitionAdapter` — faz spawn do
 binário e conversa por NDJSON em stdin/stdout; stderr é log, drenado para o SLF4J. O filho nunca
-abre o SQLite nem o arquivo de lock (`platform/lock/`), que continuam exclusivos da JVM — é isso
-que torna "IPC/stdio apenas" verificável, não só declarado.
+abre o SQLite nem o arquivo de lock (`platform/lock/`), nem o `.extract.lock` do extrato — todos
+exclusivos da JVM. O filho sinaliza sucesso fechando seu stdout e saindo com código `0` depois do
+último registro; não existe mensagem terminal de manifesto, porque todo campo do manifesto além
+das contagens de linha já é conhecido do lado Java, e essas contagens vêm do próprio
+`ExtractWriter` à medida que grava o que o filho envia.
 
 **O que sobrevive sem mudança de semântica:**
 - O invariante de "um worker de cálculo ativo por instalação" (§1.9.4 L346): um filho reivindicado
@@ -58,9 +63,10 @@ que torna "IPC/stdio apenas" verificável, não só declarado.
 - Nenhum broker, lease renovável, heartbeat de posse, fencing distribuído ou eleição de líder é
   introduzido. A reivindicação continua sendo o CAS de `acquireNext` com `process_instance_id` +
   `executionGeneration`; a recuperação continua só no boot, via `JobRecovery`.
-- ENG-51 (fechar o cliente não prova término remoto) não muda: se o filho sai sem
-  `{"type":"manifest"}` nem `{"type":"error","uncertain":false}`, o resultado é tratado como
-  incerto e a fonte entra em cooldown, exatamente como uma falha de conexão JDBC hoje.
+- ENG-51 (fechar o cliente não prova término remoto) não muda: só uma saída com código `0` conta
+  como sucesso; se o filho sai com qualquer outro código sem antes enviar
+  `{"type":"error","uncertain":false}`, o resultado é tratado como incerto e a fonte entra em
+  cooldown, exatamente como uma falha de conexão JDBC hoje.
 - `jpackage` não ganha um segundo serviço do SO. O binário do plano de execução vai dentro da app
   image, chamado como subprocesso efêmero — nunca um wrapper concorrente (§1.12.5 L491: "nunca
   dois wrappers/serviços simultâneos").
@@ -91,3 +97,9 @@ que torna "IPC/stdio apenas" verificável, não só declarado.
 - `SourceAcquisitionLimiter` ("uma extração por fonte", §1.9.2), que hoje é implícito ao ciclo de
   vida da conexão JDBC, passa a ser explicitamente adquirido pelo adaptador em torno de todo o
   ciclo de vida do processo filho.
+- Divisão do orçamento (§1.9.2) entre as duas metades: `max_rows`, `max_payload_bytes` e os
+  timeouts de sessão/consulta são do filho, que é quem lê linha a linha do PostgreSQL — por isso
+  o envelope de aquisição carrega o `ReadBudget` inteiro (plano §2.4). `max_temp_file_bytes` é do
+  lado Java, que é quem escreve o arquivo local via `ExtractWriter`, com o mesmo
+  `BoundedOutputStream` que o caminho JDBC já usa. Nenhum dos dois lados reimplementa o controle
+  que já é do outro.

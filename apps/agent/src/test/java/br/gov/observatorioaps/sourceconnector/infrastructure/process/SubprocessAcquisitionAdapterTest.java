@@ -1,6 +1,9 @@
 package br.gov.observatorioaps.sourceconnector.infrastructure.process;
 
+import br.gov.observatorioaps.extractionstore.domain.CanonicalEncounter;
+import br.gov.observatorioaps.extractionstore.domain.CanonicalModality;
 import br.gov.observatorioaps.extractionstore.domain.ExtractionManifest;
+import br.gov.observatorioaps.extractionstore.infrastructure.file.ExtractReader;
 import br.gov.observatorioaps.jobrunner.domain.CancellationToken;
 import br.gov.observatorioaps.jobrunner.domain.JobCancelledException;
 import br.gov.observatorioaps.pecadapter.domain.ColumnMetadata;
@@ -17,7 +20,11 @@ import br.gov.observatorioaps.sourceconnector.domain.PecConnectionProperties;
 import br.gov.observatorioaps.sourceconnector.domain.PecSourceIdentity;
 import br.gov.observatorioaps.sourceconnector.domain.ReadBudget;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
@@ -28,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 /**
  * Exercises {@link SubprocessAcquisitionAdapter}'s NDJSON protocol against a real spawned JVM
  * subprocess ({@link StubExecutionPlaneMain}) standing in for the Rust execution plane — process
@@ -65,6 +73,9 @@ class SubprocessAcquisitionAdapterTest {
     private static final AllowedDestinations ALLOWED = new AllowedDestinations(
             java.util.Set.of(new AllowedDestinations.HostPort("127.0.0.1", 5432)));
 
+    @TempDir
+    Path extractsDir;
+
     private SubprocessAcquisitionAdapter adapter(String scenario) {
         return adapter(scenario, ALLOWED);
     }
@@ -93,7 +104,7 @@ class SubprocessAcquisitionAdapterTest {
                 """.formatted(QUERY_CHECKSUM, TEST_OBJECT_FINGERPRINT));
         return new SubprocessAcquisitionAdapter(
                 command, secretRef -> "fixture-password".toCharArray(), allowedDestinations, matrix,
-                Duration.ofSeconds(5));
+                extractsDir, Clock.systemUTC(), Duration.ofSeconds(5));
     }
 
     private static String javaBinary() {
@@ -112,15 +123,45 @@ class SubprocessAcquisitionAdapterTest {
     }
 
     @Test
-    void happyPathReturnsManifestAndReportsProgress() {
+    void happyPathWritesRowsThroughExtractWriterAndReportsProgress() throws IOException {
         RecordingListener listener = new RecordingListener();
         ExtractionManifest manifest =
                 adapter("happy").acquire(command(), new CancellationToken(), listener);
 
+        // The manifest is produced by SubprocessAcquisitionAdapter driving the same ExtractWriter
+        // the JDBC path uses — rowCount/exclusionCount/checksum come from what was actually
+        // written, not from anything the (stub) child claimed.
         assertThat(manifest.extractionId()).isEqualTo("live-job-1-g1");
         assertThat(manifest.queryChecksum()).isEqualTo(QUERY_CHECKSUM);
+        assertThat(manifest.rowCount()).isEqualTo(2);
+        assertThat(manifest.exclusionCount()).isZero();
         assertThat(listener.progressCount.get()).isEqualTo(2);
         assertThat(listener.uncertainReasons).isEmpty();
+
+        // Reads the extract back through ExtractReader (checksum/completeness/row-count verified
+        // on the way in, per ENG-20) — proves the "row" wire message survived
+        // mapper.treeToValue(..., CanonicalEncounter.class) with its fields intact, not just that
+        // ExtractWriter's own self-consistent counters advanced.
+        ExtractReader reader = new ExtractReader();
+        List<CanonicalEncounter> encounters = reader.readEncounters(extractsDir, manifest);
+        assertThat(encounters).extracting(e -> e.sourceRef().recordId(), CanonicalEncounter::modality)
+                .containsExactlyInAnyOrder(
+                        tuple("1", CanonicalModality.PROGRAMADO),
+                        tuple("2", CanonicalModality.ESPONTANEO));
+    }
+
+    @Test
+    void outOfScopeRowIsRejectedAndExtractIsNeverPublished() {
+        RecordingListener listener = new RecordingListener();
+
+        // A child reporting a record outside the authorized municipality/period is exactly what
+        // ExtractWriter's own ExtractionScope check exists to catch (plan §2.6) — this is the
+        // property that justifies Java, not the child, owning the extract file.
+        assertThatThrownBy(() -> adapter("out-of-scope-row").acquire(command(), new CancellationToken(), listener))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bound acquisition scope");
+        assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).doesNotExist();
+        assertThat(listener.uncertainReasons).hasSize(1);
     }
 
     @Test

@@ -91,8 +91,13 @@ public final class ExtractWriter implements AutoCloseable {
                 .sourceConnection().readBudget().maxTempFileBytes(), scopeFor(acquisition));
     }
 
-    /** Opens a bounded temporary extract bound to the source and period authorized for it. */
-    ExtractWriter(
+    /**
+     * Opens a bounded temporary extract bound to the source and period authorized for it,
+     * independently of a live JDBC {@code PecSourceAcquisition} — the seam
+     * {@code SubprocessAcquisitionAdapter} uses, since the live connection lives in the child
+     * process, not this JVM.
+     */
+    public ExtractWriter(
             Path baseDir,
             String extractionId,
             long maxTempFileBytes,

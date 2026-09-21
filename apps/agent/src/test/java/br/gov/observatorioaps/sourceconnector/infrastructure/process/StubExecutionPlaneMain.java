@@ -56,9 +56,18 @@ public final class StubExecutionPlaneMain {
         switch (scenario) {
             case "happy" -> {
                 out.println("{\"type\":\"progress\"}");
+                out.println(rowMessage("1", "PROGRAMADO", "2026-03-05", "3541307"));
                 out.println("{\"type\":\"progress\"}");
-                out.println(manifestMessage());
+                out.println(rowMessage("2", "ESPONTANEO", "2026-03-10", "3541307"));
                 System.exit(0);
+            }
+            case "out-of-scope-row" -> {
+                // A real Rust child can only ever measure/stream what it sees; it has no
+                // authority over the acquisition scope. This proves ExtractWriter's own
+                // ExtractionScope check — not the child — is what a hostile or buggy child can't
+                // bypass (plan §2.6's rationale for keeping Java as the sole extract writer).
+                out.println(rowMessage("1", "PROGRAMADO", "2026-03-05", "9999999"));
+                System.exit(1);
             }
             case "crash-silent" -> {
                 // Exits non-zero without ever sending a manifest or an error message — the
@@ -85,23 +94,20 @@ public final class StubExecutionPlaneMain {
         }
     }
 
-    private static String manifestMessage() {
-        return "{\"type\":\"manifest\",\"manifest\":{"
-                + "\"extractionId\":\"live-job-1-g1\","
-                + "\"sourceId\":\"src-1\","
-                + "\"municipalityIbge\":\"3541307\","
-                + "\"periodStart\":\"2026-03-01\","
-                + "\"periodEndExclusive\":\"2026-04-01\","
-                + "\"startedAt\":\"2026-03-01T00:00:00Z\","
-                + "\"finishedAt\":\"2026-03-01T00:00:01Z\","
-                + "\"canonicalSchemaVersion\":\"1\","
-                + "\"completenessStatus\":\"COMPLETE\","
-                + "\"consistencyLevel\":\"SNAPSHOT\","
-                + "\"sourceZoneId\":\"America/Sao_Paulo\","
-                + "\"rowCount\":0,"
-                + "\"exclusionCount\":0,"
-                + "\"checksum\":\"sha256:" + "0".repeat(64) + "\","
-                + "\"queryChecksum\":\"" + QUERY_CHECKSUM + "\","
-                + "\"adapterVersion\":\"0.1.0\"}}";
+    /**
+     * A {@code row} message carrying one {@code CanonicalEncounter} — the shape
+     * {@code SubprocessAcquisitionAdapter} feeds straight into the same {@link
+     * br.gov.observatorioaps.extractionstore.infrastructure.file.ExtractWriter} the JDBC path
+     * uses. There is no terminal manifest message: the adapter finalizes the extract itself once
+     * the child closes its stdout and exits {@code 0}.
+     */
+    private static String rowMessage(String recordId, String modality, String careDate, String municipalityIbge) {
+        return "{\"type\":\"row\",\"encounter\":{"
+                + "\"sourceRef\":{\"sourceId\":\"src-1\",\"entityType\":\"tb_fat_atendimento_individual\","
+                + "\"recordId\":\"" + recordId + "\"},"
+                + "\"municipalityIbge\":\"" + municipalityIbge + "\","
+                + "\"careDate\":\"" + careDate + "\","
+                + "\"modality\":\"" + modality + "\","
+                + "\"cnes\":null,\"ine\":null,\"cbo\":null}}";
     }
 }

@@ -82,7 +82,8 @@ public class SourceConnectorConfig {
             return new JdbcAcquisitionAdapter(pecDataSourceFactory, properties.extractsDirectory(), clock);
         }
         return new SubprocessAcquisitionAdapter(
-                List.of(binary), pecSecretResolver, allowedDestinations, executionPlaneProperties.exitGrace());
+                List.of(binary), pecSecretResolver, allowedDestinations, properties.extractsDirectory(), clock,
+                executionPlaneProperties.exitGrace());
     }
 
     private static List<String> orEmpty(List<String> list) {
