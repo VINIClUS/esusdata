@@ -7,6 +7,7 @@ import type {
   IndicatorResultResponse,
   PainelResumo,
 } from './types'
+import type { ExecucaoAtual, RunResponse } from './types'
 
 type CategoryDefinition = {
   key: string
@@ -156,6 +157,116 @@ export function indicatorResultsPath({
 }): string {
   const params = new URLSearchParams({ municipalityIbge, indicatorPack, referencePeriod })
   return `/results?${params.toString()}`
+}
+
+const runStateLabels: Record<RunResponse['state'], string> = {
+  QUEUED: 'Execução na fila',
+  RUNNING: 'Execução em andamento',
+  STAGED: 'Resultado em preparação',
+  CANCEL_REQUESTED: 'Cancelamento solicitado',
+  CANCELLED: 'Execução cancelada',
+  SUCCEEDED: 'Execução concluída',
+  FAILED: 'Execução falhou',
+}
+
+const stageForRunState: Record<RunResponse['state'], number> = {
+  QUEUED: 1,
+  RUNNING: 2,
+  STAGED: 3,
+  CANCEL_REQUESTED: 4,
+  CANCELLED: 4,
+  SUCCEEDED: 4,
+  FAILED: 4,
+}
+
+const terminalRunStates = new Set<RunResponse['state']>(['CANCELLED', 'SUCCEEDED', 'FAILED'])
+
+function timeLabel(timestamp: string | null): string | null {
+  if (!timestamp) return null
+  return /^\d{4}-\d{2}-\d{2}T(\d{2}:\d{2})/.exec(timestamp)?.[1] ?? timestamp
+}
+
+function stageStatus(
+  stage: number,
+  response: RunResponse,
+): ExecucaoAtual['etapas'][number]['status'] {
+  if (response.state === 'SUCCEEDED') return 'concluido'
+  if (terminalRunStates.has(response.state)) {
+    const lastCompletedStage = response.resultId ? 3 : response.startedAt ? 2 : 1
+    return stage <= lastCompletedStage ? 'concluido' : 'pendente'
+  }
+  const currentStage = stageForRunState[response.state]
+  if (stage < currentStage) return 'concluido'
+  if (stage === currentStage) return 'em_execucao'
+  return 'pendente'
+}
+
+function runLog(response: RunResponse): ExecucaoAtual['log'] {
+  const lines: ExecucaoAtual['log'] = []
+  const add = (timestamp: string | null, texto: string, nivel: 'success' | 'info' = 'info') => {
+    lines.push({ hora: timeLabel(timestamp) ?? '—', nivel, texto })
+  }
+
+  add(response.createdAt, 'Execução registrada.')
+  if (response.startedAt) add(response.startedAt, 'Processamento iniciado.')
+  add(
+    response.lastProgressAt ?? response.startedAt ?? response.createdAt,
+    `Estado atual: ${runStateLabels[response.state]}.`,
+    response.state === 'SUCCEEDED' ? 'success' : 'info',
+  )
+  if (response.finishedAt) add(response.finishedAt, 'Execução finalizada.')
+  if (response.failureDetail)
+    add(response.finishedAt ?? response.lastProgressAt, response.failureDetail)
+  return lines
+}
+
+export function normalizeRunResponse(response: RunResponse): ExecucaoAtual {
+  const stages: Array<{ titulo: string; timestamp: string | null; descricao: string }> = [
+    {
+      titulo: 'Enfileiramento',
+      timestamp: response.createdAt,
+      descricao: 'A execução foi registrada e aguarda o processamento pelo worker.',
+    },
+    {
+      titulo: 'Processamento',
+      timestamp: response.startedAt,
+      descricao: 'O worker está processando a execução.',
+    },
+    {
+      titulo: 'Publicação',
+      timestamp: response.lastProgressAt,
+      descricao: response.resultId
+        ? `O resultado ${response.resultId} está disponível para consulta.`
+        : 'A API não fornece detalhes adicionais desta etapa.',
+    },
+    {
+      titulo: 'Finalização',
+      timestamp: response.finishedAt,
+      descricao: response.failureDetail ?? `${runStateLabels[response.state]}.`,
+    },
+  ]
+
+  return {
+    etapas: stages.map((stage, index) => ({
+      numero: index + 1,
+      titulo: stage.titulo,
+      status: stageStatus(index + 1, response),
+      hora: timeLabel(stage.timestamp),
+      descricao: stage.descricao,
+    })),
+    log: runLog(response),
+    progresso: { label: runStateLabels[response.state], processados: 0, total: null },
+    parametros: [
+      { icone: 'database', label: 'Fonte de dados', valor: response.sourceId ?? 'Não informada' },
+      { icone: 'calendar', label: 'Período de referência', valor: response.referencePeriod },
+      {
+        icone: 'clock',
+        label: 'Tentativa',
+        valor: `${response.attempt} de ${response.maxAttempts}`,
+      },
+      { icone: 'file', label: 'Indicador', valor: indicatorDisplayName(response.indicatorPack) },
+    ],
+  }
 }
 
 function numberFromApi(value: string | null): number | null {

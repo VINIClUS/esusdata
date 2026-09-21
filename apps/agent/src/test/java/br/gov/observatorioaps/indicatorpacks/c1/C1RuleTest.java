@@ -1,11 +1,11 @@
 package br.gov.observatorioaps.indicatorpacks.c1;
 
-import br.gov.observatorioaps.extractionstore.CanonicalEncounter;
-import br.gov.observatorioaps.extractionstore.CanonicalModality;
-import br.gov.observatorioaps.extractionstore.SourceRef;
-import br.gov.observatorioaps.indicatorengine.Classification;
-import br.gov.observatorioaps.indicatorengine.ExactRatio;
-import br.gov.observatorioaps.indicatorengine.IndicatorResult;
+import br.gov.observatorioaps.extractionstore.domain.CanonicalEncounter;
+import br.gov.observatorioaps.extractionstore.domain.CanonicalModality;
+import br.gov.observatorioaps.extractionstore.domain.SourceRef;
+import br.gov.observatorioaps.indicatorengine.domain.Classification;
+import br.gov.observatorioaps.indicatorengine.domain.ExactRatio;
+import br.gov.observatorioaps.indicatorengine.domain.IndicatorResult;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;

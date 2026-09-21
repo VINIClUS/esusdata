@@ -1,7 +1,6 @@
 package br.gov.observatorioaps.indicatorpacks;
 
 import br.gov.observatorioaps.indicatorpacks.c1.C1Rule;
-
 import java.util.List;
 import java.util.Optional;
 

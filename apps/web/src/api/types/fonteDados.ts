@@ -1,8 +1,8 @@
-export interface FonteConexao {
+export interface Fonte {
   tipo: string
   host: string
   porta: string
-  banco: string
+  nomeBanco: string
   usuario: string
   senha: string
   ultimoTeste: { ok: boolean; mensagem: string } | null

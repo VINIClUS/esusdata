@@ -1,6 +1,6 @@
 package br.gov.observatorioaps.api;
 
-import br.gov.observatorioaps.identityaccess.Role;
+import br.gov.observatorioaps.identityaccess.domain.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.annotation.DirtiesContext;
 
@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * plain 404, not a 501 announcing an unimplemented feature.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class UnimplementedRoutesTest extends ApiFixtureSupport {
+public class UnimplementedRoutesTest extends ApiFixtureSupport {
 
     @Test
     void unauthenticatedProbesGet401NotA404ThatWouldLeakRouteExistence() throws Exception {

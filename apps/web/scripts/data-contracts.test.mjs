@@ -8,6 +8,7 @@ import {
   normalizePainelResumo,
   indicatorResultsPath,
 } from '../src/api/normalizers.ts'
+import * as normalizers from '../src/api/normalizers.ts'
 import { realContextForScope } from '../src/app/display-context.ts'
 import { matchesIndicatorTab } from '../src/features/indicadores/filter.ts'
 import { detailTabContent } from '../src/features/indicadores/detail-tabs.ts'
@@ -97,6 +98,76 @@ test('builds the existing results query and adapts its response for the detail v
   assert.equal(detail.resultado.valor, 78.4)
   assert.equal(detail.numerador.valor, 312)
   assert.equal(detail.denominador.valor, 398)
+})
+
+test('normalizes a backend run response into the execution page model', () => {
+  assert.equal(typeof normalizers.normalizeRunResponse, 'function')
+
+  const execution = normalizers.normalizeRunResponse({
+    jobId: 'job-1',
+    runId: 'run-1',
+    state: 'RUNNING',
+    attempt: 1,
+    maxAttempts: 3,
+    municipalityIbge: '3541307',
+    indicatorPack: 'c1-mais-acesso',
+    ruleVersion: 'c1-mais-acesso@0.1.0',
+    referencePeriod: '2026-08',
+    sourceId: 'source-1',
+    extractionId: null,
+    createdAt: '2026-08-16T10:00:00Z',
+    startedAt: '2026-08-16T10:01:00Z',
+    finishedAt: null,
+    lastProgressAt: '2026-08-16T10:02:00Z',
+    failureCode: null,
+    failureDetail: null,
+    resultId: null,
+    attempts: [],
+  })
+
+  assert.equal(execution.progresso.total, null)
+  assert.equal(
+    execution.etapas.some((stage) => stage.status === 'em_execucao'),
+    true,
+  )
+  assert.equal(
+    execution.parametros.find((item) => item.label === 'Fonte de dados')?.valor,
+    'source-1',
+  )
+  assert.equal(
+    execution.parametros.find((item) => item.label === 'Período de referência')?.valor,
+    '2026-08',
+  )
+  assert.equal(execution.log.length > 0, true)
+})
+
+test('keeps unstarted stages pending when a run is cancelled before processing', () => {
+  const execution = normalizers.normalizeRunResponse({
+    jobId: 'job-2',
+    runId: 'run-2',
+    state: 'CANCELLED',
+    attempt: 0,
+    maxAttempts: 3,
+    municipalityIbge: '3541307',
+    indicatorPack: 'c1-mais-acesso',
+    ruleVersion: 'c1-mais-acesso@0.1.0',
+    referencePeriod: '2026-08',
+    sourceId: 'source-1',
+    extractionId: null,
+    createdAt: '2026-08-16T10:00:00Z',
+    startedAt: null,
+    finishedAt: '2026-08-16T10:01:00Z',
+    lastProgressAt: null,
+    failureCode: null,
+    failureDetail: null,
+    resultId: null,
+    attempts: [],
+  })
+
+  assert.deepEqual(
+    execution.etapas.map((stage) => stage.status),
+    ['concluido', 'pendente', 'pendente', 'pendente'],
+  )
 })
 
 test('keeps a blocked result unavailable instead of turning it into zero', () => {

@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * schema is not caught here and remains a documentation-only claim.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class OpenApiContractTest extends SecuritySliceTestSupport {
+public class OpenApiContractTest extends SecuritySliceTestSupport {
 
     /**
      * Boot's own default error-handling route — never part of THIS application's documented

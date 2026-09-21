@@ -1,8 +1,8 @@
 package br.gov.observatorioaps.architecture;
 
+import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import com.tngtech.archunit.lang.syntax.ArchRuleDefinition;
 import org.junit.jupiter.api.Test;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -13,18 +13,41 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * metodológica; o motor funciona com fixture canônica sem banco PEC."
  *
  * <p>This is the one place these rules are enforced as code — not as a comment, not as a code
- * review convention.
+ * review convention. Two families of rules live here:
+ *
+ * <ul>
+ *   <li><b>Module boundaries</b> (Tech Spec §1.5, ADR 0001): which module may know about which.</li>
+ *   <li><b>Layer boundaries</b> (ADR 0009): inside a module, {@code domain} is pure Java,
+ *       {@code application} orchestrates through ports, {@code infrastructure} holds adapters.</li>
+ * </ul>
  */
 class ModuleBoundaryTest {
 
-    private static final com.tngtech.archunit.core.domain.JavaClasses CLASSES = new ClassFileImporter()
+    private static final String BASE = "br.gov.observatorioaps";
+    private static final JavaClasses CLASSES = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages("br.gov.observatorioaps");
+            .importPackages(BASE);
+
+    /**
+     * ADR 0009: application-layer classes that still embed SQL or reach an adapter directly.
+     * Each entry is debt to be paid by pulling the SQL behind a port in the module's
+     * {@code domain} package. Remove the name here once that happens — the rule then guards it.
+     */
+    private static final String HEXAGONAL_DEBT = String.join("|",
+            "IndicatorRunExecutor", "SourceDiagnosticsService", "FailureClassifier",
+            "AcquisitionGuard", "IdempotencyResolver", "CancellationRegistry", "JobWorker",
+            "PublicationService", "ReproducibilityCheck",
+            "SessionService", "BootstrapActivation", "LoginThrottle", "ScopeResolver",
+            "UserProvisioning", "PasswordPolicy", "AuthenticationService", "AuthorizationVersionGuard",
+            "PecSourceAcquisition");
+    private static final String DEBT_REGEX = ".*\\.(" + HEXAGONAL_DEBT + ")(\\$.*)?";
+
+    // ---------------------------------------------------------------- module boundaries (§1.5)
 
     @Test
     void indicatorEngineDoesNotDependOnJdbcOrSql() {
         noClasses()
-                .that().resideInAPackage("br.gov.observatorioaps.indicatorengine..")
+                .that().resideInAPackage(BASE + ".indicatorengine..")
                 .should().dependOnClassesThat().resideInAnyPackage("java.sql..", "javax.sql..")
                 .check(CLASSES);
     }
@@ -32,7 +55,7 @@ class ModuleBoundaryTest {
     @Test
     void indicatorEngineDoesNotDependOnHikariOrSpringJdbc() {
         noClasses()
-                .that().resideInAPackage("br.gov.observatorioaps.indicatorengine..")
+                .that().resideInAPackage(BASE + ".indicatorengine..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "com.zaxxer.hikari..", "org.springframework.jdbc..")
                 .check(CLASSES);
@@ -41,17 +64,16 @@ class ModuleBoundaryTest {
     @Test
     void indicatorEngineDoesNotDependOnPecAdapterOrSourceConnector() {
         noClasses()
-                .that().resideInAPackage("br.gov.observatorioaps.indicatorengine..")
+                .that().resideInAPackage(BASE + ".indicatorengine..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "br.gov.observatorioaps.pecadapter..",
-                        "br.gov.observatorioaps.sourceconnector..")
+                        BASE + ".pecadapter..", BASE + ".sourceconnector..")
                 .check(CLASSES);
     }
 
     @Test
     void indicatorEngineDoesNotDependOnHttpClientOrSpringWeb() {
         noClasses()
-                .that().resideInAPackage("br.gov.observatorioaps.indicatorengine..")
+                .that().resideInAPackage(BASE + ".indicatorengine..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "java.net.http..", "org.springframework.web..")
                 .check(CLASSES);
@@ -59,25 +81,21 @@ class ModuleBoundaryTest {
 
     @Test
     void indicatorPacksDoNotDependOnJdbcSqlOrPecAdapter() {
-        ArchRuleDefinition.noClasses()
-                .that().resideInAPackage("br.gov.observatorioaps.indicatorpacks..")
+        noClasses()
+                .that().resideInAPackage(BASE + ".indicatorpacks..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "java.sql..", "javax.sql..",
                         "com.zaxxer.hikari..", "org.springframework.jdbc..",
-                        "br.gov.observatorioaps.pecadapter..",
-                        "br.gov.observatorioaps.sourceconnector..")
+                        BASE + ".pecadapter..", BASE + ".sourceconnector..")
                 .check(CLASSES);
     }
 
     @Test
     void indicatorEngineAndPacksDoNotDependOnJobRunnerOrResultStore() {
         noClasses()
-                .that().resideInAnyPackage(
-                        "br.gov.observatorioaps.indicatorengine..",
-                        "br.gov.observatorioaps.indicatorpacks..")
+                .that().resideInAnyPackage(BASE + ".indicatorengine..", BASE + ".indicatorpacks..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "br.gov.observatorioaps.jobrunner..",
-                        "br.gov.observatorioaps.resultstore..")
+                        BASE + ".jobrunner..", BASE + ".resultstore..")
                 .check(CLASSES);
     }
 
@@ -89,10 +107,9 @@ class ModuleBoundaryTest {
     @Test
     void resultStoreDoesNotDependOnPecAdapterOrSourceConnector() {
         noClasses()
-                .that().resideInAPackage("br.gov.observatorioaps.resultstore..")
+                .that().resideInAPackage(BASE + ".resultstore..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "br.gov.observatorioaps.pecadapter..",
-                        "br.gov.observatorioaps.sourceconnector..")
+                        BASE + ".pecadapter..", BASE + ".sourceconnector..")
                 .check(CLASSES);
     }
 
@@ -103,31 +120,34 @@ class ModuleBoundaryTest {
     @Test
     void resultStoreDoesNotDependOnIdentityAccess() {
         noClasses()
-                .that().resideInAPackage("br.gov.observatorioaps.resultstore..")
-                .should().dependOnClassesThat().resideInAPackage("br.gov.observatorioaps.identityaccess..")
+                .that().resideInAPackage(BASE + ".resultstore..")
+                .should().dependOnClassesThat().resideInAPackage(BASE + ".identityaccess..")
                 .check(CLASSES);
     }
 
     @Test
     void resultStoreAndIndicatorPacksDoNotDependOnServletApiOrApiPackage() {
         noClasses()
-                .that().resideInAnyPackage(
-                        "br.gov.observatorioaps.resultstore..",
-                        "br.gov.observatorioaps.indicatorpacks..")
+                .that().resideInAnyPackage(BASE + ".resultstore..", BASE + ".indicatorpacks..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "jakarta.servlet..", "br.gov.observatorioaps.api..")
+                        "jakarta.servlet..", BASE + ".api..")
                 .check(CLASSES);
     }
 
-    /** {@code api} is the HTTP boundary — it must never reach past jobrunner/resultstore into
-     *  the PEC-facing layers directly (§1.5). */
+    /**
+     * {@code api} is the HTTP boundary — it must never reach past jobrunner/resultstore into
+     * the PEC-facing layers directly (§1.5). The one thing it may see from source-connector is
+     * the <em>registry</em> of sources ({@code sourceconnector.domain}): configuration rows, never
+     * a live connection, a budget or a secret resolver.
+     */
     @Test
-    void apiDoesNotDependOnPecAdapterOrSourceConnector() {
+    void apiDoesNotDependOnPecAdapterOrSourceConnectorAdapters() {
         noClasses()
-                .that().resideInAPackage("br.gov.observatorioaps.api..")
+                .that().resideInAPackage(BASE + ".api..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "br.gov.observatorioaps.pecadapter..",
-                        "br.gov.observatorioaps.sourceconnector..")
+                        BASE + ".pecadapter..",
+                        BASE + ".sourceconnector.application..",
+                        BASE + ".sourceconnector.infrastructure..")
                 .check(CLASSES);
     }
 
@@ -135,18 +155,18 @@ class ModuleBoundaryTest {
     @Test
     void identityAccessDoesNotDependOnServletApiOrPecAdapter() {
         noClasses()
-                .that().resideInAPackage("br.gov.observatorioaps.identityaccess..")
+                .that().resideInAPackage(BASE + ".identityaccess..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "jakarta.servlet..",
-                        "br.gov.observatorioaps.pecadapter..",
-                        "br.gov.observatorioaps.sourceconnector..")
+                        BASE + ".pecadapter..",
+                        BASE + ".sourceconnector..")
                 .check(CLASSES);
     }
 
     @Test
     void indicatorEngineDoesNotDependOnServletApi() {
         noClasses()
-                .that().resideInAPackage("br.gov.observatorioaps.indicatorengine..")
+                .that().resideInAPackage(BASE + ".indicatorengine..")
                 .should().dependOnClassesThat().resideInAnyPackage("jakarta.servlet..")
                 .check(CLASSES);
     }
@@ -159,9 +179,71 @@ class ModuleBoundaryTest {
     @Test
     void jobRunnerDoesNotDependOnServletApiOrApiPackage() {
         noClasses()
-                .that().resideInAPackage("br.gov.observatorioaps.jobrunner..")
+                .that().resideInAPackage(BASE + ".jobrunner..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "jakarta.servlet..", "br.gov.observatorioaps.api..")
+                        "jakarta.servlet..", BASE + ".api..")
+                .check(CLASSES);
+    }
+
+    /** {@code platform} is shared plumbing (SQLite, process lock); it knows no module. */
+    @Test
+    void platformDoesNotDependOnAnyModule() {
+        noClasses()
+                .that().resideInAPackage(BASE + ".platform..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        BASE + ".api..", BASE + ".identityaccess..", BASE + ".sourceconnector..",
+                        BASE + ".pecadapter..", BASE + ".extractionstore..",
+                        BASE + ".indicatorengine..", BASE + ".indicatorpacks..",
+                        BASE + ".jobrunner..", BASE + ".resultstore..")
+                .check(CLASSES);
+    }
+
+    // ---------------------------------------------------------------- layer boundaries (ADR 0009)
+
+    /** {@code domain} is plain Java: records, enums, pure rules and ports. No framework, no I/O driver. */
+    @Test
+    void domainLayersDependOnNothingButJavaAndOtherDomains() {
+        noClasses()
+                .that().resideInAPackage(BASE + "..domain..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        BASE + "..application..", BASE + "..infrastructure..",
+                        "java.sql..", "javax.sql..", "com.zaxxer..",
+                        "org.springframework..", "jakarta..")
+                .check(CLASSES);
+    }
+
+    /** {@code application} never sees HTTP: no servlet, no Spring MVC, no {@code api} package. */
+    @Test
+    void applicationLayersDoNotDependOnHttp() {
+        noClasses()
+                .that().resideInAPackage(BASE + "..application..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "jakarta.servlet..", "org.springframework.web..",
+                        "org.springframework.security.web..", BASE + ".api..")
+                .check(CLASSES);
+    }
+
+    /**
+     * {@code application} talks to persistence through ports in {@code domain}. Classes listed in
+     * {@link #HEXAGONAL_DEBT} are the known exceptions; everything else is held to the rule.
+     */
+    @Test
+    void applicationLayersUsePortsNotAdapters() {
+        noClasses()
+                .that().resideInAPackage(BASE + "..application..")
+                .and().haveNameNotMatching(DEBT_REGEX)
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        BASE + "..infrastructure..",
+                        "java.sql..", "javax.sql..", "com.zaxxer..", "org.springframework.jdbc..")
+                .check(CLASSES);
+    }
+
+    /** No module's {@code infrastructure} is reached from another module's {@code domain}. */
+    @Test
+    void infrastructureIsNotReachedFromOtherModulesDomain() {
+        noClasses()
+                .that().resideInAPackage(BASE + "..domain..")
+                .should().dependOnClassesThat().resideInAPackage(BASE + "..infrastructure..")
                 .check(CLASSES);
     }
 }
