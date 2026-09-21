@@ -1,0 +1,372 @@
+package br.gov.observatorioaps.sourceconnector.infrastructure.process;
+
+import br.gov.observatorioaps.extractionstore.domain.ExtractionManifest;
+import br.gov.observatorioaps.pecadapter.infrastructure.file.PecCompatibilityMatrix;
+import br.gov.observatorioaps.pecadapter.infrastructure.jdbc.IndividualEncounterModalityCapability;
+import br.gov.observatorioaps.sourceconnector.domain.AcquisitionCommand;
+import br.gov.observatorioaps.sourceconnector.domain.AcquisitionListener;
+import br.gov.observatorioaps.sourceconnector.domain.AcquisitionPort;
+import br.gov.observatorioaps.sourceconnector.domain.AllowedDestinations;
+import br.gov.observatorioaps.sourceconnector.domain.CancellationSignal;
+import br.gov.observatorioaps.sourceconnector.domain.PecAcquisitionException;
+import br.gov.observatorioaps.sourceconnector.domain.PecSecretResolver;
+import br.gov.observatorioaps.sourceconnector.domain.ReadBudget;
+import br.gov.observatorioaps.sourceconnector.domain.SourceAcquisitionLimiter;
+import br.gov.observatorioaps.sourceconnector.domain.SourceBudgetExceededException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+/**
+ * {@link AcquisitionPort} that delegates the live PEC read to a spawned child process, talking
+ * NDJSON over its stdin/stdout (plan §2.2). The child never touches SQLite or the job queue — it
+ * only ever sees one {@code AcquisitionCommand} per invocation and exits when done. This class
+ * owns the entire protocol: handshake, compatibility comparison against the packaged {@link
+ * PecCompatibilityMatrix}, cancellation forwarding, and translating the child's outcome back into
+ * the same unchecked types {@code FailureClassifier} already knows how to classify.
+ *
+ * <p>The child is trusted to run the frozen query and compute the same compatibility fingerprints
+ * a {@code CompatibilityCatalog} would (ENG-43) — this class only ever compares what the child
+ * reports against the packaged matrix, never re-derives it locally. A wrong fingerprint fails
+ * closed (the comparison mismatches and acquisition is refused), never silently.
+ *
+ * <p>{@link AcquisitionListener#onProgress()} fires only when the child sends its own {@code
+ * progress} message, unlike {@code JdbcAcquisitionAdapter} which fires it at two fixed points
+ * (connection open, extract finalize). Plan §2.7 pre-authorizes this divergence — no decision
+ * path reads {@code last_progress_at}, it only feeds diagnostics.
+ */
+public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
+
+    private static final Logger log = LoggerFactory.getLogger(SubprocessAcquisitionAdapter.class);
+    private static final String CAPABILITY = "individual_encounter_modality";
+
+    private final List<String> command;
+    private final PecSecretResolver secretResolver;
+    private final PecCompatibilityMatrix matrix;
+    private final Duration exitGrace;
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    public SubprocessAcquisitionAdapter(List<String> command, PecSecretResolver secretResolver, Duration exitGrace) {
+        this(command, secretResolver, PecCompatibilityMatrix.fromClasspathResource(), exitGrace);
+    }
+
+    /** Package-visible seam for tests to inject a synthetic matrix, mirroring the JDBC path's own seam. */
+    SubprocessAcquisitionAdapter(
+            List<String> command, PecSecretResolver secretResolver, PecCompatibilityMatrix matrix,
+            Duration exitGrace) {
+        this.command = command;
+        this.secretResolver = secretResolver;
+        this.matrix = matrix;
+        this.exitGrace = exitGrace;
+    }
+
+    @Override
+    public ExtractionManifest acquire(
+            AcquisitionCommand acquisitionCommand, CancellationSignal cancellation, AcquisitionListener listener) {
+        try (SourceAcquisitionLimiter.Permit permit =
+                SourceAcquisitionLimiter.acquireOrFail(acquisitionCommand.connectionProperties().sourceId())) {
+            return runChild(acquisitionCommand, cancellation, listener);
+        }
+    }
+
+    private ExtractionManifest runChild(
+            AcquisitionCommand acquisitionCommand, CancellationSignal cancellation, AcquisitionListener listener) {
+        Process process;
+        try {
+            process = new ProcessBuilder(command).redirectErrorStream(false).start();
+        } catch (IOException e) {
+            // Never started — no live PEC session ever existed. Not "uncertain" in the ENG-51
+            // sense, same as a JDBC connection-open failure.
+            throw new PecAcquisitionException("could not start execution plane process: " + e.getMessage(), e);
+        }
+        drainStderr(process);
+
+        try {
+            writeAcquireEnvelope(process.getOutputStream(), acquisitionCommand);
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
+
+            JsonNode probe;
+            try {
+                probe = readMessage(reader);
+            } catch (IOException malformed) {
+                return abnormalTermination(process, cancellation, listener,
+                        "malformed message before handshake: " + malformed.getMessage());
+            }
+            // A probe (or any message at all) implies the child already opened a live connection
+            // to run information_schema queries — everything from here on is "uncertain" territory.
+            if (probe == null || !"probe".equals(text(probe, "type"))) {
+                return abnormalTermination(process, cancellation, listener,
+                        "expected a 'probe' message, got: " + probe);
+            }
+
+            String mismatch = compareFingerprints(acquisitionCommand, probe);
+            if (mismatch != null) {
+                writeLine(process.getOutputStream(), Map.of(
+                        "type", "abort", "code", "COMPATIBILITY_MISMATCH", "detail", mismatch));
+                waitForExit(process);
+                listener.onUncertainOutcome("compatibility mismatch: " + mismatch);
+                throw new IllegalStateException(
+                        "execution plane compatibility mismatch (ENG-43): " + mismatch);
+            }
+            writeLine(process.getOutputStream(), Map.of("type", "proceed"));
+
+            cancellation.bindInterrupt(() -> {
+                try {
+                    writeLine(process.getOutputStream(), Map.of("type", "cancel"));
+                } catch (RuntimeException ignored) {
+                    // Best-effort only — the child may already have exited.
+                }
+            });
+
+            return readUntilTerminal(process, reader, cancellation, listener);
+        } catch (IOException e) {
+            killProcess(process);
+            listener.onUncertainOutcome("I/O failure talking to the execution plane: " + e.getMessage());
+            throw new PecAcquisitionException("execution plane I/O failure: " + e.getMessage(), e);
+        } finally {
+            cancellation.unbindInterrupt();
+        }
+    }
+
+    private ExtractionManifest readUntilTerminal(
+            Process process, BufferedReader reader, CancellationSignal cancellation, AcquisitionListener listener)
+            throws IOException {
+        while (true) {
+            JsonNode message;
+            try {
+                message = readMessage(reader);
+            } catch (IOException malformed) {
+                return abnormalTermination(process, cancellation, listener,
+                        "malformed message: " + malformed.getMessage());
+            }
+            if (message == null) {
+                return abnormalTermination(process, cancellation, listener,
+                        "execution plane closed its output before sending a manifest or error");
+            }
+            String type = text(message, "type");
+            if ("progress".equals(type)) {
+                listener.onProgress();
+                continue;
+            }
+            if ("manifest".equals(type)) {
+                ExtractionManifest manifest = mapper.treeToValue(message.get("manifest"), ExtractionManifest.class);
+                waitForExit(process);
+                return manifest;
+            }
+            if ("error".equals(type)) {
+                boolean uncertain = message.path("uncertain").asBoolean(true);
+                String detail = text(message, "detail");
+                String code = text(message, "code");
+                waitForExit(process);
+                if (uncertain) {
+                    listener.onUncertainOutcome(
+                            "execution plane reported an uncertain outcome: " + detail);
+                }
+                // Cancellation wins if it was actually requested — mirrors how
+                // IndividualEncounterModalityCapability.stream's cancellationCheck already works:
+                // this throws JobCancelledException itself when the concrete CancellationSignal
+                // is a cancelled CancellationToken, without this class ever naming that type.
+                cancellation.checkCancelled();
+                throw translate(code, detail);
+            }
+            return abnormalTermination(process, cancellation, listener, "unexpected message type: " + type);
+        }
+    }
+
+    private ExtractionManifest abnormalTermination(
+            Process process, CancellationSignal cancellation, AcquisitionListener listener, String detail) {
+        killProcess(process);
+        listener.onUncertainOutcome("execution plane protocol violation: " + detail);
+        cancellation.checkCancelled();
+        throw new PecAcquisitionException("execution plane protocol violation: " + detail, null);
+    }
+
+    /**
+     * Plan §2.7.1's translation table, as far as it maps to exception types
+     * {@code FailureClassifier} already has a branch for. The {@code sqlstate}-carrying row is
+     * deliberately not implemented yet — it needs a new {@code PecAcquisitionException}
+     * constructor plus a classifier branch to read it back out, which is more than this adapter
+     * alone should decide; until then an error with an unrecognized {@code code} (including any
+     * carrying a raw SQLSTATE) falls through to the generic {@code UNCLASSIFIED_ERROR} branch.
+     */
+    private RuntimeException translate(String code, String detail) {
+        if ("COMPATIBILITY_MISMATCH".equals(code)) {
+            return new IllegalStateException(
+                    "execution plane compatibility mismatch (ENG-43): " + detail);
+        }
+        if (SourceBudgetExceededException.CODE.equals(code)) {
+            return new SourceBudgetExceededException(detail);
+        }
+        if ("DESTINATION_NOT_ALLOWED".equals(code)) {
+            return new AllowedDestinations.DestinationNotAllowedException(detail);
+        }
+        return new PecAcquisitionException(detail, null);
+    }
+
+    private String compareFingerprints(AcquisitionCommand acquisitionCommand, JsonNode probe) {
+        String postgresVersion = text(probe, "postgres_version");
+        PecCompatibilityMatrix.Entry entry;
+        try {
+            entry = matrix.findExact(
+                    CAPABILITY, IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                    acquisitionCommand.sourceIdentity(), postgresVersion);
+        } catch (RuntimeException noEntry) {
+            return "no compatibility matrix entry: " + noEntry.getMessage();
+        }
+        if (!IndividualEncounterModalityCapability.QUERY_CHECKSUM.equals(entry.queryChecksum())) {
+            return "query checksum mismatch: matrix has " + entry.queryChecksum();
+        }
+        String probeQueryChecksum = text(probe, "query_checksum");
+        if (!entry.queryChecksum().equals(probeQueryChecksum)) {
+            // The one place the child's own query text is checked against the frozen contract
+            // (plan §2.3) — without this, a child running a different query would still pass.
+            return "query checksum mismatch: matrix has " + entry.queryChecksum()
+                    + " but execution plane reported " + probeQueryChecksum;
+        }
+        JsonNode objects = probe.get("objects");
+        for (Map.Entry<String, String> expected : entry.objectFingerprints().entrySet()) {
+            String actual = objects == null ? null : text(objects, expected.getKey());
+            if (!expected.getValue().equals(actual)) {
+                return "fingerprint mismatch for " + expected.getKey() + ": expected "
+                        + expected.getValue() + " but got " + actual;
+            }
+        }
+        return null;
+    }
+
+    private void writeAcquireEnvelope(OutputStream stdin, AcquisitionCommand acquisitionCommand) {
+        char[] password = secretResolver.resolve(acquisitionCommand.connectionProperties().secretRef());
+        try {
+            ReadBudget budget = acquisitionCommand.budget();
+            Map<String, Object> budgetFields = new LinkedHashMap<>();
+            budgetFields.put("connect_timeout_ms", budget.connectionTimeout().toMillis());
+            budgetFields.put("acquisition_timeout_ms", budget.acquisitionTimeout().toMillis());
+            budgetFields.put("statement_timeout_ms", budget.statementTimeoutMs());
+            budgetFields.put("lock_timeout_ms", budget.lockTimeoutMs());
+            budgetFields.put("idle_in_transaction_timeout_ms", budget.idleInTransactionTimeoutMs());
+            budgetFields.put("max_rows", budget.maxRows());
+            budgetFields.put("max_duration_ms", budget.maxDurationMs());
+            budgetFields.put("max_payload_bytes", budget.maxPayloadBytes());
+            budgetFields.put("max_temp_file_bytes", budget.maxTempFileBytes());
+
+            Map<String, Object> envelope = new LinkedHashMap<>();
+            envelope.put("type", "acquire");
+            envelope.put("source_id", acquisitionCommand.connectionProperties().sourceId());
+            envelope.put("host", acquisitionCommand.connectionProperties().host());
+            envelope.put("port", acquisitionCommand.connectionProperties().port());
+            envelope.put("database", acquisitionCommand.connectionProperties().database());
+            envelope.put("user", acquisitionCommand.connectionProperties().user());
+            // Password crosses only via this stdin envelope — never argv (/proc/<pid>/cmdline is
+            // world-readable) and never an environment variable.
+            envelope.put("password", new String(password));
+            envelope.put("municipality_ibge", acquisitionCommand.connectionProperties().municipalityIbge());
+            envelope.put("pec_version", acquisitionCommand.sourceIdentity().pecVersion());
+            envelope.put("read_model", acquisitionCommand.sourceIdentity().readModel());
+            envelope.put("installation_role", acquisitionCommand.sourceIdentity().installationRole());
+            envelope.put("extraction_id", acquisitionCommand.extractionId());
+            envelope.put("period_start", acquisitionCommand.periodStart().toString());
+            envelope.put("period_end_exclusive", acquisitionCommand.periodEndExclusive().toString());
+            envelope.put("source_zone_id", acquisitionCommand.sourceZoneId());
+            envelope.put("query_checksum", IndividualEncounterModalityCapability.QUERY_CHECKSUM);
+            envelope.put("adapter_version", IndividualEncounterModalityCapability.ADAPTER_VERSION);
+            envelope.put("budget", budgetFields);
+            writeLine(stdin, envelope);
+        } finally {
+            // Mirrors PecDataSourceFactory.create()'s finally — the parent's copy is zeroed the
+            // moment it has been handed to the child, whether or not the write succeeded.
+            Arrays.fill(password, '\0');
+        }
+    }
+
+    private JsonNode readMessage(BufferedReader reader) throws IOException {
+        String line = reader.readLine();
+        if (line == null) {
+            return null;
+        }
+        if (line.isBlank()) {
+            return readMessage(reader);
+        }
+        try {
+            return mapper.readTree(line);
+        } catch (RuntimeException malformed) {
+            throw new IOException("invalid JSON line from execution plane: " + line, malformed);
+        }
+    }
+
+    private void writeLine(OutputStream stdin, Object payload) {
+        String json;
+        try {
+            json = mapper.writeValueAsString(payload);
+        } catch (RuntimeException e) {
+            throw new PecAcquisitionException("could not serialize message to execution plane: " + e.getMessage(), e);
+        }
+        synchronized (stdin) {
+            try {
+                stdin.write((json + "\n").getBytes(StandardCharsets.UTF_8));
+                stdin.flush();
+            } catch (IOException e) {
+                throw new PecAcquisitionException("could not write to execution plane stdin: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    private void drainStderr(Process process) {
+        Thread stderrThread = new Thread(() -> {
+            try (BufferedReader err = new BufferedReader(
+                    new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = err.readLine()) != null) {
+                    log.info("execution plane: {}", line);
+                }
+            } catch (IOException ignored) {
+                // The process ended; nothing left to drain.
+            }
+        }, "execplane-stderr");
+        stderrThread.setDaemon(true);
+        stderrThread.start();
+    }
+
+    private void waitForExit(Process process) {
+        try {
+            if (!process.waitFor(exitGrace.toMillis(), TimeUnit.MILLISECONDS)) {
+                killProcess(process);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            killProcess(process);
+        }
+    }
+
+    private void killProcess(Process process) {
+        if (!process.isAlive()) {
+            return;
+        }
+        process.destroy();
+        try {
+            if (!process.waitFor(1, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            process.destroyForcibly();
+        }
+    }
+
+    private static String text(JsonNode node, String field) {
+        JsonNode value = node == null ? null : node.get(field);
+        return value == null || value.isNull() ? null : value.asString();
+    }
+}
