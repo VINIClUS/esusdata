@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import br.gov.observatorioaps.jobrunner.domain.EnqueueRequest;
 import br.gov.observatorioaps.jobrunner.domain.Job;
 import br.gov.observatorioaps.jobrunner.domain.JobState;
-import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.CancellationToken;
+import br.gov.observatorioaps.jobrunner.domain.CancellationToken;
 /**
  * §1.9.4 L365, both halves in one place: "Fechar a tela, fazer logout ou expirar a sessão não
  * cancela por si só um job já autorizado. Revogação de acesso ou bloqueio da conta impede novo

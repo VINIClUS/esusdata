@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import br.gov.observatorioaps.jobrunner.domain.EnqueueRequest;
 import br.gov.observatorioaps.jobrunner.domain.Job;
 import br.gov.observatorioaps.jobrunner.domain.SourceAcquisitionBlockedException;
-import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.CancellationToken;
+import br.gov.observatorioaps.jobrunner.domain.CancellationToken;
 /**
  * ENG-51's only production caller: {@link IndicatorRunExecutor#runLive} refuses to open a PEC
  * connection while its source is on cooldown — checked before any socket is opened, so this needs

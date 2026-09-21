@@ -36,7 +36,7 @@ import br.gov.observatorioaps.jobrunner.domain.Job;
 import br.gov.observatorioaps.jobrunner.domain.JobCancelledException;
 import br.gov.observatorioaps.jobrunner.domain.JobState;
 import br.gov.observatorioaps.jobrunner.domain.SourceAcquisitionBlockedException;
-import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.CancellationToken;
+import br.gov.observatorioaps.jobrunner.domain.CancellationToken;
 /**
  * Exercises {@link IndicatorRunExecutor#runLive} end to end against a real PostgreSQL connection
  * — grant revalidation, {@link AcquisitionGuard}, the pooled connection, the cancellable {@code
@@ -50,8 +50,9 @@ import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.CancellationToken;
  * {@code IndividualEncounterModalityCapabilityIsolationTest} does — it proves this synthetic
  * fixture is isolated and queryable, not that its schema is byte-identical to the real PEC's (see
  * ENG-37: Testcontainers "não fornece automaticamente um esquema PEC homologado"). Production
- * {@code runLive()} always uses the real {@code JdbcCompatibilityCatalog}; only this test injects
- * a substitute, through the package-private overload added for exactly this purpose.
+ * always constructs {@code JdbcAcquisitionAdapter} with its two-argument constructor, which always
+ * uses the real {@code JdbcCompatibilityCatalog}; only this test injects a substitute, through
+ * {@link JobRunnerTestFixture}'s catalog-accepting constructor.
  */
 @Testcontainers
 class LiveAcquisitionEndToEndTest {
@@ -84,14 +85,10 @@ class LiveAcquisitionEndToEndTest {
         }
         var factory = new PecDataSourceFactory(
                 new AllowedDestinations(allowed), secretRef -> "fixture_password".toCharArray());
-        fixture = new JobRunnerTestFixture(dataDir, clock, factory);
 
-        fixture.sourceRepository.upsert(new SourceRecord(
-                "fixture-a", 1, "PEC_POSTGRESQL", "PRONTUARIO", "PRIMARY",
-                PG.getHost(), PG.getMappedPort(5432), "esus_fixture", "fixture_user", "unused",
-                "1100015", "5.4.37", "PEC_DW", Instant.EPOCH.toString()));
-        fixture.registerPrincipal("test-principal", "1100015");
-
+        // Computed before the fixture (which now wires the AcquisitionPort at construction time,
+        // not per-call) — depends only on the packaged matrix and the pinned PG version, not on
+        // anything the fixture itself builds.
         var entry = PecCompatibilityMatrix.fromClasspathResource().findExact(
                 "individual_encounter_modality", "0.1.0",
                 new PecSourceIdentity("fixture-a", "5.4.37", "PEC_DW", "PRONTUARIO"), "9.6.13");
@@ -109,6 +106,14 @@ class LiveAcquisitionEndToEndTest {
                 return fingerprint;
             }
         };
+
+        fixture = new JobRunnerTestFixture(dataDir, clock, factory, fixtureCatalog);
+
+        fixture.sourceRepository.upsert(new SourceRecord(
+                "fixture-a", 1, "PEC_POSTGRESQL", "PRONTUARIO", "PRIMARY",
+                PG.getHost(), PG.getMappedPort(5432), "esus_fixture", "fixture_user", "unused",
+                "1100015", "5.4.37", "PEC_DW", Instant.EPOCH.toString()));
+        fixture.registerPrincipal("test-principal", "1100015");
     }
 
     @AfterEach
@@ -146,7 +151,7 @@ class LiveAcquisitionEndToEndTest {
     void acquiresFromPostgresAndPublishesABlockedResultWithExactCounts() throws Exception {
         var context = liveContext("job-live-ok", "1100015");
 
-        var outcome = fixture.executor.runLive(context, new CancellationToken(), fixtureCatalog);
+        var outcome = fixture.executor.runLive(context, new CancellationToken());
 
         // Municipality A in the fixture: 3 programados, 2 espontaneos (see
         // IndividualEncounterModalityCapabilityIsolationTest) -> numerator 3, denominator 5.
@@ -168,7 +173,7 @@ class LiveAcquisitionEndToEndTest {
         CancellationToken cancellation = new CancellationToken();
         cancellation.requestCancel(); // pre-set: the first per-row poll inside stream() throws.
 
-        assertThatThrownBy(() -> fixture.executor.runLive(context, cancellation, fixtureCatalog))
+        assertThatThrownBy(() -> fixture.executor.runLive(context, cancellation))
                 .isInstanceOf(JobCancelledException.class);
 
         assertThat(fixture.jdbc.queryForObject(
@@ -191,11 +196,11 @@ class LiveAcquisitionEndToEndTest {
         CancellationToken cancellation = new CancellationToken();
         cancellation.requestCancel();
 
-        assertThatThrownBy(() -> fixture.executor.runLive(context, cancellation, fixtureCatalog))
+        assertThatThrownBy(() -> fixture.executor.runLive(context, cancellation))
                 .isInstanceOf(JobCancelledException.class);
 
         var retryContext = liveContext("job-live-cancel-guard-retry", "1100015");
-        assertThatThrownBy(() -> fixture.executor.runLive(retryContext, new CancellationToken(), fixtureCatalog))
+        assertThatThrownBy(() -> fixture.executor.runLive(retryContext, new CancellationToken()))
                 .isInstanceOf(SourceAcquisitionBlockedException.class);
     }
 }

@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import br.gov.observatorioaps.jobrunner.domain.Job;
 import br.gov.observatorioaps.jobrunner.domain.JobState;
 import br.gov.observatorioaps.jobrunner.domain.SourceAcquisitionBlockedException;
-import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.CancellationToken;
+import br.gov.observatorioaps.jobrunner.domain.CancellationToken;
 import br.gov.observatorioaps.jobrunner.domain.JobRepository;
 /**
  * §1.9.4/ENG-06/ENG-21/ENG-51: an abandoned RUNNING/STAGED job is never resumed or republished;

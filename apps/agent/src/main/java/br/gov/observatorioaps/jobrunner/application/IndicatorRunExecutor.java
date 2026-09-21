@@ -1,19 +1,12 @@
 package br.gov.observatorioaps.jobrunner.application;
 
 import br.gov.observatorioaps.extractionstore.domain.CanonicalEncounter;
-import br.gov.observatorioaps.extractionstore.domain.CanonicalModality;
-import br.gov.observatorioaps.extractionstore.infrastructure.file.ExtractReader;
-import br.gov.observatorioaps.extractionstore.infrastructure.file.ExtractWriter;
+import br.gov.observatorioaps.extractionstore.domain.ExtractStore;
 import br.gov.observatorioaps.extractionstore.domain.ExtractionManifest;
-import br.gov.observatorioaps.extractionstore.domain.SourceRef;
 import br.gov.observatorioaps.identityaccess.application.GrantRevalidator;
 import br.gov.observatorioaps.identityaccess.domain.Permission;
 import br.gov.observatorioaps.indicatorengine.domain.IndicatorResult;
 import br.gov.observatorioaps.indicatorpacks.c1.C1Rule;
-import br.gov.observatorioaps.pecadapter.infrastructure.jdbc.CompatibilityCatalog;
-import br.gov.observatorioaps.pecadapter.domain.EncounterModality;
-import br.gov.observatorioaps.pecadapter.infrastructure.jdbc.IndividualEncounterModalityCapability;
-import br.gov.observatorioaps.pecadapter.domain.RawEncounterRecord;
 import br.gov.observatorioaps.resultstore.domain.EvidenceEntry;
 import br.gov.observatorioaps.resultstore.domain.InputFingerprint;
 import br.gov.observatorioaps.resultstore.domain.PublicationOutcome;
@@ -21,18 +14,17 @@ import br.gov.observatorioaps.resultstore.domain.PublicationRefusedException;
 import br.gov.observatorioaps.resultstore.domain.PublicationRequest;
 import br.gov.observatorioaps.resultstore.application.PublicationService;
 import br.gov.observatorioaps.resultstore.domain.ResultStagingArea;
+import br.gov.observatorioaps.sourceconnector.domain.AcquisitionCommand;
+import br.gov.observatorioaps.sourceconnector.domain.AcquisitionListener;
+import br.gov.observatorioaps.sourceconnector.domain.AcquisitionPort;
+import br.gov.observatorioaps.sourceconnector.domain.CancellationSignal;
+import br.gov.observatorioaps.sourceconnector.domain.PecConnectionProperties;
+import br.gov.observatorioaps.sourceconnector.domain.PecSourceIdentity;
+import br.gov.observatorioaps.sourceconnector.domain.ReadBudget;
 import br.gov.observatorioaps.sourceconnector.domain.SourceRecord;
 import br.gov.observatorioaps.sourceconnector.domain.SourceRepository;
 import br.gov.observatorioaps.resultstore.domain.StagingRequest;
-import br.gov.observatorioaps.sourceconnector.domain.PecConnectionProperties;
-import br.gov.observatorioaps.sourceconnector.infrastructure.jdbc.PecDataSourceFactory;
-import br.gov.observatorioaps.sourceconnector.application.PecSourceAcquisition;
-import br.gov.observatorioaps.sourceconnector.infrastructure.jdbc.PecSourceConnection;
-import br.gov.observatorioaps.sourceconnector.domain.PecSourceIdentity;
-import br.gov.observatorioaps.sourceconnector.domain.ReadBudget;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -43,14 +35,13 @@ import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
-import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.CancellationToken;
 import br.gov.observatorioaps.jobrunner.domain.JobRepository;
 /**
  * Orchestrates one job run: read (from an already-finalized extract, or from a fresh PEC
- * acquisition) → compute (C1) → stage → publish. Today this class is C1-specific (the only
- * indicator pack wired into the pilot, §4.5.1) — a second pack would need either a small strategy
- * seam here or its own executor; premature to build before there is a second rule to generalize
- * from.
+ * acquisition via {@link AcquisitionPort}) → compute (C1) → stage → publish. Today this class is
+ * C1-specific (the only indicator pack wired into the pilot, §4.5.1) — a second pack would need
+ * either a small strategy seam here or its own executor; premature to build before there is a
+ * second rule to generalize from.
  *
  * <p>C1's release gates are not complete (§4.4 Portões A/B/D/E {@code BLOCKED} — Q01 not
  * retrieved), so every result computed here is {@code status=BLOCKED} with exact counts, never a
@@ -62,6 +53,10 @@ import br.gov.observatorioaps.jobrunner.domain.JobRepository;
  * against the principal's CURRENT grants, not whatever authorized the original HTTP request.
  * Closing a browser tab or letting the session expire does not cancel an already-authorized job;
  * only an actual grant/account change does.
+ *
+ * <p>Reading (from disk or from a live PEC acquisition) is behind ports ({@link ExtractStore},
+ * {@link AcquisitionPort}) — this class no longer imports JDBC, the PEC driver, or any other
+ * module's {@code infrastructure} package (ADR 0009).
  */
 public final class IndicatorRunExecutor {
 
@@ -75,8 +70,7 @@ public final class IndicatorRunExecutor {
     private static final String VALIDATION_STATUS = "NOT_VALIDATED";
     private static final String SOURCE_ZONE_ID = "America/Sao_Paulo";
 
-    private final Path extractsBaseDir;
-    private final ExtractReader extractReader = new ExtractReader();
+    private final ExtractStore extractStore;
     private final JobRepository jobRepository;
     private final ResultStagingArea stagingArea;
     private final PublicationService publicationService;
@@ -84,12 +78,12 @@ public final class IndicatorRunExecutor {
     private final Clock clock;
     private final GrantRevalidator grantRevalidator;
     private final SourceRepository sourceRepository;
-    private final PecDataSourceFactory pecDataSourceFactory;
+    private final AcquisitionPort acquisitionPort;
     private final AcquisitionGuard acquisitionGuard;
     private final Duration liveAcquisitionCooldownMargin;
 
     public IndicatorRunExecutor(
-            Path extractsBaseDir,
+            ExtractStore extractStore,
             JobRepository jobRepository,
             ResultStagingArea stagingArea,
             PublicationService publicationService,
@@ -97,10 +91,10 @@ public final class IndicatorRunExecutor {
             Clock clock,
             GrantRevalidator grantRevalidator,
             SourceRepository sourceRepository,
-            PecDataSourceFactory pecDataSourceFactory,
+            AcquisitionPort acquisitionPort,
             AcquisitionGuard acquisitionGuard,
             Duration liveAcquisitionCooldownMargin) {
-        this.extractsBaseDir = extractsBaseDir;
+        this.extractStore = extractStore;
         this.jobRepository = jobRepository;
         this.stagingArea = stagingArea;
         this.publicationService = publicationService;
@@ -108,7 +102,7 @@ public final class IndicatorRunExecutor {
         this.clock = clock;
         this.grantRevalidator = grantRevalidator;
         this.sourceRepository = sourceRepository;
-        this.pecDataSourceFactory = pecDataSourceFactory;
+        this.acquisitionPort = acquisitionPort;
         this.acquisitionGuard = acquisitionGuard;
         this.liveAcquisitionCooldownMargin = liveAcquisitionCooldownMargin;
     }
@@ -123,12 +117,12 @@ public final class IndicatorRunExecutor {
     public record RunOutcome(String stagingId, String resultId, IndicatorResult result) {
     }
 
-    public RunOutcome runFromExtract(RunContext context, CancellationToken cancellation) throws IOException {
+    public RunOutcome runFromExtract(RunContext context, CancellationSignal cancellation) throws IOException {
         requireC1(context);
         grantRevalidator.requireCurrentlyAuthorized(
                 context.idempotencyPrincipal(), context.municipalityIbge(), Permission.RUN_INDICATOR);
 
-        ExtractionManifest manifest = extractReader.readManifest(extractsBaseDir, context.extractionId());
+        ExtractionManifest manifest = extractStore.readManifest(context.extractionId());
         YearMonth requestedPeriod = YearMonth.parse(context.referencePeriod());
         String expectedPeriodStart = requestedPeriod.atDay(1).toString();
         String expectedPeriodEndExclusive = requestedPeriod.plusMonths(1).atDay(1).toString();
@@ -151,33 +145,19 @@ public final class IndicatorRunExecutor {
                             + "/municipality " + context.municipalityIbge() + "/period "
                             + context.referencePeriod());
         }
-        List<CanonicalEncounter> encounters = extractReader.readEncounters(extractsBaseDir, manifest);
+        List<CanonicalEncounter> encounters = extractStore.readEncounters(manifest);
         cancellation.checkCancelled();
 
         return computeStageAndPublish(context, manifest, encounters, cancellation);
     }
 
     /**
-     * Acquires directly from the PEC: opens a source-bound connection, streams the frozen
-     * capability query, writes and finalizes a fresh extract, then computes from it exactly like
-     * {@link #runFromExtract} — reading the just-written extract back from disk rather than
-     * keeping the streamed rows in memory, so both paths share one "recompute from durable
+     * Acquires directly from the PEC through {@link AcquisitionPort}, then computes from the
+     * finalized extract exactly like {@link #runFromExtract} — reading it back from disk rather
+     * than keeping streamed rows in memory, so both paths share one "recompute from durable
      * evidence" code path (the same invariant ENG-19 proves for replay).
      */
-    public RunOutcome runLive(RunContext context, CancellationToken cancellation) throws SQLException, IOException {
-        return runLive(context, cancellation, new br.gov.observatorioaps.pecadapter.infrastructure.jdbc.JdbcCompatibilityCatalog());
-    }
-
-    /**
-     * Same as {@link #runLive(RunContext, CancellationToken)}, with the compatibility catalog
-     * injectable — mirrors {@code IndividualEncounterModalityCapability.stream}'s own seam so a
-     * synthetic PostgreSQL fixture can supply probes for testing without ever weakening the
-     * validation a production run performs (ENG-43: the real {@link
-     * br.gov.observatorioaps.pecadapter.infrastructure.jdbc.JdbcCompatibilityCatalog} is always what {@link
-     * #runLive(RunContext, CancellationToken)} uses).
-     */
-    RunOutcome runLive(RunContext context, CancellationToken cancellation, CompatibilityCatalog catalog)
-            throws SQLException, IOException {
+    public RunOutcome runLive(RunContext context, CancellationSignal cancellation) throws IOException {
         requireC1(context);
         grantRevalidator.requireCurrentlyAuthorized(
                 context.idempotencyPrincipal(), context.municipalityIbge(), Permission.RUN_INDICATOR);
@@ -205,48 +185,29 @@ public final class IndicatorRunExecutor {
         LocalDate periodEndExclusive = requestedPeriod.plusMonths(1).atDay(1);
         String extractionId = "live-" + context.jobId() + "-g" + context.executionGeneration();
 
-        Instant startedAt = clock.instant();
-        ExtractionManifest manifest;
-        try (PecSourceConnection sourceConnection =
-                pecDataSourceFactory.open(properties, sourceIdentity, budget)) {
-            jobRepository.markProgress(
-                    context.jobId(), context.processInstanceId(), context.executionGeneration(), clock.instant());
-            PecSourceAcquisition acquisition = sourceConnection.acquire(periodStart, periodEndExclusive);
-            try (ExtractWriter writer = new ExtractWriter(extractsBaseDir, extractionId, acquisition)) {
-                try {
-                    IndividualEncounterModalityCapability.stream(
-                            acquisition,
-                            raw -> writeCanonical(writer, acquisition, raw),
-                            catalog,
-                            cancellation::bindStatement,
-                            cancellation::checkCancelled);
-                } catch (RuntimeException | SQLException uncertainFailure) {
-                    // The read ended abnormally (cancellation, a transient SQL/network error, or a
-                    // local write failure mid-stream) while a statement was bound to this
-                    // connection. Closing the JDBC connection on the way out of this try-with-
-                    // resources block does not prove the PostgreSQL backend actually stopped
-                    // executing: a network partition lets the server keep running until its own
-                    // statement/idle-in-transaction timeouts expire (ENG-51). Block new
-                    // LIVE_READ_ONLY acquisitions on this source for the same timeout-derived
-                    // margin JobRecovery applies to an abandoned RUNNING job, rather than only
-                    // guarding against a process restart.
-                    acquisitionGuard.block(context.sourceId(), clock.instant().plus(liveAcquisitionCooldownMargin),
-                            "job " + context.jobId() + " ended a live acquisition with an uncertain outcome: "
-                                    + uncertainFailure);
-                    throw uncertainFailure;
-                }
-                manifest = writer.finalizeExtract(
-                        startedAt, SOURCE_ZONE_ID, IndividualEncounterModalityCapability.QUERY_CHECKSUM,
-                        IndividualEncounterModalityCapability.ADAPTER_VERSION, "COMPLETE", "SNAPSHOT");
+        AcquisitionCommand command = new AcquisitionCommand(
+                properties, sourceIdentity, budget, extractionId, periodStart, periodEndExclusive,
+                SOURCE_ZONE_ID);
+
+        ExtractionManifest manifest = acquisitionPort.acquire(command, cancellation, new AcquisitionListener() {
+            @Override
+            public void onProgress() {
+                jobRepository.markProgress(context.jobId(), context.processInstanceId(),
+                        context.executionGeneration(), clock.instant());
             }
-        } finally {
-            cancellation.unbindStatement();
-        }
-        jobRepository.markProgress(
-                context.jobId(), context.processInstanceId(), context.executionGeneration(), clock.instant());
+
+            @Override
+            public void onUncertainOutcome(String reason) {
+                // Block new LIVE_READ_ONLY acquisitions on this source for the same
+                // timeout-derived margin JobRecovery applies to an abandoned RUNNING job, rather
+                // than only guarding against a process restart (ENG-51).
+                acquisitionGuard.block(context.sourceId(),
+                        clock.instant().plus(liveAcquisitionCooldownMargin), reason);
+            }
+        });
         cancellation.checkCancelled();
 
-        List<CanonicalEncounter> encounters = extractReader.readEncounters(extractsBaseDir, manifest);
+        List<CanonicalEncounter> encounters = extractStore.readEncounters(manifest);
         return computeStageAndPublish(context, manifest, encounters, cancellation);
     }
 
@@ -264,7 +225,7 @@ public final class IndicatorRunExecutor {
 
     private RunOutcome computeStageAndPublish(
             RunContext context, ExtractionManifest manifest,
-            List<CanonicalEncounter> encounters, CancellationToken cancellation) {
+            List<CanonicalEncounter> encounters, CancellationSignal cancellation) {
         YearMonth requestedPeriod = YearMonth.parse(context.referencePeriod());
         String dataCutoff = requestedPeriod.atEndOfMonth().toString();
         IndicatorResult result = C1Rule.compute(
@@ -297,23 +258,6 @@ public final class IndicatorRunExecutor {
                 context.idempotencyPrincipal(), context.municipalityIbge()));
 
         return new RunOutcome(stagingId, outcome.resultId(), result);
-    }
-
-    private void writeCanonical(ExtractWriter writer, PecSourceAcquisition acquisition, RawEncounterRecord raw) {
-        CanonicalModality modality = switch (raw.modality()) {
-            case PROGRAMADO -> CanonicalModality.PROGRAMADO;
-            case ESPONTANEO -> CanonicalModality.ESPONTANEO;
-            case UNMAPPED -> CanonicalModality.UNMAPPED;
-        };
-        CanonicalEncounter canonical = new CanonicalEncounter(
-                new SourceRef(acquisition.sourceId(), "tb_fat_atendimento_individual", String.valueOf(raw.pk())),
-                acquisition.municipalityIbge(), raw.careDate().toString(), modality,
-                raw.cnes(), raw.ine(), raw.cbo());
-        try {
-            writer.write(canonical);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private String computeInputFingerprint(ExtractionManifest manifest, IndicatorResult result) {

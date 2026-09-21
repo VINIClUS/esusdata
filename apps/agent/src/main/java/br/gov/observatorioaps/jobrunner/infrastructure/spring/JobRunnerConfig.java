@@ -10,6 +10,8 @@ import br.gov.observatorioaps.resultstore.infrastructure.jdbc.JdbcResultReposito
 
 import br.gov.observatorioaps.sourceconnector.infrastructure.jdbc.JdbcSourceRepository;
 
+import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.JdbcAcquisitionGuardStore;
+
 import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.JdbcJobRepository;
 
 import br.gov.observatorioaps.identityaccess.application.GrantRevalidator;
@@ -18,26 +20,27 @@ import br.gov.observatorioaps.jobrunner.application.CancellationRegistry;
 import br.gov.observatorioaps.jobrunner.application.IdempotencyResolver;
 import br.gov.observatorioaps.jobrunner.application.IndicatorRunExecutor;
 import br.gov.observatorioaps.jobrunner.application.JobRecovery;
+import br.gov.observatorioaps.jobrunner.domain.AcquisitionGuardStore;
 import br.gov.observatorioaps.jobrunner.domain.JobRepository;
 import br.gov.observatorioaps.jobrunner.application.JobWorker;
 import br.gov.observatorioaps.jobrunner.domain.RetryPolicy;
 import br.gov.observatorioaps.jobrunner.application.SourceDiagnosticsService;
+import br.gov.observatorioaps.extractionstore.domain.ExtractStore;
+import br.gov.observatorioaps.extractionstore.infrastructure.file.FileExtractStore;
 import br.gov.observatorioaps.resultstore.domain.EvidenceRepository;
 import br.gov.observatorioaps.resultstore.domain.ExtractionManifestRepository;
 import br.gov.observatorioaps.resultstore.application.PublicationService;
 import br.gov.observatorioaps.resultstore.application.ReproducibilityCheck;
 import br.gov.observatorioaps.resultstore.domain.ResultRepository;
 import br.gov.observatorioaps.resultstore.domain.ResultStagingArea;
+import br.gov.observatorioaps.sourceconnector.domain.AcquisitionPort;
 import br.gov.observatorioaps.sourceconnector.domain.SourceRepository;
 import br.gov.observatorioaps.sourceconnector.domain.AllowedDestinations;
-import br.gov.observatorioaps.sourceconnector.infrastructure.file.EnvFileSecretResolver;
 import br.gov.observatorioaps.sourceconnector.infrastructure.jdbc.PecDataSourceFactory;
-import br.gov.observatorioaps.sourceconnector.domain.PecSecretResolver;
 import br.gov.observatorioaps.sourceconnector.domain.ReadBudget;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.context.annotation.Bean;
@@ -45,24 +48,24 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import br.gov.observatorioaps.platform.sqlite.SqliteDataSourceConfig;
 import br.gov.observatorioaps.platform.sqlite.SqliteProperties;
-import br.gov.observatorioaps.sourceconnector.infrastructure.spring.SourceConnectionProperties;
 /**
  * Wires the job-runner + result-store beans on top of {@link SqliteDataSourceConfig}. Every bean
  * here that touches {@code jobs}/{@code results}/{@code result_staging}/{@code evidence} depends,
  * directly or transitively, on {@code flywayMigration} — migrations run before any job is
  * accepted (§1.12.2).
+ *
+ * <p>{@code sourceconnector}'s own beans (destination allowlist, secret resolution, the PEC pool
+ * factory, and the {@link AcquisitionPort} implementation) are wired in {@code
+ * sourceconnector.infrastructure.spring.SourceConnectorConfig} — this class only consumes them by
+ * type (ADR 0009: {@code jobrunner} reaches the PEC only through the port, never a concrete
+ * adapter).
  */
 @Configuration
-@EnableConfigurationProperties(SourceConnectionProperties.class)
 public class JobRunnerConfig {
 
     private static final Logger log = LoggerFactory.getLogger(JobRunnerConfig.class);
@@ -81,52 +84,6 @@ public class JobRunnerConfig {
     @Bean
     public TransactionTemplate sqliteTransactionTemplate(DataSourceTransactionManager sqliteTransactionManager) {
         return new TransactionTemplate(sqliteTransactionManager);
-    }
-
-    // --- sourceconnector (wiring only — the classes themselves stay framework-free) --------
-
-    /**
-     * §1.12.6/ENG-46: deployment-administered, never widened by a runtime call. Empty by default
-     * — a fresh install authorizes no destination until an operator configures
-     * {@code observatorio.source.allowed-destinations} (a list of {@code "host:port"} entries).
-     */
-    @Bean
-    public AllowedDestinations allowedDestinations(SourceConnectionProperties properties) {
-        Set<AllowedDestinations.HostPort> parsed = new HashSet<>();
-        for (String entry : orEmpty(properties.allowedDestinations())) {
-            int colon = entry.lastIndexOf(':');
-            if (colon <= 0 || colon == entry.length() - 1) {
-                throw new IllegalArgumentException(
-                        "observatorio.source.allowed-destinations entry must be host:port, got: " + entry);
-            }
-            String host = entry.substring(0, colon);
-            int port = Integer.parseInt(entry.substring(colon + 1));
-            parsed.add(new AllowedDestinations.HostPort(host, port));
-        }
-        return new AllowedDestinations(parsed);
-    }
-
-    /**
-     * Dev-only credential resolver (ADR-0002/0003) — the same env-file convention already used by
-     * the live PEC tests. Production secret storage remains a documented pending item (§1.12.7).
-     */
-    @Bean
-    public PecSecretResolver pecSecretResolver(SourceConnectionProperties properties) {
-        String configured = properties.secretFile();
-        Path secretFile = (configured == null || configured.isBlank())
-                ? Path.of(System.getProperty("user.home"), ".config", "observatorio-aps", "pec.env")
-                : Path.of(configured);
-        return new EnvFileSecretResolver(secretFile);
-    }
-
-    @Bean
-    public PecDataSourceFactory pecDataSourceFactory(
-            AllowedDestinations allowedDestinations, PecSecretResolver pecSecretResolver) {
-        return new PecDataSourceFactory(allowedDestinations, pecSecretResolver);
-    }
-
-    private static List<String> orEmpty(List<String> list) {
-        return list == null ? List.of() : list;
     }
 
     // --- resultstore -----------------------------------------------------------------------
@@ -152,6 +109,11 @@ public class JobRunnerConfig {
     @Bean
     public ReproducibilityCheck reproducibilityCheck(SqliteProperties properties) {
         return new ReproducibilityCheck(properties.extractsDirectory());
+    }
+
+    @Bean
+    public ExtractStore extractStore(SqliteProperties properties) {
+        return new FileExtractStore(properties.extractsDirectory());
     }
 
     @Bean
@@ -215,8 +177,13 @@ public class JobRunnerConfig {
 
     @Bean
     @DependsOn("flywayMigration")
-    public AcquisitionGuard acquisitionGuard(JdbcTemplate sqliteJdbcTemplate, Clock clock) {
-        return new AcquisitionGuard(sqliteJdbcTemplate, clock);
+    public AcquisitionGuardStore acquisitionGuardStore(JdbcTemplate sqliteJdbcTemplate) {
+        return new JdbcAcquisitionGuardStore(sqliteJdbcTemplate);
+    }
+
+    @Bean
+    public AcquisitionGuard acquisitionGuard(AcquisitionGuardStore acquisitionGuardStore, Clock clock) {
+        return new AcquisitionGuard(acquisitionGuardStore, clock);
     }
 
     /**
@@ -267,7 +234,7 @@ public class JobRunnerConfig {
 
     @Bean
     public IndicatorRunExecutor indicatorRunExecutor(
-            SqliteProperties properties,
+            ExtractStore extractStore,
             JobRepository jobRepository,
             ResultStagingArea resultStagingArea,
             PublicationService publicationService,
@@ -275,12 +242,12 @@ public class JobRunnerConfig {
             Clock clock,
             GrantRevalidator grantRevalidator,
             SourceRepository sourceRepository,
-            PecDataSourceFactory pecDataSourceFactory,
+            AcquisitionPort acquisitionPort,
             AcquisitionGuard acquisitionGuard,
             Duration liveAcquisitionCooldownMargin) {
-        return new IndicatorRunExecutor(properties.extractsDirectory(), jobRepository,
+        return new IndicatorRunExecutor(extractStore, jobRepository,
                 resultStagingArea, publicationService, appBuild, clock, grantRevalidator,
-                sourceRepository, pecDataSourceFactory, acquisitionGuard, liveAcquisitionCooldownMargin);
+                sourceRepository, acquisitionPort, acquisitionGuard, liveAcquisitionCooldownMargin);
     }
 
     // JobWorker implements SmartLifecycle — Spring's lifecycle processor calls start()/stop()
