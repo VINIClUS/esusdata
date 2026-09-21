@@ -4,6 +4,8 @@ import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
 import { Building, Calendar, ChevronDown, Menu } from 'lucide-react'
 import { useAuth } from '@/app/auth'
+import { realContextForScope } from '@/app/display-context'
+import { USE_MOCKS } from '@/api/client'
 import { demoContext } from '@/api/fixtures/context'
 import { colors, layout } from '@/theme/tokens'
 import { SelectorChip } from '@/components/ui/SelectorChip'
@@ -17,6 +19,12 @@ interface TopBarProps {
 
 export function TopBar({ compact, phone, onOpenMenu }: TopBarProps) {
   const { user } = useAuth()
+  const displayContext = USE_MOCKS
+    ? { municipio: demoContext.municipio, competencia: demoContext.competencia }
+    : realContextForScope({
+        municipalityIbge: import.meta.env.VITE_MUNICIPALITY_IBGE,
+        referencePeriod: import.meta.env.VITE_REFERENCE_PERIOD,
+      })
   return (
     <Box
       component="header"
@@ -45,7 +53,7 @@ export function TopBar({ compact, phone, onOpenMenu }: TopBarProps) {
           {!compact && (
             <Typography sx={{ fontSize: 13.5, color: colors.textSecondary }}>Município</Typography>
           )}
-          <SelectorChip icon={Building} label={demoContext.municipio} />
+          <SelectorChip icon={Building} label={displayContext.municipio} />
         </Box>
       )}
 
@@ -71,7 +79,7 @@ export function TopBar({ compact, phone, onOpenMenu }: TopBarProps) {
               Competência
             </Box>
           )}
-          <SelectorChip icon={Calendar} label={demoContext.competencia} attached={!compact} />
+          <SelectorChip icon={Calendar} label={displayContext.competencia} attached={!compact} />
         </Box>
       )}
 

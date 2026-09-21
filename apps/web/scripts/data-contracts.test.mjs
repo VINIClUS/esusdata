@@ -8,7 +8,9 @@ import {
   normalizePainelResumo,
   indicatorResultsPath,
 } from '../src/api/normalizers.ts'
+import { realContextForScope } from '../src/app/display-context.ts'
 import { matchesIndicatorTab } from '../src/features/indicadores/filter.ts'
+import { detailTabContent } from '../src/features/indicadores/detail-tabs.ts'
 
 test('normalizes the backend indicator-pack catalog into the list view model', () => {
   const result = normalizeIndicatorPacks([
@@ -159,4 +161,23 @@ test('derives the real-mode panel from the catalog and published results', () =>
   assert.equal(painel.alertas[0].descricao, 'Portão A (fonte e vigência) incompleto')
   assert.deepEqual(painel.evolucao.pontos, [])
   assert.equal(painel.qualidade.percentual, null)
+})
+
+test('uses the configured API scope in real-mode display context', () => {
+  assert.deepEqual(
+    realContextForScope({
+      municipalityIbge: '3304557',
+      referencePeriod: '2026-09',
+    }),
+    { municipio: 'IBGE 3304557', competencia: '09/2026' },
+  )
+})
+
+test('maps every detail tab to content instead of only changing its underline', () => {
+  assert.equal(detailTabContent('resultados'), 'resultados')
+  assert.equal(detailTabContent('metodologia'), 'metodologia')
+  assert.equal(detailTabContent('populacao'), 'populacao')
+  assert.equal(detailTabContent('estratificacoes'), 'populacao')
+  assert.equal(detailTabContent('evidencias'), 'evidencias')
+  assert.equal(detailTabContent('historico'), 'historico')
 })

@@ -10,6 +10,7 @@ import { DataTable, type Column } from '@/components/data/DataTable'
 import { StatColumns } from '@/components/data/StatColumns'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Callout } from '@/components/ui/Callout'
+import { PageUnavailable } from '@/components/ui/PageUnavailable'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { StatusChip } from '@/components/ui/StatusChip'
@@ -57,9 +58,18 @@ const columns: Column<RegraValidacao>[] = [
 ]
 
 export function IsolamentoPage() {
-  const { data, isPending } = useIsolamento()
+  const { data, error, isError, isPending } = useIsolamento()
   const [tab, setTab] = useState('validacao')
-  if (isPending || !data) return <PageSkeleton title="Isolamento Municipal" />
+  if (isPending) return <PageSkeleton title="Isolamento Municipal" />
+  if (isError || !data) {
+    return (
+      <PageUnavailable
+        title="Isolamento Municipal"
+        subtitle="Garanta que os dados utilizados são apenas do município selecionado."
+        error={error}
+      />
+    )
+  }
 
   return (
     <>

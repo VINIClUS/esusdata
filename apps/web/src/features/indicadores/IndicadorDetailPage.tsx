@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useIndicadorDetalhe } from '@/api/hooks'
-import type { EvidenciaMotivo, InfoAdicional, MetodologiaItem } from '@/api/types'
+import type { EvidenciaMotivo, IndicadorDetalhe, InfoAdicional, MetodologiaItem } from '@/api/types'
 import { DonutChart } from '@/components/charts/DonutChartCard'
 import { LineChartCard } from '@/components/charts/LineChartCard'
 import { DataTable, type Column } from '@/components/data/DataTable'
@@ -37,6 +37,7 @@ import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { UnderlineTabs } from '@/components/ui/Tabs'
+import { detailTabContent, type DetailTabContent } from './detail-tabs'
 import { formatInt, formatPercent } from '@/lib/format'
 import { colors } from '@/theme/tokens'
 
@@ -143,6 +144,83 @@ function MetaChip({
   )
 }
 
+function IndicatorDetailTabContent({
+  data,
+  content,
+}: {
+  data: IndicadorDetalhe
+  content: Exclude<DetailTabContent, 'resultados'>
+}) {
+  if (content === 'metodologia') {
+    return (
+      <SectionCard title="Metodologia" subtitle="Como o indicador é calculado e interpretado.">
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {data.metodologia.map((item) => {
+            const Icon = metodologiaIcons[item.icone]
+            return (
+              <IconRow
+                key={item.titulo}
+                icon={<Icon size={18} strokeWidth={2.4} />}
+                title={item.titulo}
+                text={item.texto}
+              />
+            )
+          })}
+        </Box>
+      </SectionCard>
+    )
+  }
+
+  if (content === 'evidencias') {
+    return (
+      <SectionCard title="Evidências" subtitle="Principais motivos e ações sugeridas para este resultado.">
+        <DataTable
+          columns={evidenciaColumns}
+          rows={data.evidencias}
+          getRowKey={(row) => row.motivo}
+          dense
+        />
+      </SectionCard>
+    )
+  }
+
+  if (content === 'historico') {
+    return (
+      <SectionCard title="Histórico" subtitle="Evolução temporal do indicador.">
+        {data.evolucao.length > 0 ? (
+          <LineChartCard
+            data={data.evolucao}
+            series={[{ key: 'valor', label: 'Resultado do indicador', cor: colors.primary }]}
+            xKey="mes"
+            referenceLine={{ value: data.meta, label: `Meta (${data.meta}%)` }}
+          />
+        ) : (
+          <Typography sx={{ py: 7, textAlign: 'center', color: colors.textSecondary }}>
+            Histórico indisponível para este período.
+          </Typography>
+        )}
+      </SectionCard>
+    )
+  }
+
+  return (
+    <SectionCard
+      title="População e filtros"
+      subtitle="Escopo e informações adicionais aplicados ao resultado."
+    >
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+        {data.infoAdicionais.map((item) => {
+          const Icon = infoIcons[item.icone]
+          return <MetaChip key={item.label} icon={Icon} label={item.label} value={item.valor} />
+        })}
+      </Box>
+      <Typography sx={{ mt: 2, color: colors.textSecondary, fontSize: 13.5 }}>
+        Os filtros apresentados correspondem ao escopo fornecido pela API para este indicador.
+      </Typography>
+    </SectionCard>
+  )
+}
+
 export function IndicadorDetailPage() {
   const { codigo = 'PB-01' } = useParams()
   const { data, isError, isPending } = useIndicadorDetalhe(codigo)
@@ -179,6 +257,7 @@ export function IndicadorDetailPage() {
 
   const infoIcon = <Info size={18} color={colors.primary} />
   const resultadoIndisponivel = data.resultado.valor === null
+  const content = detailTabContent(tab)
 
   return (
     <>
@@ -234,7 +313,8 @@ export function IndicadorDetailPage() {
         sx={{ mb: 2 }}
       />
 
-      <Grid container spacing={1.75}>
+      {content === 'resultados' ? (
+        <Grid container spacing={1.75}>
         <Grid size={{ xs: 6, md: 3 }}>
           <KpiCard
             label="Resultado"
@@ -470,7 +550,10 @@ export function IndicadorDetailPage() {
             </Box>
           </Grid>
         )}
-      </Grid>
+        </Grid>
+      ) : (
+        <IndicatorDetailTabContent data={data} content={content} />
+      )}
     </>
   )
 }

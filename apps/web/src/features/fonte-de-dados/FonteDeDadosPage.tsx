@@ -12,6 +12,7 @@ import { Callout } from '@/components/ui/Callout'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { Field, PasswordField } from '@/components/ui/Inputs'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
+import { PageUnavailable } from '@/components/ui/PageUnavailable'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { UnderlineTabs } from '@/components/ui/Tabs'
 import { colors } from '@/theme/tokens'
@@ -35,13 +36,22 @@ function InfoCard({ icon, title, children }: { icon: React.ReactNode; title: str
 }
 
 export function FonteDeDadosPage() {
-  const { data, isPending } = useFonteConexao()
-  const { data: requisitos } = useRequisitosFonte()
+  const { data, error, isError, isPending } = useFonteConexao()
+  const { data: requisitos, error: requisitosErrorValue, isError: requisitosError } = useRequisitosFonte()
   const navigate = useNavigate()
   const [tab, setTab] = useState('conexao')
   const [form, setForm] = useState<Record<string, string> | null>(null)
 
-  if (isPending || !data) return <PageSkeleton title="Configuração da Fonte de Dados" />
+  if (isPending) return <PageSkeleton title="Configuração da Fonte de Dados" />
+  if (isError || !data) {
+    return (
+      <PageUnavailable
+        title="Configuração da Fonte de Dados"
+        subtitle="Configure a conexão com o banco de dados do e-SUS PEC."
+        error={error}
+      />
+    )
+  }
   const values = form ?? { host: data.host, porta: data.porta, banco: data.banco, usuario: data.usuario, senha: data.senha }
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...values, [k]: e.target.value })
 
@@ -89,7 +99,15 @@ export function FonteDeDadosPage() {
         <Grid size={{ xs: 12, md: 4.8 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             <InfoCard icon={<Typography sx={{ fontWeight: 700, fontSize: 18, lineHeight: 1 }}>i</Typography>} title="Requisitos">
-              <Checklist items={(requisitos ?? []).map((r) => ({ label: r.label, ok: r.ok }))} size="lg" />
+              {requisitosError ? (
+                <Callout variant="warning" title="Requisitos indisponíveis" dense>
+                  {requisitosErrorValue instanceof Error
+                    ? requisitosErrorValue.message
+                    : 'A API não fornece os requisitos da fonte neste momento.'}
+                </Callout>
+              ) : (
+                <Checklist items={(requisitos ?? []).map((r) => ({ label: r.label, ok: r.ok }))} size="lg" />
+              )}
             </InfoCard>
             <InfoCard icon={<Shield size={18} fill="#fff" />} title="Segurança">
               <Typography sx={{ fontSize: 15, color: colors.navy, lineHeight: 1.6, mb: 2.5 }}>

@@ -10,6 +10,7 @@ import { DataTable, type Column } from '@/components/data/DataTable'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { LinkButton } from '@/components/ui/LinkButton'
+import { PageUnavailable } from '@/components/ui/PageUnavailable'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { UnderlineTabs } from '@/components/ui/Tabs'
@@ -74,9 +75,18 @@ function ReportIllustration() {
 }
 
 export function RelatoriosPage() {
-  const { data, isPending } = useRelatoriosRecentes()
+  const { data, error, isError, isPending } = useRelatoriosRecentes()
   const [tab, setTab] = useState('indicadores')
-  if (isPending || !data) return <PageSkeleton title="Relatórios" />
+  if (isPending) return <PageSkeleton title="Relatórios" />
+  if (isError || !data) {
+    return (
+      <PageUnavailable
+        title="Relatórios"
+        subtitle="Gere relatórios personalizados com base nos indicadores e evidências do e-SUS PEC."
+        error={error}
+      />
+    )
+  }
 
   return (
     <>

@@ -11,6 +11,7 @@ import { LogList } from '@/components/data/LogList'
 import { ProgressBar } from '@/components/data/ProgressBar'
 import { StatColumns } from '@/components/data/StatColumns'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { PageUnavailable } from '@/components/ui/PageUnavailable'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { UnderlineTabs } from '@/components/ui/Tabs'
@@ -19,11 +20,20 @@ import { colors } from '@/theme/tokens'
 const paramIcons: Record<ParametroExecucao['icone'], LucideIcon> = { database: Database, calendar: Calendar, clock: Clock, file: FileText }
 
 export function ExecucaoPage() {
-  const { data, isPending } = useExecucaoAtual()
+  const { data, error, isError, isPending } = useExecucaoAtual()
   const [tab, setTab] = useState('unica')
   const [log, setLog] = useState<typeof data extends undefined ? never : NonNullable<typeof data>['log'] | null>(null)
 
-  if (isPending || !data) return <PageSkeleton title="Execução de Dados" />
+  if (isPending) return <PageSkeleton title="Execução de Dados" />
+  if (isError || !data) {
+    return (
+      <PageUnavailable
+        title="Execução de Dados"
+        subtitle="Gerencie a atualização dos dados e a execução dos indicadores do e-SUS PEC."
+        error={error}
+      />
+    )
+  }
   const lines = log ?? data.log
 
   return (
