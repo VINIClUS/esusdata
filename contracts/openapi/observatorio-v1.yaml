@@ -761,6 +761,12 @@ components:
         never JSON numbers. value == null is distinct from value == "0".
       properties:
         resultId: { type: string }
+        jobId: { type: string }
+        runId: { type: string }
+        extractionId: { type: string }
+        adapterVersion: { type: string }
+        calculationPolicyVersion: { type: string }
+        inputFingerprint: { type: string }
         indicatorPack: { type: string }
         ruleVersion: { type: string }
         scope: { $ref: "#/components/schemas/ScopeResponse" }

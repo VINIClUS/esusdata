@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { USE_MOCKS, apiFetch, resolveMock } from '../client'
 import { execucaoFixture } from '../fixtures/execucao'
-import { fonteConexaoFixture, requisitosFixture } from '../fixtures/fonteDados'
+import { fonteFixture, requisitosFixture } from '../fixtures/fonteDados'
 import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadores'
 import { isolamentoFixture } from '../fixtures/isolamento'
 import { painelFixture } from '../fixtures/painel'
@@ -14,7 +14,7 @@ import {
 } from '../normalizers'
 import type {
   ExecucaoAtual,
-  FonteConexao,
+  Fonte,
   IndicatorPack,
   IndicadorDetalhe,
   IndicatorResultResponse,
@@ -24,8 +24,8 @@ import type {
   RequisitoFonte,
 } from '../types'
 
-function source<T>(mock: T, path: string) {
-  return () => (USE_MOCKS ? resolveMock(mock) : apiFetch<T>(path))
+function mockOnly<T>(mock: T, message: string) {
+  return () => (USE_MOCKS ? resolveMock(mock) : Promise.reject(new Error(message)))
 }
 
 function resolveMockIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> {
@@ -104,36 +104,53 @@ export function useIndicadorDetalhe(codigo: string) {
 }
 
 export function useExecucaoAtual() {
+  const runId = import.meta.env.VITE_RUN_ID
   return useQuery({
-    queryKey: ['execucao'],
-    queryFn: source<ExecucaoAtual>(execucaoFixture, '/runs/current'),
+    queryKey: ['execucao', runId],
+    queryFn: USE_MOCKS
+      ? () => resolveMock(execucaoFixture)
+      : runId
+        ? () => apiFetch<ExecucaoAtual>(`/runs/${encodeURIComponent(runId)}`)
+        : () => Promise.reject(new Error('Configure VITE_RUN_ID para consultar uma execução real.')),
   })
 }
 
-export function useFonteConexao() {
+export function useFonte() {
   return useQuery({
     queryKey: ['fonte'],
-    queryFn: source<FonteConexao>(fonteConexaoFixture, '/sources'),
+    queryFn: mockOnly<Fonte>(
+      fonteFixture,
+      'A API ainda não fornece a leitura da fonte cadastrada neste ambiente.',
+    ),
   })
 }
 
 export function useRequisitosFonte() {
   return useQuery({
     queryKey: ['fonte', 'requisitos'],
-    queryFn: source<RequisitoFonte[]>(requisitosFixture, '/sources/requirements'),
+    queryFn: mockOnly<RequisitoFonte[]>(
+      requisitosFixture,
+      'A API ainda não fornece os requisitos da fonte neste ambiente.',
+    ),
   })
 }
 
 export function useIsolamento() {
   return useQuery({
     queryKey: ['isolamento'],
-    queryFn: source<IsolamentoStatus>(isolamentoFixture, '/scope'),
+    queryFn: mockOnly<IsolamentoStatus>(
+      isolamentoFixture,
+      'A API ainda não fornece a validação do isolamento municipal neste ambiente.',
+    ),
   })
 }
 
 export function useRelatoriosRecentes() {
   return useQuery({
     queryKey: ['relatorios'],
-    queryFn: source<RelatorioGerado[]>(relatoriosFixture, '/exports'),
+    queryFn: mockOnly<RelatorioGerado[]>(
+      relatoriosFixture,
+      'A API ainda não fornece relatórios neste ambiente.',
+    ),
   })
 }

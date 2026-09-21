@@ -32,7 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import br.gov.observatorioaps.pecadapter.domain.PecCompatibilityMatrix;
+import br.gov.observatorioaps.pecadapter.infrastructure.file.PecCompatibilityMatrix;
 class IndividualEncounterModalityCapabilityTest {
 
     private static final PecSourceIdentity CT133_IDENTITY =

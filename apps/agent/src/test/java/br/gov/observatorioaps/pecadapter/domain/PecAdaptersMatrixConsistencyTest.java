@@ -1,6 +1,7 @@
 package br.gov.observatorioaps.pecadapter.domain;
 
 import br.gov.observatorioaps.sourceconnector.domain.PecSourceIdentity;
+import br.gov.observatorioaps.pecadapter.infrastructure.file.PecCompatibilityMatrix;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import br.gov.observatorioaps.pecadapter.infrastructure.jdbc.IndividualEncounterModalityCapability;

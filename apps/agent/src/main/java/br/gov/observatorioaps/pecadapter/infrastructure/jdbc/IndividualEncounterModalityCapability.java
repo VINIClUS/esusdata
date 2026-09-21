@@ -22,7 +22,7 @@ import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
-import br.gov.observatorioaps.pecadapter.domain.PecCompatibilityMatrix;
+import br.gov.observatorioaps.pecadapter.infrastructure.file.PecCompatibilityMatrix;
 import br.gov.observatorioaps.pecadapter.domain.RawEncounterRecord;
 /**
  * Capability {@code individual_encounter_modality} against PEC 5.4.37 / PostgreSQL 9.6.13,

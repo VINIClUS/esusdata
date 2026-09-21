@@ -3,7 +3,6 @@ package br.gov.observatorioaps.jobrunner.domain;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import br.gov.observatorioaps.jobrunner.application.JobRecovery;
 
 /**
  * All SQL against {@code jobs} and {@code job_attempts}. Every state-changing method is a

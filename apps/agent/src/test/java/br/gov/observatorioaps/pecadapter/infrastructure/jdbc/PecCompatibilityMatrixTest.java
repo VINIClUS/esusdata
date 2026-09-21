@@ -1,6 +1,6 @@
 package br.gov.observatorioaps.pecadapter.infrastructure.jdbc;
 
-import br.gov.observatorioaps.pecadapter.domain.PecCompatibilityMatrix;
+import br.gov.observatorioaps.pecadapter.infrastructure.file.PecCompatibilityMatrix;
 import org.junit.jupiter.api.Test;
 
 import br.gov.observatorioaps.sourceconnector.infrastructure.jdbc.PecSourceConnection;

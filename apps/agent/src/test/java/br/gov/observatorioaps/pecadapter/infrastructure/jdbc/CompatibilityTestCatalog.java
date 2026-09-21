@@ -4,7 +4,7 @@ import br.gov.observatorioaps.sourceconnector.domain.PecSourceIdentity;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Map;
-import br.gov.observatorioaps.pecadapter.domain.PecCompatibilityMatrix;
+import br.gov.observatorioaps.pecadapter.infrastructure.file.PecCompatibilityMatrix;
 /** Synthetic fixture catalog: it supplies probes, while the production validator still checks every value. */
 final class CompatibilityTestCatalog implements CompatibilityCatalog {
 

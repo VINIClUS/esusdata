@@ -2,7 +2,7 @@ package br.gov.observatorioaps.jobrunner.application;
 
 import br.gov.observatorioaps.indicatorpacks.c1.C1Rule;
 import br.gov.observatorioaps.pecadapter.infrastructure.jdbc.CompatibilityCatalog;
-import br.gov.observatorioaps.pecadapter.domain.PecCompatibilityMatrix;
+import br.gov.observatorioaps.pecadapter.infrastructure.file.PecCompatibilityMatrix;
 import br.gov.observatorioaps.sourceconnector.domain.SourceRecord;
 import br.gov.observatorioaps.sourceconnector.domain.AllowedDestinations;
 import br.gov.observatorioaps.sourceconnector.infrastructure.jdbc.PecDataSourceFactory;

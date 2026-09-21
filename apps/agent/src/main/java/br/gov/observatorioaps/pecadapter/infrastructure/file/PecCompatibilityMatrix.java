@@ -1,4 +1,4 @@
-package br.gov.observatorioaps.pecadapter.domain;
+package br.gov.observatorioaps.pecadapter.infrastructure.file;
 
 import br.gov.observatorioaps.sourceconnector.domain.PecSourceIdentity;
 import tools.jackson.databind.JsonNode;

@@ -5,7 +5,7 @@ import Grid from '@mui/material/Grid'
 import Typography from '@mui/material/Typography'
 import { Building, Database, Radio, Shield, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { useFonteConexao, useRequisitosFonte } from '@/api/hooks'
+import { useFonte, useRequisitosFonte } from '@/api/hooks'
 import { Checklist } from '@/components/data/ChecklistCard'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Callout } from '@/components/ui/Callout'
@@ -36,7 +36,7 @@ function InfoCard({ icon, title, children }: { icon: React.ReactNode; title: str
 }
 
 export function FonteDeDadosPage() {
-  const { data, error, isError, isPending } = useFonteConexao()
+  const { data, error, isError, isPending } = useFonte()
   const { data: requisitos, error: requisitosErrorValue, isError: requisitosError } = useRequisitosFonte()
   const navigate = useNavigate()
   const [tab, setTab] = useState('conexao')
@@ -47,17 +47,17 @@ export function FonteDeDadosPage() {
     return (
       <PageUnavailable
         title="Configuração da Fonte de Dados"
-        subtitle="Configure a conexão com o banco de dados do e-SUS PEC."
+        subtitle="Configure a fonte de dados do município."
         error={error}
       />
     )
   }
-  const values = form ?? { host: data.host, porta: data.porta, banco: data.banco, usuario: data.usuario, senha: data.senha }
+  const values = form ?? { host: data.host, porta: data.porta, nomeBanco: data.nomeBanco, usuario: data.usuario, senha: data.senha }
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...values, [k]: e.target.value })
 
   return (
     <>
-      <PageHeader title="Configuração da Fonte de Dados" subtitle="Configure a conexão com o banco de dados do e-SUS PEC." />
+      <PageHeader title="Configuração da Fonte de Dados" subtitle="Configure a fonte de dados do município." />
 
       <UnderlineTabs
         items={tabs}
@@ -68,22 +68,22 @@ export function FonteDeDadosPage() {
 
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, md: 7.2 }}>
-          <SectionCard title="Dados da conexão" subtitle="Informe os dados de acesso ao banco de dados do e-SUS PEC." padding={3} headerSx={{ pb: 2.5 }} sx={{ height: '100%' }}>
+          <SectionCard title="Dados da fonte" subtitle="Informe os parâmetros da fonte cadastrada." padding={3} headerSx={{ pb: 2.5 }} sx={{ height: '100%' }}>
             <Box component="form" onSubmit={(e) => e.preventDefault()} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                <Typography sx={{ fontSize: 15, fontWeight: 600 }}>Tipo de banco</Typography>
+                <Typography sx={{ fontSize: 15, fontWeight: 600 }}>Família da fonte</Typography>
                 <FilterSelect value={data.tipo} options={[data.tipo]} icon={Database} fullWidth />
               </Box>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 2.5 }}>
                 <Field label="Host" value={values.host} onChange={set('host')} />
                 <Field label="Porta" value={values.porta} onChange={set('porta')} />
               </Box>
-              <Field label="Banco de dados" value={values.banco} onChange={set('banco')} />
+              <Field label="Nome do banco de dados" value={values.nomeBanco} onChange={set('nomeBanco')} />
               <Field label="Usuário" value={values.usuario} onChange={set('usuario')} autoComplete="off" />
               <PasswordField label="Senha" value={values.senha} onChange={set('senha')} autoComplete="new-password" />
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'auto 1fr' }, gap: 2, alignItems: 'stretch', mt: 1 }}>
                 <Button type="submit" variant="contained" size="large" startIcon={<Radio size={22} />} sx={{ minHeight: 58, px: 3, fontSize: 17, fontWeight: 500 }}>
-                  Testar conexão
+                  Testar fonte
                 </Button>
                 {data.ultimoTeste && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, bgcolor: colors.successBg, border: `1px solid ${colors.successBorder}`, borderRadius: '10px', color: colors.success, fontSize: 15, fontWeight: 600 }}>
@@ -111,7 +111,7 @@ export function FonteDeDadosPage() {
             </InfoCard>
             <InfoCard icon={<Shield size={18} fill="#fff" />} title="Segurança">
               <Typography sx={{ fontSize: 15, color: colors.navy, lineHeight: 1.6, mb: 2.5 }}>
-                As credenciais são armazenadas de forma segura e criptografada no sistema. O acesso ao banco de dados é somente de leitura, não sendo permitidas alterações nos dados.
+                As credenciais da fonte são armazenadas de forma segura e criptografada no sistema. A leitura é somente de consulta, sem alterações nos dados de origem.
               </Typography>
               <Box sx={{ bgcolor: '#fff', borderRadius: '12px', border: `1px solid ${colors.infoBorder}`, p: 2 }}>
                 <Callout variant="info" title="Seus dados estão protegidos" dense>
