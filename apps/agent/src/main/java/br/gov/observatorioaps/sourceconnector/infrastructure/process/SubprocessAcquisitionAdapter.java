@@ -54,20 +54,24 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
 
     private final List<String> command;
     private final PecSecretResolver secretResolver;
+    private final AllowedDestinations allowedDestinations;
     private final PecCompatibilityMatrix matrix;
     private final Duration exitGrace;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public SubprocessAcquisitionAdapter(List<String> command, PecSecretResolver secretResolver, Duration exitGrace) {
-        this(command, secretResolver, PecCompatibilityMatrix.fromClasspathResource(), exitGrace);
+    public SubprocessAcquisitionAdapter(
+            List<String> command, PecSecretResolver secretResolver, AllowedDestinations allowedDestinations,
+            Duration exitGrace) {
+        this(command, secretResolver, allowedDestinations, PecCompatibilityMatrix.fromClasspathResource(), exitGrace);
     }
 
     /** Package-visible seam for tests to inject a synthetic matrix, mirroring the JDBC path's own seam. */
     SubprocessAcquisitionAdapter(
-            List<String> command, PecSecretResolver secretResolver, PecCompatibilityMatrix matrix,
-            Duration exitGrace) {
+            List<String> command, PecSecretResolver secretResolver, AllowedDestinations allowedDestinations,
+            PecCompatibilityMatrix matrix, Duration exitGrace) {
         this.command = command;
         this.secretResolver = secretResolver;
+        this.allowedDestinations = allowedDestinations;
         this.matrix = matrix;
         this.exitGrace = exitGrace;
     }
@@ -75,6 +79,11 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
     @Override
     public ExtractionManifest acquire(
             AcquisitionCommand acquisitionCommand, CancellationSignal cancellation, AcquisitionListener listener) {
+        // §1.12.6/ENG-46: the allowlist is deployment-administered and never crosses the process
+        // boundary — checked here, in Java, before the child (which has no allowlist of its own)
+        // ever gets a chance to connect anywhere.
+        allowedDestinations.assertAllowed(
+                acquisitionCommand.connectionProperties().host(), acquisitionCommand.connectionProperties().port());
         try (SourceAcquisitionLimiter.Permit permit =
                 SourceAcquisitionLimiter.acquireOrFail(acquisitionCommand.connectionProperties().sourceId())) {
             return runChild(acquisitionCommand, cancellation, listener);

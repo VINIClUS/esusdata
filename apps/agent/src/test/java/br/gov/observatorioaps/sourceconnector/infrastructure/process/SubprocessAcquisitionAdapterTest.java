@@ -50,7 +50,14 @@ class SubprocessAcquisitionAdapterTest {
         }
     }
 
+    private static final AllowedDestinations ALLOWED = new AllowedDestinations(
+            java.util.Set.of(new AllowedDestinations.HostPort("127.0.0.1", 5432)));
+
     private SubprocessAcquisitionAdapter adapter(String scenario) {
+        return adapter(scenario, ALLOWED);
+    }
+
+    private SubprocessAcquisitionAdapter adapter(String scenario, AllowedDestinations allowedDestinations) {
         List<String> command = List.of(javaBinary(), "-cp", System.getProperty("java.class.path"),
                 StubExecutionPlaneMain.class.getName(), scenario);
         PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromJson("""
@@ -73,7 +80,8 @@ class SubprocessAcquisitionAdapterTest {
                 }
                 """.formatted(QUERY_CHECKSUM));
         return new SubprocessAcquisitionAdapter(
-                command, secretRef -> "fixture-password".toCharArray(), matrix, Duration.ofSeconds(5));
+                command, secretRef -> "fixture-password".toCharArray(), allowedDestinations, matrix,
+                Duration.ofSeconds(5));
     }
 
     private static String javaBinary() {
@@ -150,6 +158,21 @@ class SubprocessAcquisitionAdapterTest {
                 .isInstanceOf(AllowedDestinations.DestinationNotAllowedException.class)
                 .hasMessageContaining("allowlist");
         assertThat(listener.uncertainReasons).isEmpty();
+    }
+
+    @Test
+    void disallowedDestinationRefusesBeforeSpawningAndNeverFlagsUncertain() {
+        RecordingListener listener = new RecordingListener();
+        AllowedDestinations noneAllowed = new AllowedDestinations(java.util.Set.of());
+
+        // "happy" would otherwise succeed — proves the refusal happens before any process exists,
+        // not merely that the scenario itself would have failed.
+        assertThatThrownBy(() -> adapter("happy", noneAllowed).acquire(command(), new CancellationToken(), listener))
+                .isInstanceOf(AllowedDestinations.DestinationNotAllowedException.class);
+        // Nothing was ever live — AcquisitionListener's own contract says onUncertainOutcome is
+        // "never fired for a failure to even open the connection."
+        assertThat(listener.uncertainReasons).isEmpty();
+        assertThat(listener.progressCount.get()).isZero();
     }
 
     @Test

@@ -6,6 +6,7 @@ import br.gov.observatorioaps.sourceconnector.domain.PecSecretResolver;
 import br.gov.observatorioaps.sourceconnector.infrastructure.file.EnvFileSecretResolver;
 import br.gov.observatorioaps.sourceconnector.infrastructure.jdbc.JdbcAcquisitionAdapter;
 import br.gov.observatorioaps.sourceconnector.infrastructure.jdbc.PecDataSourceFactory;
+import br.gov.observatorioaps.sourceconnector.infrastructure.process.SubprocessAcquisitionAdapter;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,7 +24,7 @@ import br.gov.observatorioaps.platform.sqlite.SqliteProperties;
  * never by importing this package's types directly).
  */
 @Configuration
-@EnableConfigurationProperties(SourceConnectionProperties.class)
+@EnableConfigurationProperties({SourceConnectionProperties.class, ExecutionPlaneProperties.class})
 public class SourceConnectorConfig {
 
     /**
@@ -66,9 +67,22 @@ public class SourceConnectorConfig {
         return new PecDataSourceFactory(allowedDestinations, pecSecretResolver);
     }
 
+    /**
+     * Plan §2.1: an empty {@code observatorio.execution-plane.binary} keeps the in-process JDBC
+     * adapter as the default — {@code mvn verify} and any deployment without the packaged Rust
+     * binary must never depend on one existing.
+     */
     @Bean
-    public AcquisitionPort acquisitionPort(PecDataSourceFactory pecDataSourceFactory, SqliteProperties properties, Clock clock) {
-        return new JdbcAcquisitionAdapter(pecDataSourceFactory, properties.extractsDirectory(), clock);
+    public AcquisitionPort acquisitionPort(
+            PecDataSourceFactory pecDataSourceFactory, SqliteProperties properties, Clock clock,
+            ExecutionPlaneProperties executionPlaneProperties, PecSecretResolver pecSecretResolver,
+            AllowedDestinations allowedDestinations) {
+        String binary = executionPlaneProperties.binary();
+        if (binary == null || binary.isBlank()) {
+            return new JdbcAcquisitionAdapter(pecDataSourceFactory, properties.extractsDirectory(), clock);
+        }
+        return new SubprocessAcquisitionAdapter(
+                List.of(binary), pecSecretResolver, allowedDestinations, executionPlaneProperties.exitGrace());
     }
 
     private static List<String> orEmpty(List<String> list) {
