@@ -29,7 +29,8 @@ public abstract class SecuritySliceTestSupport {
         registry.add("server.port", () -> PORT);
         registry.add("observatorio.data.directory", dataDir::toString);
         registry.add("observatorio.web.allowed-hosts", () -> "127.0.0.1:" + PORT);
-        registry.add("observatorio.web.allowed-origins", () -> BASE_URL);
+        registry.add("observatorio.web.allowed-origins",
+                () -> BASE_URL + ",http://127.0.0.1:5173,http://localhost:5173");
         registry.add("observatorio.security.argon2-memory-kib", () -> "8");
         registry.add("observatorio.security.argon2-iterations", () -> "1");
     }

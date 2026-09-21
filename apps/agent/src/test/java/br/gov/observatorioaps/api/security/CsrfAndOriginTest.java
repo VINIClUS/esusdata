@@ -78,6 +78,26 @@ public class CsrfAndOriginTest extends SecuritySliceTestSupport {
     }
 
     @Test
+    void theViteDevelopmentOriginIsAcceptedForStateChangingRequests() throws Exception {
+        CookieManager cookieManager = new CookieManager();
+        HttpClient client = HttpClient.newBuilder().cookieHandler(cookieManager).build();
+        client.send(HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        String csrfToken = csrfTokenFrom(cookieManager);
+
+        HttpResponse<String> response = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/login"))
+                        .header("Content-Type", "application/json")
+                        .header("X-XSRF-TOKEN", csrfToken)
+                        .header("Origin", "http://localhost:5173")
+                        .POST(HttpRequest.BodyPublishers.ofString("{\"username\":\"x\",\"password\":\"y\"}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(401);
+    }
+
+    @Test
     void aRequestWithAnUnrecognizedHostHeaderIsRejected() throws Exception {
         String rawResponse;
         try (Socket socket = new Socket("127.0.0.1", PORT)) {

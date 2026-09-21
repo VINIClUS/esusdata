@@ -12,7 +12,7 @@ import java.util.List;
  */
 @ConfigurationProperties(prefix = "observatorio.web")
 public record WebSecurityProperties(
-        @DefaultValue({"http://127.0.0.1:8080", "http://localhost:8080"}) List<String> allowedOrigins,
+        @DefaultValue({"http://127.0.0.1:8080", "http://localhost:8080", "http://127.0.0.1:5173", "http://localhost:5173"}) List<String> allowedOrigins,
         @DefaultValue({"127.0.0.1:8080", "localhost:8080"}) List<String> allowedHosts
 ) {
 }

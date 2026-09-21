@@ -11,9 +11,9 @@ import {
   normalizeIndicatorPacks,
   normalizeIndicatorResult,
   normalizePainelResumo,
+  normalizeRunResponse,
 } from '../normalizers'
 import type {
-  ExecucaoAtual,
   Fonte,
   IndicatorPack,
   IndicadorDetalhe,
@@ -22,6 +22,7 @@ import type {
   PainelResumo,
   RelatorioGerado,
   RequisitoFonte,
+  RunResponse,
 } from '../types'
 
 function mockOnly<T>(mock: T, message: string) {
@@ -110,8 +111,10 @@ export function useExecucaoAtual() {
     queryFn: USE_MOCKS
       ? () => resolveMock(execucaoFixture)
       : runId
-        ? () => apiFetch<ExecucaoAtual>(`/runs/${encodeURIComponent(runId)}`)
-        : () => Promise.reject(new Error('Configure VITE_RUN_ID para consultar uma execução real.')),
+        ? () =>
+            apiFetch<RunResponse>(`/runs/${encodeURIComponent(runId)}`).then(normalizeRunResponse)
+        : () =>
+            Promise.reject(new Error('Configure VITE_RUN_ID para consultar uma execução real.')),
   })
 }
 
