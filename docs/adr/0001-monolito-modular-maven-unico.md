@@ -23,3 +23,5 @@ de build.
 - Um único `mvn verify` compila e testa tudo.
 - Refatorar um pacote para módulo Maven separado é possível depois, sem afetar a spec.
 - Testes de arquitetura (ArchUnit) tornam-se o mecanismo de imposição, não a estrutura de diretórios.
+- Organização interna de cada pacote-módulo em camadas `domain`/`application`/`infrastructure`:
+  ver [[0009-camadas-hexagonais-por-modulo]].

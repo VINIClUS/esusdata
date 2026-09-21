@@ -136,6 +136,16 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>${project.basedir}/src/main/resources</directory>
+      </resource>
+      <!-- contracts/ is the single source of the published PEC compatibility contract (ADR 0009) -->
+      <resource>
+        <directory>${project.basedir}/../../contracts/compatibility</directory>
+        <targetPath>compatibility</targetPath>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
