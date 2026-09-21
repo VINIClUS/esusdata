@@ -10,7 +10,6 @@ import java.util.List;
 import br.gov.observatorioaps.jobrunner.domain.Job;
 import br.gov.observatorioaps.jobrunner.domain.JobState;
 import br.gov.observatorioaps.jobrunner.domain.RetryPolicy;
-import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.CancellationToken;
 import br.gov.observatorioaps.jobrunner.domain.JobRepository;
 /**
  * Boot-time reconciliation (§1.9.4, ENG-06, ENG-21, ENG-51). Runs once per process start, after

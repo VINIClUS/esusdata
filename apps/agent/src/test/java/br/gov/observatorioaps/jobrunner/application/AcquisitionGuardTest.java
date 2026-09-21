@@ -13,6 +13,7 @@ import java.time.ZoneOffset;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import br.gov.observatorioaps.jobrunner.domain.SourceAcquisitionBlockedException;
+import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.JdbcAcquisitionGuardStore;
 /**
  * ENG-51: a source blocked after an abandoned live acquisition refuses a new LIVE_READ_ONLY
  * attempt until the cooldown expires; IMMUTABLE_EXTRACT never consults this guard at all (proven
@@ -60,7 +61,7 @@ class AcquisitionGuardTest {
         guard.block("src-1", clock.instant().plusSeconds(60), "recovered abandoned RUNNING job");
 
         Clock later = Clock.fixed(clock.instant().plusSeconds(61), ZoneOffset.UTC);
-        AcquisitionGuard laterGuard = new AcquisitionGuard(fixture.jdbc, later);
+        AcquisitionGuard laterGuard = new AcquisitionGuard(new JdbcAcquisitionGuardStore(fixture.jdbc), later);
         assertThatCode(() -> laterGuard.requireUnblocked("src-1")).doesNotThrowAnyException();
     }
 
@@ -75,7 +76,8 @@ class AcquisitionGuardTest {
                 .isInstanceOf(SourceAcquisitionBlockedException.class);
         // Still blocked well past the shorter request's cooldown — the longer one won.
         Clock past10s = Clock.fixed(clock.instant().plusSeconds(20), ZoneOffset.UTC);
-        assertThatThrownBy(() -> new AcquisitionGuard(fixture.jdbc, past10s).requireUnblocked("src-1"))
+        assertThatThrownBy(() -> new AcquisitionGuard(new JdbcAcquisitionGuardStore(fixture.jdbc), past10s)
+                        .requireUnblocked("src-1"))
                 .isInstanceOf(SourceAcquisitionBlockedException.class);
     }
 }

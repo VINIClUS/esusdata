@@ -3,7 +3,7 @@ package br.gov.observatorioaps.jobrunner.application;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.CancellationToken;
+import br.gov.observatorioaps.jobrunner.domain.CancellationToken;
 /** Process-wide registry of the currently-running job's {@link CancellationToken}. */
 public final class CancellationRegistry {
 

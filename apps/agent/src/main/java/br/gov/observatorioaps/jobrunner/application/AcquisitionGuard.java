@@ -1,10 +1,9 @@
 package br.gov.observatorioaps.jobrunner.application;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
+import br.gov.observatorioaps.jobrunner.domain.AcquisitionGuardStore;
 import br.gov.observatorioaps.jobrunner.domain.SourceAcquisitionBlockedException;
 /**
  * ENG-51: "restart não abre extração sobreposta sem confirmar término anterior." After an
@@ -15,34 +14,26 @@ import br.gov.observatorioaps.jobrunner.domain.SourceAcquisitionBlockedException
  * is never subject to this guard.
  *
  * <p>{@link JobRecovery} writes the cooldown ({@link #block}) for an abandoned RUNNING {@code
- * LIVE_READ_ONLY} job; {@link IndicatorRunExecutor#runLive} calls {@link #requireUnblocked} before
- * opening a PEC connection.
+ * LIVE_READ_ONLY} job; {@code IndicatorRunExecutor#runLive} calls {@link #requireUnblocked} before
+ * opening a PEC connection and forwards a live acquisition's uncertain-outcome signal to {@link
+ * #block} as well.
  */
 public final class AcquisitionGuard {
 
-    private final JdbcTemplate jdbc;
+    private final AcquisitionGuardStore store;
     private final Clock clock;
 
-    public AcquisitionGuard(JdbcTemplate jdbc, Clock clock) {
-        this.jdbc = jdbc;
+    public AcquisitionGuard(AcquisitionGuardStore store, Clock clock) {
+        this.store = store;
         this.clock = clock;
     }
 
     public void block(String sourceId, Instant blockedUntil, String reason) {
-        jdbc.update("""
-                INSERT INTO source_acquisition_guard (source_id, blocked_until, reason)
-                VALUES (?, ?, ?)
-                ON CONFLICT(source_id) DO UPDATE SET
-                    blocked_until = excluded.blocked_until, reason = excluded.reason
-                WHERE excluded.blocked_until > source_acquisition_guard.blocked_until
-                """, sourceId, blockedUntil.toString(), reason);
+        store.upsertBlock(sourceId, blockedUntil, reason);
     }
 
     public void requireUnblocked(String sourceId) {
-        Optional<Instant> blockedUntil = jdbc.query(
-                "select blocked_until from source_acquisition_guard where source_id = ?",
-                (rs, rowNum) -> Instant.parse(rs.getString(1)), sourceId)
-                .stream().findFirst();
+        Optional<Instant> blockedUntil = store.blockedUntil(sourceId);
         if (blockedUntil.isPresent() && blockedUntil.get().isAfter(clock.instant())) {
             throw new SourceAcquisitionBlockedException(
                     "source " + sourceId + " is on cooldown until " + blockedUntil.get()

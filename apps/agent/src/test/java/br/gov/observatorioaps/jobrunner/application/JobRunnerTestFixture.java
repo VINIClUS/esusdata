@@ -12,8 +12,14 @@ import br.gov.observatorioaps.identityaccess.infrastructure.jdbc.JdbcGrantReposi
 
 import br.gov.observatorioaps.identityaccess.infrastructure.jdbc.JdbcUserRepository;
 
+import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.JdbcAcquisitionGuardStore;
+
 import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.JdbcJobRepository;
 
+import br.gov.observatorioaps.extractionstore.infrastructure.file.FileExtractStore;
+import br.gov.observatorioaps.pecadapter.infrastructure.jdbc.CompatibilityCatalog;
+import br.gov.observatorioaps.sourceconnector.domain.AcquisitionPort;
+import br.gov.observatorioaps.sourceconnector.infrastructure.jdbc.JdbcAcquisitionAdapter;
 import br.gov.observatorioaps.platform.sqlite.SqliteDataSourceConfig;
 import br.gov.observatorioaps.identityaccess.domain.Grant;
 import br.gov.observatorioaps.identityaccess.domain.GrantRepository;
@@ -85,7 +91,7 @@ public final class JobRunnerTestFixture implements AutoCloseable {
     public final Clock clock;
 
     public JobRunnerTestFixture(Path dataDir, Clock clock) {
-        this(dataDir, clock, null);
+        this(dataDir, clock, null, null);
     }
 
     /**
@@ -94,6 +100,17 @@ public final class JobRunnerTestFixture implements AutoCloseable {
      *     Testcontainers PostgreSQL instance.
      */
     public JobRunnerTestFixture(Path dataDir, Clock clock, PecDataSourceFactory pecDataSourceFactory) {
+        this(dataDir, clock, pecDataSourceFactory, null);
+    }
+
+    /**
+     * @param compatibilityCatalog when non-null, used instead of the real {@code
+     *     JdbcCompatibilityCatalog} — mirrors {@code IndividualEncounterModalityCapability
+     *     .stream}'s own seam so a synthetic PostgreSQL fixture can supply probes for testing.
+     */
+    public JobRunnerTestFixture(
+            Path dataDir, Clock clock, PecDataSourceFactory pecDataSourceFactory,
+            CompatibilityCatalog compatibilityCatalog) {
         this.clock = clock;
         this.extractsDir = dataDir.resolve("extracts");
 
@@ -126,9 +143,13 @@ public final class JobRunnerTestFixture implements AutoCloseable {
         PecDataSourceFactory factory = pecDataSourceFactory != null ? pecDataSourceFactory
                 : new PecDataSourceFactory(
                         new AllowedDestinations(Set.of()), new EnvFileSecretResolver(dataDir.resolve("unused.env")));
+        AcquisitionPort acquisitionPort = compatibilityCatalog != null
+                ? new JdbcAcquisitionAdapter(factory, extractsDir, clock, compatibilityCatalog)
+                : new JdbcAcquisitionAdapter(factory, extractsDir, clock);
         executor = new IndicatorRunExecutor(
-                extractsDir, jobRepository, stagingArea, publicationService, "test-build", clock,
-                grantRevalidator, sourceRepository, factory, acquisitionGuard(), liveAcquisitionCooldownMargin);
+                new FileExtractStore(extractsDir), jobRepository, stagingArea, publicationService,
+                "test-build", clock, grantRevalidator, sourceRepository, acquisitionPort,
+                acquisitionGuard(), liveAcquisitionCooldownMargin);
     }
 
     public JobRecovery jobRecovery() {
@@ -137,7 +158,7 @@ public final class JobRunnerTestFixture implements AutoCloseable {
     }
 
     public AcquisitionGuard acquisitionGuard() {
-        return new AcquisitionGuard(jdbc, clock);
+        return new AcquisitionGuard(new JdbcAcquisitionGuardStore(jdbc), clock);
     }
 
     public JobWorker worker(String processInstanceId) {

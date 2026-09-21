@@ -32,10 +32,18 @@ class ModuleBoundaryTest {
      * ADR 0009: application-layer classes that still embed SQL or reach an adapter directly.
      * Each entry is debt to be paid by pulling the SQL behind a port in the module's
      * {@code domain} package. Remove the name here once that happens — the rule then guards it.
+     *
+     * <p>{@code IndicatorRunExecutor}, {@code JobWorker}, {@code CancellationRegistry}, and
+     * {@code AcquisitionGuard} paid this debt: acquisition now goes through {@code
+     * sourceconnector.domain.AcquisitionPort}, cancellation through {@code
+     * sourceconnector.domain.CancellationSignal} (implemented by {@code
+     * jobrunner.domain.CancellationToken}), and the ENG-51 cooldown row through {@code
+     * jobrunner.domain.AcquisitionGuardStore} — see {@link
+     * #jobRunnerApplicationDoesNotDependOnPecDriverOrSourceConnectorAdapters}.
      */
     private static final String HEXAGONAL_DEBT = String.join("|",
-            "IndicatorRunExecutor", "SourceDiagnosticsService", "FailureClassifier",
-            "AcquisitionGuard", "IdempotencyResolver", "CancellationRegistry", "JobWorker",
+            "SourceDiagnosticsService", "FailureClassifier",
+            "IdempotencyResolver",
             "PublicationService", "ReproducibilityCheck",
             "SessionService", "BootstrapActivation", "LoginThrottle", "ScopeResolver",
             "UserProvisioning", "PasswordPolicy", "AuthenticationService", "AuthorizationVersionGuard",
@@ -182,6 +190,28 @@ class ModuleBoundaryTest {
                 .that().resideInAPackage(BASE + ".jobrunner..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "jakarta.servlet..", BASE + ".api..")
+                .check(CLASSES);
+    }
+
+    /**
+     * {@code jobrunner.application} orchestrates the run; it does not know the PEC driver or any
+     * adapter that touches it. Acquisition crosses through {@code
+     * sourceconnector.domain.AcquisitionPort} — {@code JdbcAcquisitionAdapter} (or, later, an
+     * out-of-process execution plane) is the only thing on the other side of that seam. Scoped to
+     * {@code application} only, not all of {@code jobrunner}: {@code infrastructure.spring}
+     * wiring is explicitly allowed to depend on anything (ADR 0009's layer table). Classes still
+     * named in {@link #HEXAGONAL_DEBT} are exempt; everything else in {@code
+     * jobrunner.application} is held to this rule.
+     */
+    @Test
+    void jobRunnerApplicationDoesNotDependOnPecDriverOrSourceConnectorAdapters() {
+        noClasses()
+                .that().resideInAPackage(BASE + ".jobrunner.application..")
+                .and().haveNameNotMatching(DEBT_REGEX)
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.postgresql..",
+                        BASE + ".pecadapter.infrastructure..",
+                        BASE + ".sourceconnector.infrastructure..")
                 .check(CLASSES);
     }
 

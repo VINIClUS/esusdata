@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import br.gov.observatorioaps.jobrunner.domain.EnqueueRequest;
 import br.gov.observatorioaps.jobrunner.domain.Job;
 import br.gov.observatorioaps.jobrunner.domain.JobState;
-import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.CancellationToken;
+import br.gov.observatorioaps.jobrunner.domain.CancellationToken;
 /**
  * End-to-end over a synthetic extract, without any PEC involved: job → staging → publication.
  * C1's release gates are incomplete (§4.4), so the published result is honestly {@code BLOCKED}

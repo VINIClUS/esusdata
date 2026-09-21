@@ -20,7 +20,7 @@ import br.gov.observatorioaps.jobrunner.domain.JobCancelledException;
 import br.gov.observatorioaps.jobrunner.domain.JobState;
 import br.gov.observatorioaps.jobrunner.domain.RetryPolicy;
 import br.gov.observatorioaps.jobrunner.domain.SourceAcquisitionBlockedException;
-import br.gov.observatorioaps.jobrunner.infrastructure.jdbc.CancellationToken;
+import br.gov.observatorioaps.jobrunner.domain.CancellationToken;
 import br.gov.observatorioaps.jobrunner.domain.JobRepository;
 /**
  * The MVP's single calculation worker (§1.9.4: "um worker de cálculo ativo por instalação"). Runs
