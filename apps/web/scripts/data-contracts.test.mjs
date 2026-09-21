@@ -141,6 +141,35 @@ test('normalizes a backend run response into the execution page model', () => {
   assert.equal(execution.log.length > 0, true)
 })
 
+test('keeps unstarted stages pending when a run is cancelled before processing', () => {
+  const execution = normalizers.normalizeRunResponse({
+    jobId: 'job-2',
+    runId: 'run-2',
+    state: 'CANCELLED',
+    attempt: 0,
+    maxAttempts: 3,
+    municipalityIbge: '3541307',
+    indicatorPack: 'c1-mais-acesso',
+    ruleVersion: 'c1-mais-acesso@0.1.0',
+    referencePeriod: '2026-08',
+    sourceId: 'source-1',
+    extractionId: null,
+    createdAt: '2026-08-16T10:00:00Z',
+    startedAt: null,
+    finishedAt: '2026-08-16T10:01:00Z',
+    lastProgressAt: null,
+    failureCode: null,
+    failureDetail: null,
+    resultId: null,
+    attempts: [],
+  })
+
+  assert.deepEqual(
+    execution.etapas.map((stage) => stage.status),
+    ['concluido', 'pendente', 'pendente', 'pendente'],
+  )
+})
+
 test('keeps a blocked result unavailable instead of turning it into zero', () => {
   const detail = normalizeIndicatorResult({
     resultId: 'blocked-1',

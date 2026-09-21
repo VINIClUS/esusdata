@@ -190,7 +190,11 @@ function stageStatus(
   stage: number,
   response: RunResponse,
 ): ExecucaoAtual['etapas'][number]['status'] {
-  if (terminalRunStates.has(response.state)) return 'concluido'
+  if (response.state === 'SUCCEEDED') return 'concluido'
+  if (terminalRunStates.has(response.state)) {
+    const lastCompletedStage = response.resultId ? 3 : response.startedAt ? 2 : 1
+    return stage <= lastCompletedStage ? 'concluido' : 'pendente'
+  }
   const currentStage = stageForRunState[response.state]
   if (stage < currentStage) return 'concluido'
   if (stage === currentStage) return 'em_execucao'
