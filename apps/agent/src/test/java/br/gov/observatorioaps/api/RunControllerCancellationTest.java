@@ -106,7 +106,7 @@ class RunControllerCancellationTest {
 
         RunController controller = new RunController(
                 jobRepository, mock(IdempotencyResolver.class), new CancellationRegistry(),
-                mock(ResultRepository.class), mock(SourceRepository.class),
+                new RunResponseFactory(jobRepository, mock(ResultRepository.class)), mock(SourceRepository.class),
                 mock(ExtractionManifestRepository.class), authorization,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
