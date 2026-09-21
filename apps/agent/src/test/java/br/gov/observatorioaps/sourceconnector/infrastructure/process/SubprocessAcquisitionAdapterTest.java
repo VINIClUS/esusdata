@@ -3,6 +3,10 @@ package br.gov.observatorioaps.sourceconnector.infrastructure.process;
 import br.gov.observatorioaps.extractionstore.domain.ExtractionManifest;
 import br.gov.observatorioaps.jobrunner.domain.CancellationToken;
 import br.gov.observatorioaps.jobrunner.domain.JobCancelledException;
+import br.gov.observatorioaps.pecadapter.domain.ColumnMetadata;
+import br.gov.observatorioaps.pecadapter.domain.CompatibilityFingerprint;
+import br.gov.observatorioaps.pecadapter.domain.CompatibilityProbeResult;
+import br.gov.observatorioaps.pecadapter.domain.ProbeItem;
 import br.gov.observatorioaps.pecadapter.infrastructure.file.PecCompatibilityMatrix;
 import br.gov.observatorioaps.pecadapter.infrastructure.jdbc.IndividualEncounterModalityCapability;
 import br.gov.observatorioaps.sourceconnector.domain.AcquisitionCommand;
@@ -34,6 +38,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SubprocessAcquisitionAdapterTest {
 
     private static final String QUERY_CHECKSUM = IndividualEncounterModalityCapability.QUERY_CHECKSUM;
+    // The same algorithm the adapter itself uses, over the exact raw column data
+    // StubExecutionPlaneMain reports for "test_object.col_a" — this test never hardcodes a
+    // fingerprint string, it derives the expectation the same way the adapter must.
+    private static final String TEST_OBJECT_FINGERPRINT = CompatibilityFingerprint.compute(
+            new CompatibilityProbeResult(
+                    "test_object",
+                    java.util.Map.of("col_a", new ColumnMetadata("text", "text", "NO", 1)),
+                    List.of(new ProbeItem.ColumnItem("col_a"))));
 
     private static final class RecordingListener implements AcquisitionListener {
         final AtomicInteger progressCount = new AtomicInteger();
@@ -74,11 +86,11 @@ class SubprocessAcquisitionAdapterTest {
                     "status": "VALIDATED",
                     "query_checksum": "%s",
                     "objects_used": [
-                      {"object": "test_object", "signature_fingerprint": "sha256:deadbeef", "columns_used": ["col_a"]}
+                      {"object": "test_object", "signature_fingerprint": "%s", "columns_used": ["col_a"]}
                     ]
                   }]
                 }
-                """.formatted(QUERY_CHECKSUM));
+                """.formatted(QUERY_CHECKSUM, TEST_OBJECT_FINGERPRINT));
         return new SubprocessAcquisitionAdapter(
                 command, secretRef -> "fixture-password".toCharArray(), allowedDestinations, matrix,
                 Duration.ofSeconds(5));

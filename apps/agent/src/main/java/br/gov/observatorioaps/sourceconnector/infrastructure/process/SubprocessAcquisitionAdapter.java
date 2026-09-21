@@ -1,6 +1,10 @@
 package br.gov.observatorioaps.sourceconnector.infrastructure.process;
 
 import br.gov.observatorioaps.extractionstore.domain.ExtractionManifest;
+import br.gov.observatorioaps.pecadapter.domain.ColumnMetadata;
+import br.gov.observatorioaps.pecadapter.domain.CompatibilityFingerprint;
+import br.gov.observatorioaps.pecadapter.domain.CompatibilityProbeResult;
+import br.gov.observatorioaps.pecadapter.domain.ProbeItem;
 import br.gov.observatorioaps.pecadapter.infrastructure.file.PecCompatibilityMatrix;
 import br.gov.observatorioaps.pecadapter.infrastructure.jdbc.IndividualEncounterModalityCapability;
 import br.gov.observatorioaps.sourceconnector.domain.AcquisitionCommand;
@@ -24,10 +28,13 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 /**
  * {@link AcquisitionPort} that delegates the live PEC read to a spawned child process, talking
@@ -247,13 +254,96 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
         }
         JsonNode objects = probe.get("objects");
         for (Map.Entry<String, String> expected : entry.objectFingerprints().entrySet()) {
-            String actual = objects == null ? null : text(objects, expected.getKey());
+            String object = expected.getKey();
+            JsonNode objectNode = objects == null ? null : objects.get(object);
+            if (objectNode == null) {
+                return "no probe data reported for object " + object;
+            }
+            String actual;
+            try {
+                CompatibilityProbeResult probeResult =
+                        buildProbeResult(object, objectNode, entry.objectColumns().get(object));
+                actual = CompatibilityFingerprint.compute(probeResult);
+            } catch (RuntimeException invalid) {
+                return "could not compute fingerprint for " + object + ": " + invalid.getMessage();
+            }
             if (!expected.getValue().equals(actual)) {
-                return "fingerprint mismatch for " + expected.getKey() + ": expected "
-                        + expected.getValue() + " but got " + actual;
+                return "fingerprint mismatch for " + object + ": expected "
+                        + expected.getValue() + " but computed " + actual;
             }
         }
         return null;
+    }
+
+    /**
+     * The child never reports a fingerprint string — only the raw data it measured (column
+     * metadata, and one raw result per {@code columns_used} marker). This class computes the
+     * fingerprint itself via {@link CompatibilityFingerprint#compute}, the exact same algorithm
+     * {@code JdbcCompatibilityCatalog} uses (plan §1.3/§2.2) — there is no second implementation
+     * of the ENG-43 signature algorithm for a child to drift from.
+     */
+    private CompatibilityProbeResult buildProbeResult(String object, JsonNode objectNode, List<String> columnsUsed) {
+        Map<String, ColumnMetadata> columns = new LinkedHashMap<>();
+        JsonNode columnsNode = objectNode.get("columns");
+        if (columnsNode != null) {
+            for (JsonNode column : columnsNode) {
+                columns.put(text(column, "name"), new ColumnMetadata(
+                        text(column, "data_type"), text(column, "udt_name"), text(column, "is_nullable"),
+                        column.path("ordinal_position").asInt(0)));
+            }
+        }
+
+        List<ProbeItem> items = new ArrayList<>();
+        for (String requested : columnsUsed) {
+            if (requested.startsWith("UNIQUE_KEY=")) {
+                JsonNode uniqueKey = objectNode.get("unique_key");
+                String matchedType = uniqueKey == null ? null : text(uniqueKey, "matched_constraint_type");
+                boolean violation = uniqueKey != null
+                        && uniqueKey.path("uniqueness_violation_found").asBoolean(false);
+                items.add(new ProbeItem.UniqueKeyItem(requested, matchedType, violation));
+                continue;
+            }
+            if (requested.startsWith("REQUIRED_DIMENSIONS=")) {
+                JsonNode requiredDimensions = objectNode.get("required_dimensions");
+                Long violatingFactId = null;
+                if (requiredDimensions != null) {
+                    JsonNode idNode = requiredDimensions.get("violating_fact_event_id");
+                    if (idNode != null && !idNode.isNull()) {
+                        violatingFactId = idNode.asLong();
+                    }
+                }
+                items.add(new ProbeItem.RequiredDimensionsItem(requested, violatingFactId));
+                continue;
+            }
+            if (requested.startsWith("LEAF_SEMANTICS=")) {
+                List<ProbeItem.LeafRow> rows = new ArrayList<>();
+                JsonNode leafSemantics = objectNode.get("leaf_semantics");
+                JsonNode rowsNode = leafSemantics == null ? null : leafSemantics.get("rows");
+                if (rowsNode != null) {
+                    for (JsonNode row : rowsNode) {
+                        JsonNode parentNode = row.get("parent_id");
+                        Integer parent = (parentNode == null || parentNode.isNull()) ? null : parentNode.asInt();
+                        rows.add(new ProbeItem.LeafRow(row.path("id").asInt(0), text(row, "description"), parent));
+                    }
+                }
+                items.add(new ProbeItem.LeafSemanticsItem(requested, rows));
+                continue;
+            }
+            if (requested.startsWith("LEAF_IDS=")) {
+                Set<Integer> found = new HashSet<>();
+                JsonNode leafIds = objectNode.get("leaf_ids");
+                JsonNode foundIdsNode = leafIds == null ? null : leafIds.get("found_ids");
+                if (foundIdsNode != null) {
+                    for (JsonNode id : foundIdsNode) {
+                        found.add(id.asInt());
+                    }
+                }
+                items.add(new ProbeItem.LeafIdsItem(requested, found));
+                continue;
+            }
+            items.add(new ProbeItem.ColumnItem(requested));
+        }
+        return new CompatibilityProbeResult(object, columns, items);
     }
 
     private void writeAcquireEnvelope(OutputStream stdin, AcquisitionCommand acquisitionCommand) {

@@ -14,7 +14,10 @@ import java.nio.charset.StandardCharsets;
  */
 public final class StubExecutionPlaneMain {
 
-    private static final String CORRECT_FINGERPRINT = "sha256:deadbeef";
+    // Raw column data for "test_object.col_a" — SubprocessAcquisitionAdapterTest's synthetic
+    // matrix pins the fingerprint CompatibilityFingerprint.compute() derives from exactly this
+    // data (sha256("test_object\ncol_a|text|text|1|NO")), never a fingerprint this stub invents.
+    private static final String CORRECT_DATA_TYPE = "text";
     // Matches IndividualEncounterModalityCapability.QUERY_CHECKSUM for the query text this repo
     // ships in contracts/compatibility/queries/individual_encounter_modality@0.1.0.sql.
     private static final String QUERY_CHECKSUM =
@@ -37,10 +40,12 @@ public final class StubExecutionPlaneMain {
             return;
         }
 
-        String fingerprint = "mismatch".equals(scenario) ? "sha256:wrong" : CORRECT_FINGERPRINT;
+        String dataType = "mismatch".equals(scenario) ? "varchar" : CORRECT_DATA_TYPE;
         String queryChecksum = "wrong-query".equals(scenario) ? "sha256:tampered" : QUERY_CHECKSUM;
-        out.println("{\"type\":\"probe\",\"postgres_version\":\"9.6.13\",\"objects\":{\"test_object\":\""
-                + fingerprint + "\"},\"query_checksum\":\"" + queryChecksum + "\"}");
+        out.println("{\"type\":\"probe\",\"postgres_version\":\"9.6.13\",\"query_checksum\":\"" + queryChecksum
+                + "\",\"objects\":{\"test_object\":{\"columns\":[{\"name\":\"col_a\",\"data_type\":\""
+                + dataType + "\",\"udt_name\":\"" + dataType + "\",\"is_nullable\":\"NO\","
+                + "\"ordinal_position\":1}]}}}");
 
         String decision = in.readLine(); // "proceed" or "abort"
         if (decision == null || decision.contains("\"type\":\"abort\"")) {
