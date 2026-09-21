@@ -4,6 +4,7 @@ import br.gov.observatorioaps.extractionstore.ExtractFixtures;
 import br.gov.observatorioaps.extractionstore.ExtractionManifest;
 import br.gov.observatorioaps.indicatorengine.Classification;
 import br.gov.observatorioaps.indicatorengine.IndicatorResult;
+import br.gov.observatorioaps.jobrunner.JobRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,7 +60,8 @@ class ResultScopeIsolationTest {
 
         ResultStagingArea stagingArea = new ResultStagingArea(jdbc);
         ExtractionManifestRepository manifestRepository = new ExtractionManifestRepository(jdbc);
-        PublicationService publicationService = new PublicationService(jdbc, tx, manifestRepository,
+        PublicationService publicationService = new PublicationService(jdbc, tx, new JobRepository(jdbc, tx),
+                manifestRepository,
                 new ReproducibilityCheck(extractsDir), extractsDir, PublicationAuthorization.allowAll());
         resultRepository = new ResultRepository(jdbc);
         evidenceRepository = new EvidenceRepository(jdbc);

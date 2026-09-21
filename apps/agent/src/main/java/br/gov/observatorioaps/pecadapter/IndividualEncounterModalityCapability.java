@@ -148,6 +148,7 @@ public final class IndividualEncounterModalityCapability {
                 ps.setDate(2, Date.valueOf(periodStart));
                 ps.setDate(3, Date.valueOf(periodEndExclusive));
                 onStatementPrepared.accept(ps);
+                cancellationCheck.run();
 
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {

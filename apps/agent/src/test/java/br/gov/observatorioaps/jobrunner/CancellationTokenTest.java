@@ -41,6 +41,17 @@ class CancellationTokenTest {
     }
 
     @Test
+    void bindingAfterCancellationCancelsTheNewlyBoundStatement() throws SQLException {
+        CancellationToken token = new CancellationToken();
+        Statement statement = Mockito.mock(Statement.class);
+
+        token.requestCancel();
+        token.bindStatement(statement);
+
+        verify(statement, times(1)).cancel();
+    }
+
+    @Test
     void aFailingStatementCancelIsSwallowedBestEffort() throws SQLException {
         CancellationToken token = new CancellationToken();
         Statement statement = Mockito.mock(Statement.class);

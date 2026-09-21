@@ -54,6 +54,13 @@ public final class ResultRepository {
                 MAPPER, resultId, municipalityIbge).stream().findFirst();
     }
 
+    /** Lets {@code GET /runs/{id}} surface where a SUCCEEDED job's result landed. */
+    public Optional<String> findResultIdByJobId(String jobId, String municipalityIbge) {
+        requireScope(municipalityIbge);
+        return jdbc.query("select result_id from results where job_id = ? and municipality_ibge = ?",
+                (rs, rowNum) -> rs.getString("result_id"), jobId, municipalityIbge).stream().findFirst();
+    }
+
     private void requireScope(String municipalityIbge) {
         if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
             throw new IllegalArgumentException(

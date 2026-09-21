@@ -22,6 +22,7 @@ import br.gov.observatorioaps.resultstore.SourceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -92,9 +93,17 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
      *     mutation bumps it, which would look like an authorization bug rather than a fixture one.
      */
     String sessionCookie(String userId) {
+        return SessionCookie.NAME + "=" + rawSessionToken(userId);
+    }
+
+    /**
+     * @return the raw opaque session token (not the {@code OBS_SESSION=...} cookie header) — for
+     *     tests that need to look up the underlying {@code sessions} row directly, via {@link
+     *     #sha256Hex}.
+     */
+    String rawSessionToken(String userId) {
         long authorizationVersion = userRepository.findById(userId).orElseThrow().authorizationVersion();
-        String rawToken = sessionService.create(userId, authorizationVersion, clock.instant());
-        return SessionCookie.NAME + "=" + rawToken;
+        return sessionService.create(userId, authorizationVersion, clock.instant());
     }
 
     /**
@@ -110,7 +119,7 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
         return SessionCookie.NAME + "=" + rawToken;
     }
 
-    private String sha256Hex(String rawToken) {
+    String sha256Hex(String rawToken) {
         try {
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
             return java.util.HexFormat.of().formatHex(
@@ -125,6 +134,17 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 sourceId, 1, "PEC_POSTGRESQL", "PRONTUARIO", "PRIMARY",
                 "127.0.0.1", 5432, "esus", "esus_leitura", "PEC_DB_PASSWORD",
                 municipalityIbge, "5.4.37", "PEC_DW", Instant.EPOCH.toString()));
+    }
+
+    ExtractionManifest registerExtract(
+            String extractionId, String sourceId, String municipalityIbge, String referencePeriod,
+            int programado, int espontaneo, int unmapped) throws IOException {
+        ExtractionManifest manifest = ExtractFixtures.write(
+                dataDir.resolve("extracts"), extractionId, sourceId, municipalityIbge,
+                referencePeriod, programado, espontaneo, unmapped);
+        extractionManifestRepository.save(manifest,
+                dataDir.resolve("extracts").resolve(manifest.extractionId() + ".jsonl.gz"));
+        return manifest;
     }
 
     /**
@@ -174,15 +194,21 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
      * {@code CsrfAndOriginTest} proves the filter chain requires.
      */
     HttpResponse<String> authenticatedPost(String sessionCookie, URI uri, String jsonBody) throws Exception {
-        return authenticatedRequest(sessionCookie, uri, "POST", jsonBody);
+        return authenticatedRequest(sessionCookie, uri, "POST", jsonBody, null);
+    }
+
+    HttpResponse<String> authenticatedPostWithIdempotency(
+            String sessionCookie, String idempotencyKey, String jsonBody) throws Exception {
+        return authenticatedRequest(sessionCookie, URI.create(BASE_URL + "/api/v1/runs"), "POST",
+                jsonBody, idempotencyKey);
     }
 
     HttpResponse<String> authenticatedDelete(String sessionCookie, URI uri) throws Exception {
-        return authenticatedRequest(sessionCookie, uri, "DELETE", null);
+        return authenticatedRequest(sessionCookie, uri, "DELETE", null, null);
     }
 
     private HttpResponse<String> authenticatedRequest(
-            String sessionCookie, URI uri, String method, String jsonBody) throws Exception {
+            String sessionCookie, URI uri, String method, String jsonBody, String idempotencyKey) throws Exception {
         HttpClient client = HttpClient.newHttpClient();
         HttpResponse<String> ready = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
@@ -197,6 +223,9 @@ abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 .header("Cookie", sessionCookie + "; XSRF-TOKEN=" + csrfToken)
                 .header("X-XSRF-TOKEN", csrfToken)
                 .method(method, body);
+        if (idempotencyKey != null) {
+            builder.header("Idempotency-Key", idempotencyKey);
+        }
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 

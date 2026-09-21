@@ -19,7 +19,7 @@ public final class CancellationRegistry {
         tokens.remove(jobId);
     }
 
-    /** Returns {@code true} if a running attempt was found and asked to cancel. */
+    /** Returns {@code true} after recording a cancellation for a currently registered attempt. */
     public boolean requestCancel(String jobId) {
         CancellationToken token = tokens.get(jobId);
         if (token == null) {

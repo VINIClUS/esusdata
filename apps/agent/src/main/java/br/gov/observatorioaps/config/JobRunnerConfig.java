@@ -145,11 +145,13 @@ public class JobRunnerConfig {
     public PublicationService publicationService(
             JdbcTemplate sqliteJdbcTemplate,
             TransactionTemplate sqliteTransactionTemplate,
+            JobRepository jobRepository,
             ExtractionManifestRepository extractionManifestRepository,
             ReproducibilityCheck reproducibilityCheck,
             SqliteProperties properties,
             GrantRevalidator grantRevalidator) {
         return new PublicationService(sqliteJdbcTemplate, sqliteTransactionTemplate,
+                jobRepository,
                 extractionManifestRepository, reproducibilityCheck, properties.extractsDirectory(),
                 grantRevalidator);
     }
