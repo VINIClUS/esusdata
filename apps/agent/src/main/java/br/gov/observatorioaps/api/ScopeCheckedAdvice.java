@@ -3,6 +3,7 @@ package br.gov.observatorioaps.api;
 import br.gov.observatorioaps.identityaccess.AccessAdministrationService;
 import br.gov.observatorioaps.identityaccess.ReauthenticationGuard;
 import br.gov.observatorioaps.identityaccess.UserProvisioning;
+import br.gov.observatorioaps.jobrunner.JobRequestConflictException;
 import br.gov.observatorioaps.jobrunner.SourceNotFoundException;
 import br.gov.observatorioaps.resultstore.EvidenceNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -66,8 +67,29 @@ class ScopeCheckedAdvice {
                 .body(new ApiError("REAUTHENTICATION_REQUIRED", e.getMessage()));
     }
 
+    /** ENG-24/§1.9.5: the same idempotency key was already used with a different request payload. */
+    @ExceptionHandler(JobRequestConflictException.class)
+    ResponseEntity<ApiError> handleJobRequestConflict(JobRequestConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiError("IDEMPOTENCY_KEY_CONFLICT", e.getMessage()));
+    }
+
+    /** The job's current state lost the cancel CAS — already terminal, or the worker won the race. */
+    @ExceptionHandler(JobNotCancellableException.class)
+    ResponseEntity<ApiError> handleJobNotCancellable(JobNotCancellableException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiError("JOB_NOT_CANCELLABLE", e.getMessage()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiError("BAD_REQUEST", e.getMessage()));
+    }
+
+    /** {@link SseConnectionLimiter} refused a new stream — the fast-cadence load bound from the plan. */
+    @ExceptionHandler(TooManyEventStreamsException.class)
+    ResponseEntity<ApiError> handleTooManyEventStreams(TooManyEventStreamsException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ApiError("TOO_MANY_EVENT_STREAMS", e.getMessage()));
     }
 }

@@ -154,6 +154,12 @@ public final class JobWorker implements SmartLifecycle {
     private void processJob(Job job) {
         CancellationToken token = cancellationRegistry.register(job.jobId());
         try {
+            Job persisted = jobRepository.findById(job.jobId()).orElse(null);
+            if (persisted != null && persisted.state() == JobState.CANCEL_REQUESTED
+                    && processInstanceId.equals(persisted.processInstanceId())
+                    && persisted.executionGeneration() == job.executionGeneration()) {
+                token.requestCancel();
+            }
             IndicatorRunExecutor.RunContext context = new IndicatorRunExecutor.RunContext(
                     job.jobId(), job.runId(), job.sourceId(), job.executionGeneration(),
                     job.processInstanceId(), job.extractionId(), job.municipalityIbge(),
@@ -172,13 +178,8 @@ public final class JobWorker implements SmartLifecycle {
                         "job has neither extraction_id (IMMUTABLE_EXTRACT) nor source_id (LIVE_READ_ONLY).");
                 return;
             }
-            // Success — PublicationService already moved the job to SUCCEEDED. job_attempts still
-            // needs its own row here, or a normally completed job's attempt history silently omits
-            // its final (successful) attempt despite the schema explicitly supporting it.
-            Instant now = clock.instant();
-            jobRepository.recordAttempt(job.jobId(), job.attempt(), processInstanceId,
-                    job.executionGeneration(), job.startedAt() == null ? now : job.startedAt(), now,
-                    "SUCCEEDED", null, null);
+            // PublicationService records the successful attempt in the same transaction that
+            // makes the result and SUCCEEDED job visible.
         } catch (JobCancelledException | PublicationRefusedException cancelledOrRaced) {
             finalizeCancellationIfOwned(job);
         } catch (Exception failure) {
@@ -204,13 +205,8 @@ public final class JobWorker implements SmartLifecycle {
         if (refreshed.stagingId() != null) {
             stagingArea.neutralize(refreshed.stagingId());
         }
-        boolean cancelled = jobRepository.markCancelled(
+        jobRepository.markCancelledAndRecordAttempt(
                 job.jobId(), processInstanceId, job.executionGeneration(), now);
-        if (cancelled) {
-            jobRepository.recordAttempt(job.jobId(), job.attempt(), processInstanceId,
-                    job.executionGeneration(), job.startedAt() == null ? now : job.startedAt(), now,
-                    "CANCELLED", "CANCELLED", "cooperative cancellation completed");
-        }
     }
 
     private void handleFailure(Job job, Throwable failure) {
@@ -233,8 +229,6 @@ public final class JobWorker implements SmartLifecycle {
         boolean retriable = classification.category() == FailureClassifier.Category.TRANSIENT
                 && retryPolicy.canRetry(job.attempt(), job.maxAttempts());
 
-        boolean transitioned;
-        String outcome;
         if (retriable) {
             Instant nextAttemptAt = retryPolicy.nextAttemptAt(now, job.attempt());
             if (failure instanceof SourceAcquisitionBlockedException blocked
@@ -244,30 +238,19 @@ public final class JobWorker implements SmartLifecycle {
                 // would have accomplished nothing.
                 nextAttemptAt = blocked.blockedUntil();
             }
-            transitioned = jobRepository.requeueForRetry(job.jobId(), processInstanceId,
+            jobRepository.requeueForRetryAndRecordAttempt(job.jobId(), processInstanceId,
                     job.executionGeneration(), fromState, nextAttemptAt,
-                    classification.code(), classification.detail());
-            outcome = "FAILED_TRANSIENT";
+                    classification.code(), classification.detail(), now);
         } else {
-            transitioned = jobRepository.markFailed(job.jobId(), processInstanceId,
+            jobRepository.markFailedAndRecordAttempt(job.jobId(), processInstanceId,
                     job.executionGeneration(), fromState, classification.code(),
                     classification.detail(), now);
-            outcome = "FAILED_DEFINITIVE";
-        }
-        if (transitioned) {
-            jobRepository.recordAttempt(job.jobId(), job.attempt(), processInstanceId,
-                    job.executionGeneration(), job.startedAt() == null ? now : job.startedAt(), now,
-                    outcome, classification.code(), classification.detail());
         }
     }
 
     private void finalizeDefinitiveFailure(Job job, String code, String detail) {
         Instant now = clock.instant();
-        boolean transitioned = jobRepository.markFailed(job.jobId(), processInstanceId,
+        jobRepository.markFailedAndRecordAttempt(job.jobId(), processInstanceId,
                 job.executionGeneration(), JobState.RUNNING, code, detail, now);
-        if (transitioned) {
-            jobRepository.recordAttempt(job.jobId(), job.attempt(), processInstanceId,
-                    job.executionGeneration(), now, now, "FAILED_DEFINITIVE", code, detail);
-        }
     }
 }
