@@ -56,9 +56,13 @@ cd apps/agent && mvn verify -Dsurefire.reuseForks=false
 cd apps/web && npm install && npm run dev
 
 # plano de execução (ADR 0010) — build separado, opcional; sem o binário o backend usa o
-# adaptador JDBC in-process (observatorio.execution-plane.binary vazio). Hoje só o handshake
-# de compatibilidade está implementado — nunca aponte observatorio.execution-plane.binary
-# para este binário contra uma fonte real ainda.
+# adaptador JDBC in-process (observatorio.execution-plane.binary vazio). O handshake de
+# compatibilidade e o streaming de linhas (consulta congelada, orçamento de leitura) estão
+# implementados e verificados manualmente contra um Postgres real; cancelamento cooperativo
+# também, exceto o caso de cancelar em meio ao streaming (só o caso antes da primeira linha foi
+# exercitado). Ainda não há empacotamento jpackage nem teste de integração automatizado ponta a
+# ponta com o Java — nunca aponte observatorio.execution-plane.binary para este binário contra
+# uma fonte real ainda.
 cd apps/execplane && cargo build --release && cargo test
 ```
 
