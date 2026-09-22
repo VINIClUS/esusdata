@@ -1,15 +1,5 @@
 package br.gov.observatorioaps.execution;
 
-import br.gov.observatorioaps.results.adapter.out.sqlite.JdbcResultStagingArea;
-
-import br.gov.observatorioaps.results.adapter.out.sqlite.JdbcExtractionManifestRepository;
-
-import br.gov.observatorioaps.results.adapter.out.sqlite.JdbcEvidenceRepository;
-
-import br.gov.observatorioaps.results.adapter.out.sqlite.JdbcResultRepository;
-
-import br.gov.observatorioaps.sources.adapter.out.sqlite.JdbcSourceRepository;
-
 import br.gov.observatorioaps.execution.adapter.out.sqlite.JdbcAcquisitionGuardStore;
 
 import br.gov.observatorioaps.execution.adapter.out.sqlite.JdbcJobRepository;
@@ -27,11 +17,7 @@ import br.gov.observatorioaps.execution.domain.job.RetryPolicy;
 import br.gov.observatorioaps.execution.application.SourceDiagnosticsService;
 import br.gov.observatorioaps.execution.domain.extract.ExtractStore;
 import br.gov.observatorioaps.execution.adapter.out.file.FileExtractStore;
-import br.gov.observatorioaps.results.domain.EvidenceRepository;
-import br.gov.observatorioaps.results.domain.ExtractionManifestRepository;
 import br.gov.observatorioaps.results.application.PublicationService;
-import br.gov.observatorioaps.results.application.ReproducibilityCheck;
-import br.gov.observatorioaps.results.domain.ResultRepository;
 import br.gov.observatorioaps.results.domain.ResultStagingArea;
 import br.gov.observatorioaps.execution.domain.acquisition.AcquisitionPort;
 import br.gov.observatorioaps.sources.domain.SourceRepository;
@@ -54,16 +40,18 @@ import java.util.UUID;
 import br.gov.observatorioaps.platform.sqlite.SqliteDataSourceConfig;
 import br.gov.observatorioaps.platform.sqlite.SqliteProperties;
 /**
- * Wires the job-runner + result-store beans on top of {@link SqliteDataSourceConfig}. Every bean
- * here that touches {@code jobs}/{@code results}/{@code result_staging}/{@code evidence} depends,
- * directly or transitively, on {@code flywayMigration} — migrations run before any job is
- * accepted (§1.12.2).
+ * Wires the job-runner beans on top of {@link SqliteDataSourceConfig}. Every bean here that
+ * touches {@code jobs} depends, directly or transitively, on {@code flywayMigration} — migrations
+ * run before any job is accepted (§1.12.2).
  *
  * <p>The PEC acquisition beans (destination allowlist, secret resolution, the PEC pool factory,
  * and the {@link AcquisitionPort} implementation) are wired in {@link
  * br.gov.observatorioaps.execution.AcquisitionConfig} — this class only consumes them by type
  * (ADR 0012: {@code execution.application} reaches the PEC only through the port, never a
- * concrete adapter).
+ * concrete adapter). The source registry is wired in {@code
+ * br.gov.observatorioaps.sources.SourcesConfig} and result publication in {@code
+ * br.gov.observatorioaps.results.ResultsConfig}; this class consumes {@link SourceRepository} and
+ * {@link PublicationService} by type only.
  */
 @Configuration
 public class JobRunnerConfig {
@@ -86,62 +74,9 @@ public class JobRunnerConfig {
         return new TransactionTemplate(sqliteTransactionManager);
     }
 
-    // --- results ---------------------------------------------------------------------------
-
-    @Bean
-    @DependsOn("flywayMigration")
-    public SourceRepository sourceRepository(JdbcTemplate sqliteJdbcTemplate) {
-        return new JdbcSourceRepository(sqliteJdbcTemplate);
-    }
-
-    @Bean
-    @DependsOn("flywayMigration")
-    public ExtractionManifestRepository extractionManifestRepository(JdbcTemplate sqliteJdbcTemplate) {
-        return new JdbcExtractionManifestRepository(sqliteJdbcTemplate);
-    }
-
-    @Bean
-    @DependsOn("flywayMigration")
-    public ResultStagingArea resultStagingArea(JdbcTemplate sqliteJdbcTemplate) {
-        return new JdbcResultStagingArea(sqliteJdbcTemplate);
-    }
-
-    @Bean
-    public ReproducibilityCheck reproducibilityCheck(SqliteProperties properties) {
-        return new ReproducibilityCheck(properties.extractsDirectory());
-    }
-
     @Bean
     public ExtractStore extractStore(SqliteProperties properties) {
         return new FileExtractStore(properties.extractsDirectory());
-    }
-
-    @Bean
-    @DependsOn("flywayMigration")
-    public PublicationService publicationService(
-            JdbcTemplate sqliteJdbcTemplate,
-            TransactionTemplate sqliteTransactionTemplate,
-            JobRepository jobRepository,
-            ExtractionManifestRepository extractionManifestRepository,
-            ReproducibilityCheck reproducibilityCheck,
-            SqliteProperties properties,
-            GrantRevalidator grantRevalidator) {
-        return new PublicationService(sqliteJdbcTemplate, sqliteTransactionTemplate,
-                jobRepository,
-                extractionManifestRepository, reproducibilityCheck, properties.extractsDirectory(),
-                grantRevalidator);
-    }
-
-    @Bean
-    @DependsOn("flywayMigration")
-    public ResultRepository resultRepository(JdbcTemplate sqliteJdbcTemplate) {
-        return new JdbcResultRepository(sqliteJdbcTemplate);
-    }
-
-    @Bean
-    @DependsOn("flywayMigration")
-    public EvidenceRepository evidenceRepository(JdbcTemplate sqliteJdbcTemplate) {
-        return new JdbcEvidenceRepository(sqliteJdbcTemplate);
     }
 
     @Bean
