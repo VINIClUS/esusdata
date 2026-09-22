@@ -12,7 +12,7 @@ verificáveis, não dez serviços nem obrigação de dez subprojetos de build."*
 `apps/agent` é **um único projeto Maven**. Os módulos arquiteturais (`identity-access`,
 `source-connector`, `pec-adapter`, `extraction-store`, `indicator-engine`, `job-runner`,
 `result-store`, `external-data`, `quality-rules`, `audit-operations`) são pacotes Java sob
-`br.gov.observatorioaps.<modulo>`, não módulos Maven separados. `indicator-packs` compila como
+`esusdata.<pacote>` (nomes atuais em ADR 0013), não módulos Maven separados. `indicator-packs` compila como
 código-fonte incluído na mesma release (§1.5: *"Pacotes compilados no MVP... incluídos na mesma
 release do serviço"*).
 
