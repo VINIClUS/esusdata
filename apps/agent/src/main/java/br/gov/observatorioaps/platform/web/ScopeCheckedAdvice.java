@@ -10,9 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import br.gov.observatorioaps.access.adapter.in.http.AuthController;
 import br.gov.observatorioaps.access.application.ScopeDeniedException;
-import br.gov.observatorioaps.execution.adapter.in.http.SseConnectionLimiter;
 
 /**
  * Global HTTP error mapping for the domain controllers (results, evidence, indicator packs, and
@@ -89,7 +87,7 @@ public class ScopeCheckedAdvice {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiError("BAD_REQUEST", e.getMessage()));
     }
 
-    /** {@link SseConnectionLimiter} refused a new stream — the fast-cadence load bound from the plan. */
+    /** {@code SseConnectionLimiter} refused a new stream — the fast-cadence load bound from the plan. */
     @ExceptionHandler(TooManyEventStreamsException.class)
     ResponseEntity<ApiError> handleTooManyEventStreams(TooManyEventStreamsException e) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)

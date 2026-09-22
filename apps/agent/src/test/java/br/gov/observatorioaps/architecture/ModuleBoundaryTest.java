@@ -1,25 +1,36 @@
 package br.gov.observatorioaps.architecture;
 
+import br.gov.observatorioaps.execution.adapter.out.pec.PecDataSourceFactory;
+import br.gov.observatorioaps.execution.adapter.out.pec.PecSourceConnection;
+import br.gov.observatorioaps.execution.application.SourceDiagnosticsService;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition;
 import org.junit.jupiter.api.Test;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * Tech Spec §1.5: "indicator-engine não depende de JDBC, HikariCP, HTTP ou leitura direta do PEC;
- * não executa SQL de usuário." ENG-35: "Teste de arquitetura impede JDBC/SQL na avaliação
- * metodológica; o motor funciona com fixture canônica sem banco PEC."
- *
- * <p>This is the one place these rules are enforced as code — not as a comment, not as a code
- * review convention. Two families of rules live here:
+ * ADR 0012: the codebase is organized into five capabilities (access, sources, execution,
+ * indicators, results) plus platform, each internally layered {@code domain}/{@code
+ * application}/{@code adapter/in}/{@code adapter/out} (ADR 0009's layer semantics, carried over —
+ * see ADR 0012 for what changed and why). This is the one place these rules are enforced as code
+ * — not as a comment, not as a code review convention.
  *
  * <ul>
- *   <li><b>Module boundaries</b> (Tech Spec §1.5, ADR 0001): which module may know about which.</li>
- *   <li><b>Layer boundaries</b> (ADR 0009): inside a module, {@code domain} is pure Java,
- *       {@code application} orchestrates through ports, {@code infrastructure} holds adapters.</li>
+ *   <li><b>Layer rules</b>: what {@code domain}/{@code application}/{@code adapter} may see,
+ *       inside any capability.</li>
+ *   <li><b>Capability rules</b>: what each capability may depend on.</li>
+ *   <li><b>Cycle rule</b>: no capability/layer slice may depend on another that depends back.</li>
  * </ul>
+ *
+ * <p>Capability root packages ({@code access.IdentityAccessConfig}, {@code
+ * execution.JobRunnerConfig}, {@code execution.AcquisitionConfig}, {@code sources.SourcesConfig},
+ * {@code results.ResultsConfig}, and their {@code @ConfigurationProperties} records) hold only
+ * Spring {@code @Configuration} wiring and are deliberately outside every rule below — same
+ * precedent ADR 0009 set for {@code infrastructure/spring}: wiring is where the object graph for
+ * the whole process gets assembled, so it is the one place allowed to depend on anything.
  */
 class ModuleBoundaryTest {
 
@@ -29,251 +40,310 @@ class ModuleBoundaryTest {
             .importPackages(BASE);
 
     /**
-     * ADR 0009: application-layer classes that still embed SQL or reach an adapter directly.
-     * Each entry is debt to be paid by pulling the SQL behind a port in the module's
-     * {@code domain} package. Remove the name here once that happens — the rule then guards it.
-     *
-     * <p>{@code IndicatorRunExecutor}, {@code JobWorker}, {@code CancellationRegistry}, and
-     * {@code AcquisitionGuard} paid this debt: acquisition now goes through {@code
-     * sourceconnector.domain.AcquisitionPort}, cancellation through {@code
-     * sourceconnector.domain.CancellationSignal} (implemented by {@code
-     * jobrunner.domain.CancellationToken}), and the ENG-51 cooldown row through {@code
-     * jobrunner.domain.AcquisitionGuardStore} — see {@link
-     * #jobRunnerApplicationDoesNotDependOnPecDriverOrSourceConnectorAdapters}.
+     * {@code application} classes that legitimately classify a persistence failure (SQLState,
+     * {@code DataAccessException}) or, for the three still embedding raw SQL, have not yet had
+     * that SQL pulled behind a domain port. Each reason is why the class remains here, not an
+     * invitation to leave it here — the goal is to keep shrinking this list, per ADR 0009/ADR
+     * 0012's "removing a name here is the criterion for having paid the debt."
      */
-    private static final String HEXAGONAL_DEBT = String.join("|",
-            "SourceDiagnosticsService", "FailureClassifier",
-            "IdempotencyResolver",
-            "PublicationService", "ReproducibilityCheck",
-            "SessionService", "BootstrapActivation", "LoginThrottle", "ScopeResolver",
-            "UserProvisioning", "PasswordPolicy", "AuthenticationService", "AuthorizationVersionGuard",
-            "PecSourceAcquisition");
-    private static final String DEBT_REGEX = ".*\\.(" + HEXAGONAL_DEBT + ")(\\$.*)?";
-
-    // ---------------------------------------------------------------- module boundaries (§1.5)
-
-    @Test
-    void indicatorEngineDoesNotDependOnJdbcOrSql() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".indicatorengine..")
-                .should().dependOnClassesThat().resideInAnyPackage("java.sql..", "javax.sql..")
-                .check(CLASSES);
-    }
-
-    @Test
-    void indicatorEngineDoesNotDependOnHikariOrSpringJdbc() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".indicatorengine..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "com.zaxxer.hikari..", "org.springframework.jdbc..")
-                .check(CLASSES);
-    }
-
-    @Test
-    void indicatorEngineDoesNotDependOnPecAdapterOrSourceConnector() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".indicatorengine..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        BASE + ".pecadapter..", BASE + ".sourceconnector..")
-                .check(CLASSES);
-    }
-
-    @Test
-    void indicatorEngineDoesNotDependOnHttpClientOrSpringWeb() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".indicatorengine..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "java.net.http..", "org.springframework.web..")
-                .check(CLASSES);
-    }
-
-    @Test
-    void indicatorPacksDoNotDependOnJdbcSqlOrPecAdapter() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".indicatorpacks..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "java.sql..", "javax.sql..",
-                        "com.zaxxer.hikari..", "org.springframework.jdbc..",
-                        BASE + ".pecadapter..", BASE + ".sourceconnector..")
-                .check(CLASSES);
-    }
-
-    @Test
-    void indicatorEngineAndPacksDoNotDependOnJobRunnerOrResultStore() {
-        noClasses()
-                .that().resideInAnyPackage(BASE + ".indicatorengine..", BASE + ".indicatorpacks..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        BASE + ".jobrunner..", BASE + ".resultstore..")
-                .check(CLASSES);
-    }
+    private static final String APPLICATION_EMBEDS_SQL = String.join("|",
+            // Embedded SQL via JdbcTemplate — not yet pulled behind a domain port.
+            "BootstrapActivation", "ScopeResolver", "UserProvisioning", "SessionService",
+            "LoginThrottle", "AuthorizationVersionGuard",
+            // Publication is one SQLite transaction spanning results and the job row (ENG-23);
+            // splitting it behind a port would either lose the single-transaction guarantee or
+            // require a distributed-transaction port, neither of which the SQLite-only design
+            // (ADR 0001) has room for.
+            "PublicationService",
+            // Classify a persistence failure by inspecting SQLState/DataAccessException — this is
+            // reading a JDBC-shaped signal, not issuing SQL.
+            "JobWorker", "FailureClassifier", "IdempotencyResolver",
+            // Same failure-classification reasoning as above; also the one class that legitimately
+            // reaches an adapter directly (see APPLICATION_REACHES_ADAPTER).
+            "SourceDiagnosticsService");
+    private static final String SQL_DEBT_REGEX = ".*\\.(" + APPLICATION_EMBEDS_SQL + ")(\\$.*)?";
 
     /**
-     * §1.12.1: result-store persists minimal evidence and results, but it is not the PEC
-     * boundary — it must stay readable (history, evidence) with the PEC entirely disconnected,
-     * exactly like extraction-store already is.
+     * {@code /sources/{id}/test} (§1.10) must reuse the exact {@code AllowedDestinations}/{@code
+     * PecDataSourceFactory} the live acquisition path uses — a diagnostic through a second,
+     * looser code path would prove nothing. That reuse is the one place {@code
+     * execution.application} legitimately instantiates an {@code execution.adapter.out.pec} type
+     * instead of going through {@link br.gov.observatorioaps.execution.domain.acquisition.AcquisitionPort}.
      */
-    @Test
-    void resultStoreDoesNotDependOnPecAdapterOrSourceConnector() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".resultstore..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        BASE + ".pecadapter..", BASE + ".sourceconnector..")
-                .check(CLASSES);
-    }
+    private static final String APPLICATION_REACHES_ADAPTER = "SourceDiagnosticsService";
+    private static final String ADAPTER_DEBT_REGEX = ".*\\.(" + APPLICATION_REACHES_ADAPTER + ")(\\$.*)?";
 
     /**
-     * §1.9.4 L365 revalidation at publish time goes through the {@code PublicationAuthorization}
-     * seam defined in resultstore, implemented by identityaccess — never the reverse.
+     * The published result and the OpenAPI {@code Scope} shape are the same DTO
+     * ({@code access.adapter.in.http.ScopeResponse}) on both the auth and the results surface —
+     * {@code results.adapter.in.http.ResultController}/{@code ResultResponse} are the one place
+     * {@code results}'s HTTP adapter reaches into {@code access}'s HTTP adapter rather than
+     * {@code access}'s domain or application layer. Follow-up: give {@code ScopeResponse} a home
+     * that isn't inside either capability's adapter package.
      */
-    @Test
-    void resultStoreDoesNotDependOnIdentityAccess() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".resultstore..")
-                .should().dependOnClassesThat().resideInAPackage(BASE + ".identityaccess..")
-                .check(CLASSES);
-    }
+    private static final String CROSS_ADAPTER_DEBT_REGEX = ".*\\.(ResultController|ResultResponse)(\\$.*)?";
 
-    @Test
-    void resultStoreAndIndicatorPacksDoNotDependOnServletApiOrApiPackage() {
-        noClasses()
-                .that().resideInAnyPackage(BASE + ".resultstore..", BASE + ".indicatorpacks..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "jakarta.servlet..", BASE + ".api..")
-                .check(CLASSES);
-    }
+    // ---------------------------------------------------------------------------- layer rules
 
-    /**
-     * {@code api} is the HTTP boundary — it must never reach past jobrunner/resultstore into
-     * the PEC-facing layers directly (§1.5). The one thing it may see from source-connector is
-     * the <em>registry</em> of sources ({@code sourceconnector.domain}): configuration rows, never
-     * a live connection, a budget or a secret resolver.
-     */
-    @Test
-    void apiDoesNotDependOnPecAdapterOrSourceConnectorAdapters() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".api..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        BASE + ".pecadapter..",
-                        BASE + ".sourceconnector.application..",
-                        BASE + ".sourceconnector.infrastructure..")
-                .check(CLASSES);
-    }
-
-    /** {@code identityaccess} stays framework-thin — no servlet type, ever. */
-    @Test
-    void identityAccessDoesNotDependOnServletApiOrPecAdapter() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".identityaccess..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "jakarta.servlet..",
-                        BASE + ".pecadapter..",
-                        BASE + ".sourceconnector..")
-                .check(CLASSES);
-    }
-
-    @Test
-    void indicatorEngineDoesNotDependOnServletApi() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".indicatorengine..")
-                .should().dependOnClassesThat().resideInAnyPackage("jakarta.servlet..")
-                .check(CLASSES);
-    }
-
-    /**
-     * {@code jobrunner} stays the HTTP-free worker/executor layer; the SSE controller (fatia D)
-     * must poll it through a plain method call, never by importing servlet types or reaching
-     * back into {@code api}.
-     */
-    @Test
-    void jobRunnerDoesNotDependOnServletApiOrApiPackage() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".jobrunner..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "jakarta.servlet..", BASE + ".api..")
-                .check(CLASSES);
-    }
-
-    /**
-     * {@code jobrunner.application} orchestrates the run; it does not know the PEC driver or any
-     * adapter that touches it. Acquisition crosses through {@code
-     * sourceconnector.domain.AcquisitionPort} — {@code JdbcAcquisitionAdapter} (or, later, an
-     * out-of-process execution plane) is the only thing on the other side of that seam. Scoped to
-     * {@code application} only, not all of {@code jobrunner}: {@code infrastructure.spring}
-     * wiring is explicitly allowed to depend on anything (ADR 0009's layer table). Classes still
-     * named in {@link #HEXAGONAL_DEBT} are exempt; everything else in {@code
-     * jobrunner.application} is held to this rule.
-     */
-    @Test
-    void jobRunnerApplicationDoesNotDependOnPecDriverOrSourceConnectorAdapters() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".jobrunner.application..")
-                .and().haveNameNotMatching(DEBT_REGEX)
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "org.postgresql..",
-                        BASE + ".pecadapter.infrastructure..",
-                        BASE + ".sourceconnector.infrastructure..")
-                .check(CLASSES);
-    }
-
-    /** {@code platform} is shared plumbing (SQLite, process lock); it knows no module. */
-    @Test
-    void platformDoesNotDependOnAnyModule() {
-        noClasses()
-                .that().resideInAPackage(BASE + ".platform..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        BASE + ".api..", BASE + ".identityaccess..", BASE + ".sourceconnector..",
-                        BASE + ".pecadapter..", BASE + ".extractionstore..",
-                        BASE + ".indicatorengine..", BASE + ".indicatorpacks..",
-                        BASE + ".jobrunner..", BASE + ".resultstore..")
-                .check(CLASSES);
-    }
-
-    // ---------------------------------------------------------------- layer boundaries (ADR 0009)
-
-    /** {@code domain} is plain Java: records, enums, pure rules and ports. No framework, no I/O driver. */
+    /** {@code domain} is plain Java: records, enums, pure rules and ports — no framework, no I/O driver. */
     @Test
     void domainLayersDependOnNothingButJavaAndOtherDomains() {
         noClasses()
                 .that().resideInAPackage(BASE + "..domain..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        BASE + "..application..", BASE + "..infrastructure..",
-                        "java.sql..", "javax.sql..", "com.zaxxer..",
-                        "org.springframework..", "jakarta..")
+                        BASE + "..application..", BASE + "..adapter..",
+                        "org.springframework..", "jakarta..",
+                        "java.sql..", "javax.sql..", "com.zaxxer..")
                 .check(CLASSES);
     }
 
-    /** {@code application} never sees HTTP: no servlet, no Spring MVC, no {@code api} package. */
+    /** {@code application} never sees HTTP: no servlet, no Spring MVC, no Spring Security web. */
     @Test
     void applicationLayersDoNotDependOnHttp() {
         noClasses()
                 .that().resideInAPackage(BASE + "..application..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "jakarta.servlet..", "org.springframework.web..",
-                        "org.springframework.security.web..", BASE + ".api..")
+                        "org.springframework.security.web..")
                 .check(CLASSES);
     }
 
     /**
-     * {@code application} talks to persistence through ports in {@code domain}. Classes listed in
-     * {@link #HEXAGONAL_DEBT} are the known exceptions; everything else is held to the rule.
+     * {@code application} talks to persistence and to the PEC through ports in {@code domain},
+     * never by instantiating an {@code adapter} type — {@link #APPLICATION_REACHES_ADAPTER} is
+     * the one documented exception.
      */
     @Test
-    void applicationLayersUsePortsNotAdapters() {
+    void applicationLayersDoNotReachAdaptersDirectly() {
         noClasses()
                 .that().resideInAPackage(BASE + "..application..")
-                .and().haveNameNotMatching(DEBT_REGEX)
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        BASE + "..infrastructure..",
-                        "java.sql..", "javax.sql..", "com.zaxxer..", "org.springframework.jdbc..")
+                .and().haveNameNotMatching(ADAPTER_DEBT_REGEX)
+                .should().dependOnClassesThat().resideInAPackage(BASE + "..adapter..")
                 .check(CLASSES);
     }
 
-    /** No module's {@code infrastructure} is reached from another module's {@code domain}. */
+    /**
+     * {@code application} talks to persistence through ports in {@code domain}; {@link
+     * #APPLICATION_EMBEDS_SQL} is the declared, reasoned exception list.
+     */
     @Test
-    void infrastructureIsNotReachedFromOtherModulesDomain() {
+    void applicationLayersDoNotEmbedSql() {
         noClasses()
-                .that().resideInAPackage(BASE + "..domain..")
-                .should().dependOnClassesThat().resideInAPackage(BASE + "..infrastructure..")
+                .that().resideInAPackage(BASE + "..application..")
+                .and().haveNameNotMatching(SQL_DEBT_REGEX)
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "java.sql..", "javax.sql..", "com.zaxxer..",
+                        "org.springframework.jdbc..", "org.springframework.dao..")
+                .check(CLASSES);
+    }
+
+    /** HTTP adapters (in) must not reach persistence/PEC/process adapters (out) directly — only through application/domain. */
+    @Test
+    void adapterInDoesNotDependOnAdapterOut() {
+        noClasses()
+                .that().resideInAPackage(BASE + "..adapter.in..")
+                .should().dependOnClassesThat().resideInAPackage(BASE + "..adapter.out..")
+                .check(CLASSES);
+    }
+
+    // ----------------------------------------------------------------------- adapter privacy
+
+    /**
+     * A capability's {@code adapter} package is private to that capability — everything another
+     * capability needs is exposed through {@code domain} or {@code application}. One rule per
+     * capability keeps each violation's message naming the actual capability, not a generic
+     * wildcard match.
+     */
+    @Test
+    void onlyAccessDependsOnAccessAdapters() {
+        noClasses()
+                .that().resideOutsideOfPackage(BASE + ".access..")
+                .and().haveNameNotMatching(CROSS_ADAPTER_DEBT_REGEX)
+                .should().dependOnClassesThat().resideInAPackage(BASE + ".access.adapter..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void onlySourcesDependsOnSourcesAdapters() {
+        noClasses()
+                .that().resideOutsideOfPackage(BASE + ".sources..")
+                .should().dependOnClassesThat().resideInAPackage(BASE + ".sources.adapter..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void onlyExecutionDependsOnExecutionAdapters() {
+        noClasses()
+                .that().resideOutsideOfPackage(BASE + ".execution..")
+                .should().dependOnClassesThat().resideInAPackage(BASE + ".execution.adapter..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void onlyIndicatorsDependsOnIndicatorsAdapters() {
+        noClasses()
+                .that().resideOutsideOfPackage(BASE + ".indicators..")
+                .should().dependOnClassesThat().resideInAPackage(BASE + ".indicators.adapter..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void onlyResultsDependsOnResultsAdapters() {
+        noClasses()
+                .that().resideOutsideOfPackage(BASE + ".results..")
+                .should().dependOnClassesThat().resideInAPackage(BASE + ".results.adapter..")
+                .check(CLASSES);
+    }
+
+    /** The PEC driver is the acquisition adapter's business, never anyone else's. */
+    @Test
+    void postgresDriverIsReachableOnlyFromExecutionPecAdapter() {
+        noClasses()
+                .that().resideOutsideOfPackage(BASE + ".execution.adapter.out.pec..")
+                .should().dependOnClassesThat().resideInAPackage("org.postgresql..")
+                .check(CLASSES);
+    }
+
+    // ------------------------------------------------------------------------ capability rules
+
+    /**
+     * §1.5/Tech Spec: the indicator engine stays pure — no JDBC, no PEC, no HTTP, no other
+     * capability. The strict form (core only, whitelisting {@code java..}/{@code indicators..})
+     * catches anything at all outside those two; the named form below additionally holds the HTTP
+     * adapter to the same "no PEC/JDBC/other capability" bar, since Spring/Jakarta are the only
+     * things {@code indicators.adapter.in.http} is allowed that the core is not.
+     */
+    @Test
+    void indicatorsCoreIsPureJava() {
+        noClasses()
+                .that().resideInAPackage(BASE + ".indicators..")
+                .and().resideOutsideOfPackage(BASE + ".indicators.adapter..")
+                .should().dependOnClassesThat().resideOutsideOfPackages("java..", BASE + ".indicators..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void indicatorsNeverDependsOnOtherCapabilitiesOrPecOrJdbc() {
+        noClasses()
+                .that().resideInAPackage(BASE + ".indicators..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        BASE + ".execution..", BASE + ".results..", BASE + ".sources..", BASE + ".access..",
+                        "java.sql..", "javax.sql..", "jakarta.servlet..", "java.net.http..")
+                .check(CLASSES);
+    }
+
+    /**
+     * §1.12.1: {@code results} stays readable — history, evidence, publication — with the PEC
+     * entirely disconnected, exactly like the old extraction-store already was. Scoped to {@code
+     * results.domain}/{@code results.application}/{@code results.adapter.out} (persistence, which
+     * has no legitimate reason to see another capability): {@code results.adapter.in.http} is
+     * deliberately excluded because it legitimately uses {@code access.domain}/{@code
+     * access.application} for the same auth check every other capability's HTTP adapter makes,
+     * and {@code access.adapter.in.http.ScopeResponse} for the one documented DTO reuse (see
+     * {@link #CROSS_ADAPTER_DEBT_REGEX}).
+     */
+    @Test
+    void resultsCoreDoesNotDependOnExecutionCoreOrAccessOrSources() {
+        noClasses()
+                .that().resideInAnyPackage(
+                        BASE + ".results.domain..", BASE + ".results.application..",
+                        BASE + ".results.adapter.out..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        BASE + ".execution.application..", BASE + ".execution.adapter..",
+                        BASE + ".execution.domain.acquisition..",
+                        BASE + ".access..", BASE + ".sources..")
+                .check(CLASSES);
+    }
+
+    /** {@code sources}'s own domain (the source registry) depends on no other capability. */
+    @Test
+    void sourcesDomainDependsOnNoCapability() {
+        noClasses()
+                .that().resideInAPackage(BASE + ".sources.domain..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        BASE + ".access..", BASE + ".execution..", BASE + ".indicators..", BASE + ".results..")
+                .check(CLASSES);
+    }
+
+    /**
+     * §1.9.4 L365: {@code access} may implement {@code results.domain.PublicationAuthorization}
+     * (that seam is how revalidation reaches publication without {@code results} depending on
+     * {@code access} — see {@link #resultsCoreDoesNotDependOnExecutionCoreOrAccessOrSources}) but
+     * otherwise knows no other capability.
+     */
+    @Test
+    void accessCoreDependsOnNoCapabilityExceptResultsDomain() {
+        noClasses()
+                .that().resideInAnyPackage(BASE + ".access.domain..", BASE + ".access.application..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        BASE + ".sources..", BASE + ".execution..", BASE + ".indicators..",
+                        BASE + ".results.application..", BASE + ".results.adapter..")
+                .check(CLASSES);
+    }
+
+    /** {@code platform.sqlite}/{@code platform.lock} are shared plumbing — they know no capability. */
+    @Test
+    void platformSqliteAndLockDependOnNoCapability() {
+        noClasses()
+                .that().resideInAnyPackage(BASE + ".platform.sqlite..", BASE + ".platform.lock..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        BASE + ".access..", BASE + ".sources..", BASE + ".execution..",
+                        BASE + ".indicators..", BASE + ".results..")
+                .check(CLASSES);
+    }
+
+    /**
+     * {@code platform.web} (the global {@code ScopeCheckedAdvice}, {@code ReadyController}, the
+     * {@code ApiError} family) is the one sanctioned platform → capability edge — the process-wide
+     * exception mapping has to name domain exceptions from every capability. It may see {@code
+     * domain}/{@code application}, never an {@code adapter} — the global advice does not become a
+     * dumping ground that also knows HTTP DTOs or persistence.
+     */
+    @Test
+    void platformWebOnlyReachesCapabilityDomainOrApplication() {
+        noClasses()
+                .that().resideInAPackage(BASE + ".platform.web..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        BASE + ".access.adapter..", BASE + ".sources.adapter..",
+                        BASE + ".execution.adapter..", BASE + ".indicators.adapter..",
+                        BASE + ".results.adapter..")
+                .check(CLASSES);
+    }
+
+    // --------------------------------------------------------------------------------- cycles
+
+    /**
+     * Capability × top-level-layer slices (e.g. {@code execution.domain}, {@code
+     * execution.application}, {@code results.domain}) must not form a cycle. Capability root
+     * wiring classes (one path segment below {@code BASE}, e.g. {@code execution.JobRunnerConfig})
+     * do not match this slice pattern and are excluded — consistent with every rule above treating
+     * wiring as the one place allowed to depend on anything.
+     *
+     * <p><b>This does not prove the whole capability graph is a DAG</b> — it proves the finer-grained
+     * claim that no single {@code capability.layer} slice pair depends on each other both ways.
+     * {@code execution} and {@code results} legitimately depend on each other at the coarser,
+     * whole-capability level ({@code execution.application.IndicatorRunExecutor} calls {@code
+     * results.application.PublicationService}; {@code results.application.PublicationService}
+     * closes the job through {@code execution.domain.job.JobRepository} in the same SQLite
+     * transaction, ENG-23) without those two edges ever landing on the same slice pair — see ADR
+     * 0012's "Ciclos" section for why that specific relationship is accepted rather than removed.
+     *
+     * <p>{@code execution.adapter} and {@code execution.application} would otherwise form a
+     * 2-slice cycle solely because both {@code adapter.in} and {@code adapter.out} collapse into
+     * one {@code execution.adapter} slice at this granularity: {@code adapter.in} → {@code
+     * application} is the ordinary HTTP-to-use-case direction, and {@link
+     * SourceDiagnosticsService} → {@code adapter.out.pec} is the one already-documented, named
+     * exception in {@link #applicationLayersDoNotReachAdaptersDirectly}. A run with these two
+     * edges ignored and nothing else changed reports zero remaining violations, confirming they
+     * are the entire cause, not a partial mask of a broader problem.
+     */
+    @Test
+    void capabilityLayerSlicesAreFreeOfCycles() {
+        SlicesRuleDefinition.slices()
+                .matching(BASE + ".(*).(*)..")
+                .should().beFreeOfCycles()
+                .ignoreDependency(SourceDiagnosticsService.class, PecDataSourceFactory.class)
+                .ignoreDependency(SourceDiagnosticsService.class, PecSourceConnection.class)
                 .check(CLASSES);
     }
 }
