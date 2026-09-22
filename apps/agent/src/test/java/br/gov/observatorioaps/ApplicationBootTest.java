@@ -1,7 +1,7 @@
 package br.gov.observatorioaps;
 
-import br.gov.observatorioaps.jobrunner.application.JobRecovery;
-import br.gov.observatorioaps.jobrunner.application.JobWorker;
+import br.gov.observatorioaps.execution.application.JobRecovery;
+import br.gov.observatorioaps.execution.application.JobWorker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The full production wiring — {@code JobRunnerConfig} + {@code IdentityAccessConfig} on top of
  * {@code SqliteDataSourceConfig} — has never been assembled by anything other than the app's own
  * {@code main()} until this test. {@code webEnvironment = NONE} keeps Tomcat out (no
- * {@code SecurityConfig}/{@code api} package exists yet); this only proves every {@code @Bean}
+ * {@code SecurityConfig}/{@code access.adapter.in.http} package exists yet); this only proves
+ * every {@code @Bean}
  * method resolves, migrates, and runs boot-time recovery/bootstrap without a running servlet
  * container.
  */
