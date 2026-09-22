@@ -415,16 +415,16 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
             }
             if (requested.startsWith("REQUIRED_DIMENSIONS=")) {
                 JsonNode requiredDimensions = objectNode.get("required_dimensions");
-                // An absent block is not the same claim as a present block whose
-                // violating_fact_event_id is explicitly null (a completed probe that found no
-                // violation) — a child built against a mismatched protocol that omits the block
-                // entirely must not be read as "coverage OK" by default.
-                if (requiredDimensions == null) {
+                // Neither the block nor its field being entirely absent is the same claim as the
+                // field being explicitly null (a completed probe that found no violation) — a
+                // child built against a mismatched protocol that drops either one must not be
+                // read as "coverage OK" by default.
+                if (requiredDimensions == null || !requiredDimensions.has("violating_fact_event_id")) {
                     throw new IllegalStateException(
                             "execution plane omitted required_dimensions evidence for " + object);
                 }
                 JsonNode idNode = requiredDimensions.get("violating_fact_event_id");
-                Long violatingFactId = (idNode == null || idNode.isNull()) ? null : idNode.asLong();
+                Long violatingFactId = idNode.isNull() ? null : idNode.asLong();
                 items.add(new ProbeItem.RequiredDimensionsItem(requested, violatingFactId));
                 continue;
             }
