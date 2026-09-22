@@ -88,6 +88,11 @@ pub fn stream_query(
         let row = match next {
             Ok(Some(row)) => row,
             Ok(None) => {
+                // The same race as the top-of-loop check, landing during the final fetch: the
+                // caller's cancel wins over an otherwise complete read.
+                if cancel_requested.load(Ordering::SeqCst) {
+                    return Ok(StreamOutcome::Cancelled);
+                }
                 // Mirrors the JDBC path's own post-loop guard.checkDuration(): the fetch that
                 // returns "no more rows" is itself a round trip and can be what pushes total
                 // elapsed time past max_duration_ms, even though every row already seen was

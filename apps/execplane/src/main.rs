@@ -330,14 +330,25 @@ fn report_pre_probe_failure(err: &(dyn Error + 'static)) -> Result<i32, Box<dyn 
     let mut error = json!({
         "type": "error", "code": "UNCLASSIFIED_ERROR", "detail": err.to_string(), "uncertain": true,
     });
-    if err.is::<ProbeBudgetExceeded>() {
+    let postgres_error = err.downcast_ref::<postgres::Error>();
+    if err.is::<ProbeBudgetExceeded>() || postgres_error.is_some_and(is_timeout_budget) {
         error["code"] = json!("SOURCE_BUDGET_EXCEEDED");
-    } else if let Some(sqlstate) = err.downcast_ref::<postgres::Error>().and_then(stream::sqlstate_of) {
+    } else if let Some(sqlstate) = postgres_error.and_then(stream::sqlstate_of) {
         error["code"] = json!("SQL_ERROR");
         error["sqlstate"] = json!(sqlstate);
     }
     write_line(&error)?;
     Ok(1)
+}
+
+/// `statement_timeout`/`lock_timeout` are read-budget limits set by this process itself — the
+/// streaming path already classifies the same states as `BudgetExceeded` (`stream::classify_failure`).
+/// No cancel listener runs during probing, so a `57014` here can only be the statement timeout.
+fn is_timeout_budget(err: &postgres::Error) -> bool {
+    err.code().is_some_and(|code| {
+        code == &postgres::error::SqlState::QUERY_CANCELED
+            || code == &postgres::error::SqlState::LOCK_NOT_AVAILABLE
+    })
 }
 
 /// Mirrors `BudgetGuard.checkDuration` on the JDBC path, whose clock also starts before
