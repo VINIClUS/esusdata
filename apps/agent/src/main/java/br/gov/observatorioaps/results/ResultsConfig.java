@@ -1,6 +1,7 @@
 package br.gov.observatorioaps.results;
 
 import br.gov.observatorioaps.access.application.GrantRevalidator;
+import br.gov.observatorioaps.execution.domain.extract.ExtractStore;
 import br.gov.observatorioaps.execution.domain.job.JobRepository;
 import br.gov.observatorioaps.results.adapter.out.sqlite.JdbcEvidenceRepository;
 import br.gov.observatorioaps.results.adapter.out.sqlite.JdbcExtractionManifestRepository;
@@ -44,8 +45,8 @@ public class ResultsConfig {
     }
 
     @Bean
-    public ReproducibilityCheck reproducibilityCheck(SqliteProperties properties) {
-        return new ReproducibilityCheck(properties.extractsDirectory());
+    public ReproducibilityCheck reproducibilityCheck(ExtractStore extractStore) {
+        return new ReproducibilityCheck(extractStore);
     }
 
     @Bean

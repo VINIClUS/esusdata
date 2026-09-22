@@ -127,7 +127,7 @@ public final class JobRunnerTestFixture implements AutoCloseable {
         extractionManifestRepository = new JdbcExtractionManifestRepository(jdbc);
         sourceRepository = new JdbcSourceRepository(jdbc);
         resultRepository = new JdbcResultRepository(jdbc);
-        reproducibilityCheck = new ReproducibilityCheck(extractsDir);
+        reproducibilityCheck = new ReproducibilityCheck(new FileExtractStore(extractsDir));
 
         userRepository = new JdbcUserRepository(jdbc);
         grantRepository = new JdbcGrantRepository(jdbc);

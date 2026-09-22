@@ -13,6 +13,7 @@ import br.gov.observatorioaps.sources.adapter.out.sqlite.JdbcSourceRepository;
 import br.gov.observatorioaps.execution.adapter.out.sqlite.JdbcJobRepository;
 
 import br.gov.observatorioaps.execution.adapter.out.file.ExtractFixtures;
+import br.gov.observatorioaps.execution.adapter.out.file.FileExtractStore;
 import br.gov.observatorioaps.execution.domain.extract.ExtractionManifest;
 import br.gov.observatorioaps.indicators.domain.Classification;
 import br.gov.observatorioaps.indicators.domain.IndicatorResult;
@@ -85,7 +86,7 @@ class ResultScopeIsolationTest {
         ExtractionManifestRepository manifestRepository = new JdbcExtractionManifestRepository(jdbc);
         PublicationService publicationService = new PublicationService(jdbc, tx, new JdbcJobRepository(jdbc, tx),
                 manifestRepository,
-                new ReproducibilityCheck(extractsDir), extractsDir, PublicationAuthorization.allowAll());
+                new ReproducibilityCheck(new FileExtractStore(extractsDir)), extractsDir, PublicationAuthorization.allowAll());
         resultRepository = new JdbcResultRepository(jdbc);
         evidenceRepository = new JdbcEvidenceRepository(jdbc);
 
