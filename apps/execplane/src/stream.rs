@@ -6,7 +6,7 @@ use std::error::Error;
 use std::io::{self, BufRead, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 const PROGRAMADO_IDS: [i64; 2] = [2, 3];
 const ESPONTANEO_IDS: [i64; 3] = [5, 6, 7];
@@ -31,8 +31,13 @@ pub enum StreamOutcome {
 /// for `SubprocessAcquisitionAdapter` to feed straight into `ExtractWriter` (ADR 0010 — this
 /// process never writes the extract itself). A background thread reads the rest of stdin for
 /// `{"type":"cancel"}` and forwards it to PostgreSQL's own cancel signal — the equivalent of
-/// `Statement.cancel()` (plan §2.7). `max_rows`/`max_payload_bytes`/duration are this process's
-/// job (plan §2.4/ADR 0010): it is the side actually reading rows off the wire.
+/// `Statement.cancel()` (plan §2.7). A second background thread enforces max_duration_ms itself:
+/// `tcp_user_timeout` only bounds unacknowledged *transmitted* data, so a connection that stays
+/// fully acknowledged but never sends a response (server stalled, not blackholed) would otherwise
+/// leave `rows.next()` blocked past the budget with nothing to interrupt it — this watchdog fires
+/// the same cancel signal proactively once the deadline passes, whether or not the main thread is
+/// currently blocked in a read. `max_rows`/`max_payload_bytes`/duration are this process's job
+/// (plan §2.4/ADR 0010): it is the side actually reading rows off the wire.
 #[allow(clippy::too_many_arguments)]
 pub fn stream_query(
     txn: &mut Transaction,
@@ -46,14 +51,16 @@ pub fn stream_query(
     start: Instant,
 ) -> Result<StreamOutcome, Box<dyn Error>> {
     let cancel_requested = Arc::new(AtomicBool::new(false));
-    spawn_cancel_listener(cancel_token, Arc::clone(&cancel_requested));
+    let duration_exceeded = Arc::new(AtomicBool::new(false));
+    spawn_cancel_listener(cancel_token.clone(), Arc::clone(&cancel_requested));
+    spawn_duration_watchdog(cancel_token, start, budget.max_duration_ms, Arc::clone(&duration_exceeded));
 
     let positional_query = to_positional_placeholders(query_text);
     let params: [&(dyn postgres::types::ToSql + Sync); 3] =
         [&municipality_ibge, &period_start, &period_end_exclusive];
     let mut rows = match txn.query_raw(positional_query.as_str(), params) {
         Ok(rows) => rows,
-        Err(err) => return Ok(classify_failure(err, &cancel_requested)),
+        Err(err) => return Ok(classify_failure(err, &cancel_requested, &duration_exceeded)),
     };
 
     let mut row_count: i64 = 0;
@@ -74,7 +81,7 @@ pub fn stream_query(
                 break;
             }
             Err(err) => {
-                return Ok(classify_failure(err, &cancel_requested));
+                return Ok(classify_failure(err, &cancel_requested, &duration_exceeded));
             }
         };
 
@@ -158,11 +165,25 @@ pub fn check_duration(start: &Instant, budget: &Budget) -> Option<StreamOutcome>
 /// cooperative cancellation, so it must classify as `BudgetExceeded` — Java's `translate()` has
 /// no mapping for `CANCELLED` outside of an actual `CancellationSignal`, and would otherwise
 /// misfile a budget overrun as `UNCLASSIFIED_ERROR`.
-fn classify_failure(err: postgres::Error, cancel_requested: &AtomicBool) -> StreamOutcome {
+fn classify_failure(
+    err: postgres::Error,
+    cancel_requested: &AtomicBool,
+    duration_exceeded: &AtomicBool,
+) -> StreamOutcome {
+    // cancel_requested is checked ahead of duration_exceeded on purpose: if a user's explicit
+    // cancel and the watchdog's deadline land at roughly the same moment, the caller's intent
+    // wins the classification. The two aren't equivalent to Java's FailureClassifier — cancelled
+    // and budget-exceeded carry different retry decisions — and the deadline will simply re-fire
+    // if this particular cancel_query call is what actually lands.
     if let Some(db_error) = err.as_db_error() {
         if db_error.code() == &postgres::error::SqlState::QUERY_CANCELED {
             if cancel_requested.load(Ordering::SeqCst) {
                 return StreamOutcome::Cancelled;
+            }
+            if duration_exceeded.load(Ordering::SeqCst) {
+                return StreamOutcome::BudgetExceeded(
+                    "duration ceiling exceeded (a stalled read was interrupted)".to_string(),
+                );
             }
             return StreamOutcome::BudgetExceeded(
                 "statement timeout exceeded on the source connection".to_string(),
@@ -176,10 +197,15 @@ fn classify_failure(err: postgres::Error, cancel_requested: &AtomicBool) -> Stre
     }
     // cancel_token.cancel_query() signals the backend over a separate connection — the main
     // connection can observe a transport-level failure (broken pipe, reset) instead of a clean
-    // 57014 if that lands awkwardly. A cancel we ourselves requested is still a cancellation
-    // regardless of what shape the resulting error takes.
+    // 57014 if that lands awkwardly. Either background thread's cancel is still classified as
+    // its own trigger regardless of what shape the resulting error takes.
     if cancel_requested.load(Ordering::SeqCst) {
         return StreamOutcome::Cancelled;
+    }
+    if duration_exceeded.load(Ordering::SeqCst) {
+        return StreamOutcome::BudgetExceeded(
+            "duration ceiling exceeded (a stalled read was interrupted)".to_string(),
+        );
     }
     StreamOutcome::Failed(err.to_string())
 }
@@ -231,6 +257,27 @@ fn spawn_cancel_listener(cancel_token: CancelToken, cancel_requested: Arc<Atomic
                 break;
             }
         }
+    });
+}
+
+/// Fires once, proactively, when max_duration_ms elapses — independent of whether the main
+/// thread is currently making progress. If the query already finished (or the process already
+/// exited) before the deadline, this either finds nothing left to cancel or never gets the chance
+/// to run at all (`std::process::exit` tears down lingering threads with it).
+fn spawn_duration_watchdog(
+    cancel_token: CancelToken,
+    start: Instant,
+    max_duration_ms: i64,
+    duration_exceeded: Arc<AtomicBool>,
+) {
+    let deadline = Duration::from_millis(max_duration_ms.max(0) as u64);
+    std::thread::spawn(move || {
+        let elapsed = start.elapsed();
+        if elapsed < deadline {
+            std::thread::sleep(deadline - elapsed);
+        }
+        duration_exceeded.store(true, Ordering::SeqCst);
+        let _ = cancel_token.cancel_query(NoTls);
     });
 }
 

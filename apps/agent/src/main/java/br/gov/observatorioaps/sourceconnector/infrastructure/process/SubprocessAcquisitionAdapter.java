@@ -174,6 +174,20 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
                 listener.onUncertainOutcome("could not open the local extract writer: " + cannotOpen.getMessage());
                 throw new PecAcquisitionException(
                         "could not open the local extract writer: " + cannotOpen.getMessage(), cannotOpen);
+            } catch (RuntimeException cannotOpen) {
+                // Same reasoning as the IOException branch above (a live connection already
+                // exists), for the unchecked failures ExtractWriter's constructor can also throw
+                // (e.g. SourceBudgetExceededException from its own disk-space reservation). Falling
+                // through to the outer catch (RuntimeException) below would skip
+                // onUncertainOutcome entirely — this dispatches it here and rethrows the original,
+                // concrete exception unwrapped, same as every other RuntimeException path in this
+                // class, so FailureClassifier still sees SourceBudgetExceededException and not a
+                // generic wrapper.
+                writeLine(process.getOutputStream(), Map.of(
+                        "type", "abort", "code", "EXTRACT_WRITER_UNAVAILABLE", "detail", cannotOpen.getMessage()));
+                waitForExit(process);
+                listener.onUncertainOutcome("could not open the local extract writer: " + cannotOpen.getMessage());
+                throw cannotOpen;
             }
 
             try (writer) {
