@@ -78,6 +78,12 @@ pub fn stream_query(
     let mut payload_bytes: i64 = 0;
 
     loop {
+        // A cancel that reaches PostgreSQL after the query already finished server-side raises no
+        // query error at all — the rows still buffered on this side would drain to a success the
+        // caller already cancelled. Mirrors the JDBC path's per-row cancellationCheck.
+        if cancel_requested.load(Ordering::SeqCst) {
+            return Ok(StreamOutcome::Cancelled);
+        }
         let next = rows.next();
         let row = match next {
             Ok(Some(row)) => row,

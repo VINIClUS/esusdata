@@ -106,7 +106,10 @@ também o teto de bytes temporários e a falta de espaço livre, que antes só e
   > ~55 execuções, uma não cancelou — o filho seguiu até o teto de `max_duration_ms` (120s nesse
   > orçamento) e saiu como `SOURCE_BUDGET_EXCEEDED`, com o rollback final falhando por
   > `connection closed`. Não reproduziu em 40 iterações numa mesma JVM (com timers distintos) nem
-  > em 8 JVMs novas. O teto de duração continua limitando o pior caso. A verificação no PEC real
+  > em 8 JVMs novas. O teto de duração continua limitando o pior caso. Revisão do PR #19 achou
+  > uma corrida relacionada, já corrigida: um cancel que chega depois de a query terminar no
+  > servidor não gera erro, e o filho esvaziava as linhas em buffer até `complete`. O loop de
+  > `stream_query` agora consulta `cancel_requested` a cada linha. A verificação no PEC real
   > (`ExecutionPlaneLivePecTest`, CT 133, opt-in `-Dobservatorio.execution-plane.live-pec=true`) não rodou: o PostgreSQL do PEC está parado desde
   > 2026-09-22 00:14 (serviço `e-SUS-AB-PostgreSQL` em `failed`).
 - `ExtractPublication` (novo, package-private) extrai de `ExtractWriter` as mecânicas estáticas de
