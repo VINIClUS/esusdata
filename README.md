@@ -62,12 +62,14 @@ cd apps/web && npm install && npm run dev
 # bytes); Java mantém lock, reconcile, manifesto e publicação atômica. Handshake de
 # compatibilidade, streaming e geração do extrato (JDBC vs. Rust, mesmo fixture) estão cobertos
 # por ExecutionPlaneDifferentialLiveTest, gated atrás de -Dobservatorio.execution-plane.binary.
-# Cancelamento cooperativo é verificado manualmente, não por esse teste: antes da primeira linha
-# (mensagem cancel explícita) e via EOF em stdin com a query bloqueada (pai morto), ambos contra
-# um Postgres real; cancelar em meio ao streaming, depois de pelo menos uma linha já emitida,
-# ainda não foi exercitado nem manual nem automaticamente. Ainda não há empacotamento jpackage
-# nem prova de equivalência contra as fingerprints de produção empacotadas — nunca aponte
-# observatorio.execution-plane.binary para este binário contra uma fonte real ainda.
+# O mesmo teste cobre cancelar depois de linhas já emitidas (1 de ~55 execuções não cancelou e
+# seguiu até max_duration_ms, sem causa encontrada — ver ADR 0011) e compara com o JDBC a
+# classificação de senha errada e de fonte inalcançável, sem cooldown ENG-51. O cancelamento via
+# EOF em stdin (pai morto) continua verificado só manualmente. ExecutionPlaneLivePecTest roda os
+# mesmos casos contra o PEC real (túnel do ADR 0003 + pec.env), ainda sem uma execução verde.
+# Ainda não há empacotamento jpackage nem prova de equivalência contra as fingerprints de produção
+# empacotadas — nunca aponte observatorio.execution-plane.binary para este binário contra uma
+# fonte real ainda.
 cd apps/execplane && cargo build --release && cargo test
 cd apps/agent && mvn verify -Dsurefire.reuseForks=false \
   -Dobservatorio.execution-plane.binary=$PWD/../execplane/target/release/observatorio-execplane
