@@ -1,22 +1,27 @@
 package br.gov.observatorioaps.pecadapter.infrastructure.jdbc;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import br.gov.observatorioaps.pecadapter.domain.ColumnMetadata;
+import br.gov.observatorioaps.pecadapter.domain.CompatibilityFingerprint;
+import br.gov.observatorioaps.pecadapter.domain.CompatibilityProbeResult;
+import br.gov.observatorioaps.pecadapter.domain.ProbeItem;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-/** PostgreSQL implementation of the compatibility probe, restricted to the packaged contract. */
+/**
+ * PostgreSQL implementation of the compatibility probe, restricted to the packaged contract.
+ * Only ever gathers raw data (runs the frozen probe queries, including the marker-driven
+ * uniqueness/coverage/leaf checks) and hands it to {@link CompatibilityFingerprint} — the
+ * signature algorithm itself lives there exactly once (plan §1.3), so a future Rust probe never
+ * has to reimplement it, only report the same shape of raw data over its own connection.
+ */
 public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
 
     private static final String VERSION_QUERY = "SELECT current_setting('server_version')";
@@ -58,58 +63,59 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         if (object == null || !object.matches("[A-Za-z0-9_]+")) {
             throw new SQLException("Invalid compatibility object name: " + object);
         }
-        Map<String, Column> columns = new HashMap<>();
+        Map<String, ColumnMetadata> columns = fetchColumns(connection, object);
+
+        List<ProbeItem> items = new ArrayList<>();
+        for (String requested : columnsUsed) {
+            if (requested.startsWith("UNIQUE_KEY=")) {
+                items.add(probeUniqueKey(connection, object, requested));
+                continue;
+            }
+            if (requested.startsWith("REQUIRED_DIMENSIONS=")) {
+                items.add(probeRequiredDimensions(connection, requested));
+                continue;
+            }
+            if (requested.startsWith("LEAF_SEMANTICS=")) {
+                items.add(probeLeafSemantics(connection, requested));
+                continue;
+            }
+            if (requested.startsWith("LEAF_IDS=")) {
+                items.add(probeLeafIds(connection, requested));
+                continue;
+            }
+            items.add(new ProbeItem.ColumnItem(requested));
+        }
+
+        CompatibilityProbeResult probe = new CompatibilityProbeResult(object, columns, items);
+        try {
+            return CompatibilityFingerprint.compute(probe);
+        } catch (CompatibilityFingerprint.VerificationException e) {
+            throw new SQLException(e.getMessage(), e.getCause());
+        }
+    }
+
+    private static Map<String, ColumnMetadata> fetchColumns(Connection connection, String object) throws SQLException {
+        Map<String, ColumnMetadata> columns = new HashMap<>();
         try (PreparedStatement statement = connection.prepareStatement(COLUMNS_QUERY)) {
             statement.setString(1, object);
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
-                    columns.put(result.getString("column_name"), new Column(
+                    columns.put(result.getString("column_name"), new ColumnMetadata(
                             result.getString("data_type"), result.getString("udt_name"),
-                            result.getString("is_nullable"),
-                            result.getInt("ordinal_position")));
+                            result.getString("is_nullable"), result.getInt("ordinal_position")));
                 }
             }
         }
-
-        List<String> signatureParts = new ArrayList<>();
-        signatureParts.add(object);
-        for (String requested : columnsUsed) {
-            if (requested.startsWith("UNIQUE_KEY=")) {
-                signatureParts.add(verifyUniqueKey(connection, object, requested, columns));
-                continue;
-            }
-            if (requested.startsWith("REQUIRED_DIMENSIONS=")) {
-                signatureParts.add(verifyRequiredDimensions(connection, object, requested));
-                continue;
-            }
-            if (requested.startsWith("LEAF_SEMANTICS=")) {
-                signatureParts.add(verifyFrozenLeafSemantics(connection, object, requested, columns));
-                continue;
-            }
-            if (requested.startsWith("LEAF_IDS=")) {
-                verifyFrozenLeafIds(connection, requested);
-                signatureParts.add(requested);
-                continue;
-            }
-            Column column = columns.get(requested);
-            if (column == null) {
-                throw new SQLException("Required compatibility column is missing: " + object + "." + requested);
-            }
-            if (column.dataType() == null || column.udtName() == null || column.isNullable() == null
-                    || column.ordinalPosition() <= 0
-                    || !("YES".equals(column.isNullable()) || "NO".equals(column.isNullable()))) {
-                throw new SQLException("Incomplete compatibility metadata for " + object + "." + requested);
-            }
-            signatureParts.add(requested + "|" + column.dataType() + "|" + column.udtName()
-                    + "|" + column.ordinalPosition() + "|" + column.isNullable());
-        }
-        return sha256(String.join("\n", signatureParts));
+        return columns;
     }
 
-    private static String verifyUniqueKey(
-            Connection connection, String object, String marker, Map<String, Column> columns) throws SQLException {
-        List<String> expectedColumns = parseKeyColumns(marker, "UNIQUE_KEY=");
-        for (String column : expectedColumns) requireColumnMetadata(columns, object, column);
+    private static ProbeItem probeUniqueKey(Connection connection, String object, String marker) throws SQLException {
+        List<String> expectedColumns;
+        try {
+            expectedColumns = CompatibilityFingerprint.parseUniqueKeyColumns(marker);
+        } catch (CompatibilityFingerprint.VerificationException e) {
+            throw new SQLException(e.getMessage(), e.getCause());
+        }
 
         Map<String, String> constraintTypes = new LinkedHashMap<>();
         Map<String, List<String>> constraintColumns = new LinkedHashMap<>();
@@ -127,8 +133,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
 
         for (Map.Entry<String, List<String>> constraint : constraintColumns.entrySet()) {
             if (expectedColumns.equals(constraint.getValue())) {
-                return marker + "\n" + constraintTypes.get(constraint.getKey())
-                        + "|" + String.join(",", constraint.getValue());
+                return new ProbeItem.UniqueKeyItem(marker, constraintTypes.get(constraint.getKey()), false);
             }
         }
 
@@ -144,22 +149,15 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
                         .map(column -> column + " IS NULL")
                         .collect(java.util.stream.Collectors.joining(" OR "))
                 + " LIMIT 1";
+        boolean violation;
         try (PreparedStatement statement = connection.prepareStatement(uniquenessQuery);
              ResultSet result = statement.executeQuery()) {
-            if (result.next()) {
-                throw new SQLException("Unique key has duplicate or null values: "
-                        + object + "." + expectedColumns);
-            }
+            violation = result.next();
         }
-        return marker + "\nUNIQUE_DATA|" + keyExpression;
+        return new ProbeItem.UniqueKeyItem(marker, null, violation);
     }
 
-    private static String verifyRequiredDimensions(
-            Connection connection, String object, String marker) throws SQLException {
-        if (!"tb_fat_atendimento_individual".equals(object)
-                || !"REQUIRED_DIMENSIONS=tb_dim_tempo,tb_dim_municipio".equals(marker)) {
-            throw new SQLException("Unsupported required-dimensions marker: " + object + "." + marker);
-        }
+    private static ProbeItem probeRequiredDimensions(Connection connection, String marker) throws SQLException {
         String query = """
                 SELECT f.co_seq_fat_atd_ind
                   FROM public.tb_fat_atendimento_individual f
@@ -171,54 +169,30 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
                     OR m.co_seq_dim_municipio IS NULL
                  LIMIT 1
                 """;
+        Long violatingFactId = null;
         try (PreparedStatement statement = connection.prepareStatement(query);
              ResultSet result = statement.executeQuery()) {
             if (result.next()) {
-                throw new SQLException(
-                        "Required dimension reference is missing for fact event " + result.getLong(1));
+                violatingFactId = result.getLong(1);
             }
         }
-        return marker + "\nCOVERAGE_OK";
+        return new ProbeItem.RequiredDimensionsItem(marker, violatingFactId);
     }
 
-    private static List<String> parseKeyColumns(String marker, String prefix) throws SQLException {
-        if (!marker.startsWith(prefix)) throw new SQLException("Invalid unique-key marker: " + marker);
-        List<String> columns = List.of(marker.substring(prefix.length()).split(",", -1));
-        if (columns.isEmpty() || columns.stream().anyMatch(String::isBlank)
-                || columns.stream().distinct().count() != columns.size()) {
-            throw new SQLException("Invalid unique-key marker: " + marker);
+    private static ProbeItem probeLeafSemantics(Connection connection, String marker) throws SQLException {
+        Set<Integer> expected;
+        try {
+            expected = CompatibilityFingerprint.parseLeafSemanticsIds(marker);
+        } catch (CompatibilityFingerprint.VerificationException e) {
+            throw new SQLException(e.getMessage(), e.getCause());
         }
-        return columns;
-    }
-
-    private static void requireColumnMetadata(Map<String, Column> columns, String object, String column)
-            throws SQLException {
-        Column metadata = columns.get(column);
-        if (metadata == null || metadata.dataType() == null || metadata.udtName() == null
-                || metadata.isNullable() == null || metadata.ordinalPosition() <= 0
-                || !("YES".equals(metadata.isNullable()) || "NO".equals(metadata.isNullable()))) {
-            throw new SQLException("Incomplete compatibility metadata for " + object + "." + column);
-        }
-    }
-
-    private static String verifyFrozenLeafSemantics(
-            Connection connection, String object, String marker, Map<String, Column> columns) throws SQLException {
-        if (!"tb_dim_tipo_atendimento".equals(object)) {
-            throw new SQLException("Leaf semantics marker is only supported for tb_dim_tipo_atendimento");
-        }
-        requireColumnMetadata(columns, object, "co_seq_dim_tipo_atendimento");
-        requireColumnMetadata(columns, object, "ds_tipo_atendimento");
-        requireColumnMetadata(columns, object, "co_dim_tipo_atendimento_pai");
-
-        Set<Integer> expected = parseLeafIds(marker, "LEAF_SEMANTICS=");
         String placeholders = "?,".repeat(expected.size());
         placeholders = placeholders.substring(0, placeholders.length() - 1);
         String query = "SELECT co_seq_dim_tipo_atendimento, ds_tipo_atendimento, "
                 + "co_dim_tipo_atendimento_pai FROM public.tb_dim_tipo_atendimento "
                 + "WHERE co_seq_dim_tipo_atendimento IN (" + placeholders + ") "
                 + "ORDER BY co_seq_dim_tipo_atendimento";
-        Set<Integer> found = new HashSet<>();
-        List<String> semanticRows = new ArrayList<>();
+        List<ProbeItem.LeafRow> rows = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(query)) {
             int index = 1;
             for (Integer value : expected) statement.setInt(index++, value);
@@ -228,59 +202,26 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
                     String description = result.getString(2);
                     int parentId = result.getInt(3);
                     Integer parent = result.wasNull() ? null : parentId;
-                    if (description == null || description.isBlank()) {
-                        throw new SQLException("Mapped leaf description is blank for id " + id);
-                    }
-                    found.add(id);
-                    semanticRows.add(id + "|" + utf8Length(description) + ":" + description + "|"
-                            + (parent == null ? "NULL" : parent));
+                    rows.add(new ProbeItem.LeafRow(id, description, parent));
                 }
             }
         }
-        if (!found.equals(expected)) {
-            throw new SQLException("Frozen leaf semantic set changed: expected " + expected + " but found " + found);
-        }
-        return marker + "\n" + String.join("\n", semanticRows);
+        return new ProbeItem.LeafSemanticsItem(marker, rows);
     }
 
-    private static Set<Integer> parseLeafIds(String marker, String prefix) throws SQLException {
-        if (!marker.startsWith(prefix)) throw new SQLException("Invalid leaf semantic marker: " + marker);
-        Set<Integer> expected = new HashSet<>();
-        for (String value : marker.substring(prefix.length()).split(",")) {
-            try {
-                if (!expected.add(Integer.valueOf(value))) {
-                    throw new SQLException("Duplicate frozen leaf id in marker: " + marker);
-                }
-            } catch (NumberFormatException e) {
-                throw new SQLException("Invalid frozen leaf semantic marker: " + marker, e);
-            }
+    private static ProbeItem probeLeafIds(Connection connection, String marker) throws SQLException {
+        Set<Integer> expected;
+        try {
+            expected = CompatibilityFingerprint.parseLeafIdsSet(marker);
+        } catch (CompatibilityFingerprint.VerificationException e) {
+            throw new SQLException(e.getMessage(), e.getCause());
         }
-        if (expected.isEmpty()) throw new SQLException("Frozen leaf semantic marker is empty: " + marker);
-        return expected;
-    }
-
-    private static int utf8Length(String value) {
-        return value.getBytes(StandardCharsets.UTF_8).length;
-    }
-
-    private static void verifyFrozenLeafIds(Connection connection, String marker) throws SQLException {
-        if (!marker.startsWith("LEAF_IDS=")) throw new SQLException("Invalid leaf-id marker: " + marker);
-        Set<Integer> expected = new HashSet<>();
-        for (String value : marker.substring("LEAF_IDS=".length()).split(",")) {
-            try {
-                expected.add(Integer.valueOf(value));
-            } catch (NumberFormatException e) {
-                throw new SQLException("Invalid frozen leaf-id marker: " + marker, e);
-            }
-        }
-        if (expected.isEmpty()) throw new SQLException("Frozen leaf-id marker is empty: " + marker);
-
         String placeholders = "?,".repeat(expected.size());
         placeholders = placeholders.substring(0, placeholders.length() - 1);
         String query = "SELECT co_seq_dim_tipo_atendimento "
                 + "FROM public.tb_dim_tipo_atendimento WHERE co_seq_dim_tipo_atendimento IN ("
                 + placeholders + ")";
-        Set<Integer> found = new HashSet<>();
+        Set<Integer> found = new java.util.HashSet<>();
         try (PreparedStatement statement = connection.prepareStatement(query)) {
             int index = 1;
             for (Integer value : expected) statement.setInt(index++, value);
@@ -288,24 +229,10 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
                 while (result.next()) found.add(result.getInt(1));
             }
         }
-        if (!found.equals(expected)) {
-            throw new SQLException("Frozen leaf-id set changed: expected " + expected + " but found " + found);
-        }
+        return new ProbeItem.LeafIdsItem(marker, found);
     }
 
     private static void requireConnection(Connection connection) throws SQLException {
         if (connection == null) throw new SQLException("A connected PostgreSQL session is required");
-    }
-
-    private static String sha256(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return "sha256:" + HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
-    }
-
-    private record Column(String dataType, String udtName, String isNullable, int ordinalPosition) {
     }
 }

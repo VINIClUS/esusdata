@@ -1,9 +1,10 @@
 # Observatório APS
 
 Serviço local que lê o PEC e-SUS de um município em modo somente-leitura, calcula indicadores
-metodológicos versionados e publica resultados com evidência mínima. Um processo por instalação,
-uma linguagem. O termo canônico é em português (o da Tech Spec e das fichas); o identificador em
-inglês entre parênteses é o nome usado no código. Nome de produto na interface: "Esusdata Helper".
+metodológicos versionados e publica resultados com evidência mínima. Um processo de serviço por
+instalação; a aquisição viva pode rodar num plano de execução efêmero (ADR 0010). O termo canônico
+é em português (o da Tech Spec e das fichas); o identificador em inglês entre parênteses é o nome
+usado no código. Nome de produto na interface: "Esusdata Helper".
 
 ## Language
 
@@ -105,6 +106,21 @@ Chave fornecida pelo cliente que faz duas solicitações iguais devolverem a mes
 
 **Guarda de aquisição** (`AcquisitionGuard`):
 Bloqueio que impede duas leituras vivas simultâneas na mesma fonte.
+
+**Plano de execução** (`observatorio-execplane`):
+Processo filho efêmero, um por job reivindicado, que faz a aquisição viva no PEC (ADR 0010). Não
+é um worker nem um serviço do SO; nunca abre o SQLite nem o lock de processo.
+_Avoid_: worker, wrapper (worker é `JobWorker`; wrapper é o instalador do SO)
+
+**Porta de aquisição** (`AcquisitionPort`):
+Interface de domínio que a execução usa para adquirir um extrato, com duas implementações: leitura
+in-process via JDBC (`JdbcAcquisitionAdapter`) ou delegada a um plano de execução
+(`SubprocessAcquisitionAdapter`).
+
+**Comando de aquisição** (`AcquisitionCommand`):
+Os dados de uma solicitação de aquisição — fonte, identidade, escopo, orçamento — como a execução
+os entrega à porta. É a origem dos campos do envelope NDJSON que `SubprocessAcquisitionAdapter`
+monta para o plano de execução.
 
 ### Resultado
 

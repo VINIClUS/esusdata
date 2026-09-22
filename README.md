@@ -2,7 +2,9 @@
 
 Serviço local que lê o PEC e-SUS de um município em modo somente-leitura, calcula indicadores
 metodológicos versionados (piloto: C1 — Mais Acesso) e publica resultados com evidência mínima.
-Um processo por instalação; SQLite próprio; nunca escreve no PEC.
+Um processo de serviço por instalação; SQLite próprio; nunca escreve no PEC. A aquisição viva pode
+rodar num plano de execução efêmero em processo filho (ADR 0010) — o worker de cálculo continua
+único por instalação.
 
 - Especificação: [`Tech_Spec_Observatorio_APS_v0_4.md`](./Tech_Spec_Observatorio_APS_v0_4.md)
 - Vocabulário canônico: [`CONTEXT.md`](./CONTEXT.md)
@@ -13,6 +15,7 @@ Um processo por instalação; SQLite próprio; nunca escreve no PEC.
 ```
 apps/agent/      backend Java 21 / Spring Boot — um único projeto Maven (ADR 0001)
 apps/web/        frontend React + Vite + MUI ("Esusdata Helper")
+apps/execplane/  plano de execução em Rust — aquisição viva do PEC, IPC por stdin/stdout (ADR 0010)
 contracts/       contratos publicados: compatibilidade de adaptadores PEC e OpenAPI v1
 docs/adr/        registros de decisão
 docs/discovery/  investigação do PEC real (CT 133)
@@ -51,6 +54,16 @@ cd apps/agent && mvn verify -Dsurefire.reuseForks=false
 
 # frontend (dados mockados por padrão: VITE_USE_MOCKS)
 cd apps/web && npm install && npm run dev
+
+# plano de execução (ADR 0010) — build separado, opcional; sem o binário o backend usa o
+# adaptador JDBC in-process (observatorio.execution-plane.binary vazio). O handshake de
+# compatibilidade e o streaming de linhas (consulta congelada, orçamento de leitura) estão
+# implementados e verificados manualmente contra um Postgres real; cancelamento cooperativo
+# também, exceto o caso de cancelar em meio ao streaming (só o caso antes da primeira linha foi
+# exercitado). Ainda não há empacotamento jpackage nem teste de integração automatizado ponta a
+# ponta com o Java — nunca aponte observatorio.execution-plane.binary para este binário contra
+# uma fonte real ainda.
+cd apps/execplane && cargo build --release && cargo test
 ```
 
 Testes com sufixo `LiveTest` exigem um PEC acessível e são pulados sem ele (ADR 0002, ADR 0003).

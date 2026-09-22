@@ -7,6 +7,7 @@ import br.gov.observatorioaps.sourceconnector.domain.PecSourceIdentity;
 import br.gov.observatorioaps.sourceconnector.infrastructure.jdbc.PecSourceConnection;
 import br.gov.observatorioaps.sourceconnector.domain.SourceBudgetExceededException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Reader;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
@@ -26,8 +27,9 @@ import br.gov.observatorioaps.pecadapter.infrastructure.file.PecCompatibilityMat
 import br.gov.observatorioaps.pecadapter.domain.RawEncounterRecord;
 /**
  * Capability {@code individual_encounter_modality} against PEC 5.4.37 / PostgreSQL 9.6.13,
- * read model {@code PEC_DW}. Frozen and fingerprinted in
- * {@code contracts/compatibility/pec-adapters.json}; grounded in
+ * read model {@code PEC_DW}. Query text frozen in
+ * {@code contracts/compatibility/queries/individual_encounter_modality@0.1.0.sql}, fingerprinted
+ * in {@code contracts/compatibility/pec-adapters.json}; grounded in
  * {@code docs/discovery/2026-09-19-pec-ct133.md}.
  *
  * <p>Binds the municipal cut on {@code tb_dim_municipio.co_ibge} (7-digit text), never on the
@@ -43,20 +45,18 @@ public final class IndividualEncounterModalityCapability {
     public static final String CAPABILITY = "individual_encounter_modality";
     public static final String ADAPTER_VERSION = "0.1.0";
 
-    /** Frozen query text — its SHA-256 is recorded as {@code query_checksum} in the adapter matrix. */
-    public static final String QUERY = """
-            SELECT f.co_seq_fat_atd_ind, f.co_dim_tipo_atendimento, t.dt_registro,
-                   u.nu_cnes, e.nu_ine, c.nu_cbo, f.nu_uuid_ficha, f.nu_atendimento
-              FROM public.tb_fat_atendimento_individual f
-              JOIN public.tb_dim_tempo      t ON t.co_seq_dim_tempo       = f.co_dim_tempo
-              JOIN public.tb_dim_municipio  m ON m.co_seq_dim_municipio   = f.co_dim_municipio
-              LEFT JOIN public.tb_dim_unidade_saude u ON u.co_seq_dim_unidade_saude = f.co_dim_unidade_saude_1
-              LEFT JOIN public.tb_dim_equipe        e ON e.co_seq_dim_equipe        = f.co_dim_equipe_1
-              LEFT JOIN public.tb_dim_cbo           c ON c.co_seq_dim_cbo           = f.co_dim_cbo_1
-             WHERE m.co_ibge = ?
-               AND t.dt_registro >= ? AND t.dt_registro < ?
-             ORDER BY f.co_seq_fat_atd_ind
-            """;
+    /**
+     * Loaded from {@code contracts/compatibility/queries/individual_encounter_modality@0.1.0.sql}
+     * (the {@code pom.xml} resource copy makes {@code contracts/compatibility} the classpath root
+     * — ADR 0009: {@code contracts/} is the single source of the compatibility contract), not an
+     * inline text block, so a future non-Java execution plane can {@code include_str!} the exact
+     * same bytes rather than keep a second, driftable copy of the query text. Its SHA-256 is
+     * recorded as {@code query_checksum} in the adapter matrix.
+     */
+    private static final String QUERY_RESOURCE =
+            "/compatibility/queries/individual_encounter_modality@0.1.0.sql";
+
+    public static final String QUERY = loadQuery();
 
     /**
      * Real SHA-256 of {@link #QUERY}, computed once and reused everywhere a query checksum is
@@ -66,6 +66,18 @@ public final class IndividualEncounterModalityCapability {
     public static final String QUERY_CHECKSUM = computeQueryChecksum();
 
     private static final int FETCH_SIZE = 1000;
+
+    private static String loadQuery() {
+        try (InputStream resource =
+                IndividualEncounterModalityCapability.class.getResourceAsStream(QUERY_RESOURCE)) {
+            if (resource == null) {
+                throw new IllegalStateException("Packaged capability query is missing: " + QUERY_RESOURCE);
+            }
+            return new String(resource.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not read packaged capability query: " + QUERY_RESOURCE, e);
+        }
+    }
 
     private static String computeQueryChecksum() {
         try {

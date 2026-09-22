@@ -1,5 +1,6 @@
 package br.gov.observatorioaps.extractionstore.infrastructure.file;
 
+import br.gov.observatorioaps.sourceconnector.domain.AcquisitionCommand;
 import br.gov.observatorioaps.sourceconnector.domain.ReadBudget;
 import br.gov.observatorioaps.sourceconnector.application.PecSourceAcquisition;
 import br.gov.observatorioaps.sourceconnector.domain.SourceBudgetExceededException;
@@ -91,7 +92,21 @@ public final class ExtractWriter implements AutoCloseable {
                 .sourceConnection().readBudget().maxTempFileBytes(), scopeFor(acquisition));
     }
 
-    /** Opens a bounded temporary extract bound to the source and period authorized for it. */
+    /** Opens a writer bound to the exact source, period, and read policy of one acquisition,
+     * independently of a live JDBC {@code PecSourceAcquisition} — the seam
+     * {@code SubprocessAcquisitionAdapter} uses, since the live connection lives in the child
+     * process, not this JVM. */
+    public ExtractWriter(
+            Path baseDir,
+            String extractionId,
+            AcquisitionCommand acquisitionCommand
+    ) throws IOException {
+        this(baseDir, extractionId,
+                Objects.requireNonNull(acquisitionCommand, "acquisitionCommand is required")
+                        .budget().maxTempFileBytes(),
+                scopeFor(acquisitionCommand));
+    }
+
     ExtractWriter(
             Path baseDir,
             String extractionId,
@@ -152,6 +167,14 @@ public final class ExtractWriter implements AutoCloseable {
         return new ExtractionScope(
                 acquisition.sourceId(), acquisition.municipalityIbge(),
                 acquisition.periodStart().toString(), acquisition.periodEndExclusive().toString());
+    }
+
+    private static ExtractionScope scopeFor(AcquisitionCommand acquisitionCommand) {
+        return new ExtractionScope(
+                acquisitionCommand.connectionProperties().sourceId(),
+                acquisitionCommand.connectionProperties().municipalityIbge(),
+                acquisitionCommand.periodStart().toString(),
+                acquisitionCommand.periodEndExclusive().toString());
     }
 
     public void write(CanonicalEncounter encounter) throws IOException {
