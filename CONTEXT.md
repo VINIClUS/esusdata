@@ -2,7 +2,8 @@
 
 Serviço local que lê o PEC e-SUS de um município em modo somente-leitura, calcula indicadores
 metodológicos versionados e publica resultados com evidência mínima. Um processo de serviço por
-instalação; a aquisição viva pode rodar num plano de execução efêmero (ADR 0010). O termo canônico
+instalação; a aquisição viva pode rodar num plano de execução efêmero que também gera o data file
+do extrato (ADR 0010, ADR 0011). O termo canônico
 é em português (o da Tech Spec e das fichas); o identificador em inglês entre parênteses é o nome
 usado no código. Nome de produto na interface: "Esusdata Helper".
 
@@ -108,8 +109,11 @@ Chave fornecida pelo cliente que faz duas solicitações iguais devolverem a mes
 Bloqueio que impede duas leituras vivas simultâneas na mesma fonte.
 
 **Plano de execução** (`observatorio-execplane`):
-Processo filho efêmero, um por job reivindicado, que faz a aquisição viva no PEC (ADR 0010). Não
-é um worker nem um serviço do SO; nunca abre o SQLite nem o lock de processo.
+Processo filho efêmero, um por job reivindicado, que faz a aquisição viva no PEC e gera o data
+file do extrato — parsing, validação por registro, gzip, SHA-256, teto de bytes temporários
+(ADR 0010, ADR 0011). Não é um worker nem um serviço do SO; nunca abre o SQLite, o lock de
+processo, nem o `.extract.lock` — lock, reconcile/recovery, manifesto e publicação continuam
+exclusivos do Java (`DelegatedExtractPublication`).
 _Avoid_: worker, wrapper (worker é `JobWorker`; wrapper é o instalador do SO)
 
 **Porta de aquisição** (`AcquisitionPort`):

@@ -47,6 +47,11 @@ mesmo `ExtractWriter` que o caminho JDBC já usa, com uma única implementação
 arquivo (lock de escrita, orçamento de bytes, publicação atômica por hard link). Java continua
 sendo o control plane inteiro: fila, gerações, retry, recuperação, staging e publicação.
 
+> **Superado por ADR 0011.** O filho passou a ser dono da escrita do data file do extrato
+> (parsing, validação por registro, gzip, SHA-256, teto de bytes) — deixou de usar o
+> `ExtractWriter` do caminho JDBC. `.extract.lock`, reconcile/recovery, manifesto e publicação
+> atômica continuam exclusivos do Java, sem mudança.
+
 Por job reivindicado, `SubprocessAcquisitionAdapter`
 (`sourceconnector.infrastructure.process`) — segunda implementação de
 `sourceconnector.domain.AcquisitionPort`, ao lado de `JdbcAcquisitionAdapter` — faz spawn do
@@ -57,16 +62,20 @@ exclusivos da JVM. O filho sinaliza sucesso fechando seu stdout e saindo com có
 das contagens de linha já é conhecido do lado Java, e essas contagens vêm do próprio
 `ExtractWriter` à medida que grava o que o filho envia.
 
+> **Superado por ADR 0011.** O filho agora envia uma mensagem terminal `{"type":"complete",...}`
+> com as contagens, o checksum e o tamanho comprimido — sucesso exige essa mensagem **e** exit 0,
+> não mais só o exit 0. As contagens vêm do filho, não mais de `ExtractWriter`.
+
 **O que sobrevive sem mudança de semântica:**
 - O invariante de "um worker de cálculo ativo por instalação" (§1.9.4 L346): um filho reivindicado
   por um job não é um segundo worker, é a mesma tentativa estendendo-se a um processo.
 - Nenhum broker, lease renovável, heartbeat de posse, fencing distribuído ou eleição de líder é
   introduzido. A reivindicação continua sendo o CAS de `acquireNext` com `process_instance_id` +
   `executionGeneration`; a recuperação continua só no boot, via `JobRecovery`.
-- ENG-51 (fechar o cliente não prova término remoto) não muda: só uma saída com código `0` conta
-  como sucesso; se o filho sai com qualquer outro código sem antes enviar
-  `{"type":"error","uncertain":false}`, o resultado é tratado como incerto e a fonte entra em
-  cooldown, exatamente como uma falha de conexão JDBC hoje.
+- ENG-51 (fechar o cliente não prova término remoto) não muda: se o filho sai com qualquer código
+  sem antes enviar `{"type":"error","uncertain":false}`, o resultado é tratado como incerto e a
+  fonte entra em cooldown, exatamente como uma falha de conexão JDBC hoje. (ADR 0011 endurece o
+  próprio critério de sucesso — ver nota acima.)
 - `jpackage` não ganha um segundo serviço do SO. O binário do plano de execução vai dentro da app
   image, chamado como subprocesso efêmero — nunca um wrapper concorrente (§1.12.5 L491: "nunca
   dois wrappers/serviços simultâneos").
@@ -103,3 +112,6 @@ das contagens de linha já é conhecido do lado Java, e essas contagens vêm do 
   lado Java, que é quem escreve o arquivo local via `ExtractWriter`, com o mesmo
   `BoundedOutputStream` que o caminho JDBC já usa. Nenhum dos dois lados reimplementa o controle
   que já é do outro.
+
+  > **Superado por ADR 0011.** `max_temp_file_bytes` passou para o envelope de aquisição e é
+  > aplicado pelo filho (`extract::ExtractSink`), não mais pelo `ExtractWriter` do lado Java.
