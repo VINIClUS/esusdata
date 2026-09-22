@@ -66,7 +66,9 @@ cd apps/web && npm install && npm run dev
 # seguiu até max_duration_ms, sem causa encontrada — ver ADR 0011) e compara com o JDBC a
 # classificação de senha errada e de fonte inalcançável, sem cooldown ENG-51. O cancelamento via
 # EOF em stdin (pai morto) continua verificado só manualmente. ExecutionPlaneLivePecTest roda os
-# mesmos casos contra o PEC real (túnel do ADR 0003 + pec.env), ainda sem uma execução verde.
+# mesmos casos contra o PEC real (túnel do ADR 0003 + pec.env) só com o opt-in explícito
+# -Dobservatorio.execution-plane.live-pec=true — o comando abaixo nunca toca o PEC real —, e
+# ainda não teve uma execução verde.
 # Ainda não há empacotamento jpackage nem prova de equivalência contra as fingerprints de produção
 # empacotadas — nunca aponte observatorio.execution-plane.binary para este binário contra uma
 # fonte real ainda.

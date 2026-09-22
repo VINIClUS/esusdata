@@ -43,13 +43,17 @@ import static org.assertj.core.api.Assertions.catchThrowable;
  * handshake, never a synthetic one. A fingerprint mismatch fails this test closed; it is never
  * worked around by forcing {@code proceed}.
  *
- * <p><b>Gate:</b> both {@link LivePecAssumptions} (secret file + reachable tunnel) <em>and</em>
- * {@code -Dobservatorio.execution-plane.binary}, so CI and a dead tunnel both skip. Extracts land
- * only in this test's {@code @TempDir} — they carry patient data and are deleted with it.
+ * <p><b>Gate:</b> its own opt-in {@code -Dobservatorio.execution-plane.live-pec=true}, on top of
+ * {@code -Dobservatorio.execution-plane.binary} and {@link LivePecAssumptions} (secret file +
+ * reachable tunnel + a real login). The binary property alone is what the README's ordinary
+ * {@code mvn verify} passes — that must never, by itself, send a failed login and a cancelled
+ * read to the production PEC. Extracts land only in this test's {@code @TempDir} — they carry
+ * patient data and are deleted with it.
  */
 class ExecutionPlaneLivePecTest {
 
     private static final String BINARY_PROPERTY = "observatorio.execution-plane.binary";
+    private static final String OPT_IN_PROPERTY = "observatorio.execution-plane.live-pec";
     private static final String MUNICIPALITY_IBGE = "3541307";
 
     @TempDir
@@ -60,6 +64,8 @@ class ExecutionPlaneLivePecTest {
 
     @BeforeEach
     void setUp() throws IOException {
+        Assumptions.assumeTrue(Boolean.getBoolean(OPT_IN_PROPERTY),
+                "Skipping: touches the production PEC — opt in with -D" + OPT_IN_PROPERTY + "=true");
         realBinary = System.getProperty(BINARY_PROPERTY);
         Assumptions.assumeTrue(realBinary != null && !realBinary.isBlank(),
                 "Skipping: -D" + BINARY_PROPERTY + " not set");
@@ -109,16 +115,22 @@ class ExecutionPlaneLivePecTest {
                 extractsDir, Clock.systemUTC(), Duration.ofSeconds(10));
     }
 
-    /** The pilot competência (ADR 0004), with duration/statement ceilings tighter than the default. */
+    /**
+     * The whole history (~294k rows, discovery doc), not the pilot competência's ~10k: against a
+     * container, a cancel sent at the first {@code progress} landed only after up to ~90k more
+     * rows, so a single month would already be fully on the wire and never exercise the cancel.
+     * Statement/duration ceilings are tighter than the default so a cancel that doesn't land still
+     * stops within 20s.
+     */
     private AcquisitionCommand command(String extractionId) {
         ReadBudget budget = new ReadBudget(
                 2, Duration.ofSeconds(10), Duration.ofSeconds(10), 20_000, 10_000, 20_000,
-                200_000, 30_000, ReadBudget.DEFAULT_MAX_PAYLOAD_BYTES, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES);
+                500_000, 20_000, ReadBudget.DEFAULT_MAX_PAYLOAD_BYTES, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES);
         return new AcquisitionCommand(
                 new PecConnectionProperties("pec-ct133-dev", env.get("PEC_DB_HOST"), port(),
                         env.get("PEC_DB_NAME"), env.get("PEC_DB_USER"), "PEC_DB_PASSWORD", MUNICIPALITY_IBGE),
                 new PecSourceIdentity("pec-ct133-dev", "5.4.37", "PEC_DW", "PRONTUARIO"),
-                budget, extractionId, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                budget, extractionId, LocalDate.of(2000, 1, 1), LocalDate.of(2027, 1, 1),
                 "America/Sao_Paulo");
     }
 

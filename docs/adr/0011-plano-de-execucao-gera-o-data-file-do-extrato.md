@@ -107,7 +107,7 @@ também o teto de bytes temporários e a falta de espaço livre, que antes só e
   > orçamento) e saiu como `SOURCE_BUDGET_EXCEEDED`, com o rollback final falhando por
   > `connection closed`. Não reproduziu em 40 iterações numa mesma JVM (com timers distintos) nem
   > em 8 JVMs novas. O teto de duração continua limitando o pior caso. A verificação no PEC real
-  > (`ExecutionPlaneLivePecTest`, CT 133) não rodou: o PostgreSQL do PEC está parado desde
+  > (`ExecutionPlaneLivePecTest`, CT 133, opt-in `-Dobservatorio.execution-plane.live-pec=true`) não rodou: o PostgreSQL do PEC está parado desde
   > 2026-09-22 00:14 (serviço `e-SUS-AB-PostgreSQL` em `failed`).
 - `ExtractPublication` (novo, package-private) extrai de `ExtractWriter` as mecânicas estáticas de
   publicação (criação de arquivo owner-only, hard link atômico, fsync de diretório, reserva de

@@ -352,8 +352,9 @@ class ExecutionPlaneDifferentialLiveTest {
 
     /**
      * The same parity for a server that isn't there at all: the child has no server-side
-     * SQLSTATE to forward and reports pgJDBC's own {@code 08001} instead — this test is what holds
-     * that choice to what pgJDBC actually does.
+     * SQLSTATE to forward and reports {@code 08001} instead. This holds that choice to the same
+     * classification pgJDBC's failure gets (both {@code 08*}, transient) — not to byte-equal
+     * SQLSTATEs.
      */
     @Test
     void unreachableSourceIsClassifiedTheSameWayByBothAdaptersWithoutCooldown() throws Exception {
