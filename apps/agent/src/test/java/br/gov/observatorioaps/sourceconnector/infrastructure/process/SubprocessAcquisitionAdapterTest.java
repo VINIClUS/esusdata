@@ -123,25 +123,26 @@ class SubprocessAcquisitionAdapterTest {
     }
 
     @Test
-    void happyPathWritesRowsThroughExtractWriterAndReportsProgress() throws IOException {
+    void happyPathWritesRowsThroughDelegatedExtractPublicationAndReportsProgress() throws IOException {
         RecordingListener listener = new RecordingListener();
         ExtractionManifest manifest =
                 adapter("happy").acquire(command(), new CancellationToken(), listener);
 
-        // The manifest is produced by SubprocessAcquisitionAdapter driving the same ExtractWriter
-        // the JDBC path uses — rowCount/exclusionCount/checksum come from what was actually
-        // written, not from anything the (stub) child claimed.
+        // rowCount/exclusionCount/checksum come from the child's own "complete" report (fatia 3 /
+        // ADR 0011) — DelegatedExtractPublication.publish verified them against the actual file
+        // before trusting them, and the assertions below (reading the file back through
+        // ExtractReader) prove that check wasn't hollow.
         assertThat(manifest.extractionId()).isEqualTo("live-job-1-g1");
         assertThat(manifest.queryChecksum()).isEqualTo(QUERY_CHECKSUM);
         assertThat(manifest.rowCount()).isEqualTo(2);
         assertThat(manifest.exclusionCount()).isZero();
-        assertThat(listener.progressCount.get()).isEqualTo(2);
+        assertThat(listener.progressCount.get()).isEqualTo(1);
         assertThat(listener.uncertainReasons).isEmpty();
 
         // Reads the extract back through ExtractReader (checksum/completeness/row-count verified
-        // on the way in, per ENG-20) — proves the "row" wire message survived
-        // mapper.treeToValue(..., CanonicalEncounter.class) with its fields intact, not just that
-        // ExtractWriter's own self-consistent counters advanced.
+        // on the way in, per ENG-20) — proves the stub's real gzip bytes survived
+        // DelegatedExtractPublication's own integrity check and publication with their fields
+        // intact, not just that the child's self-reported counters were internally consistent.
         ExtractReader reader = new ExtractReader();
         List<CanonicalEncounter> encounters = reader.readEncounters(extractsDir, manifest);
         assertThat(encounters).extracting(e -> e.sourceRef().recordId(), CanonicalEncounter::modality)
@@ -150,17 +151,115 @@ class SubprocessAcquisitionAdapterTest {
                         tuple("2", CanonicalModality.ESPONTANEO));
     }
 
+    /**
+     * A child reporting a record outside the authorized municipality/period is exactly what
+     * {@code apps/execplane/src/extract.rs}'s own scope check exists to catch — fatia 3 / ADR 0011
+     * moved that write-time guarantee from Java to the child, since the child is the one holding
+     * the bytes as they're produced. What Java still guarantees is that such a record can never be
+     * <em>read</em> as a calculation input: {@link DelegatedExtractPublication#publish} only
+     * checks metadata/integrity (never re-parses records), so a buggy/hostile stub reporting a
+     * self-consistent completion for an out-of-scope row still publishes — and
+     * {@code ExtractReader}/{@code ExtractValidation.validateRecord} is what rejects it,
+     * unconditionally, before any calculation ever sees it.
+     */
     @Test
-    void outOfScopeRowIsRejectedAndExtractIsNeverPublished() {
+    void outOfScopeRowIsPublishedButRejectedOnRead() {
         RecordingListener listener = new RecordingListener();
 
-        // A child reporting a record outside the authorized municipality/period is exactly what
-        // ExtractWriter's own ExtractionScope check exists to catch (plan §2.6) — this is the
-        // property that justifies Java, not the child, owning the extract file.
-        assertThatThrownBy(() -> adapter("out-of-scope-row").acquire(command(), new CancellationToken(), listener))
+        ExtractionManifest manifest =
+                adapter("out-of-scope-row").acquire(command(), new CancellationToken(), listener);
+
+        assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).exists();
+        assertThat(listener.uncertainReasons).isEmpty();
+        assertThatThrownBy(() -> new ExtractReader().readEncounters(extractsDir, manifest))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("municipality");
+    }
+
+    /**
+     * {@link DelegatedExtractPublication#publish}'s integrity check: a fresh SHA-256 over the raw
+     * bytes on disk must match what the child reported, or nothing is published. Not "uncertain"
+     * in the ENG-51 sense — the live read already completed successfully; this is a local-file
+     * mismatch, classified {@code INCOMPATIBLE_OR_INVALID_EXTRACT} DEFINITIVE like any other
+     * extract-integrity failure (ENG-20), same as {@code FailureClassifier} already treats a
+     * checksum/row-count mismatch caught by {@code ExtractReader} on the read side.
+     */
+    @Test
+    void mismatchedChecksumIsRejectedAndNothingIsPublished() {
+        RecordingListener listener = new RecordingListener();
+
+        assertThatThrownBy(() -> adapter("wrong-checksum").acquire(command(), new CancellationToken(), listener))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("checksum");
+        assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).doesNotExist();
+        assertThat(listener.uncertainReasons).isEmpty();
+    }
+
+    @Test
+    void mismatchedCompressedByteCountIsRejectedAndNothingIsPublished() {
+        RecordingListener listener = new RecordingListener();
+
+        assertThatThrownBy(() -> adapter("wrong-size").acquire(command(), new CancellationToken(), listener))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("compressed_bytes");
+        assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).doesNotExist();
+        assertThat(listener.uncertainReasons).isEmpty();
+    }
+
+    @Test
+    void exclusionCountGreaterThanRowCountIsRejectedBeforeTouchingTheFile() {
+        RecordingListener listener = new RecordingListener();
+
+        assertThatThrownBy(() -> adapter("exclusion-gt-rows").acquire(command(), new CancellationToken(), listener))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exclusion_count");
+        assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).doesNotExist();
+        assertThat(listener.uncertainReasons).isEmpty();
+    }
+
+    @Test
+    void aCompletionReportForAFileTheChildNeverWroteIsRejected() {
+        RecordingListener listener = new RecordingListener();
+
+        assertThatThrownBy(() -> adapter("missing-file").acquire(command(), new CancellationToken(), listener))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("regular extract temp file");
+        assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).doesNotExist();
+        assertThat(listener.uncertainReasons).isEmpty();
+    }
+
+    /**
+     * Success requires exit {@code 0} <em>and</em> a {@code complete} message — either alone is a
+     * protocol violation, treated as uncertain (ENG-51), never as a silent success.
+     */
+    @Test
+    void exitingZeroWithoutACompleteMessageIsTreatedAsUncertain() {
+        RecordingListener listener = new RecordingListener();
+
+        assertThatThrownBy(() -> adapter("exit0-without-complete").acquire(command(), new CancellationToken(), listener))
+                .isInstanceOf(PecAcquisitionException.class);
+        assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).doesNotExist();
+        assertThat(listener.uncertainReasons).hasSize(1);
+    }
+
+    @Test
+    void reportingCompleteThenExitingNonZeroIsTreatedAsUncertain() {
+        RecordingListener listener = new RecordingListener();
+
+        assertThatThrownBy(() -> adapter("complete-then-nonzero").acquire(command(), new CancellationToken(), listener))
+                .isInstanceOf(PecAcquisitionException.class);
+        assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).doesNotExist();
+        assertThat(listener.uncertainReasons).hasSize(1);
+    }
+
+    /** Plan §2.7.1's new {@code INVALID_EXTRACT_RECORD} branch (fatia 3 / ADR 0011). */
+    @Test
+    void invalidExtractRecordIsClassifiedAsInvalidRequest() {
+        RecordingListener listener = new RecordingListener();
+
+        assertThatThrownBy(() -> adapter("invalid-record").acquire(command(), new CancellationToken(), listener))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("bound acquisition scope");
-        assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).doesNotExist();
         assertThat(listener.uncertainReasons).hasSize(1);
     }
 

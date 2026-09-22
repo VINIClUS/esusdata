@@ -1,4 +1,5 @@
 mod envelope;
+mod extract;
 mod matrix;
 mod probe;
 mod stream;
@@ -147,6 +148,34 @@ fn run() -> Result<i32, Box<dyn Error>> {
     let period_start = chrono::NaiveDate::from_str(&envelope.period_start)?;
     let period_end_exclusive = chrono::NaiveDate::from_str(&envelope.period_end_exclusive)?;
 
+    // Opened only now, after the compatibility handshake decided to proceed — mirrors the
+    // pre-fatia-3 timing of opening ExtractWriter right before "proceed" was sent, so a local
+    // sink failure (disk full, path unwritable) still aborts before any row is read. Java has
+    // already taken the `.extract.lock` and reconciled this extraction id before ever spawning
+    // this process (DelegatedExtractPublication, fatia 3 / ADR 0011) — this process only ever
+    // creates the one `.tmp` path it was handed.
+    let scope = extract::Scope {
+        source_id: envelope.source_id.clone(),
+        municipality_ibge: envelope.municipality_ibge.clone(),
+        period_start,
+        period_end_exclusive,
+    };
+    let mut sink = match extract::ExtractSink::open(
+        std::path::Path::new(&envelope.extract_temp_path),
+        envelope.budget.max_temp_file_bytes,
+        scope,
+    ) {
+        Ok(sink) => sink,
+        Err(err) => {
+            // A live connection already exists (the probe ran) — this is uncertain territory,
+            // same reasoning as every other post-probe failure.
+            let (code, detail) = extract_error_code_and_detail(err);
+            write_line(&json!({ "type": "error", "code": code, "detail": detail, "uncertain": true }))?;
+            end_transaction(txn.rollback());
+            return Ok(1);
+        }
+    };
+
     let outcome = stream::stream_query(
         &mut txn,
         cancel_token,
@@ -157,13 +186,29 @@ fn run() -> Result<i32, Box<dyn Error>> {
         period_end_exclusive,
         &budget,
         start,
+        &mut sink,
     )?;
 
     let exit_code = match outcome {
-        stream::StreamOutcome::Success => {
-            end_transaction(txn.commit());
-            0
-        }
+        stream::StreamOutcome::Success => match sink.finish() {
+            Ok(completion) => {
+                write_line(&json!({
+                    "type": "complete",
+                    "row_count": completion.row_count,
+                    "exclusion_count": completion.exclusion_count,
+                    "checksum": completion.checksum,
+                    "compressed_bytes": completion.compressed_bytes,
+                }))?;
+                end_transaction(txn.commit());
+                0
+            }
+            Err(err) => {
+                let (code, detail) = extract_error_code_and_detail(err);
+                write_line(&json!({ "type": "error", "code": code, "detail": detail, "uncertain": true }))?;
+                end_transaction(txn.rollback());
+                1
+            }
+        },
         stream::StreamOutcome::BudgetExceeded(detail) => {
             write_line(&json!({
                 "type": "error", "code": "SOURCE_BUDGET_EXCEEDED", "detail": detail, "uncertain": true,
@@ -185,8 +230,26 @@ fn run() -> Result<i32, Box<dyn Error>> {
             end_transaction(txn.rollback());
             1
         }
+        stream::StreamOutcome::InvalidRecord(detail) => {
+            write_line(&json!({
+                "type": "error", "code": "INVALID_EXTRACT_RECORD", "detail": detail, "uncertain": true,
+            }))?;
+            end_transaction(txn.rollback());
+            1
+        }
     };
     Ok(exit_code)
+}
+
+/// `ExtractError` has no `SOURCE_BUDGET_EXCEEDED` vs `UNCLASSIFIED_ERROR` distinction baked into
+/// its own type name — this is the one place that maps it to the wire's error codes, mirroring
+/// how `stream::StreamOutcome`'s variants are mapped just above.
+fn extract_error_code_and_detail(err: extract::ExtractError) -> (&'static str, String) {
+    match err {
+        extract::ExtractError::BudgetExceeded(detail) => ("SOURCE_BUDGET_EXCEEDED", detail),
+        extract::ExtractError::InvalidRecord(detail) => ("INVALID_EXTRACT_RECORD", detail),
+        extract::ExtractError::Io(detail) => ("UNCLASSIFIED_ERROR", detail),
+    }
 }
 
 /// A cancel packet that arrives after the row loop already reached a decided outcome (all rows

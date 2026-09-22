@@ -28,6 +28,10 @@ pub struct AcquireEnvelope {
     pub period_end_exclusive: String,
     #[allow(dead_code)]
     pub source_zone_id: String,
+    /// Where this process must create the extract's data file (fatia 3 / ADR 0011) — an
+    /// absolute path Java already reserved via its own lock + reconcile before this process
+    /// was even spawned. Never a directory: the full `<extractionId>.jsonl.gz.tmp` filename.
+    pub extract_temp_path: String,
     #[allow(dead_code)]
     pub query_checksum: String,
     pub adapter_version: String,
@@ -48,6 +52,5 @@ pub struct Budget {
     pub max_duration_ms: i64,
     #[allow(dead_code)]
     pub max_payload_bytes: i64,
-    #[allow(dead_code)]
     pub max_temp_file_bytes: i64,
 }

@@ -19,18 +19,26 @@ pub struct Budget {
 }
 
 pub enum StreamOutcome {
+    /// The extract's data file was written in full — `main.rs` still has to call
+    /// `ExtractSink::finish` itself (this function only holds a `&mut` borrow, not ownership) and
+    /// emit the terminal `complete` message before committing.
     Success,
     BudgetExceeded(String),
     Cancelled,
     Failed(String),
+    /// A record failed `ExtractSink::write`'s port of `validateRecordForWrite` (out-of-scope
+    /// `care_date`, blank required field, ...) — mirrors Java's `IllegalArgumentException` /
+    /// `INVALID_EXTRACT_RECORD` (fatia 3 / ADR 0011).
+    InvalidRecord(String),
 }
 
 /// Ports `IndividualEncounterModalityCapability.stream`'s row loop: runs the frozen query inside
 /// the already-open, already-probed transaction, classifies each row via
-/// `EncounterTypeMapping.classify` (hardcoded, same two id sets), and emits it as a `row` message
-/// for `SubprocessAcquisitionAdapter` to feed straight into `ExtractWriter` (ADR 0010 — this
-/// process never writes the extract itself). A background thread reads the rest of stdin for
-/// `{"type":"cancel"}` and forwards it to PostgreSQL's own cancel signal — the equivalent of
+/// `EncounterTypeMapping.classify` (hardcoded, same two id sets), and writes it through the
+/// already-open `ExtractSink` — this process now owns the extract's data file in full (fatia 3 /
+/// ADR 0011, superseding ADR 0010's "child never writes the extract" decision). A background
+/// thread reads the rest of stdin for `{"type":"cancel"}` — or its own EOF, meaning the parent
+/// died — and forwards it to PostgreSQL's own cancel signal, the equivalent of
 /// `Statement.cancel()` (plan §2.7). A second background thread enforces max_duration_ms itself:
 /// `tcp_user_timeout` only bounds unacknowledged *transmitted* data, so a connection that stays
 /// fully acknowledged but never sends a response (server stalled, not blackholed) would otherwise
@@ -49,6 +57,7 @@ pub fn stream_query(
     period_end_exclusive: NaiveDate,
     budget: &Budget,
     start: Instant,
+    sink: &mut crate::extract::ExtractSink,
 ) -> Result<StreamOutcome, Box<dyn Error>> {
     let cancel_requested = Arc::new(AtomicBool::new(false));
     let duration_exceeded = Arc::new(AtomicBool::new(false));
@@ -122,22 +131,26 @@ pub fn stream_query(
         }
 
         let modality = classify(tipo_atendimento_id);
-        write_line(&json!({
-            "type": "row",
-            "encounter": {
-                "sourceRef": {
-                    "sourceId": source_id,
-                    "entityType": "tb_fat_atendimento_individual",
-                    "recordId": pk.to_string(),
-                },
-                "municipalityIbge": municipality_ibge,
-                "careDate": care_date_str,
-                "modality": modality,
-                "cnes": cnes,
-                "ine": ine,
-                "cbo": cbo,
+        let encounter = crate::extract::Encounter {
+            source_ref: crate::extract::SourceRef {
+                source_id: source_id.to_string(),
+                entity_type: "tb_fat_atendimento_individual".to_string(),
+                record_id: pk.to_string(),
             },
-        }))?;
+            municipality_ibge: municipality_ibge.to_string(),
+            care_date: care_date_str,
+            modality,
+            cnes,
+            ine,
+            cbo,
+        };
+        if let Err(err) = sink.write(&encounter) {
+            return Ok(match err {
+                crate::extract::ExtractError::InvalidRecord(detail) => StreamOutcome::InvalidRecord(detail),
+                crate::extract::ExtractError::BudgetExceeded(detail) => StreamOutcome::BudgetExceeded(detail),
+                crate::extract::ExtractError::Io(detail) => StreamOutcome::Failed(detail),
+            });
+        }
 
         if row_count % PROGRESS_INTERVAL == 0 {
             write_line(&json!({ "type": "progress" }))?;
@@ -254,9 +267,16 @@ fn spawn_cancel_listener(cancel_token: CancelToken, cancel_requested: Arc<Atomic
             if line.contains("\"type\":\"cancel\"") {
                 cancel_requested.store(true, Ordering::SeqCst);
                 let _ = cancel_token.cancel_query(NoTls);
-                break;
+                return;
             }
         }
+        // stdin closed without an explicit cancel ever arriving — the parent process died. An
+        // orphaned child must not keep reading the PEC (or holding the extract temp file open)
+        // until max_duration_ms elapses on its own; EOF is the standard, reliable "parent is
+        // gone" signal (plan §2.7's table: "o filho detecta EOF no stdin... e sai sozinho"), so it
+        // gets exactly the same treatment as an explicit cancel.
+        cancel_requested.store(true, Ordering::SeqCst);
+        let _ = cancel_token.cancel_query(NoTls);
     });
 }
 
