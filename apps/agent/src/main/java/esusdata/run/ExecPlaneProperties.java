@@ -1,0 +1,18 @@
+package esusdata.run;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
+
+import java.time.Duration;
+
+/**
+ * Plan §2.1: an empty {@code binary} means no Rust execution plane is installed, and
+ * {@link RunConfig} falls back to the in-process {@code InProcessAcquisition} — a
+ * fresh install or a machine without the packaged binary must never fail to acquire.
+ */
+@ConfigurationProperties(prefix = "observatorio.execution-plane")
+public record ExecPlaneProperties(
+        @DefaultValue("") String binary,
+        @DefaultValue("30s") Duration exitGrace
+) {
+}
