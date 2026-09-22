@@ -1,8 +1,7 @@
 package br.gov.observatorioaps.sourceconnector.infrastructure.process;
 
-import br.gov.observatorioaps.extractionstore.domain.CanonicalEncounter;
 import br.gov.observatorioaps.extractionstore.domain.ExtractionManifest;
-import br.gov.observatorioaps.extractionstore.infrastructure.file.ExtractWriter;
+import br.gov.observatorioaps.extractionstore.infrastructure.file.DelegatedExtractPublication;
 import br.gov.observatorioaps.pecadapter.domain.ColumnMetadata;
 import br.gov.observatorioaps.pecadapter.domain.CompatibilityFingerprint;
 import br.gov.observatorioaps.pecadapter.domain.CompatibilityProbeResult;
@@ -45,12 +44,14 @@ import java.util.concurrent.TimeUnit;
 /**
  * {@link AcquisitionPort} that delegates the live PEC read to a spawned child process, talking
  * NDJSON over its stdin/stdout (plan §2.2). The child never touches SQLite or the job queue, and
- * never writes the extract file itself — it only measures compatibility and streams canonical
- * rows back; this class drives the same {@link ExtractWriter} the JDBC path uses, so there is one
- * extract-file writer implementation, not two. This class owns the entire protocol: handshake,
- * compatibility comparison against the packaged {@link PecCompatibilityMatrix}, cancellation
- * forwarding, and translating the child's outcome back into the same unchecked types
- * {@code FailureClassifier} already knows how to classify.
+ * never opens the {@code .extract.lock} or performs recovery/publication — since fatia 3 (ADR
+ * 0011) it {@code does} write the extract's data file itself, at the exact path this class hands
+ * it in the {@code acquire} envelope ({@link DelegatedExtractPublication#tempFile()}), reserved
+ * and lock-protected by this class <em>before</em> the child is ever spawned. This class owns the
+ * entire protocol: handshake, compatibility comparison against the packaged
+ * {@link PecCompatibilityMatrix}, cancellation forwarding, verifying the child's reported
+ * completion against the file it actually produced, and translating the child's outcome back into
+ * the same unchecked types {@code FailureClassifier} already knows how to classify.
  *
  * <p>The child only ever reports the raw data it measured (column metadata, probe rows) — never a
  * fingerprint string. This class derives the ENG-43 fingerprint itself via {@link
@@ -63,10 +64,11 @@ import java.util.concurrent.TimeUnit;
  * (connection open, extract finalize). Plan §2.7 pre-authorizes this divergence — no decision
  * path reads {@code last_progress_at}, it only feeds diagnostics.
  *
- * <p>The child signals success by closing its stdout and exiting {@code 0} after streaming its
- * last row — there is no terminal "manifest" message, since every manifest field other than the
- * row/exclusion counts is already known on the Java side, and those two come from
- * {@link ExtractWriter} itself as it writes what the child sends.
+ * <p>The child signals success by sending a terminal {@code complete} message (row/exclusion
+ * counts, checksum, compressed byte count) and then closing its stdout and exiting {@code 0} —
+ * both are required; either alone is a protocol violation. {@link DelegatedExtractPublication}
+ * checks that report against the file's actual size and a fresh raw SHA-256 before publishing —
+ * see its class doc for exactly what that check does and does not prove.
  */
 public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
 
@@ -123,6 +125,32 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
             AcquisitionCommand acquisitionCommand, String validatedHost,
             CancellationSignal cancellation, AcquisitionListener listener) {
         Instant startedAt = clock.instant();
+
+        // Opened before any process is spawned (fatia 3 / ADR 0011 — a deliberate move earlier
+        // than the pre-fatia-3 "right before proceed" timing): takes the .extract.lock and
+        // reconciles any abandoned publication for this extraction id. A failure here means no
+        // live PEC session ever existed, so it is never "uncertain" in the ENG-51 sense, and
+        // never needs an abort message to a child that doesn't exist yet.
+        DelegatedExtractPublication publication;
+        try {
+            publication = new DelegatedExtractPublication(
+                    extractsBaseDir, acquisitionCommand.extractionId(), acquisitionCommand);
+        } catch (IOException cannotOpen) {
+            throw new PecAcquisitionException(
+                    "could not open the local extract publication: " + cannotOpen.getMessage(), cannotOpen);
+        }
+        // A RuntimeException from the constructor above (e.g. SourceBudgetExceededException from
+        // its own disk-space reservation) is allowed to propagate unwrapped — same reasoning, and
+        // FailureClassifier already knows that type.
+
+        try (publication) {
+            return runChild(acquisitionCommand, validatedHost, cancellation, listener, publication, startedAt);
+        }
+    }
+
+    private ExtractionManifest runChild(
+            AcquisitionCommand acquisitionCommand, String validatedHost, CancellationSignal cancellation,
+            AcquisitionListener listener, DelegatedExtractPublication publication, Instant startedAt) {
         Process process;
         try {
             process = new ProcessBuilder(command).redirectErrorStream(false).start();
@@ -134,7 +162,7 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
         drainStderr(process);
 
         try {
-            writeAcquireEnvelope(process.getOutputStream(), acquisitionCommand, validatedHost);
+            writeAcquireEnvelope(process.getOutputStream(), acquisitionCommand, validatedHost, publication.tempFile());
             BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
 
@@ -162,74 +190,28 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
                         "execution plane compatibility mismatch (ENG-43): " + mismatch);
             }
 
-            ExtractWriter writer;
-            try {
-                writer = new ExtractWriter(extractsBaseDir, acquisitionCommand.extractionId(), acquisitionCommand);
-            } catch (IOException cannotOpen) {
-                // The child already proved it can read the source (it sent a probe); it just never
-                // gets told to proceed. Uncertain all the same — a live connection was opened.
-                writeLine(process.getOutputStream(), Map.of(
-                        "type", "abort", "code", "EXTRACT_WRITER_UNAVAILABLE", "detail", cannotOpen.getMessage()));
-                waitForExit(process);
-                listener.onUncertainOutcome("could not open the local extract writer: " + cannotOpen.getMessage());
-                throw new PecAcquisitionException(
-                        "could not open the local extract writer: " + cannotOpen.getMessage(), cannotOpen);
-            } catch (RuntimeException cannotOpen) {
-                // Same reasoning as the IOException branch above (a live connection already
-                // exists), for the unchecked failures ExtractWriter's constructor can also throw
-                // (e.g. SourceBudgetExceededException from its own disk-space reservation). Falling
-                // through to the outer catch (RuntimeException) below would skip
-                // onUncertainOutcome entirely — this dispatches it here and rethrows the original,
-                // concrete exception unwrapped, same as every other RuntimeException path in this
-                // class, so FailureClassifier still sees SourceBudgetExceededException and not a
-                // generic wrapper.
-                writeLine(process.getOutputStream(), Map.of(
-                        "type", "abort", "code", "EXTRACT_WRITER_UNAVAILABLE", "detail", cannotOpen.getMessage()));
-                waitForExit(process);
-                listener.onUncertainOutcome("could not open the local extract writer: " + cannotOpen.getMessage());
-                throw cannotOpen;
-            }
+            writeLine(process.getOutputStream(), Map.of("type", "proceed"));
 
-            try (writer) {
-                writeLine(process.getOutputStream(), Map.of("type", "proceed"));
-
-                cancellation.bindInterrupt(() -> {
-                    try {
-                        writeLine(process.getOutputStream(), Map.of("type", "cancel"));
-                    } catch (RuntimeException ignored) {
-                        // Best-effort only — the child may already have exited.
-                    }
-                });
-
-                consumeRows(process, reader, writer, cancellation, listener);
+            cancellation.bindInterrupt(() -> {
                 try {
-                    return writer.finalizeExtract(startedAt, acquisitionCommand.sourceZoneId(),
-                            IndividualEncounterModalityCapability.QUERY_CHECKSUM,
-                            IndividualEncounterModalityCapability.ADAPTER_VERSION, "COMPLETE", "SNAPSHOT");
-                } catch (IOException finalizeFailure) {
-                    // The child already closed its stdout and exited 0 — the live read is over and
-                    // succeeded. A local disk failure finalizing the extract is not "uncertain" in
-                    // the ENG-51 sense (mirrors JdbcAcquisitionAdapter: finalizeExtract's IOException
-                    // never flags the source, only failures during the live read do).
-                    throw new PecAcquisitionException(
-                            "could not finalize execution plane extract: " + finalizeFailure.getMessage(),
-                            finalizeFailure);
+                    writeLine(process.getOutputStream(), Map.of("type", "cancel"));
+                } catch (RuntimeException ignored) {
+                    // Best-effort only — the child may already have exited.
                 }
-            }
+            });
+
+            return consumeUntilComplete(
+                    process, reader, publication, cancellation, listener,
+                    startedAt, acquisitionCommand.sourceZoneId());
         } catch (IOException e) {
-            // Reachable only via ExtractWriter's own AutoCloseable#close() (invoked implicitly by
-            // the try-with-resources above) failing on an already-successful path — every
-            // IOException that can happen while the child's live read is actually in flight is
-            // caught and flagged uncertain closer to its source (probe handshake, writer open,
-            // row write, finalize). Not an ENG-51 case, same reasoning as finalize's own catch.
             killProcess(process);
             throw new PecAcquisitionException("execution plane I/O failure: " + e.getMessage(), e);
         } catch (RuntimeException e) {
-            // A bad AcquisitionCommand, a budget/validation failure opening the writer,
-            // or a stdin write racing the child's exit can all throw unchecked after spawn. Every
-            // one of those paths that should flag ENG-51 uncertainty already does so closer to its
-            // source — this catch exists only to guarantee the child is never orphaned still
-            // holding a live PEC read while SourceAcquisitionLimiter's permit is released (§1.9.2).
+            // A bad AcquisitionCommand or a stdin write racing the child's exit can throw
+            // unchecked after spawn. Every path that should flag ENG-51 uncertainty already does
+            // so closer to its source — this catch exists only to guarantee the child is never
+            // orphaned still holding a live PEC read while SourceAcquisitionLimiter's permit is
+            // released (§1.9.2).
             killProcess(process);
             throw e;
         } finally {
@@ -239,40 +221,37 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
 
 
     /**
-     * Reads {@code progress}/{@code row}/{@code error} messages until the child closes its
-     * stdout. A clean EOF is the normal end of a successful stream — the child never sends a
-     * terminal message of its own — so the exit code, not the presence of a message, decides
-     * whether the stream actually succeeded.
+     * Reads {@code progress}/{@code complete}/{@code error} messages until the child closes its
+     * stdout, then requires both an exit code of {@code 0} <em>and</em> a {@code complete} message
+     * — either alone is a protocol violation, not a success. Only once both hold does this call
+     * {@link DelegatedExtractPublication#publish} to verify the child's report against the file it
+     * actually produced and publish it.
      */
-    private void consumeRows(
-            Process process, BufferedReader reader, ExtractWriter writer, CancellationSignal cancellation,
-            AcquisitionListener listener) throws IOException {
+    private ExtractionManifest consumeUntilComplete(
+            Process process, BufferedReader reader, DelegatedExtractPublication publication,
+            CancellationSignal cancellation, AcquisitionListener listener,
+            Instant startedAt, String sourceZoneId) throws IOException {
+        JsonNode complete = null;
         while (true) {
             JsonNode message;
             try {
                 message = readMessage(reader);
             } catch (IOException malformed) {
-                abnormalTermination(process, cancellation, listener, "malformed message: " + malformed.getMessage());
-                return;
+                return abnormalTermination(process, cancellation, listener, "malformed message: " + malformed.getMessage());
             }
             if (message == null) {
-                int exitValue = waitForExit(process);
-                if (exitValue == 0) {
-                    return;
-                }
-                listener.onUncertainOutcome(
-                        "execution plane exited " + exitValue + " without reporting an outcome");
-                cancellation.checkCancelled();
-                throw new PecAcquisitionException(
-                        "execution plane exited " + exitValue + " without reporting an outcome", null);
+                break;
             }
             String type = text(message, "type");
             if ("progress".equals(type)) {
                 listener.onProgress();
                 continue;
             }
-            if ("row".equals(type)) {
-                writeRow(process, message, writer, cancellation, listener);
+            if ("complete".equals(type)) {
+                // Not yet trusted — still needs the exit-code check below. A child that reports
+                // complete and then exits non-zero (or never exits 0 at all) is exactly the
+                // "complete-then-nonzero" protocol violation this two-part check exists to catch.
+                complete = message;
                 continue;
             }
             if ("error".equals(type)) {
@@ -291,38 +270,40 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
                 cancellation.checkCancelled();
                 throw translate(code, detail);
             }
-            abnormalTermination(process, cancellation, listener, "unexpected message type: " + type);
-            return;
+            return abnormalTermination(process, cancellation, listener, "unexpected message type: " + type);
         }
-    }
 
-    /**
-     * Writes one child-reported row through the shared {@link ExtractWriter}. A failure here
-     * (budget exceeded, scope mismatch) keeps its concrete exception type — {@code
-     * FailureClassifier} dispatches on it (plan §2.7.1) — rather than being folded into {@link
-     * PecAcquisitionException}.
-     */
-    private void writeRow(
-            Process process, JsonNode message, ExtractWriter writer, CancellationSignal cancellation,
-            AcquisitionListener listener) {
-        CanonicalEncounter encounter;
-        try {
-            encounter = mapper.treeToValue(message.get("encounter"), CanonicalEncounter.class);
-        } catch (RuntimeException malformed) {
-            abnormalTermination(process, cancellation, listener, "malformed row: " + malformed.getMessage());
-            return;
-        }
-        try {
-            writer.write(encounter);
-        } catch (IOException | RuntimeException writeFailure) {
-            killProcess(process);
-            listener.onUncertainOutcome("could not write acquired row: " + writeFailure.getMessage());
+        int exitValue = waitForExit(process);
+        if (exitValue != 0 || complete == null) {
+            listener.onUncertainOutcome("execution plane exited " + exitValue
+                    + (complete == null ? " without reporting completion" : " after reporting completion"));
             cancellation.checkCancelled();
-            if (writeFailure instanceof RuntimeException runtimeFailure) {
+            throw new PecAcquisitionException(
+                    "execution plane exited " + exitValue + " without a valid completion", null);
+        }
+
+        long rowCount = complete.path("row_count").asLong(-1);
+        long exclusionCount = complete.path("exclusion_count").asLong(-1);
+        String checksum = text(complete, "checksum");
+        long compressedBytes = complete.path("compressed_bytes").asLong(-1);
+
+        try {
+            return publication.publish(
+                    rowCount, exclusionCount, checksum, compressedBytes, startedAt, sourceZoneId,
+                    IndividualEncounterModalityCapability.QUERY_CHECKSUM,
+                    IndividualEncounterModalityCapability.ADAPTER_VERSION, "COMPLETE", "SNAPSHOT");
+        } catch (IOException | RuntimeException publishFailure) {
+            // The child already reported success and exited 0 — the live read is over. A failure
+            // verifying/publishing the local file is not "uncertain" in the ENG-51 sense (mirrors
+            // the pre-fatia-3 finalizeExtract IOException branch): the source itself isn't
+            // implicated. Metadata/integrity mismatches (checksum, size, counts) surface as
+            // IllegalStateException, which FailureClassifier already treats as
+            // INCOMPATIBLE_OR_INVALID_EXTRACT DEFINITIVE.
+            if (publishFailure instanceof RuntimeException runtimeFailure) {
                 throw runtimeFailure;
             }
             throw new PecAcquisitionException(
-                    "could not write acquired row: " + writeFailure.getMessage(), writeFailure);
+                    "could not publish execution plane extract: " + publishFailure.getMessage(), publishFailure);
         }
     }
 
@@ -352,6 +333,12 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
         }
         if ("DESTINATION_NOT_ALLOWED".equals(code)) {
             return new AllowedDestinations.DestinationNotAllowedException(detail);
+        }
+        if ("INVALID_EXTRACT_RECORD".equals(code)) {
+            // Same classification FailureClassifier already gives a bad AcquisitionCommand or a
+            // malformed manifest argument (INVALID_REQUEST, DEFINITIVE) — a record the child
+            // itself refused to write is never retried unchanged.
+            return new IllegalArgumentException("execution plane rejected an extract record: " + detail);
         }
         return new PecAcquisitionException(detail, null);
     }
@@ -473,7 +460,8 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
         return new CompatibilityProbeResult(object, columns, items);
     }
 
-    private void writeAcquireEnvelope(OutputStream stdin, AcquisitionCommand acquisitionCommand, String validatedHost) {
+    private void writeAcquireEnvelope(
+            OutputStream stdin, AcquisitionCommand acquisitionCommand, String validatedHost, Path extractTempPath) {
         char[] password = secretResolver.resolve(acquisitionCommand.connectionProperties().secretRef());
         try {
             ReadBudget budget = acquisitionCommand.budget();
@@ -506,6 +494,10 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
             envelope.put("period_start", acquisitionCommand.periodStart().toString());
             envelope.put("period_end_exclusive", acquisitionCommand.periodEndExclusive().toString());
             envelope.put("source_zone_id", acquisitionCommand.sourceZoneId());
+            // Fatia 3 / ADR 0011: the child writes the extract's data file itself, at this one
+            // reserved path — the same path DelegatedExtractPublication already took the
+            // .extract.lock for and reconciled, before this process was ever spawned.
+            envelope.put("extract_temp_path", extractTempPath.toString());
             envelope.put("query_checksum", IndividualEncounterModalityCapability.QUERY_CHECKSUM);
             envelope.put("adapter_version", IndividualEncounterModalityCapability.ADAPTER_VERSION);
             envelope.put("budget", budgetFields);

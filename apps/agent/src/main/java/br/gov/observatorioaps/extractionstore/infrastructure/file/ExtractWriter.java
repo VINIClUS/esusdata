@@ -8,19 +8,12 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AccessDeniedException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.LinkOption;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.PosixFileAttributeView;
-import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -28,7 +21,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.Objects;
-import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 import br.gov.observatorioaps.extractionstore.domain.CanonicalEncounter;
 import br.gov.observatorioaps.extractionstore.domain.CanonicalModality;
@@ -41,6 +33,12 @@ import br.gov.observatorioaps.extractionstore.domain.ExtractionScope;
  * {@link #finalizeExtract}, after the stream is closed, the checksum is computed, and the
  * manifest is written. Any failure before that point leaves only an orphaned {@code .tmp} file,
  * never something {@link ExtractReader} will accept.
+ *
+ * <p>The publication mechanics (owner-only file creation, atomic hard-link publication, directory
+ * fsync, free-space reservation) live in {@link ExtractPublication}, shared with
+ * {@link DelegatedExtractPublication} — the execution-plane path whose data file is written by
+ * the Rust child instead of this class (fatia 3 / ADR 0011). This class is the JDBC path's own
+ * byte-level writer (digest, gzip, per-record validation); it is not deleted or superseded.
  */
 public final class ExtractWriter implements AutoCloseable {
 
@@ -135,8 +133,8 @@ public final class ExtractWriter implements AutoCloseable {
             } catch (NoSuchAlgorithmException e) {
                 throw new IllegalStateException("SHA-256 not available", e);
             }
-            ensureTempSpace(baseDir, maxTempFileBytes);
-            createOwnerOnlyFile(tempFile);
+            ExtractPublication.ensureTempSpace(baseDir, maxTempFileBytes);
+            ExtractPublication.createOwnerOnlyFile(tempFile);
             FileChannel dataChannel = FileChannel.open(tempFile, StandardOpenOption.WRITE);
             BoundedOutputStream boundedStream = new BoundedOutputStream(
                     Channels.newOutputStream(dataChannel), maxTempFileBytes);
@@ -180,7 +178,7 @@ public final class ExtractWriter implements AutoCloseable {
     public void write(CanonicalEncounter encounter) throws IOException {
         if (closed) throw new IllegalStateException("writer already finalized/closed");
         validateRecordForWrite(encounter);
-        ensureTempSpace(baseDir, maxTempFileBytes - boundedOut.written());
+        ExtractPublication.ensureTempSpace(baseDir, maxTempFileBytes - boundedOut.written());
         byte[] line = (mapper.writeValueAsString(encounter) + "\n").getBytes(StandardCharsets.UTF_8);
         gzipOut.write(line);
         rowCount++;
@@ -226,15 +224,15 @@ public final class ExtractWriter implements AutoCloseable {
             String completenessStatus,
             String consistencyLevel
     ) throws IOException {
-        validateManifestArguments(sourceId, municipalityIbge, periodStart, periodEndExclusive,
+        ExtractPublication.validateManifestArguments(sourceId, municipalityIbge, periodStart, periodEndExclusive,
                 startedAt, sourceZoneId, queryChecksum, adapterVersion, completenessStatus,
                 consistencyLevel);
         ensureWrittenScopeMatches(sourceId, municipalityIbge, periodStart, periodEndExclusive);
         Path finalFile = baseDir.resolve(extractionId + ".jsonl.gz");
         Path manifestFile = baseDir.resolve(extractionId + ".manifest.json");
-        requirePublicationTargetAbsent(finalFile, "extract data file");
-        requirePublicationTargetAbsent(manifestFile, "manifest file");
-        ensureTempSpace(baseDir, maxTempFileBytes - boundedOut.written());
+        ExtractPublication.requirePublicationTargetAbsent(finalFile, "extract data file");
+        ExtractPublication.requirePublicationTargetAbsent(manifestFile, "manifest file");
+        ExtractPublication.ensureTempSpace(baseDir, maxTempFileBytes - boundedOut.written());
 
         gzipOut.close();
         closed = true;
@@ -252,13 +250,13 @@ public final class ExtractWriter implements AutoCloseable {
 
         Path manifestTemp = baseDir.resolve(extractionId + ".manifest.json.tmp");
         ExtractValidation.rejectSymbolicLink(manifestTemp, "manifest temporary file");
-        writeAndForce(manifestTemp, mapper.writeValueAsBytes(manifest));
+        ExtractPublication.writeAndForce(manifestTemp, mapper.writeValueAsBytes(manifest));
 
-        publishNewFile(tempFile, finalFile);
-        forceDirectory(baseDir);
+        ExtractPublication.publishNewFile(tempFile, finalFile);
+        ExtractPublication.forceDirectory(baseDir);
 
-        publishNewFile(manifestTemp, manifestFile);
-        forceDirectory(baseDir);
+        ExtractPublication.publishNewFile(manifestTemp, manifestFile);
+        ExtractPublication.forceDirectory(baseDir);
         writerLock.close();
 
         return manifest;
@@ -328,50 +326,6 @@ public final class ExtractWriter implements AutoCloseable {
         }
     }
 
-    private void validateManifestArguments(
-            String sourceId,
-            String municipalityIbge,
-            String periodStart,
-            String periodEndExclusive,
-            Instant startedAt,
-            String sourceZoneId,
-            String queryChecksum,
-            String adapterVersion,
-            String completenessStatus,
-            String consistencyLevel
-    ) {
-        if (sourceId == null || sourceId.isBlank()) throw new IllegalArgumentException("sourceId is required");
-        if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
-            throw new IllegalArgumentException("municipalityIbge must be a 7-digit IBGE code");
-        }
-        LocalDate start;
-        LocalDate end;
-        try {
-            start = LocalDate.parse(periodStart);
-            end = LocalDate.parse(periodEndExclusive);
-        } catch (RuntimeException e) {
-            throw new IllegalArgumentException("period must use ISO local dates", e);
-        }
-        if (!end.isAfter(start)) throw new IllegalArgumentException("period end must be after period start");
-        if (startedAt == null) throw new IllegalArgumentException("startedAt is required");
-        if (sourceZoneId == null || sourceZoneId.isBlank()) throw new IllegalArgumentException("sourceZoneId is required");
-        if (!ExtractValidation.isSha256Digest(queryChecksum)) {
-            throw new IllegalArgumentException("queryChecksum must be a SHA-256 digest");
-        }
-        if (adapterVersion == null || adapterVersion.isBlank()) throw new IllegalArgumentException("adapterVersion is required");
-        if (!"COMPLETE".equals(completenessStatus)) {
-            throw new IllegalArgumentException("only COMPLETE extracts may be published");
-        }
-        if (!"SNAPSHOT".equals(consistencyLevel)) {
-            throw new IllegalArgumentException("only SNAPSHOT extracts may be published");
-        }
-        try {
-            java.time.ZoneId.of(sourceZoneId);
-        } catch (RuntimeException e) {
-            throw new IllegalArgumentException("sourceZoneId is invalid", e);
-        }
-    }
-
     private void ensureWrittenScopeMatches(
             String sourceId, String municipalityIbge, String periodStart, String periodEndExclusive) {
         if (acquisitionScope != null) {
@@ -400,71 +354,6 @@ public final class ExtractWriter implements AutoCloseable {
     private static void forceFile(Path path) throws IOException {
         try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE)) {
             channel.force(true);
-        }
-    }
-
-    private static void writeAndForce(Path path, byte[] bytes) throws IOException {
-        createOwnerOnlyFile(path);
-        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE)) {
-            ByteBuffer buffer = ByteBuffer.wrap(bytes);
-            while (buffer.hasRemaining()) channel.write(buffer);
-            channel.force(true);
-        }
-    }
-
-    private static void createOwnerOnlyFile(Path path) throws IOException {
-        PosixFileAttributeView posixView = Files.getFileAttributeView(
-                path.getParent(), PosixFileAttributeView.class);
-        if (posixView != null) {
-            Files.createFile(path, PosixFilePermissions.asFileAttribute(Set.of(
-                    PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
-        } else {
-            Files.createFile(path);
-        }
-    }
-
-    /**
-     * Publishes a new file without replacement semantics. {@link Files#move(Path, Path,
-     * java.nio.file.StandardCopyOption...)} with {@code ATOMIC_MOVE} is allowed to replace an
-     * existing target on common Unix providers even when {@code REPLACE_EXISTING} is absent. A
-     * hard link creates the destination directory entry with create-new semantics; the source is
-     * removed only after publication, so a retry can never mutate an already finalized extract.
-     */
-    private static void publishNewFile(Path temporaryFile, Path finalFile) throws IOException {
-        requirePublicationTargetAbsent(finalFile, "publication target");
-        Files.createLink(finalFile, temporaryFile);
-        Files.delete(temporaryFile);
-    }
-
-    private static void requirePublicationTargetAbsent(Path path, String description) throws IOException {
-        ExtractValidation.rejectSymbolicLink(path, description);
-        if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
-            throw new FileAlreadyExistsException(path.toString());
-        }
-    }
-
-    private static void forceDirectory(Path directory) throws IOException {
-        try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {
-            channel.force(true);
-        } catch (UnsupportedOperationException | AccessDeniedException ignored) {
-            // Directory fsync is unavailable on some platforms (notably Windows); file contents
-            // were still forced, and real file-write failures have already propagated.
-        }
-    }
-
-    private static void ensureTempSpace(Path directory, long maxTempFileBytes) throws IOException {
-        if (maxTempFileBytes < 0) {
-            throw new SourceBudgetExceededException(
-                    SourceBudgetExceededException.CODE + ": temporary extract byte ceiling exceeded");
-        }
-        long reserveBytes = maxTempFileBytes > Long.MAX_VALUE - 1_048_576L
-                ? Long.MAX_VALUE
-                : maxTempFileBytes + 1_048_576L;
-        long usableBytes = Files.getFileStore(directory).getUsableSpace();
-        if (usableBytes < reserveBytes) {
-            throw new SourceBudgetExceededException(
-                    SourceBudgetExceededException.CODE + ": insufficient free space for the temporary extract: "
-                            + usableBytes + " < " + reserveBytes + " bytes reserved");
         }
     }
 

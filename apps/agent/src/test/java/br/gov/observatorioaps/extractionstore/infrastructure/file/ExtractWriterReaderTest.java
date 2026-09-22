@@ -44,6 +44,28 @@ class ExtractWriterReaderTest {
                 .isTrue();
     }
 
+    /**
+     * Same guard as {@link #publicWriterApiRequiresAnAcquisitionBoundScope}, extended to
+     * {@link DelegatedExtractPublication} (fatia 3 / ADR 0011) — the property that a publication's
+     * scope is always derived from an acquisition-authoritative object, never handed in as a bare
+     * value, must hold for both implementations. A first version of the pre-fatia-3
+     * {@code SubprocessAcquisitionAdapter} rewrite widened a constructor to violate exactly this
+     * guard on {@code ExtractWriter} and broke {@code mvn verify} for the rest of that session
+     * before being caught — this test exists so the same mistake on the new class fails loudly.
+     */
+    @Test
+    void publicDelegatedExtractPublicationApiAlsoRequiresAnAcquisitionBoundScope() {
+        assertThat(Arrays.stream(DelegatedExtractPublication.class.getConstructors())
+                .anyMatch(constructor -> Arrays.stream(constructor.getParameterTypes())
+                        .anyMatch(type -> type.getName().equals(
+                                "br.gov.observatorioaps.sourceconnector.domain.AcquisitionCommand"))))
+                .isTrue();
+        assertThat(Arrays.stream(DelegatedExtractPublication.class.getConstructors())
+                .noneMatch(constructor -> Arrays.asList(constructor.getParameterTypes())
+                        .contains(ExtractionScope.class)))
+                .isTrue();
+    }
+
     @Test
     void acquisitionBoundWriterDerivesItsManifestScopeFromTheSession() throws Exception {
         var properties = new PecConnectionProperties(

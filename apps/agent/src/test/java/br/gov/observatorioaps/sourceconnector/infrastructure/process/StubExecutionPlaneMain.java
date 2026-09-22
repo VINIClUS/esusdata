@@ -1,16 +1,33 @@
 package br.gov.observatorioaps.sourceconnector.infrastructure.process;
 
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Stands in for the real Rust execution plane in {@link SubprocessAcquisitionAdapterTest} —
  * exercises the NDJSON protocol from the child side under each scenario the adapter must handle.
  * Run as a real subprocess (not called in-process) so the adapter's process management (spawn,
  * kill, exit-code wait) is genuinely exercised, not simulated.
+ *
+ * <p>Since fatia 3 (ADR 0011) the child owns the extract's data file: this stub writes real gzip
+ * bytes to the {@code extract_temp_path} the acquire envelope hands it and reports a terminal
+ * {@code complete} message — the same two-part contract ({@code complete} message <em>and</em>
+ * exit {@code 0}) the real binary must satisfy, so {@link DelegatedExtractPublication}'s
+ * verification logic is genuinely exercised, not simulated.
  */
 public final class StubExecutionPlaneMain {
 
@@ -22,6 +39,7 @@ public final class StubExecutionPlaneMain {
     // ships in contracts/compatibility/queries/individual_encounter_modality@0.1.0.sql.
     private static final String QUERY_CHECKSUM =
             "sha256:d3056dab5cb643fa03eb8a7b3b963e69532e12d1e23b3f5c3010d3a965b90246";
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static void main(String[] args) throws IOException, InterruptedException {
         String scenario = args.length > 0 ? args[0] : "happy";
@@ -34,11 +52,13 @@ public final class StubExecutionPlaneMain {
             return;
         }
 
-        String acquireLine = in.readLine(); // the "acquire" envelope — content not needed by the stub
+        String acquireLine = in.readLine();
         if (acquireLine == null) {
             System.exit(3);
             return;
         }
+        JsonNode envelope = MAPPER.readTree(acquireLine);
+        String extractTempPath = envelope.path("extract_temp_path").asString(null);
 
         String dataType = "mismatch".equals(scenario) ? "varchar" : CORRECT_DATA_TYPE;
         String queryChecksum = "wrong-query".equals(scenario) ? "sha256:tampered" : QUERY_CHECKSUM;
@@ -56,27 +76,75 @@ public final class StubExecutionPlaneMain {
         switch (scenario) {
             case "happy" -> {
                 out.println("{\"type\":\"progress\"}");
-                out.println(rowMessage("1", "PROGRAMADO", "2026-03-05", "3541307"));
-                out.println("{\"type\":\"progress\"}");
-                out.println(rowMessage("2", "ESPONTANEO", "2026-03-10", "3541307"));
+                Completion completion = writeExtract(extractTempPath, List.of(
+                        row("1", "PROGRAMADO", "2026-03-05", "3541307"),
+                        row("2", "ESPONTANEO", "2026-03-10", "3541307")));
+                out.println(completeMessage(completion));
                 System.exit(0);
             }
             case "out-of-scope-row" -> {
-                // A real Rust child can only ever measure/stream what it sees; it has no
-                // authority over the acquisition scope. This proves ExtractWriter's own
-                // ExtractionScope check — not the child — is what a hostile or buggy child can't
-                // bypass (plan §2.6's rationale for keeping Java as the sole extract writer).
-                out.println(rowMessage("1", "PROGRAMADO", "2026-03-05", "9999999"));
+                // A real Rust child validates scope itself now (fatia 3 / ADR 0011) — a
+                // buggy/hostile child could still report a fully self-consistent completion for a
+                // file whose one row falls outside the bound municipality. This proves
+                // ExtractReader/ExtractValidation.validateRecord — not DelegatedExtractPublication
+                // — is what ultimately catches it: publication succeeds (the manifest is derived
+                // from the bound scope, never from file contents), but a later read fails closed.
+                Completion completion = writeExtract(extractTempPath, List.of(
+                        row("1", "PROGRAMADO", "2026-03-05", "9999999")));
+                out.println(completeMessage(completion));
+                System.exit(0);
+            }
+            case "wrong-checksum" -> {
+                Completion actual = writeExtract(extractTempPath, List.of(
+                        row("1", "PROGRAMADO", "2026-03-05", "3541307")));
+                out.println(completeMessage(new Completion(
+                        actual.rowCount, actual.exclusionCount, "0".repeat(64), actual.compressedBytes)));
+                System.exit(0);
+            }
+            case "wrong-size" -> {
+                Completion actual = writeExtract(extractTempPath, List.of(
+                        row("1", "PROGRAMADO", "2026-03-05", "3541307")));
+                out.println(completeMessage(new Completion(
+                        actual.rowCount, actual.exclusionCount, actual.checksum, actual.compressedBytes + 1)));
+                System.exit(0);
+            }
+            case "exclusion-gt-rows" -> {
+                Completion actual = writeExtract(extractTempPath, List.of(
+                        row("1", "PROGRAMADO", "2026-03-05", "3541307")));
+                out.println(completeMessage(new Completion(
+                        actual.rowCount, actual.rowCount + 1, actual.checksum, actual.compressedBytes)));
+                System.exit(0);
+            }
+            case "missing-file" -> {
+                // Reports success without ever touching extract_temp_path — proves
+                // DelegatedExtractPublication.publish itself checks the file exists, not just
+                // that the child claimed it does.
+                out.println(completeMessage(new Completion(0, 0, "0".repeat(64), 0)));
+                System.exit(0);
+            }
+            case "exit0-without-complete" -> {
+                writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
+                System.exit(0);
+            }
+            case "complete-then-nonzero" -> {
+                Completion completion = writeExtract(extractTempPath, List.of(
+                        row("1", "PROGRAMADO", "2026-03-05", "3541307")));
+                out.println(completeMessage(completion));
                 System.exit(1);
             }
             case "crash-silent" -> {
-                // Exits non-zero without ever sending a manifest or an error message — the
+                // Exits non-zero without ever sending a complete or error message — the
                 // "uncertain by default" case (no explicit uncertain:false to say otherwise).
                 System.exit(1);
             }
             case "clean-failure" -> {
                 out.println("{\"type\":\"error\",\"code\":\"DESTINATION_NOT_ALLOWED\","
                         + "\"detail\":\"host is not on the allowlist\",\"uncertain\":false}");
+                System.exit(1);
+            }
+            case "invalid-record" -> {
+                out.println("{\"type\":\"error\",\"code\":\"INVALID_EXTRACT_RECORD\","
+                        + "\"detail\":\"record does not match the bound acquisition scope\",\"uncertain\":true}");
                 System.exit(1);
             }
             case "cancel" -> {
@@ -94,20 +162,54 @@ public final class StubExecutionPlaneMain {
         }
     }
 
+    private record Completion(long rowCount, long exclusionCount, String checksum, long compressedBytes) {
+    }
+
+    private static String completeMessage(Completion completion) {
+        return "{\"type\":\"complete\",\"row_count\":" + completion.rowCount()
+                + ",\"exclusion_count\":" + completion.exclusionCount()
+                + ",\"checksum\":\"" + completion.checksum()
+                + "\",\"compressed_bytes\":" + completion.compressedBytes() + "}";
+    }
+
     /**
-     * A {@code row} message carrying one {@code CanonicalEncounter} — the shape
-     * {@code SubprocessAcquisitionAdapter} feeds straight into the same {@link
-     * br.gov.observatorioaps.extractionstore.infrastructure.file.ExtractWriter} the JDBC path
-     * uses. There is no terminal manifest message: the adapter finalizes the extract itself once
-     * the child closes its stdout and exits {@code 0}.
+     * A JSON line carrying one {@code CanonicalEncounter} — field-for-field what
+     * {@link DelegatedExtractPublication}'s published data file must decode via
+     * {@link br.gov.observatorioaps.extractionstore.infrastructure.file.ExtractReader}.
      */
-    private static String rowMessage(String recordId, String modality, String careDate, String municipalityIbge) {
-        return "{\"type\":\"row\",\"encounter\":{"
-                + "\"sourceRef\":{\"sourceId\":\"src-1\",\"entityType\":\"tb_fat_atendimento_individual\","
+    private static String row(String recordId, String modality, String careDate, String municipalityIbge) {
+        return "{\"sourceRef\":{\"sourceId\":\"src-1\",\"entityType\":\"tb_fat_atendimento_individual\","
                 + "\"recordId\":\"" + recordId + "\"},"
                 + "\"municipalityIbge\":\"" + municipalityIbge + "\","
                 + "\"careDate\":\"" + careDate + "\","
                 + "\"modality\":\"" + modality + "\","
-                + "\"cnes\":null,\"ine\":null,\"cbo\":null}}";
+                + "\"cnes\":null,\"ine\":null,\"cbo\":null}";
+    }
+
+    /**
+     * Writes real gzip bytes to the reserved temp path and reports the checksum/size a genuine
+     * writer would — mirrors the byte-level pipeline {@code apps/execplane/src/extract.rs} owns
+     * in the real binary (fatia 3 / ADR 0011), so this stub exercises
+     * {@link DelegatedExtractPublication}'s verification for real, not a simulation of it.
+     */
+    private static Completion writeExtract(String tempPath, List<String> jsonLines) throws IOException {
+        long exclusionCount = jsonLines.stream().filter(line -> line.contains("\"modality\":\"UNMAPPED\"")).count();
+        ByteArrayOutputStream raw = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzip = new GZIPOutputStream(raw)) {
+            for (String line : jsonLines) {
+                gzip.write((line + "\n").getBytes(StandardCharsets.UTF_8));
+            }
+        }
+        byte[] compressed = raw.toByteArray();
+        Files.write(Path.of(tempPath), compressed);
+
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+        String checksum = HexFormat.of().formatHex(digest.digest(compressed));
+        return new Completion(jsonLines.size(), exclusionCount, checksum, compressed.length);
     }
 }

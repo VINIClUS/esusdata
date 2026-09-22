@@ -15,5 +15,12 @@ postgres = { version = "0.19", features = ["with-chrono-0_4"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 zeroize = "1"
+# Compresses the extract data file — fatia 3 moves the file's whole byte pipeline into this
+# process (ADR 0011). Default features use the pure-Rust miniz_oxide backend, matching this
+# binary's existing no-C-dependency posture.
+flate2 = "1.1"
+# Cross-platform free-disk-space check, mirroring Files.getFileStore(dir).getUsableSpace() in
+# ExtractWriter.ensureTempSpace. Only the (default) "sync" feature is used.
+fs4 = "1.1"
 
 [dev-dependencies]
