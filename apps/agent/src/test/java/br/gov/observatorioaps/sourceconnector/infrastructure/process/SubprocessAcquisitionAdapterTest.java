@@ -4,6 +4,7 @@ import br.gov.observatorioaps.extractionstore.domain.CanonicalEncounter;
 import br.gov.observatorioaps.extractionstore.domain.CanonicalModality;
 import br.gov.observatorioaps.extractionstore.domain.ExtractionManifest;
 import br.gov.observatorioaps.extractionstore.infrastructure.file.ExtractReader;
+import br.gov.observatorioaps.jobrunner.application.FailureClassifier;
 import br.gov.observatorioaps.jobrunner.domain.CancellationToken;
 import br.gov.observatorioaps.jobrunner.domain.JobCancelledException;
 import br.gov.observatorioaps.pecadapter.domain.ColumnMetadata;
@@ -55,7 +56,7 @@ class SubprocessAcquisitionAdapterTest {
                     java.util.Map.of("col_a", new ColumnMetadata("text", "text", "NO", 1)),
                     List.of(new ProbeItem.ColumnItem("col_a"))));
 
-    private static final class RecordingListener implements AcquisitionListener {
+    private static class RecordingListener implements AcquisitionListener {
         final AtomicInteger progressCount = new AtomicInteger();
         final List<String> uncertainReasons = new CopyOnWriteArrayList<>();
 
@@ -291,6 +292,81 @@ class SubprocessAcquisitionAdapterTest {
         assertThatThrownBy(() -> future.get(5, TimeUnit.SECONDS))
                 .hasCauseInstanceOf(JobCancelledException.class);
         assertThat(listener.uncertainReasons).hasSize(1);
+    }
+
+    /**
+     * A partial temp file left by a cancel after rows were already written is never published,
+     * and never blocks the retry: the next attempt's {@link DelegatedExtractPublication}
+     * reconciles it away before spawning its own child.
+     */
+    @Test
+    void cancelAfterARowWasWrittenPublishesNothingAndDoesNotBlockTheRetry() throws Exception {
+        CancellationToken cancellation = new CancellationToken();
+        // Cancels from inside the first progress callback — the stub only sends it after the
+        // row is already on disk, so the cancel provably lands after a row was emitted.
+        RecordingListener listener = new RecordingListener() {
+            @Override
+            public void onProgress() {
+                super.onProgress();
+                cancellation.requestCancel();
+            }
+        };
+
+        assertThatThrownBy(() -> adapter("cancel-after-row").acquire(command(), cancellation, listener))
+                .isInstanceOf(JobCancelledException.class);
+        assertThat(listener.progressCount.get()).isEqualTo(1);
+        assertThat(listener.uncertainReasons).hasSize(1);
+        assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).doesNotExist();
+
+        ExtractionManifest retried =
+                adapter("happy").acquire(command(), new CancellationToken(), new RecordingListener());
+        assertThat(retried.rowCount()).isEqualTo(2);
+    }
+
+    /**
+     * The pre-probe half of plan §2.7.1: a rejected password never opened a session, so it must
+     * classify exactly like the JDBC path's connection-open failure — {@code
+     * SOURCE_AUTHENTICATION_FAILED} with no ENG-51 cooldown — not as a protocol violation.
+     */
+    @Test
+    void authenticationFailureBeforeTheProbeClassifiesLikeJdbcWithoutCooldown() {
+        RecordingListener listener = new RecordingListener();
+
+        Throwable failure = catchFailure("auth-failure", listener);
+
+        assertThat(FailureClassifier.classify(failure).code()).isEqualTo("SOURCE_AUTHENTICATION_FAILED");
+        assertThat(listener.uncertainReasons).isEmpty();
+    }
+
+    @Test
+    void unreachableSourceBeforeTheProbeIsTransientWithoutCooldown() {
+        RecordingListener listener = new RecordingListener();
+
+        FailureClassifier.Classification classification =
+                FailureClassifier.classify(catchFailure("connect-refused", listener));
+
+        assertThat(classification.code()).isEqualTo("TRANSIENT_SQL_ERROR");
+        assertThat(classification.category()).isEqualTo(FailureClassifier.Category.TRANSIENT);
+        assertThat(listener.uncertainReasons).isEmpty();
+    }
+
+    /** A live session existed, so this one does flag uncertainty — the SQLSTATE still classifies it. */
+    @Test
+    void sqlErrorDuringTheProbeCarriesItsSqlStateAndFlagsUncertain() {
+        RecordingListener listener = new RecordingListener();
+
+        assertThat(FailureClassifier.classify(catchFailure("probe-sql-error", listener)).code())
+                .isEqualTo("SQL_ERROR");
+        assertThat(listener.uncertainReasons).hasSize(1);
+    }
+
+    private Throwable catchFailure(String scenario, RecordingListener listener) {
+        try {
+            adapter(scenario).acquire(command(), new CancellationToken(), listener);
+        } catch (RuntimeException failure) {
+            return failure;
+        }
+        throw new AssertionError("scenario " + scenario + " unexpectedly succeeded");
     }
 
     @Test

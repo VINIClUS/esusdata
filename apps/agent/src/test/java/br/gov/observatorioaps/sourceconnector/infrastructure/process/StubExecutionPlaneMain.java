@@ -60,6 +60,17 @@ public final class StubExecutionPlaneMain {
         JsonNode envelope = MAPPER.readTree(acquireLine);
         String extractTempPath = envelope.path("extract_temp_path").asString(null);
 
+        // Failures the real binary reports before (or instead of) the probe message — a
+        // connection that never opened is "uncertain":false, anything after it is true.
+        switch (scenario) {
+            case "auth-failure" -> preProbeError("28P01",
+                    "password authentication failed for user \\\"esus_leitura\\\"", false);
+            case "connect-refused" -> preProbeError("08001", "Connection refused (os error 111)", false);
+            case "probe-sql-error" -> preProbeError("42501", "permission denied for relation tb_fat", true);
+            default -> {
+            }
+        }
+
         String dataType = "mismatch".equals(scenario) ? "varchar" : CORRECT_DATA_TYPE;
         String queryChecksum = "wrong-query".equals(scenario) ? "sha256:tampered" : QUERY_CHECKSUM;
         out.println("{\"type\":\"probe\",\"postgres_version\":\"9.6.13\",\"query_checksum\":\"" + queryChecksum
@@ -147,6 +158,20 @@ public final class StubExecutionPlaneMain {
                         + "\"detail\":\"record does not match the bound acquisition scope\",\"uncertain\":true}");
                 System.exit(1);
             }
+            case "cancel-after-row" -> {
+                // At least one record already sits in the temp file before the cancel arrives —
+                // the case "cancel" below (heartbeat only, no row) never covered.
+                writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
+                out.println("{\"type\":\"progress\"}");
+                String next = in.readLine();
+                if (next != null && next.contains("\"type\":\"cancel\"")) {
+                    out.println("{\"type\":\"error\",\"code\":\"CANCELLED\","
+                            + "\"detail\":\"cancelled cooperatively\",\"uncertain\":true}");
+                    System.exit(2);
+                } else {
+                    System.exit(3);
+                }
+            }
             case "cancel" -> {
                 out.println("{\"type\":\"progress\"}");
                 String next = in.readLine(); // blocks until the adapter's bound interrupt fires
@@ -160,6 +185,13 @@ public final class StubExecutionPlaneMain {
             }
             default -> System.exit(3);
         }
+    }
+
+    private static void preProbeError(String sqlState, String detail, boolean uncertain) {
+        System.out.println("{\"type\":\"error\",\"code\":\"SQL_ERROR\",\"sqlstate\":\"" + sqlState
+                + "\",\"detail\":\"" + detail + "\",\"uncertain\":" + uncertain + "}");
+        System.out.flush();
+        System.exit(1);
     }
 
     private record Completion(long rowCount, long exclusionCount, String checksum, long compressedBytes) {
