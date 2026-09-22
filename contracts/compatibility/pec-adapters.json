@@ -68,7 +68,7 @@
       "query_checksum": "sha256:d3056dab5cb643fa03eb8a7b3b963e69532e12d1e23b3f5c3010d3a965b90246",
       "fixture_checksum": "sha256:8909c30b9acd60ffc1b96b8c0c2d77fa2bbe46b0d19bc7f4f9bfb6ae54164148",
       "test_result": "PASS",
-      "test_evidence_ref": "docs/discovery/2026-09-19-pec-ct133.md; apps/agent/src/test/java/br/gov/observatorioaps/pecadapter/IndividualEncounterModalityCapabilityLiveTest.java; apps/agent/src/test/java/br/gov/observatorioaps/pecadapter/IndividualEncounterModalityCapabilityIsolationTest.java; apps/agent/src/test/java/br/gov/observatorioaps/integration/Eng19ReproducibilityWithoutPecLiveTest.java",
+      "test_evidence_ref": "docs/discovery/2026-09-19-pec-ct133.md; apps/agent/src/test/java/esusdata/source/pec/IndividualEncounterModalityCapabilityLiveTest.java; apps/agent/src/test/java/esusdata/source/pec/IndividualEncounterModalityCapabilityIsolationTest.java; apps/agent/src/test/java/esusdata/integration/Eng19ReproducibilityWithoutPecLiveTest.java",
       "test_notes": "Validated twice, independently: (1) live against the production PEC on CT 133 through the actual adapter code, reproducing 7100 programados / 2929 espontaneos / 0 fora / 10029 total for competencia 2026-03, byte-identical to the psql baseline, and again end-to-end through a full acquire-extract-disconnect-recompute cycle (ENG-19). (2) against a synthetic Testcontainers postgres:9.6 fixture (fixture_checksum above) with two municipalities that deliberately share the same unidade/equipe/cbo surrogate ids, proving the join binds on tb_dim_municipio.co_ibge and not on any installation-local key (ENG-37, ENG-38).",
       "approved_at": "2026-09-19",
       "approved_by": "vasrtr@gmail.com"

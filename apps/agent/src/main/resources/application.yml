@@ -5,4 +5,4 @@ observatorio:
 logging:
   level:
     root: INFO
-    br.gov.observatorioaps: INFO
+    esusdata: INFO

@@ -1,7 +1,7 @@
 # ADR 0009 — Camadas hexagonais dentro de cada módulo
 
 ## Status
-Accepted
+Superseded por [[0013-pacotes-planos]]. As camadas obrigatórias por módulo foram abandonadas.
 
 ## Contexto
 O ADR 0001 fixou os módulos da Tech Spec §1.5 como pacotes Java de um único projeto Maven, com
