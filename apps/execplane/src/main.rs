@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 use std::error::Error;
 use std::io::{self, BufRead, Write};
 use std::str::FromStr;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use zeroize::Zeroize;
 
 const CAPABILITY: &str = "individual_encounter_modality";
@@ -83,11 +83,23 @@ fn run() -> Result<i32, Box<dyn Error>> {
         .isolation_level(IsolationLevel::RepeatableRead)
         .start()?;
 
+    // Started here, not at the first row of the frozen query: mirrors BudgetGuard's clock on the
+    // JDBC path, which starts at PecSourceConnection.acquire() — before compatibility probing,
+    // not after. A large source's probes (each running its own query) can otherwise burn most or
+    // all of a small max_duration_ms budget before a single row is ever read.
+    let start = Instant::now();
+    let budget = stream::Budget {
+        max_rows: envelope.budget.max_rows,
+        max_duration_ms: envelope.budget.max_duration_ms,
+        max_payload_bytes: envelope.budget.max_payload_bytes,
+    };
+
     let postgres_version: String = txn
         .query_one("SELECT current_setting('server_version')", &[])?
         .get::<_, String>(0)
         .trim()
         .to_string();
+    check_probe_duration(&start, &budget)?;
 
     let objects = matrix::objects_to_probe(
         CAPABILITY,
@@ -101,6 +113,7 @@ fn run() -> Result<i32, Box<dyn Error>> {
     for object in &objects {
         let probed = probe::probe_object(&mut txn, &object.object, &object.columns_used)?;
         objects_json.insert(object.object.clone(), probed);
+        check_probe_duration(&start, &budget)?;
     }
 
     let query_checksum = format!("sha256:{}", hex_encode(Sha256::digest(QUERY_TEXT.as_bytes())));
@@ -128,11 +141,6 @@ fn run() -> Result<i32, Box<dyn Error>> {
 
     let period_start = chrono::NaiveDate::from_str(&envelope.period_start)?;
     let period_end_exclusive = chrono::NaiveDate::from_str(&envelope.period_end_exclusive)?;
-    let budget = stream::Budget {
-        max_rows: envelope.budget.max_rows,
-        max_duration_ms: envelope.budget.max_duration_ms,
-        max_payload_bytes: envelope.budget.max_payload_bytes,
-    };
 
     let outcome = stream::stream_query(
         &mut txn,
@@ -143,6 +151,7 @@ fn run() -> Result<i32, Box<dyn Error>> {
         period_start,
         period_end_exclusive,
         &budget,
+        start,
     )?;
 
     let exit_code = match outcome {
@@ -196,4 +205,15 @@ fn write_line(value: &serde_json::Value) -> Result<(), Box<dyn Error>> {
 
 fn hex_encode(bytes: impl AsRef<[u8]>) -> String {
     bytes.as_ref().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// A probe-phase duration overrun has no protocol message to carry it: Java's handshake accepts
+/// only a `probe` message first and treats anything else — this included — as an abnormal,
+/// uncertain termination (the same fallback probe-phase failures already get today). Returning
+/// `Err` here closes stdout before any message is sent, which is exactly that fallback path.
+fn check_probe_duration(start: &Instant, budget: &stream::Budget) -> Result<(), Box<dyn Error>> {
+    match stream::check_duration(start, budget) {
+        Some(stream::StreamOutcome::BudgetExceeded(detail)) => Err(detail.into()),
+        _ => Ok(()),
+    }
 }

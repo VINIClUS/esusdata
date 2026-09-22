@@ -43,6 +43,7 @@ pub fn stream_query(
     period_start: NaiveDate,
     period_end_exclusive: NaiveDate,
     budget: &Budget,
+    start: Instant,
 ) -> Result<StreamOutcome, Box<dyn Error>> {
     let cancel_requested = Arc::new(AtomicBool::new(false));
     spawn_cancel_listener(cancel_token, Arc::clone(&cancel_requested));
@@ -55,7 +56,6 @@ pub fn stream_query(
         Err(err) => return Ok(classify_failure(err, &cancel_requested)),
     };
 
-    let start = Instant::now();
     let mut row_count: i64 = 0;
     let mut payload_bytes: i64 = 0;
 
@@ -131,7 +131,7 @@ pub fn stream_query(
     Ok(StreamOutcome::Success)
 }
 
-fn check_duration(start: &Instant, budget: &Budget) -> Option<StreamOutcome> {
+pub fn check_duration(start: &Instant, budget: &Budget) -> Option<StreamOutcome> {
     let elapsed_ms = start.elapsed().as_millis() as i64;
     if elapsed_ms > budget.max_duration_ms {
         return Some(StreamOutcome::BudgetExceeded(format!(
@@ -142,14 +142,30 @@ fn check_duration(start: &Instant, budget: &Budget) -> Option<StreamOutcome> {
     None
 }
 
+/// PostgreSQL reports the same SQLSTATE (57014, QUERY_CANCELED) whether a client explicitly
+/// cancels or `statement_timeout` simply expires — `cancel_requested` (set only by this
+/// process's own cancel-listener thread) is what tells the two apart. An expired
+/// `statement_timeout` is this process's own read budget being enforced server-side, not a
+/// cooperative cancellation, so it must classify as `BudgetExceeded` — Java's `translate()` has
+/// no mapping for `CANCELLED` outside of an actual `CancellationSignal`, and would otherwise
+/// misfile a budget overrun as `UNCLASSIFIED_ERROR`.
 fn classify_failure(err: postgres::Error, cancel_requested: &AtomicBool) -> StreamOutcome {
-    if cancel_requested.load(Ordering::SeqCst) {
-        return StreamOutcome::Cancelled;
-    }
     if let Some(db_error) = err.as_db_error() {
         if db_error.code() == &postgres::error::SqlState::QUERY_CANCELED {
-            return StreamOutcome::Cancelled;
+            if cancel_requested.load(Ordering::SeqCst) {
+                return StreamOutcome::Cancelled;
+            }
+            return StreamOutcome::BudgetExceeded(
+                "statement timeout exceeded on the source connection".to_string(),
+            );
         }
+    }
+    // cancel_token.cancel_query() signals the backend over a separate connection — the main
+    // connection can observe a transport-level failure (broken pipe, reset) instead of a clean
+    // 57014 if that lands awkwardly. A cancel we ourselves requested is still a cancellation
+    // regardless of what shape the resulting error takes.
+    if cancel_requested.load(Ordering::SeqCst) {
+        return StreamOutcome::Cancelled;
     }
     StreamOutcome::Failed(err.to_string())
 }

@@ -26,6 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -106,17 +107,21 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
             AcquisitionCommand acquisitionCommand, CancellationSignal cancellation, AcquisitionListener listener) {
         // §1.12.6/ENG-46: the allowlist is deployment-administered and never crosses the process
         // boundary — checked here, in Java, before the child (which has no allowlist of its own)
-        // ever gets a chance to connect anywhere.
-        allowedDestinations.assertAllowed(
+        // ever gets a chance to connect anywhere. The returned address is the one actually
+        // validated; sending the child the original hostname instead would let it re-resolve DNS
+        // on its own and connect to whatever that second lookup returns, defeating the check
+        // (mirrors PecDataSourceFactory pinning the same InetAddress into its JDBC URL).
+        InetAddress validatedAddress = allowedDestinations.assertAllowed(
                 acquisitionCommand.connectionProperties().host(), acquisitionCommand.connectionProperties().port());
         try (SourceAcquisitionLimiter.Permit permit =
                 SourceAcquisitionLimiter.acquireOrFail(acquisitionCommand.connectionProperties().sourceId())) {
-            return runChild(acquisitionCommand, cancellation, listener);
+            return runChild(acquisitionCommand, validatedAddress.getHostAddress(), cancellation, listener);
         }
     }
 
     private ExtractionManifest runChild(
-            AcquisitionCommand acquisitionCommand, CancellationSignal cancellation, AcquisitionListener listener) {
+            AcquisitionCommand acquisitionCommand, String validatedHost,
+            CancellationSignal cancellation, AcquisitionListener listener) {
         Instant startedAt = clock.instant();
         Process process;
         try {
@@ -129,7 +134,7 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
         drainStderr(process);
 
         try {
-            writeAcquireEnvelope(process.getOutputStream(), acquisitionCommand);
+            writeAcquireEnvelope(process.getOutputStream(), acquisitionCommand, validatedHost);
             BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
 
@@ -451,7 +456,7 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
         return new CompatibilityProbeResult(object, columns, items);
     }
 
-    private void writeAcquireEnvelope(OutputStream stdin, AcquisitionCommand acquisitionCommand) {
+    private void writeAcquireEnvelope(OutputStream stdin, AcquisitionCommand acquisitionCommand, String validatedHost) {
         char[] password = secretResolver.resolve(acquisitionCommand.connectionProperties().secretRef());
         try {
             ReadBudget budget = acquisitionCommand.budget();
@@ -469,7 +474,7 @@ public final class SubprocessAcquisitionAdapter implements AcquisitionPort {
             Map<String, Object> envelope = new LinkedHashMap<>();
             envelope.put("type", "acquire");
             envelope.put("source_id", acquisitionCommand.connectionProperties().sourceId());
-            envelope.put("host", acquisitionCommand.connectionProperties().host());
+            envelope.put("host", validatedHost);
             envelope.put("port", acquisitionCommand.connectionProperties().port());
             envelope.put("database", acquisitionCommand.connectionProperties().database());
             envelope.put("user", acquisitionCommand.connectionProperties().user());
