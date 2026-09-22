@@ -24,4 +24,7 @@ de build.
 - Refatorar um pacote para módulo Maven separado é possível depois, sem afetar a spec.
 - Testes de arquitetura (ArchUnit) tornam-se o mecanismo de imposição, não a estrutura de diretórios.
 - Organização interna de cada pacote-módulo em camadas `domain`/`application`/`infrastructure`:
-  ver [[0009-camadas-hexagonais-por-modulo]].
+  ver [[0009-camadas-hexagonais-por-modulo]] (parcialmente superseded).
+- A lista de módulos-pacote em si — os oito da §1.5 mais `api`/`platform` — foi substituída por
+  cinco capacidades verticais mais `platform`: ver [[0012-capacidades-verticais]]. O limite
+  continua lógico/Maven único, como decidido aqui; só a geografia interna mudou.

@@ -24,28 +24,28 @@ docs/fichas/     fichas metodológicas dos indicadores
 ```
 
 `deployment/` e `indicator-packs/` da §1.5 ainda não existem: o pacote C1 compila dentro de
-`apps/agent` (`indicatorpacks.c1`), e empacotamento é fase posterior.
+`apps/agent` (`indicators.packs.c1`), e empacotamento é fase posterior.
 
-### `apps/agent` — módulos e camadas
+### `apps/agent` — capacidades e camadas
 
-Pacote base `br.gov.observatorioaps`. Cada módulo da Tech Spec §1.5 é um pacote com camadas
-`domain` / `application` / `infrastructure` (ADR 0009):
+Pacote base `br.gov.observatorioaps`. O backend é organizado por capacidade vertical, não por
+módulo técnico (ADR 0012, que supersede parcialmente ADR 0009 quanto à lista de módulos e ao
+pacote `api` global). Cada capacidade tem `domain` (regras e portas puras), `application` (casos
+de uso), `adapter/in/http` (controllers/DTOs) e, quando há persistência ou I/O externo,
+`adapter/out/*` — só as camadas que fazem sentido para aquela capacidade existem.
 
-| Pacote | Módulo da spec | Responsabilidade |
+| Capacidade | Onde encontrar | Responsabilidade |
 |---|---|---|
-| `identityaccess` | identity-access | usuários, papéis, concessões, sessões, escopo |
-| `sourceconnector` | source-connector | registro de fontes, conexão, segredo, orçamento de leitura |
-| `pecadapter` | pec-adapter | matriz de compatibilidade e consultas verificadas ao PEC |
-| `extractionstore` | extraction-store | extrato mínimo, manifesto, verificação |
-| `indicatorengine` | indicator-engine | `ExactRatio`, classificação — sem JDBC nem HTTP |
-| `indicatorpacks` | indicator-packs | regras compiladas (C1) |
-| `jobrunner` | job-runner | fila persistente, worker único, cancelamento, recuperação |
-| `resultstore` | result-store | staging, publicação, evidência, reprodutibilidade |
-| `api` | — | adaptador HTTP por recurso: `auth`, `access`, `sources`, `results`, `runs`, `packs`, `ready`, `security`, `error` |
-| `platform` | — | SQLite e lock de processo |
+| `access` | login, sessão, autorização | usuários, papéis, concessões, sessões, escopo, o filtro de segurança HTTP |
+| `sources` | cadastro de fontes | registro e diagnóstico de fontes — não a aquisição viva |
+| `execution` | uma execução acontecendo | fila persistente, worker, cancelamento, aquisição PEC (in-process e via plano Rust), extrato |
+| `indicators` | regras dos indicadores | motor puro (`ExactRatio`, classificação — sem JDBC nem HTTP) + pacotes compilados (C1) |
+| `results` | resultados e evidências | staging, publicação, evidência, reprodutibilidade — nunca precisa do PEC conectado |
+| `platform` | — | SQLite, lock de processo, e o pequeno `web` transversal (erro HTTP global, readiness) |
 
-Os limites entre módulos e entre camadas são impostos por
-`src/test/java/.../architecture/ModuleBoundaryTest.java`, não por convenção.
+Os limites entre capacidades e entre camadas são impostos por
+`src/test/java/.../architecture/ModuleBoundaryTest.java`, não por convenção. Ver ADR 0012 para o
+que cada regra protege.
 
 ## Rodar
 

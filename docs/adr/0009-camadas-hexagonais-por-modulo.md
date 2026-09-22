@@ -1,7 +1,13 @@
 # ADR 0009 — Camadas hexagonais dentro de cada módulo
 
 ## Status
-Accepted
+Superseded by [[0012-capacidades-verticais]] quanto à lista de módulos e ao pacote `api` global.
+A semântica de camada em si (`domain` não depende de `application`/`infrastructure`/framework;
+`application` fala com persistência por portas; a dívida declarada nominalmente em vez de
+escondida) continua valendo — só sem a obrigatoriedade mecânica de sempre criar as três pastas, e
+com `infrastructure/jdbc`/`infrastructure/file` renomeados para o vocabulário hexagonal padrão
+`adapter/out/sqlite`/`adapter/out/file`. Este documento fica como registro histórico da decisão
+original; não foi reescrito.
 
 ## Contexto
 O ADR 0001 fixou os módulos da Tech Spec §1.5 como pacotes Java de um único projeto Maven, com

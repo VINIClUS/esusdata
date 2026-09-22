@@ -51,8 +51,8 @@ configuração/auditoria puramente técnicas — `ScopeResolver.hasPermission` s
   qualquer leitor do código sabe que são decisão de projeto, não texto normativo da spec.
 - Adicionar uma quinta permissão no futuro (ex.: para importação/exportação, ainda não expostas)
   exige uma nova migração e uma atualização deste ADR, não uma mudança silenciosa de enum.
-- `GrantRevalidator` (usado por `jobrunner` e, via o seam `PublicationAuthorization`, por
-  `resultstore`) depende desta matriz para `RUN_INDICATOR` — mudar a matriz muda diretamente quem
+- `GrantRevalidator` (usado por `execution` e, via o seam `PublicationAuthorization`, por
+  `results`) depende desta matriz para `RUN_INDICATOR` — mudar a matriz muda diretamente quem
   pode disparar/publicar execuções.
 - Este ADR não define a superfície HTTP de autenticação (rotas, contrato de sessão) — isso é
   `docs/adr/0008-superficie-http-de-autenticacao.md`, ainda não escrito nesta fase.
