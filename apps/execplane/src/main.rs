@@ -48,7 +48,12 @@ fn run() -> Result<i32, Box<dyn Error>> {
         .dbname(&envelope.database)
         .user(&envelope.user)
         .password(envelope.password.as_bytes())
-        .connect_timeout(Duration::from_millis(envelope.budget.connect_timeout_ms.max(0) as u64));
+        .connect_timeout(Duration::from_millis(envelope.budget.connect_timeout_ms.max(0) as u64))
+        // Bounds a blackholed TCP connection (packets sent, never acknowledged) the same way
+        // PecDataSourceFactory's pgJDBC `socketTimeout` property does on the JDBC path — without
+        // this, a dead connection leaves a blocking socket read waiting indefinitely, and neither
+        // max_duration_ms nor cooperative cancellation can free the sole acquisition worker.
+        .tcp_user_timeout(Duration::from_millis(envelope.budget.max_duration_ms.max(0) as u64));
     let connect_result = config.connect(NoTls);
     // Zeroed regardless of outcome — mirrors PecDataSourceFactory/writeAcquireEnvelope's own
     // finally-block zeroing on both sides of this same secret.

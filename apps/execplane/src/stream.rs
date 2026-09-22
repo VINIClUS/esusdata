@@ -63,7 +63,16 @@ pub fn stream_query(
         let next = rows.next();
         let row = match next {
             Ok(Some(row)) => row,
-            Ok(None) => break,
+            Ok(None) => {
+                // Mirrors the JDBC path's own post-loop guard.checkDuration(): the fetch that
+                // returns "no more rows" is itself a round trip and can be what pushes total
+                // elapsed time past max_duration_ms, even though every row already seen was
+                // within budget.
+                if let Some(outcome) = check_duration(&start, budget) {
+                    return Ok(outcome);
+                }
+                break;
+            }
             Err(err) => {
                 return Ok(classify_failure(err, &cancel_requested));
             }
@@ -157,6 +166,11 @@ fn classify_failure(err: postgres::Error, cancel_requested: &AtomicBool) -> Stre
             }
             return StreamOutcome::BudgetExceeded(
                 "statement timeout exceeded on the source connection".to_string(),
+            );
+        }
+        if db_error.code() == &postgres::error::SqlState::LOCK_NOT_AVAILABLE {
+            return StreamOutcome::BudgetExceeded(
+                "lock timeout exceeded on the source connection".to_string(),
             );
         }
     }
