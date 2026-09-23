@@ -59,7 +59,23 @@ fn run() -> Result<i32, Box<dyn Error>> {
     // Zeroed regardless of outcome — mirrors PecDataSourceFactory/writeAcquireEnvelope's own
     // finally-block zeroing on both sides of this same secret.
     envelope.password.zeroize();
-    let mut client = connect_result?;
+    let mut client = match connect_result {
+        Ok(client) => client,
+        Err(err) => {
+            // No session ever existed, so nothing can still be executing on the source — not
+            // "uncertain" in the ENG-51 sense, mirroring JdbcAcquisitionAdapter's outer catch for a
+            // connection that never became live. The SQLSTATE lets Java's FailureClassifier tell a
+            // rejected credential (28P01 → SOURCE_AUTHENTICATION_FAILED) from an unreachable
+            // server; a failure with no server-side code gets pgJDBC's own `08001` for the same
+            // case (PSQLState.CONNECTION_UNABLE_TO_CONNECT).
+            let sqlstate = err.code().map_or("08001", |code| code.code());
+            write_line(&json!({
+                "type": "error", "code": "SQL_ERROR", "sqlstate": sqlstate,
+                "detail": err.to_string(), "uncertain": false,
+            }))?;
+            return Ok(1);
+        }
+    };
     // Captured before any &mut borrow of client (e.g. build_transaction()) makes that
     // impossible — CancelToken is independent of the connection it was derived from and stays
     // usable from another thread for as long as the process runs (plan §2.7's cancellation path).
@@ -68,7 +84,7 @@ fn run() -> Result<i32, Box<dyn Error>> {
     // Same session GUCs as PecDataSourceFactory's connectionInitSql, byte-identical
     // application_name so the child is findable in pg_stat_activity under the name operators are
     // told to look for.
-    client.batch_execute(&format!(
+    let session_setup = client.batch_execute(&format!(
         "SET application_name = 'observatorio-aps'; \
          SET default_transaction_read_only = on; \
          SET statement_timeout = {}; \
@@ -77,17 +93,24 @@ fn run() -> Result<i32, Box<dyn Error>> {
         envelope.budget.statement_timeout_ms,
         envelope.budget.lock_timeout_ms,
         envelope.budget.idle_in_transaction_timeout_ms,
-    ))?;
+    ));
+    if let Err(err) = session_setup {
+        return report_pre_probe_failure(&err);
+    }
 
     // ENG-43: the probe and (in the next slice) the frozen query itself run inside one
     // read-only repeatable-read transaction — the same snapshot, never reopened. This
     // transaction is deliberately kept open past the probe: it only ends via explicit
     // rollback below (abort/not-yet-implemented) or, in the next slice, after streaming.
-    let mut txn = client
+    let mut txn = match client
         .build_transaction()
         .read_only(true)
         .isolation_level(IsolationLevel::RepeatableRead)
-        .start()?;
+        .start()
+    {
+        Ok(txn) => txn,
+        Err(err) => return report_pre_probe_failure(&err),
+    };
 
     // Started here, not at the first row of the frozen query: mirrors BudgetGuard's clock on the
     // JDBC path, which starts at PecSourceConnection.acquire() — before compatibility probing,
@@ -100,27 +123,13 @@ fn run() -> Result<i32, Box<dyn Error>> {
         max_payload_bytes: envelope.budget.max_payload_bytes,
     };
 
-    let postgres_version: String = txn
-        .query_one("SELECT current_setting('server_version')", &[])?
-        .get::<_, String>(0)
-        .trim()
-        .to_string();
-    check_probe_duration(&start, &budget)?;
-
-    let objects = matrix::objects_to_probe(
-        CAPABILITY,
-        &envelope.adapter_version,
-        &envelope.pec_version,
-        &envelope.read_model,
-        &envelope.installation_role,
-    );
-
-    let mut objects_json = Map::new();
-    for object in &objects {
-        let probed = probe::probe_object(&mut txn, &object.object, &object.columns_used)?;
-        objects_json.insert(object.object.clone(), probed);
-        check_probe_duration(&start, &budget)?;
-    }
+    let (postgres_version, objects_json) = match run_probes(&mut txn, &envelope, &start, &budget) {
+        Ok(report) => report,
+        Err(err) => {
+            end_transaction(txn.rollback());
+            return report_pre_probe_failure(err.as_ref());
+        }
+    };
 
     let query_checksum = format!("sha256:{}", hex_encode(Sha256::digest(QUERY_TEXT.as_bytes())));
     write_line(&json!({
@@ -223,10 +232,15 @@ fn run() -> Result<i32, Box<dyn Error>> {
             end_transaction(txn.rollback());
             2
         }
-        stream::StreamOutcome::Failed(detail) => {
-            write_line(&json!({
+        stream::StreamOutcome::Failed { detail, sqlstate } => {
+            let mut error = json!({
                 "type": "error", "code": "UNCLASSIFIED_ERROR", "detail": detail, "uncertain": true,
-            }))?;
+            });
+            if let Some(sqlstate) = sqlstate {
+                error["code"] = json!("SQL_ERROR");
+                error["sqlstate"] = json!(sqlstate);
+            }
+            write_line(&error)?;
             end_transaction(txn.rollback());
             1
         }
@@ -275,13 +289,88 @@ fn hex_encode(bytes: impl AsRef<[u8]>) -> String {
     bytes.as_ref().iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// A probe-phase duration overrun has no protocol message to carry it: Java's handshake accepts
-/// only a `probe` message first and treats anything else — this included — as an abnormal,
-/// uncertain termination (the same fallback probe-phase failures already get today). Returning
-/// `Err` here closes stdout before any message is sent, which is exactly that fallback path.
+/// Everything the `probe` message reports, measured inside the already-open read-only
+/// transaction. Split out of `run` only so that every failure in here reaches
+/// `report_pre_probe_failure` through one `Err`, instead of a bare `?` closing stdout silently.
+fn run_probes(
+    txn: &mut postgres::Transaction,
+    envelope: &AcquireEnvelope,
+    start: &Instant,
+    budget: &stream::Budget,
+) -> Result<(String, Map<String, serde_json::Value>), Box<dyn Error>> {
+    let postgres_version: String = txn
+        .query_one("SELECT current_setting('server_version')", &[])?
+        .get::<_, String>(0)
+        .trim()
+        .to_string();
+    check_probe_duration(start, budget)?;
+
+    let objects = matrix::objects_to_probe(
+        CAPABILITY,
+        &envelope.adapter_version,
+        &envelope.pec_version,
+        &envelope.read_model,
+        &envelope.installation_role,
+    );
+
+    let mut objects_json = Map::new();
+    for object in &objects {
+        let probed = probe::probe_object(txn, &object.object, &object.columns_used)?;
+        objects_json.insert(object.object.clone(), probed);
+        check_probe_duration(start, budget)?;
+    }
+    Ok((postgres_version, objects_json))
+}
+
+/// A live session already exists by this point, so every pre-probe failure is "uncertain" in the
+/// ENG-51 sense — same as the JDBC path, where compatibility probing runs inside the catch that
+/// calls `onUncertainOutcome`. The SQLSTATE, when there is one, still reaches Java so it
+/// classifies the failure itself (e.g. `42501` → `SQL_ERROR`, a broken connection → transient).
+fn report_pre_probe_failure(err: &(dyn Error + 'static)) -> Result<i32, Box<dyn Error>> {
+    let mut error = json!({
+        "type": "error", "code": "UNCLASSIFIED_ERROR", "detail": err.to_string(), "uncertain": true,
+    });
+    let postgres_error = err.downcast_ref::<postgres::Error>();
+    if err.is::<ProbeBudgetExceeded>() || postgres_error.is_some_and(is_timeout_budget) {
+        error["code"] = json!("SOURCE_BUDGET_EXCEEDED");
+    } else if let Some(sqlstate) = postgres_error.and_then(stream::sqlstate_of) {
+        error["code"] = json!("SQL_ERROR");
+        error["sqlstate"] = json!(sqlstate);
+    }
+    write_line(&error)?;
+    Ok(1)
+}
+
+/// `statement_timeout`/`lock_timeout` are read-budget limits set by this process itself. Same test
+/// as `IndividualEncounterModalityCapability.isPostgresBudgetCancellation` on the JDBC path: the
+/// SQLSTATE alone isn't enough, since an external `pg_cancel_backend` also reports `57014` and
+/// must stay a plain `SQL_ERROR`.
+fn is_timeout_budget(err: &postgres::Error) -> bool {
+    let Some(db_error) = err.as_db_error() else {
+        return false;
+    };
+    let message = db_error.message().to_lowercase();
+    (db_error.code() == &postgres::error::SqlState::QUERY_CANCELED && message.contains("statement timeout"))
+        || (db_error.code() == &postgres::error::SqlState::LOCK_NOT_AVAILABLE && message.contains("lock timeout"))
+}
+
+/// Mirrors `BudgetGuard.checkDuration` on the JDBC path, whose clock also starts before
+/// compatibility probing: a probe-phase overrun is a real `SOURCE_BUDGET_EXCEEDED`, reported as
+/// such by `report_pre_probe_failure` rather than as a generic failure.
+#[derive(Debug)]
+struct ProbeBudgetExceeded(String);
+
+impl std::fmt::Display for ProbeBudgetExceeded {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl Error for ProbeBudgetExceeded {}
+
 fn check_probe_duration(start: &Instant, budget: &stream::Budget) -> Result<(), Box<dyn Error>> {
     match stream::check_duration(start, budget) {
-        Some(stream::StreamOutcome::BudgetExceeded(detail)) => Err(detail.into()),
+        Some(stream::StreamOutcome::BudgetExceeded(detail)) => Err(Box::new(ProbeBudgetExceeded(detail))),
         _ => Ok(()),
     }
 }

@@ -27,6 +27,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -170,8 +171,13 @@ public final class ExecPlaneAcquisition implements Acquisition {
                 return abnormalTermination(process, cancellation, listener,
                         "malformed message before handshake: " + malformed.getMessage());
             }
-            // A probe (or any message at all) implies the child already opened a live connection
-            // to run information_schema queries — everything from here on is "uncertain" territory.
+            // An error before the probe carries its own "uncertain" flag: false only when the
+            // child never got a live connection (e.g. a rejected password), so a failed login
+            // doesn't put the source on the ENG-51 cooldown — same as a JDBC connection-open
+            // failure. Anything else short of a probe is still a protocol violation.
+            if (probe != null && "error".equals(text(probe, "type"))) {
+                return failFromErrorMessage(process, cancellation, listener, probe);
+            }
             if (probe == null || !"probe".equals(text(probe, "type"))) {
                 return abnormalTermination(process, cancellation, listener,
                         "expected a 'probe' message, got: " + probe);
@@ -251,20 +257,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
                 continue;
             }
             if ("error".equals(type)) {
-                boolean uncertain = message.path("uncertain").asBoolean(true);
-                String detail = text(message, "detail");
-                String code = text(message, "code");
-                waitForExit(process);
-                if (uncertain) {
-                    listener.onUncertainOutcome(
-                            "execution plane reported an uncertain outcome: " + detail);
-                }
-                // Cancellation wins if it was actually requested — mirrors how
-                // IndividualEncounterModalityCapability.stream's cancellationCheck already works:
-                // this throws JobCancelledException itself when the concrete CancellationSignal
-                // is a cancelled CancellationToken, without this class ever naming that type.
-                cancellation.checkCancelled();
-                throw translate(code, detail);
+                return failFromErrorMessage(process, cancellation, listener, message);
             }
             return abnormalTermination(process, cancellation, listener, "unexpected message type: " + type);
         }
@@ -303,6 +296,22 @@ public final class ExecPlaneAcquisition implements Acquisition {
         }
     }
 
+    private ExtractionManifest failFromErrorMessage(
+            Process process, CancellationSignal cancellation, AcquisitionListener listener, JsonNode message) {
+        boolean uncertain = message.path("uncertain").asBoolean(true);
+        String detail = text(message, "detail");
+        waitForExit(process);
+        if (uncertain) {
+            listener.onUncertainOutcome("execution plane reported an uncertain outcome: " + detail);
+        }
+        // Cancellation wins if it was actually requested — mirrors how
+        // IndividualEncounterModalityCapability.stream's cancellationCheck already works: this
+        // throws JobCancelledException itself when the concrete CancellationSignal is a cancelled
+        // CancellationToken, without this class ever naming that type.
+        cancellation.checkCancelled();
+        throw translate(text(message, "code"), text(message, "sqlstate"), detail);
+    }
+
     private ExtractionManifest abnormalTermination(
             Process process, CancellationSignal cancellation, AcquisitionListener listener, String detail) {
         killProcess(process);
@@ -312,14 +321,15 @@ public final class ExecPlaneAcquisition implements Acquisition {
     }
 
     /**
-     * Plan §2.7.1's translation table, as far as it maps to exception types
-     * {@code FailureClassifier} already has a branch for. The {@code sqlstate}-carrying row is
-     * deliberately not implemented yet — it needs a new {@code PecAcquisitionException}
-     * constructor plus a classifier branch to read it back out, which is more than this adapter
-     * alone should decide; until then an error with an unrecognized {@code code} (including any
-     * carrying a raw SQLSTATE) falls through to the generic {@code UNCLASSIFIED_ERROR} branch.
+     * Plan §2.7.1's translation table, mapped onto exception types {@code FailureClassifier}
+     * already has a branch for. An error carrying a {@code sqlstate} becomes a {@code
+     * PecAcquisitionException} caused by a {@link SQLException} with that same state — exactly the
+     * shape the JDBC path throws — so the classifier's existing SQLSTATE dispatch ({@code 28*} →
+     * {@code SOURCE_AUTHENTICATION_FAILED}, {@code 08*} → transient) applies unchanged, rather
+     * than the plan's original new constructor plus a second, parallel classifier branch. Any
+     * other unrecognized {@code code} falls through to the generic {@code UNCLASSIFIED_ERROR}.
      */
-    private RuntimeException translate(String code, String detail) {
+    private RuntimeException translate(String code, String sqlState, String detail) {
         if ("COMPATIBILITY_MISMATCH".equals(code)) {
             return new IllegalStateException(
                     "execution plane compatibility mismatch (ENG-43): " + detail);
@@ -335,6 +345,9 @@ public final class ExecPlaneAcquisition implements Acquisition {
             // malformed manifest argument (INVALID_REQUEST, DEFINITIVE) — a record the child
             // itself refused to write is never retried unchanged.
             return new IllegalArgumentException("execution plane rejected an extract record: " + detail);
+        }
+        if (sqlState != null) {
+            return new PecAcquisitionException(detail, new SQLException(detail, sqlState));
         }
         return new PecAcquisitionException(detail, null);
     }

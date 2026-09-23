@@ -25,7 +25,9 @@ pub enum StreamOutcome {
     Success,
     BudgetExceeded(String),
     Cancelled,
-    Failed(String),
+    /// `sqlstate` is forwarded on the wire so Java's `FailureClassifier` classifies it exactly as
+    /// it would the same `SQLException` on the JDBC path (see `sqlstate_of`).
+    Failed { detail: String, sqlstate: Option<String> },
     /// A record failed `ExtractSink::write`'s port of `validateRecordForWrite` (out-of-scope
     /// `care_date`, blank required field, ...) — mirrors Java's `IllegalArgumentException` /
     /// `INVALID_EXTRACT_RECORD` (fatia 3 / ADR 0011).
@@ -76,10 +78,21 @@ pub fn stream_query(
     let mut payload_bytes: i64 = 0;
 
     loop {
+        // A cancel that reaches PostgreSQL after the query already finished server-side raises no
+        // query error at all — the rows still buffered on this side would drain to a success the
+        // caller already cancelled. Mirrors the JDBC path's per-row cancellationCheck.
+        if cancel_requested.load(Ordering::SeqCst) {
+            return Ok(StreamOutcome::Cancelled);
+        }
         let next = rows.next();
         let row = match next {
             Ok(Some(row)) => row,
             Ok(None) => {
+                // The same race as the top-of-loop check, landing during the final fetch: the
+                // caller's cancel wins over an otherwise complete read.
+                if cancel_requested.load(Ordering::SeqCst) {
+                    return Ok(StreamOutcome::Cancelled);
+                }
                 // Mirrors the JDBC path's own post-loop guard.checkDuration(): the fetch that
                 // returns "no more rows" is itself a round trip and can be what pushes total
                 // elapsed time past max_duration_ms, even though every row already seen was
@@ -148,7 +161,9 @@ pub fn stream_query(
             return Ok(match err {
                 crate::extract::ExtractError::InvalidRecord(detail) => StreamOutcome::InvalidRecord(detail),
                 crate::extract::ExtractError::BudgetExceeded(detail) => StreamOutcome::BudgetExceeded(detail),
-                crate::extract::ExtractError::Io(detail) => StreamOutcome::Failed(detail),
+                crate::extract::ExtractError::Io(detail) => {
+                    StreamOutcome::Failed { detail, sqlstate: None }
+                }
             });
         }
 
@@ -220,7 +235,19 @@ fn classify_failure(
             "duration ceiling exceeded (a stalled read was interrupted)".to_string(),
         );
     }
-    StreamOutcome::Failed(err.to_string())
+    StreamOutcome::Failed { detail: err.to_string(), sqlstate: sqlstate_of(&err) }
+}
+
+/// The SQLSTATE pgJDBC would have attached to the same failure: the server's own code when there
+/// is one, `08006` (connection failure) for a transport-level break on an already-open
+/// connection — pgJDBC's `PSQLState.CONNECTION_FAILURE` — and `None` for anything else, which
+/// Java then leaves as `UNCLASSIFIED_ERROR`.
+pub fn sqlstate_of(err: &postgres::Error) -> Option<String> {
+    if let Some(code) = err.code() {
+        return Some(code.code().to_string());
+    }
+    let transport = err.is_closed() || err.source().is_some_and(|source| source.is::<io::Error>());
+    transport.then(|| "08006".to_string())
 }
 
 fn classify(tipo_atendimento_id: i64) -> &'static str {

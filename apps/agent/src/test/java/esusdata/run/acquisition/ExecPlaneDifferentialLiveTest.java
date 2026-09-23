@@ -17,6 +17,7 @@ import esusdata.source.pec.ReadBudget;
 import esusdata.source.pec.SourceBudgetExceededException;
 
 import esusdata.source.pec.PecDataSourceFactory;
+import esusdata.run.job.JobCancelledException;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,10 +29,12 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Clock;
@@ -45,6 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 /**
  * The gated acceptance test for fatia 3 (ADR 0011): runs the real, compiled
@@ -138,16 +142,25 @@ class ExecPlaneDifferentialLiveTest {
     }
 
     private AcquisitionCommand command(String extractionId, ReadBudget budget) {
+        return command(extractionId, budget, PG.getHost(), PG.getMappedPort(5432), MUNICIPALITY_IBGE);
+    }
+
+    private AcquisitionCommand command(
+            String extractionId, ReadBudget budget, String host, int port, String municipalityIbge) {
         return new AcquisitionCommand(
                 new PecConnectionProperties(
-                        SOURCE_ID, PG.getHost(), PG.getMappedPort(5432), PG.getDatabaseName(),
-                        PG.getUsername(), "unused", MUNICIPALITY_IBGE),
+                        SOURCE_ID, host, port, PG.getDatabaseName(),
+                        PG.getUsername(), "unused", municipalityIbge),
                 sourceIdentity, budget, extractionId, PERIOD_START, PERIOD_END_EXCLUSIVE,
                 "America/Sao_Paulo");
     }
 
     private InProcessAcquisition jdbcAdapter() {
-        var factory = new PecDataSourceFactory(allowedDestinations, secretRef -> "fixture_password".toCharArray());
+        return jdbcAdapter("fixture_password");
+    }
+
+    private InProcessAcquisition jdbcAdapter(String password) {
+        var factory = new PecDataSourceFactory(allowedDestinations, secretRef -> password.toCharArray());
         // Same reasoning as LiveAcquisitionEndToEndTest: IndividualEncounterModalityCapability
         // .stream always validates against the packaged classpath matrix's pinned fingerprints,
         // hardcoded, not injectable. This adapter's only job here is producing reference rows from
@@ -204,12 +217,16 @@ class ExecPlaneDifferentialLiveTest {
     }
 
     private ExecPlaneAcquisition rustAdapter(PecCompatibilityMatrix matrix) {
+        return rustAdapter(matrix, "fixture_password");
+    }
+
+    private ExecPlaneAcquisition rustAdapter(PecCompatibilityMatrix matrix, String password) {
         return new ExecPlaneAcquisition(
-                List.of(realBinary), secretRef -> "fixture_password".toCharArray(), allowedDestinations,
+                List.of(realBinary), secretRef -> password.toCharArray(), allowedDestinations,
                 matrix, extractsDir, Clock.systemUTC(), Duration.ofSeconds(10));
     }
 
-    private static final class RecordingListener implements AcquisitionListener {
+    private static class RecordingListener implements AcquisitionListener {
         final AtomicInteger progressCount = new AtomicInteger();
         final List<String> uncertainReasons = new java.util.concurrent.CopyOnWriteArrayList<>();
 
@@ -305,5 +322,147 @@ class ExecPlaneDifferentialLiveTest {
         assertThat(failure).isInstanceOf(SourceBudgetExceededException.class);
         assertThat(FailureClassifier.classify(failure).category()).isEqualTo(FailureClassifier.Category.DEFINITIVE);
         assertThat(extractsDir.resolve("diff-rust-tiny-temp.jsonl.gz")).doesNotExist();
+    }
+
+    /**
+     * Pre-probe half of plan §2.7.1, against a real server rejecting a real login: both adapters
+     * must land on the same classification, and neither may put the source on the ENG-51 cooldown
+     * — no session ever existed. The JDBC leg failing with a {@code 28*} state is also what proves
+     * this container actually enforces passwords (a {@code trust} pg_hba would make it vacuous).
+     */
+    @Test
+    void wrongPasswordIsClassifiedTheSameWayByBothAdaptersWithoutCooldown() throws Exception {
+        PecCompatibilityMatrix syntheticMatrix = syntheticMatrixWithRealFingerprints();
+        ReadBudget budget = ReadBudget.initialEngineeringProposal();
+        RecordingListener jdbcListener = new RecordingListener();
+        RecordingListener rustListener = new RecordingListener();
+
+        Throwable jdbcFailure = catchThrowable(() -> jdbcAdapter("wrong-password").acquire(
+                command("diff-jdbc-auth", budget), new CancellationToken(), jdbcListener));
+        Throwable rustFailure = catchThrowable(() -> rustAdapter(syntheticMatrix, "wrong-password").acquire(
+                command("diff-rust-auth", budget), new CancellationToken(), rustListener));
+
+        assertThat(FailureClassifier.classify(jdbcFailure).code()).isEqualTo("SOURCE_AUTHENTICATION_FAILED");
+        assertThat(FailureClassifier.classify(rustFailure).code()).isEqualTo("SOURCE_AUTHENTICATION_FAILED");
+        assertThat(FailureClassifier.classify(rustFailure).category()).isEqualTo(FailureClassifier.Category.DEFINITIVE);
+        assertThat(jdbcListener.uncertainReasons).isEmpty();
+        assertThat(rustListener.uncertainReasons).isEmpty();
+    }
+
+    /**
+     * The same parity for a server that isn't there at all: the child has no server-side
+     * SQLSTATE to forward and reports {@code 08001} instead. This holds that choice to the same
+     * classification pgJDBC's failure gets (both {@code 08*}, transient) — not to byte-equal
+     * SQLSTATEs.
+     */
+    @Test
+    void unreachableSourceIsClassifiedTheSameWayByBothAdaptersWithoutCooldown() throws Exception {
+        PecCompatibilityMatrix syntheticMatrix = syntheticMatrixWithRealFingerprints();
+        int deadPort;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            deadPort = socket.getLocalPort();
+        }
+        allowedDestinations = new AllowedDestinations(Set.of(new AllowedDestinations.HostPort("127.0.0.1", deadPort)));
+        ReadBudget budget = ReadBudget.initialEngineeringProposal();
+        RecordingListener jdbcListener = new RecordingListener();
+        RecordingListener rustListener = new RecordingListener();
+
+        Throwable jdbcFailure = catchThrowable(() -> jdbcAdapter().acquire(
+                command("diff-jdbc-dead", budget, "127.0.0.1", deadPort, MUNICIPALITY_IBGE),
+                new CancellationToken(), jdbcListener));
+        Throwable rustFailure = catchThrowable(() -> rustAdapter(syntheticMatrix).acquire(
+                command("diff-rust-dead", budget, "127.0.0.1", deadPort, MUNICIPALITY_IBGE),
+                new CancellationToken(), rustListener));
+
+        assertThat(FailureClassifier.classify(rustFailure))
+                .isEqualTo(new FailureClassifier.Classification(
+                        FailureClassifier.classify(jdbcFailure).category(),
+                        FailureClassifier.classify(jdbcFailure).code(),
+                        FailureClassifier.classify(rustFailure).detail()));
+        assertThat(FailureClassifier.classify(rustFailure).code()).isEqualTo("TRANSIENT_SQL_ERROR");
+        assertThat(jdbcListener.uncertainReasons).isEmpty();
+        assertThat(rustListener.uncertainReasons).isEmpty();
+    }
+
+    /**
+     * Cancelling after rows were already emitted — the case ADR 0011 left without coverage. Bulk
+     * rows go under a municipality no other test binds (the frozen query filters {@code
+     * m.co_ibge = ?}), far more than socket buffers can hold, so the server is provably still
+     * sending when the cancel lands. The cancel fires from inside the first {@code progress}
+     * callback, which the child only sends after 1000 rows already went through its sink.
+     *
+     * <p>A success here means the whole result streamed before the cancel landed — reported as
+     * that race, not silently passed. Afterwards no {@code observatorio-aps} query may still be
+     * running on the server: that, not the exit code, is the ENG-51 property.
+     */
+    @Test
+    void cancellingAfterRowsWereEmittedStopsTheServerQueryAndPublishesNothing() throws Exception {
+        PecCompatibilityMatrix syntheticMatrix = syntheticMatrixWithRealFingerprints();
+        insertBulkRowsOnce();
+        ReadBudget roomyBudget = new ReadBudget(
+                2, Duration.ofSeconds(10), Duration.ofSeconds(10), 60_000, 10_000, 60_000,
+                10_000_000, 120_000, 4L * 1024 * 1024 * 1024, 4L * 1024 * 1024 * 1024);
+        CancellationToken cancellation = new CancellationToken();
+        RecordingListener listener = new RecordingListener() {
+            @Override
+            public void onProgress() {
+                super.onProgress();
+                cancellation.requestCancel();
+            }
+        };
+
+        Throwable failure = catchThrowable(() -> rustAdapter(syntheticMatrix).acquire(
+                command("diff-rust-cancel", roomyBudget, PG.getHost(), PG.getMappedPort(5432), BULK_MUNICIPALITY_IBGE),
+                cancellation, listener));
+
+        assertThat(failure)
+                .as("race: the whole result streamed before the cancel landed — raise BULK_ROWS")
+                .isNotNull();
+        assertThat(failure).isInstanceOf(JobCancelledException.class);
+        assertThat(listener.progressCount.get()).isGreaterThanOrEqualTo(1);
+        // JobCancelledException alone would also come out of a crash (checkCancelled() wins over
+        // every failure path) — this is what proves the child itself honoured the cancel.
+        assertThat(listener.uncertainReasons).singleElement().asString().contains("cancelled cooperatively");
+        assertThat(extractsDir.resolve("diff-rust-cancel.jsonl.gz")).doesNotExist();
+        assertThat(activeObservatorioQueriesAfterSettling()).isZero();
+    }
+
+    private static final String BULK_MUNICIPALITY_IBGE = "9999999";
+    private static final int BULK_ROWS = 1_000_000;
+    private static boolean bulkRowsInserted = false;
+
+    private void insertBulkRowsOnce() throws Exception {
+        if (bulkRowsInserted) {
+            return;
+        }
+        try (Connection c = DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword());
+             Statement st = c.createStatement()) {
+            st.execute("INSERT INTO tb_dim_municipio VALUES (99, 'MUNICIPIO SINTETICO VOLUMOSO', '"
+                    + BULK_MUNICIPALITY_IBGE + "')");
+            st.execute("INSERT INTO tb_fat_atendimento_individual "
+                    + "SELECT 1000000 + g, 99, 1 + g % 3, 2, 10, NULL, 20, NULL, 30, NULL, 'bulk-' || g, 1 "
+                    + "FROM generate_series(1, " + BULK_ROWS + ") g");
+            st.execute("ANALYZE tb_fat_atendimento_individual");
+        }
+        bulkRowsInserted = true;
+    }
+
+    private long activeObservatorioQueriesAfterSettling() throws Exception {
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        try (Connection c = DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword());
+             Statement st = c.createStatement()) {
+            while (true) {
+                long active;
+                try (ResultSet rs = st.executeQuery("SELECT count(*) FROM pg_stat_activity "
+                        + "WHERE application_name = 'observatorio-aps' AND state <> 'idle'")) {
+                    rs.next();
+                    active = rs.getLong(1);
+                }
+                if (active == 0 || System.nanoTime() > deadline) {
+                    return active;
+                }
+                Thread.sleep(100);
+            }
+        }
     }
 }

@@ -96,6 +96,22 @@ também o teto de bytes temporários e a falta de espaço livre, que antes só e
   `{"type":"error","code":"CANCELLED","uncertain":true}`) em ~8ms. Cancelar em meio ao streaming,
   depois de pelo menos uma linha já emitida, continua sem cobertura — nem manual nem automatizada,
   nesta fatia nem na anterior.
+
+  > **Atualização (2026-09-22).** Cancelar depois de linhas já emitidas agora tem cobertura
+  > automatizada: `cancelAfterARowWasWrittenPublishesNothingAndDoesNotBlockTheRetry` (stub, sempre
+  > roda) e `cancellingAfterRowsWereEmittedStopsTheServerQueryAndPublishesNothing`
+  > (`ExecPlaneDifferentialLiveTest`, binário real + 1M linhas). Esse teste cancela no primeiro
+  > `progress` e exige `CANCELLED` vindo do próprio filho, nenhum extrato publicado e nenhuma
+  > query `observatorio-aps` ativa no `pg_stat_activity`. **Lacuna observada, não explicada:** em
+  > ~55 execuções, uma não cancelou — o filho seguiu até o teto de `max_duration_ms` (120s nesse
+  > orçamento) e saiu como `SOURCE_BUDGET_EXCEEDED`, com o rollback final falhando por
+  > `connection closed`. Não reproduziu em 40 iterações numa mesma JVM (com timers distintos) nem
+  > em 8 JVMs novas. O teto de duração continua limitando o pior caso. Revisão do PR #19 achou
+  > uma corrida relacionada, já corrigida: um cancel que chega depois de a query terminar no
+  > servidor não gera erro, e o filho esvaziava as linhas em buffer até `complete`. O loop de
+  > `stream_query` agora consulta `cancel_requested` a cada linha. A verificação no PEC real
+  > (`ExecPlaneLivePecTest`, CT 133, opt-in `-Dobservatorio.execution-plane.live-pec=true`) não rodou: o PostgreSQL do PEC está parado desde
+  > 2026-09-22 00:14 (serviço `e-SUS-AB-PostgreSQL` em `failed`).
 - `ExtractPublication` (novo, package-private) extrai de `ExtractWriter` as mecânicas estáticas de
   publicação (criação de arquivo owner-only, hard link atômico, fsync de diretório, reserva de
   espaço, validação dos argumentos do manifesto) — usadas tanto por `ExtractWriter` (caminho JDBC,
@@ -110,3 +126,15 @@ também o teto de bytes temporários e a falta de espaço livre, que antes só e
 - Seguem fora do escopo desta fatia, registrados no PR: erro estruturado antes do probe +
   `sqlstate` (hoje uma senha errada sai como `UNCLASSIFIED_ERROR` + cooldown ENG-51, enquanto o
   JDBC dá `SOURCE_AUTHENTICATION_FAILED`), e `jpackage`/empacotamento do binário.
+
+  > **Atualização (2026-09-22).** O erro estruturado antes do probe está resolvido. Falha de
+  > conexão sai como `{"type":"error","code":"SQL_ERROR","sqlstate":...,"uncertain":false}` — o
+  > SQLSTATE do servidor, ou `08001` quando não há resposta (o mesmo do pgJDBC). Qualquer falha
+  > depois da conexão e antes da mensagem `probe` sai com `uncertain:true` (paridade com o JDBC,
+  > onde o probe roda dentro do catch que dispara o ENG-51), e o estouro de duração no probe vira
+  > `SOURCE_BUDGET_EXCEEDED`. Falhas SQL no streaming também passam a levar o `sqlstate`. Em Java,
+  > `ExecPlaneAcquisition` embrulha o estado num `SQLException` como causa de
+  > `PecAcquisitionException` — `FailureClassifier` não mudou, ao contrário do que o §2.7.1 do
+  > plano previa (construtor novo + ramificação nova). Senha errada e porta fechada são
+  > classificadas igual nos dois adaptadores e sem cooldown
+  > (`ExecPlaneDifferentialLiveTest`). Segue pendente só o `jpackage`.
