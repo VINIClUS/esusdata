@@ -88,14 +88,16 @@ modules="$(ls "$java_home/jmods" | sed -n 's/\.jmod$//p' | grep -v '^jdk\.incuba
   --dest "$out"
 
 # The .deb is built from the app image; fail if that ever stops carrying the service (unit file
-# plus the jpackage-generated register_services call in postinst).
+# plus the register_services call in postinst, by unit name — see resources/postinst).
 deb="$(ls "$out"/*.deb)"
 unit="./lib/systemd/system/$name-$name.service"
 # (Captured first: grep -q closing the pipe early would trip pipefail.)
 contents="$(dpkg-deb -c "$deb")"
 postinst="$(dpkg-deb -I "$deb" postinst)"
 grep -qF "$unit" <<<"$contents" || { echo "no systemd unit in $deb" >&2; exit 1; }
-grep -qF "register_services '/lib/systemd/system/$name-$name.service'" <<<"$postinst" \
+grep -q '^register_services ()' <<<"$postinst" \
+  || { echo "postinst in $deb lacks the jpackage service functions" >&2; exit 1; }
+grep -qxF "register_services $name-$name.service" <<<"$postinst" \
   || { echo "postinst in $deb does not register the service" >&2; exit 1; }
 
 ls -l "$deb"

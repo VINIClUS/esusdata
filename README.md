@@ -98,3 +98,16 @@ defaults empacotados; mudar o diretório de dados exige também `systemctl edit 
 `ReadWritePaths=` para o novo caminho). Remover o pacote, inclusive com purge, preserva dados e configuração.
 O `.msi` do Windows sai do workflow `package` (`deployment/jpackage/package-windows.ps1`); ainda
 sem serviço do Windows e sem aquisição funcional no Windows — ver ADR 0014.
+
+O `.deb` exige Ubuntu 24.04+ ou Debian 13 (depende de `libasound2t64`); só é testado no Ubuntu 24.04. O workflow `package` o
+instala num runner com systemd e percorre o ciclo de vida com `deployment/jpackage/test-deb-lifecycle.sh`
+(instalar, reiniciar, reinstalar, remover, purgar). Localmente, só numa VM descartável:
+`sudo deployment/jpackage/test-deb-lifecycle.sh target/jpackage/observatorio-aps_*.deb`.
+
+### Release
+
+1. Atualize `<version>` em `apps/agent/pom.xml` (só números, `X.Y.Z` — o MSI não aceita sufixos) e
+   faça o merge em `main`.
+2. `git tag vX.Y.Z && git push origin vX.Y.Z` — a tag precisa ser igual à versão do pom.
+3. O workflow `package` gera o `.deb` e o `.msi`, testa o ciclo de vida do `.deb` e cria um
+   **draft** de GitHub Release com os instaladores e o `SHA256SUMS`. Revise e publique.
