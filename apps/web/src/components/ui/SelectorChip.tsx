@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box'
+import type { MouseEvent } from 'react'
 import { ChevronDown, type LucideIcon } from 'lucide-react'
 import { colors } from '@/theme/tokens'
 
@@ -6,7 +7,7 @@ interface SelectorChipProps {
   icon: LucideIcon
   label: string
   attached?: boolean
-  onClick?: () => void
+  onClick?: (event: MouseEvent<HTMLElement>) => void
 }
 
 export function SelectorChip({ icon: Icon, label, attached, onClick }: SelectorChipProps) {

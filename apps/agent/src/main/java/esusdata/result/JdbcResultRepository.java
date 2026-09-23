@@ -44,6 +44,15 @@ public final class JdbcResultRepository implements ResultRepository {
                 """, MAPPER, municipalityIbge, indicatorPack, referencePeriod);
     }
 
+    public List<String> findPublishedPeriods(String municipalityIbge) {
+        requireScope(municipalityIbge);
+        return jdbc.queryForList("""
+                select distinct reference_period from results
+                 where municipality_ibge = ?
+                 order by reference_period desc
+                """, String.class, municipalityIbge);
+    }
+
     /**
      * Looks up a result by id, scoped to a municipality. An object that exists but is out of
      * scope returns empty — identical to "not found" from the caller's perspective (§1.10.1:

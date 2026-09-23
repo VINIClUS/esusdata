@@ -7,6 +7,8 @@ export interface AuthLoginResponse {
 
 export interface AuthMeResponse {
   userId: string
+  /** Municipalities whose aggregate the user may read (READ_CLINICAL, municipality-wide). */
+  municipalities?: string[]
 }
 
 function initialsFor(parts: string[], fallback: string): string {

@@ -34,13 +34,14 @@ public class SecurityConfig {
 
     /**
      * ENG-44 (§1.12.7 L537): "polling, SSE e heartbeat não contam" toward session inactivity.
-     * {@code GET /runs/{id}} is polled repeatedly while a run is in flight, and
+     * {@code GET /runs/{id}} (and the {@code GET /runs} list the web client uses to find the
+     * current run) is polled repeatedly while a run is in flight, and
      * {@code GET /runs/{id}/events} (SSE) can stay open for the life of a run — neither should
      * extend the session; only an explicit action does. {@code AntPathMatcher}'s single {@code *}
      * never crosses a path separator, so the two patterns are listed separately.
      */
     private static final Set<String> NON_INTERACTIVE_GET_PATTERNS =
-            Set.of("/api/v1/runs/*", "/api/v1/runs/*/events");
+            Set.of("/api/v1/runs", "/api/v1/runs/*", "/api/v1/runs/*/events");
 
     /**
      * Suppresses Boot's {@code UserDetailsServiceAutoConfiguration} fallback, which activates

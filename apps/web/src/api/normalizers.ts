@@ -159,6 +159,14 @@ export function indicatorResultsPath({
   return `/results?${params.toString()}`
 }
 
+export function publishedPeriodsPath(municipalityIbge: string): string {
+  return `/results/periods?${new URLSearchParams({ municipalityIbge }).toString()}`
+}
+
+export function recentRunsPath(municipalityIbge: string, limit: number): string {
+  return `/runs?${new URLSearchParams({ municipalityIbge, limit: String(limit) }).toString()}`
+}
+
 const runStateLabels: Record<RunResponse['state'], string> = {
   QUEUED: 'Execução na fila',
   RUNNING: 'Execução em andamento',

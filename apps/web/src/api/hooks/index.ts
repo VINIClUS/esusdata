@@ -6,13 +6,14 @@ import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadore
 import { isolamentoFixture } from '../fixtures/isolamento'
 import { painelFixture } from '../fixtures/painel'
 import { relatoriosFixture } from '../fixtures/relatorios'
-import { configuredJobId } from '../run-config'
+import { useScope } from '@/app/scope'
 import {
   indicatorResultsPath,
   normalizeIndicatorPacks,
   normalizeIndicatorResult,
   normalizePainelResumo,
   normalizeRunResponse,
+  recentRunsPath,
 } from '../normalizers'
 import type {
   Fonte,
@@ -36,18 +37,16 @@ function resolveMockIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> 
   return resolveMock(detalhe)
 }
 
-function configuredApiScope() {
-  return {
-    municipalityIbge: import.meta.env.VITE_MUNICIPALITY_IBGE,
-    referencePeriod: import.meta.env.VITE_REFERENCE_PERIOD,
-  }
+interface ApiScope {
+  municipalityIbge?: string
+  referencePeriod?: string
 }
 
-function resolveApiIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> {
-  const { municipalityIbge, referencePeriod } = configuredApiScope()
-  if (!municipalityIbge || !referencePeriod) {
-    return Promise.reject(new Error('Configure VITE_MUNICIPALITY_IBGE e VITE_REFERENCE_PERIOD.'))
-  }
+const NO_MUNICIPALITY = 'Nenhum município autorizado para leitura de resultados.'
+
+function resolveApiIndicadorDetalhe(codigo: string, { municipalityIbge, referencePeriod }: ApiScope): Promise<IndicadorDetalhe> {
+  if (!municipalityIbge) return Promise.reject(new Error(NO_MUNICIPALITY))
+  if (!referencePeriod) return Promise.reject(new Error(`Nenhum resultado publicado para ${codigo}.`))
 
   return apiFetch<IndicatorResultResponse[]>(
     indicatorResultsPath({ municipalityIbge, indicatorPack: codigo, referencePeriod }),
@@ -58,9 +57,8 @@ function resolveApiIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> {
   })
 }
 
-async function resolveApiPainelResumo(): Promise<PainelResumo> {
+async function resolveApiPainelResumo({ municipalityIbge, referencePeriod }: ApiScope): Promise<PainelResumo> {
   const packs = await apiFetch<IndicatorPack[]>('/indicator-packs')
-  const { municipalityIbge, referencePeriod } = configuredApiScope()
   if (!municipalityIbge || !referencePeriod) {
     return normalizePainelResumo(packs, [], referencePeriod || 'período atual')
   }
@@ -78,10 +76,20 @@ async function resolveApiPainelResumo(): Promise<PainelResumo> {
   return normalizePainelResumo(packs, results, referencePeriod)
 }
 
+async function resolveApiExecucaoAtual(municipalityIbge: string | undefined) {
+  if (!municipalityIbge) throw new Error(NO_MUNICIPALITY)
+  const [latest] = await apiFetch<RunResponse[]>(recentRunsPath(municipalityIbge, 1))
+  if (!latest) throw new Error('Nenhuma execução registrada para este município.')
+  return normalizeRunResponse(latest)
+}
+
 export function usePainelResumo() {
+  const { municipalityIbge, referencePeriod, isLoading } = useScope()
   return useQuery({
-    queryKey: ['painel', import.meta.env.VITE_MUNICIPALITY_IBGE, import.meta.env.VITE_REFERENCE_PERIOD],
-    queryFn: () => (USE_MOCKS ? resolveMock(painelFixture) : resolveApiPainelResumo()),
+    queryKey: ['painel', municipalityIbge, referencePeriod],
+    queryFn: () =>
+      USE_MOCKS ? resolveMock(painelFixture) : resolveApiPainelResumo({ municipalityIbge, referencePeriod }),
+    enabled: !isLoading,
   })
 }
 
@@ -96,26 +104,23 @@ export function useIndicadores() {
 }
 
 export function useIndicadorDetalhe(codigo: string) {
+  const { municipalityIbge, referencePeriod, isLoading } = useScope()
   return useQuery({
-    queryKey: ['indicadores', codigo],
+    queryKey: ['indicadores', codigo, municipalityIbge, referencePeriod],
     queryFn: () =>
       USE_MOCKS
         ? resolveMockIndicadorDetalhe(codigo)
-        : resolveApiIndicadorDetalhe(codigo),
+        : resolveApiIndicadorDetalhe(codigo, { municipalityIbge, referencePeriod }),
+    enabled: !isLoading,
   })
 }
 
 export function useExecucaoAtual() {
-  const jobId = configuredJobId({ VITE_JOB_ID: import.meta.env.VITE_JOB_ID })
+  const { municipalityIbge, isLoading } = useScope()
   return useQuery({
-    queryKey: ['execucao', jobId],
-    queryFn: USE_MOCKS
-      ? () => resolveMock(execucaoFixture)
-      : jobId
-        ? () =>
-            apiFetch<RunResponse>(`/runs/${encodeURIComponent(jobId)}`).then(normalizeRunResponse)
-        : () =>
-            Promise.reject(new Error('Configure VITE_JOB_ID para consultar uma execução real.')),
+    queryKey: ['execucao', municipalityIbge],
+    queryFn: () => (USE_MOCKS ? resolveMock(execucaoFixture) : resolveApiExecucaoAtual(municipalityIbge)),
+    enabled: !isLoading,
   })
 }
 

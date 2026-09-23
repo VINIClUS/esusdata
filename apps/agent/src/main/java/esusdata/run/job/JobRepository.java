@@ -23,6 +23,9 @@ public interface JobRepository {
 
     Optional<Job> findById(String jobId);
 
+    /** The municipality's most recently created jobs, newest first. */
+    List<Job> findRecent(String municipalityIbge, int limit);
+
     Optional<Job> findByIdempotency(String principal, String idempotencyKey);
 
     /**

@@ -7,6 +7,7 @@ import esusdata.auth.dto.MeResponse;
 import esusdata.auth.dto.ReauthRequest;
 
 import esusdata.auth.model.AuthenticationFailedException;
+import esusdata.auth.model.Permission;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
@@ -36,12 +37,15 @@ public class AuthController {
 
     private final AuthenticationService authenticationService;
     private final BootstrapActivation bootstrapActivation;
+    private final ScopeResolver scopeResolver;
     private final Clock clock;
 
     public AuthController(
-            AuthenticationService authenticationService, BootstrapActivation bootstrapActivation, Clock clock) {
+            AuthenticationService authenticationService, BootstrapActivation bootstrapActivation,
+            ScopeResolver scopeResolver, Clock clock) {
         this.authenticationService = authenticationService;
         this.bootstrapActivation = bootstrapActivation;
+        this.scopeResolver = scopeResolver;
         this.clock = clock;
     }
 
@@ -67,7 +71,8 @@ public class AuthController {
     @GetMapping("/api/v1/auth/me")
     public MeResponse me(
             @AuthenticationPrincipal esusdata.auth.model.AuthenticatedSession session) {
-        return new MeResponse(session.userId());
+        return new MeResponse(session.userId(),
+                scopeResolver.municipalitiesWithAggregateAccess(session.userId(), Permission.READ_CLINICAL));
     }
 
     @PostMapping("/api/v1/auth/activate")
