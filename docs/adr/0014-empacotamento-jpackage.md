@@ -38,7 +38,9 @@ test da app image. `.github/workflows/package.yml` roda os dois em runners do pr
   `observatorio`, `ProtectSystem=strict`, escrita só em `/var/lib/observatorio-aps`. O `postinst`
   cria usuário, diretórios e um `application.yml` comentado só se ausentes, antes do bloco de
   registro do serviço gerado pelo jpackage. Remover — inclusive purge — preserva dados,
-  configuração e usuário.
+  configuração e usuário. Mover `observatorio.data.directory` exige também um drop-in
+  (`systemctl edit observatorio-aps` → `ReadWritePaths=<novo diretório>`); só o YAML deixa o
+  diretório somente-leitura para o serviço.
 - **Windows.** `.msi` com `--win-upgrade-uuid` fixo (sem ele cada versão instala lado a lado).
 
 ## Consequências

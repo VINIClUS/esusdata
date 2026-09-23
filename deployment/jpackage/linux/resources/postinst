@@ -45,6 +45,12 @@ setup_observatorio ()
 # Restart after editing: systemctl restart observatorio-aps
 #
 # observatorio:
+#   data:
+#     # The unit only allows writes under /var/lib/observatorio-aps (ProtectSystem=strict).
+#     # Moving it also needs a drop-in: systemctl edit observatorio-aps, then
+#     #   [Service]
+#     #   ReadWritePaths=/new/data/dir
+#     directory: /var/lib/observatorio-aps
 #   source:
 #     allowed-destinations: ["10.0.0.5:5432"]
 #     # owner observatorio, mode 0600

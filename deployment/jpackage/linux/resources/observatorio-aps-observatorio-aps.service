@@ -18,6 +18,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
+# A different observatorio.data.directory needs a drop-in adding it here (ADR 0014).
 ReadWritePaths=/var/lib/observatorio-aps
 
 [Install]

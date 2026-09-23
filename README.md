@@ -89,6 +89,7 @@ systemctl status observatorio-aps
 
 O `.deb` instala em `/opt/observatorio-aps`, cria o usuário `observatorio`, dados em
 `/var/lib/observatorio-aps` e configuração em `/etc/observatorio-aps/application.yml` (vence os
-defaults empacotados). Remover o pacote, inclusive com purge, preserva dados e configuração.
+defaults empacotados; mudar o diretório de dados exige também `systemctl edit observatorio-aps` com
+`ReadWritePaths=` para o novo caminho). Remover o pacote, inclusive com purge, preserva dados e configuração.
 O `.msi` do Windows sai do workflow `package` (`deployment/jpackage/package-windows.ps1`); ainda
 sem serviço do Windows e sem aquisição funcional no Windows — ver ADR 0014.
