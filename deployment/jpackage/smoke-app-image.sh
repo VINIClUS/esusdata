@@ -27,7 +27,9 @@ for _ in $(seq 1 90); do
     echo
     echo "smoke: ready"
     for path in / /indicadores/c1-mais-acesso; do
-      if ! curl -fsS "http://127.0.0.1:$port$path" | grep -q 'id="root"'; then
+      # (Captured first: grep -q closing the pipe early would trip pipefail.)
+      body="$(curl -fsS "http://127.0.0.1:$port$path" || true)"
+      if ! grep -qF 'id="root"' <<<"$body"; then
         echo "smoke: web client not served at $path" >&2
         exit 1
       fi

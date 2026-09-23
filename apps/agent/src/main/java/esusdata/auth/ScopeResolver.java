@@ -118,9 +118,11 @@ public final class ScopeResolver {
     }
 
     /**
-     * The municipalities whose unscoped aggregate {@code permission} reaches — exactly the ones
-     * {@link #hasPermission(String, Permission, String)} would accept, sorted. Team-scoped grants
-     * are left out for the same reason they never authorize the aggregate.
+     * The municipalities whose unscoped aggregate {@code permission} reaches, sorted — for a
+     * municipality-scoped permission such as {@code READ_CLINICAL}, exactly the ones {@link
+     * #hasPermission(String, Permission, String)} would accept (installation-scoped grants, which
+     * name no municipality, are not listed). Team-scoped grants are left out for the same reason
+     * they never authorize the aggregate.
      */
     public List<String> municipalitiesWithAggregateAccess(String userId, Permission permission) {
         TreeSet<String> municipalities = new TreeSet<>();

@@ -23,8 +23,9 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 /**
- * The one place the HTTP filter chain is assembled. No {@code permitAll} beyond login, activation
- * and readiness (plan decision 7/§1.12.6). Session state is entirely {@link SessionService}-based
+ * The one place the HTTP filter chains are assembled. Under {@code /api/**}, no {@code permitAll}
+ * beyond login, activation and readiness (plan decision 7/§1.12.6); everything else is the static
+ * web client, which carries no data. Session state is entirely {@link SessionService}-based
  * (STATELESS servlet session policy) — Spring's own {@code HttpSession}-backed security context is
  * never used, for the reasons {@link SessionService}'s javadoc gives.
  */
