@@ -341,14 +341,17 @@ fn report_pre_probe_failure(err: &(dyn Error + 'static)) -> Result<i32, Box<dyn 
     Ok(1)
 }
 
-/// `statement_timeout`/`lock_timeout` are read-budget limits set by this process itself — the
-/// streaming path already classifies the same states as `BudgetExceeded` (`stream::classify_failure`).
-/// No cancel listener runs during probing, so a `57014` here can only be the statement timeout.
+/// `statement_timeout`/`lock_timeout` are read-budget limits set by this process itself. Same test
+/// as `IndividualEncounterModalityCapability.isPostgresBudgetCancellation` on the JDBC path: the
+/// SQLSTATE alone isn't enough, since an external `pg_cancel_backend` also reports `57014` and
+/// must stay a plain `SQL_ERROR`.
 fn is_timeout_budget(err: &postgres::Error) -> bool {
-    err.code().is_some_and(|code| {
-        code == &postgres::error::SqlState::QUERY_CANCELED
-            || code == &postgres::error::SqlState::LOCK_NOT_AVAILABLE
-    })
+    let Some(db_error) = err.as_db_error() else {
+        return false;
+    };
+    let message = db_error.message().to_lowercase();
+    (db_error.code() == &postgres::error::SqlState::QUERY_CANCELED && message.contains("statement timeout"))
+        || (db_error.code() == &postgres::error::SqlState::LOCK_NOT_AVAILABLE && message.contains("lock timeout"))
 }
 
 /// Mirrors `BudgetGuard.checkDuration` on the JDBC path, whose clock also starts before
