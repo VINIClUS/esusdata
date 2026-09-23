@@ -64,6 +64,6 @@ test da app image. `.github/workflows/package.yml` roda os dois em runners do pr
 - `pec.env` continua sendo o resolvedor de desenvolvimento (§1.12.7 pendente); no pacote ele fica em
   `/etc/observatorio-aps/pec.env`, dono `observatorio`, modo `0600`.
 - Sem mocks, as telas de fonte, requisitos, isolamento e relatórios mostram erro no pacote: a API
-  ainda não tem as rotas delas.
+  ainda não tem as rotas delas (issue #22).
 - Fora desta fatia: assinatura, SBOM e proveniência (§1.12.8),
   `.rpm`, e o teste de ciclo de vida completo da §1.12.5 (boot, perda de energia, rollback).

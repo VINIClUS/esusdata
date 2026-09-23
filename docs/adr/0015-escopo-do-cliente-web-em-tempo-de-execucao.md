@@ -33,6 +33,6 @@ ainda a oferecer. A tela de execução mostra o job mais recente do município.
 
 - O bundle não tem mais configuração por instalação; só `VITE_USE_MOCKS` segue sendo de build.
 - Um usuário só com concessão de equipe não vê município no seletor: o painel agregado não é para
-  ele, e a leitura de evidências por equipe ainda não tem tela.
+  ele, e a leitura de evidências por equipe ainda não tem tela (issue #23).
 - Um usuário com `read_clinical` mas sem `run_indicator` (auditor) vê o painel, mas a tela de
   execução responde 404, como `GET /runs/{id}` já fazia.
