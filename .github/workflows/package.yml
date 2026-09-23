@@ -1,5 +1,7 @@
 # Builds the jpackage installers (ADR 0014, Tech Spec §1.12.5): each package is built on its own
-# OS. Actions are pinned by commit SHA and the Rust toolchain by version (§1.12.8).
+# OS, the .deb is installed and taken through its lifecycle on a real systemd runner, and a v* tag
+# turns the result into a draft GitHub Release. Actions are pinned by commit SHA and the Rust
+# toolchain by version (§1.12.8).
 name: package
 
 on:
@@ -16,6 +18,11 @@ on:
 
 permissions:
   contents: read
+
+# A re-pushed tag must not race the previous run into creating the same release.
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 env:
   RUST_TOOLCHAIN: '1.98.1'
@@ -87,3 +94,64 @@ jobs:
           name: observatorio-aps-windows-msi
           path: target/jpackage/*.msi
           if-no-files-found: error
+
+  # The runner is a disposable VM with systemd and passwordless sudo: install for real.
+  deb-lifecycle:
+    needs: linux
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: observatorio-aps-linux-deb
+          path: dist
+      - name: Install, run, reinstall, remove, purge
+        run: sudo deployment/jpackage/test-deb-lifecycle.sh dist/*.deb
+
+  # Draft only: the MSI still has no Windows service nor working acquisition (ADR 0014), so a
+  # person reviews the notes before publishing.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows, deb-lifecycle]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Tag matches the project version
+        id: version
+        run: |
+          version="$(sed -n '/<artifactId>esusdata-agent<\/artifactId>/,/<version>/s:.*<version>\(.*\)</version>.*:\1:p' apps/agent/pom.xml)"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "tag $GITHUB_REF_NAME does not match apps/agent/pom.xml version $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: observatorio-aps-*
+          merge-multiple: true
+          path: dist
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum -- *.deb *.msi >SHA256SUMS
+          cat SHA256SUMS
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cat >notes.md <<'MD'
+          ## Instalação
+
+          - **Linux (Ubuntu 24.04+ / Debian 13)**: `sudo apt install ./observatorio-aps_*_amd64.deb`
+            — serviço systemd `observatorio-aps`, dados em `/var/lib/observatorio-aps`, configuração
+            local em `/etc/observatorio-aps/application.yml`.
+          - **Windows (.msi)**: prévia — ainda sem serviço do Windows e sem aquisição do PEC (ADR 0014).
+
+          Confira os downloads com `sha256sum -c SHA256SUMS`.
+          MD
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes \
+            --title "Observatório APS $VERSION" --notes-file notes.md \
+            dist/*.deb dist/*.msi dist/SHA256SUMS

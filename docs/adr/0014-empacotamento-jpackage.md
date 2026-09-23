@@ -56,3 +56,9 @@ test da app image. `.github/workflows/package.yml` roda os dois em runners do pr
   `/etc/observatorio-aps/pec.env`, dono `observatorio`, modo `0600`.
 - Fora desta fatia: frontend servido pelo backend, assinatura, SBOM e proveniência (§1.12.8),
   `.rpm`, e o teste de ciclo de vida completo da §1.12.5 (boot, perda de energia, rollback).
+- **Acompanhamento.** O workflow `package` instala o `.deb` num runner Ubuntu 24.04 com systemd e
+  verifica usuário, permissões, serviço sem privilégio respondendo `/ready`, restart, reinstalação
+  preservando `/etc`, e remove/purge preservando dados, configuração e usuário
+  (`deployment/jpackage/test-deb-lifecycle.sh`). Suporte do `.deb`: Ubuntu 24.04+ / Debian 13
+  (`libasound2t64`). Tags `vX.Y.Z` iguais à versão do pom geram um draft de GitHub Release com
+  `.deb`, `.msi` e `SHA256SUMS`; publicar é ação humana enquanto o MSI não operar.
