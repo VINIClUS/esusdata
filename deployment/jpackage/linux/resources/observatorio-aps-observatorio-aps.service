@@ -1,0 +1,26 @@
+[Unit]
+Description=SERVICE_DESCRIPTION
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=APPLICATION_LAUNCHER
+Restart=on-failure
+# §1.12.5: unprivileged service user; privileges are only used by the package scripts.
+User=observatorio
+Group=observatorio
+UMask=0077
+# The JVM exits with 128+SIGTERM after a clean shutdown; the grace covers
+# observatorio.execution-plane.exit-grace (30s) on a child still running.
+SuccessExitStatus=143
+TimeoutStopSec=60
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# A different observatorio.data.directory needs a drop-in adding it here (ADR 0014).
+ReadWritePaths=/var/lib/observatorio-aps
+
+[Install]
+WantedBy=multi-user.target
+Alias=observatorio-aps.service

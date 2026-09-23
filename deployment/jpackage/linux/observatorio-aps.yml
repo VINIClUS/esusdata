@@ -1,0 +1,20 @@
+# Linux platform defaults, shipped inside the app image (ADR 0014). The launcher loads this file
+# first and /etc/observatorio-aps/application.yml after it, so anything set there wins —
+# §1.12.5: "defaults de projeto, ajustáveis pelo instalador". Never edit this copy in place: an
+# upgrade replaces it.
+observatorio:
+  data:
+    directory: /var/lib/observatorio-aps
+  source:
+    # Must be owned by the service user and mode 0600 (EnvFileSecretResolver refuses anything
+    # group- or world-readable).
+    secret-file: /etc/observatorio-aps/pec.env
+  execution-plane:
+    # ADR 0010: the Rust execution plane ships inside the app image and is on by default (ADR 0014).
+    # Turn it off with `binary: ""` in /etc/observatorio-aps/application.yml.
+    binary: ${observatorio.install-dir}/observatorio-execplane
+
+# §1.4: individual installation by default. Publishing on the network is an explicit /etc
+# override, together with observatorio.web.allowed-origins / allowed-hosts.
+server:
+  address: 127.0.0.1

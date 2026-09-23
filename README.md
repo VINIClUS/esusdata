@@ -18,13 +18,14 @@ apps/web/        frontend React + Vite + MUI ("Esusdata Helper")
 apps/execplane/  plano de execução em Rust — aquisição viva do PEC e geração do data file do extrato,
                  IPC por stdin/stdout (ADR 0010, ADR 0011)
 contracts/       contratos publicados: compatibilidade de adaptadores PEC e OpenAPI v1
+deployment/      empacotamento jpackage por SO e smoke test da app image (ADR 0014)
 docs/adr/        registros de decisão
 docs/discovery/  investigação do PEC real (CT 133)
 docs/fichas/     fichas metodológicas dos indicadores
 ```
 
-`deployment/` e `indicator-packs/` da §1.5 ainda não existem: o pacote C1 compila dentro de
-`apps/agent` (`indicator.pack.c1`), e empacotamento é fase posterior.
+`indicator-packs/` da §1.5 ainda não existe: o pacote C1 compila dentro de `apps/agent`
+(`indicator.pack.c1`).
 
 ### `apps/agent` — pacotes
 
@@ -66,12 +67,29 @@ cd apps/web && npm install && npm run dev
 # mesmos casos contra o PEC real (túnel do ADR 0003 + pec.env) só com o opt-in explícito
 # -Dobservatorio.execution-plane.live-pec=true — o comando abaixo nunca toca o PEC real —, e
 # ainda não teve uma execução verde.
-# Ainda não há empacotamento jpackage nem prova de equivalência contra as fingerprints de produção
-# empacotadas — nunca aponte observatorio.execution-plane.binary para este binário contra uma
-# fonte real ainda.
+# Ainda não há prova de equivalência contra as fingerprints de produção empacotadas; mesmo assim
+# o pacote (ADR 0014) liga o plano de execução por padrão. Para desligar numa instalação:
+# observatorio.execution-plane.binary: "" em /etc/observatorio-aps/application.yml.
 cd apps/execplane && cargo build --release && cargo test
 cd apps/agent && mvn verify -Dsurefire.reuseForks=false \
   -Dobservatorio.execution-plane.binary=$PWD/../execplane/target/release/observatorio-execplane
 ```
 
 Testes com sufixo `LiveTest` exigem um PEC acessível e são pulados sem ele (ADR 0002, ADR 0003).
+
+## Empacotar (ADR 0014)
+
+```bash
+# Linux: app image + .deb com serviço systemd em target/jpackage/ (JDK 21 com jmods, cargo, dpkg-deb, fakeroot)
+deployment/jpackage/package-linux.sh            # --skip-tests para iterar
+deployment/jpackage/smoke-app-image.sh          # sobe a app image num diretório temporário e espera /ready
+sudo apt install ./target/jpackage/observatorio-aps_*.deb
+systemctl status observatorio-aps
+```
+
+O `.deb` instala em `/opt/observatorio-aps`, cria o usuário `observatorio`, dados em
+`/var/lib/observatorio-aps` e configuração em `/etc/observatorio-aps/application.yml` (vence os
+defaults empacotados; mudar o diretório de dados exige também `systemctl edit observatorio-aps` com
+`ReadWritePaths=` para o novo caminho). Remover o pacote, inclusive com purge, preserva dados e configuração.
+O `.msi` do Windows sai do workflow `package` (`deployment/jpackage/package-windows.ps1`); ainda
+sem serviço do Windows e sem aquisição funcional no Windows — ver ADR 0014.
