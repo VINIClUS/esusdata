@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Starts the packaged app image against a throwaway data directory and waits for
-# /api/v1/ready. Runs on Linux and on Windows (Git Bash). Needs no root: the data directory and
+# Starts the packaged app image against a throwaway data directory, waits for /api/v1/ready,
+# then checks the web client is served, deep links included. Runs on Linux and on Windows (Git Bash). Needs no root: the data directory and
 # port are overridden by command-line arguments, which win over the packaged defaults.
 #
 #   deployment/jpackage/smoke-app-image.sh [app-image-dir]
@@ -26,6 +26,13 @@ for _ in $(seq 1 90); do
   if curl -fsS -H 'Host: 127.0.0.1:8080' "http://127.0.0.1:$port/api/v1/ready" 2>/dev/null; then
     echo
     echo "smoke: ready"
+    for path in / /indicadores/c1-mais-acesso; do
+      if ! curl -fsS "http://127.0.0.1:$port$path" | grep -q 'id="root"'; then
+        echo "smoke: web client not served at $path" >&2
+        exit 1
+      fi
+    done
+    echo "smoke: web client served"
     exit 0
   fi
   if ! kill -0 "$pid" 2>/dev/null; then

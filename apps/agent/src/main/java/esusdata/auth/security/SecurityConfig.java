@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -61,6 +62,7 @@ public class SecurityConfig {
     }
 
     @Bean
+    @Order(1)
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http, SessionService sessionService, Clock clock, WebSecurityProperties webProperties)
             throws Exception {
@@ -116,6 +118,37 @@ public class SecurityConfig {
                                 Set.copyOf(webProperties.allowedOrigins()), Set.copyOf(webProperties.allowedHosts())),
                         UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(new NoStoreCacheControlFilter(), UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    /**
+     * Everything outside {@code /api/**}: the static web client ({@code SpaWebConfig}). No session
+     * or CSRF here — the pages carry no data, every read goes through the chain above — only the
+     * browser-hardening headers. {@code style-src 'unsafe-inline'} because MUI (emotion) injects
+     * {@code <style>} elements at runtime. Must stay ordered after the API chain: it matches any
+     * request.
+     */
+    @Bean
+    @Order(2)
+    public SecurityFilterChain webClientFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(headers -> headers
+                        // SpaWebConfig sets Cache-Control per path (immutable assets, revalidated
+                        // index.html); Security's no-store default would defeat both.
+                        .cacheControl(cache -> cache.disable())
+                        .frameOptions(frame -> frame.deny())
+                        .contentTypeOptions(contentTypeOptions -> {})
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                                        + "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")))
+                .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+                .httpBasic(basic -> basic.disable())
+                .formLogin(form -> form.disable())
+                .logout(logout -> logout.disable());
 
         return http.build();
     }
