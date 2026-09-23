@@ -11,6 +11,7 @@ on:
       - 'deployment/**'
       - 'apps/agent/**'
       - 'apps/execplane/**'
+      - 'apps/web/**'
       - 'contracts/**'
       - '.github/workflows/package.yml'
 

@@ -65,6 +65,15 @@ public class ResultController {
                 .toList();
     }
 
+    /** Lets a client default to the latest competência instead of having one configured. */
+    @GetMapping("/api/v1/results/periods")
+    public List<String> periods(
+            @AuthenticationPrincipal AuthenticatedSession session,
+            @RequestParam String municipalityIbge) {
+        authorization.requireObjectScope(session, Permission.READ_CLINICAL, municipalityIbge);
+        return resultRepository.findPublishedPeriods(municipalityIbge);
+    }
+
     @GetMapping("/api/v1/results/{id}/evidence")
     public EvidenceResponse evidence(
             @AuthenticationPrincipal AuthenticatedSession session,

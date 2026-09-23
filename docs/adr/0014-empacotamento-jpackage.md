@@ -42,6 +42,15 @@ test da app image. `.github/workflows/package.yml` roda os dois em runners do pr
   (`systemctl edit observatorio-aps` → `ReadWritePaths=<novo diretório>`); só o YAML deixa o
   diretório somente-leitura para o serviço.
 - **Windows.** `.msi` com `--win-upgrade-uuid` fixo (sem ele cada versão instala lado a lado).
+- **Frontend servido pelo backend.** Os scripts constroem o jar com `-Pweb`: o
+  `frontend-maven-plugin` baixa o Node fixado no `pom.xml` para `target/`, roda `npm ci` e
+  `npm run build` com `VITE_USE_MOCKS=false`, e o `dist/` entra no jar em `static/`.
+  `esusdata.web.SpaWebConfig` serve o bundle na mesma origem da API; caminhos sem arquivo e sem
+  extensão caem no `index.html` (roteamento do cliente), `/api/**` nunca. Uma segunda cadeia do
+  Spring Security, depois da de `/api/**`, cobre as páginas: sem sessão nem CSRF, só CSP e demais
+  cabeçalhos. O escopo (município, competência, execução) vem da API em tempo de execução, então o
+  mesmo pacote serve qualquer instalação ([[0015-escopo-do-cliente-web-em-tempo-de-execucao]]).
+  O smoke test confere `/` e um deep link.
 
 ## Consequências
 
@@ -54,5 +63,7 @@ test da app image. `.github/workflows/package.yml` roda os dois em runners do pr
   via `java.beans`). Aceito até a redução de módulos.
 - `pec.env` continua sendo o resolvedor de desenvolvimento (§1.12.7 pendente); no pacote ele fica em
   `/etc/observatorio-aps/pec.env`, dono `observatorio`, modo `0600`.
-- Fora desta fatia: frontend servido pelo backend, assinatura, SBOM e proveniência (§1.12.8),
+- Sem mocks, as telas de fonte, requisitos, isolamento e relatórios mostram erro no pacote: a API
+  ainda não tem as rotas delas (issue #22).
+- Fora desta fatia: assinatura, SBOM e proveniência (§1.12.8),
   `.rpm`, e o teste de ciclo de vida completo da §1.12.5 (boot, perda de energia, rollback).

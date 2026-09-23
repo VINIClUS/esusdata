@@ -3,6 +3,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { useAuth } from './auth'
+import { ScopeProvider } from './scope'
 
 export function RequireAuth() {
   const { user, isLoading } = useAuth()
@@ -16,8 +17,10 @@ export function RequireAuth() {
   }
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />
   return (
-    <AppShell>
-      <Outlet />
-    </AppShell>
+    <ScopeProvider>
+      <AppShell>
+        <Outlet />
+      </AppShell>
+    </ScopeProvider>
   )
 }

@@ -1,6 +1,6 @@
-function formatReferencePeriod(referencePeriod: string | undefined): string {
+export function formatReferencePeriod(referencePeriod: string | undefined): string {
   const match = /^(\d{4})-(\d{2})$/.exec(referencePeriod ?? '')
-  return match ? `${match[2]}/${match[1]}` : referencePeriod || 'Não configurada'
+  return match ? `${match[2]}/${match[1]}` : referencePeriod || 'Sem resultados'
 }
 
 export function realContextForScope({
@@ -11,7 +11,7 @@ export function realContextForScope({
   referencePeriod?: string
 }): { municipio: string; competencia: string } {
   return {
-    municipio: municipalityIbge ? `IBGE ${municipalityIbge}` : 'Município não configurado',
+    municipio: municipalityIbge ? `IBGE ${municipalityIbge}` : 'Nenhum município autorizado',
     competencia: formatReferencePeriod(referencePeriod),
   }
 }

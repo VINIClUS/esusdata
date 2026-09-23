@@ -73,6 +73,13 @@ public final class JdbcJobRepository implements JobRepository {
                 .stream().findFirst();
     }
 
+    public List<Job> findRecent(String municipalityIbge, int limit) {
+        return jdbc.query("""
+                select * from jobs where municipality_ibge = ?
+                 order by created_at desc, job_id desc limit ?
+                """, MAPPER, municipalityIbge, limit);
+    }
+
     public Optional<Job> findByIdempotency(String principal, String idempotencyKey) {
         if (principal == null || idempotencyKey == null) return Optional.empty();
         return jdbc.query(

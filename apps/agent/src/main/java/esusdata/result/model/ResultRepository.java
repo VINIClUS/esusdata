@@ -11,6 +11,9 @@ public interface ResultRepository {
     List<PublishedResult> findPublished(
             String municipalityIbge, String indicatorPack, String referencePeriod);
 
+    /** Reference periods with at least one published result in the municipality, newest first. */
+    List<String> findPublishedPeriods(String municipalityIbge);
+
     /**
      * Looks up a result by id, scoped to a municipality. An object that exists but is out of
      * scope returns empty — identical to "not found" from the caller's perspective (§1.10.1:

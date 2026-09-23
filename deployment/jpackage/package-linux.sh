@@ -33,13 +33,14 @@ fi
 cargo build --release --locked --manifest-path "$root/apps/execplane/Cargo.toml"
 execplane="$root/apps/execplane/target/release/observatorio-execplane"
 
-# 2. Backend jar. The surefire flag is the reuseForks quirk documented in README.md; the binary
-#    property turns on ExecPlaneDifferentialLiveTest (JDBC vs. Rust on the same fixture).
+# 2. Backend jar, with the web client under static/ (-Pweb). The surefire flag is the reuseForks
+#    quirk documented in README.md; the binary property turns on ExecPlaneDifferentialLiveTest
+#    (JDBC vs. Rust on the same fixture).
 mvn_args=(-B -f "$root/apps/agent/pom.xml")
 if $skip_tests; then
-  mvn "${mvn_args[@]}" package -DskipTests
+  mvn "${mvn_args[@]}" -Pweb package -DskipTests
 else
-  mvn "${mvn_args[@]}" verify -Dsurefire.reuseForks=false \
+  mvn "${mvn_args[@]}" -Pweb verify -Dsurefire.reuseForks=false \
     -Dobservatorio.execution-plane.binary="$execplane"
 fi
 version="$(mvn "${mvn_args[@]}" -q help:evaluate -Dexpression=project.version -DforceStdout)"

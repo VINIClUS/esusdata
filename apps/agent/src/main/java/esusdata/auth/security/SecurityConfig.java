@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -22,8 +23,9 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 /**
- * The one place the HTTP filter chain is assembled. No {@code permitAll} beyond login, activation
- * and readiness (plan decision 7/§1.12.6). Session state is entirely {@link SessionService}-based
+ * The one place the HTTP filter chains are assembled. Under {@code /api/**}, no {@code permitAll}
+ * beyond login, activation and readiness (plan decision 7/§1.12.6); everything else is the static
+ * web client, which carries no data. Session state is entirely {@link SessionService}-based
  * (STATELESS servlet session policy) — Spring's own {@code HttpSession}-backed security context is
  * never used, for the reasons {@link SessionService}'s javadoc gives.
  */
@@ -34,13 +36,14 @@ public class SecurityConfig {
 
     /**
      * ENG-44 (§1.12.7 L537): "polling, SSE e heartbeat não contam" toward session inactivity.
-     * {@code GET /runs/{id}} is polled repeatedly while a run is in flight, and
+     * {@code GET /runs/{id}} (and the {@code GET /runs} list the web client uses to find the
+     * current run) is polled repeatedly while a run is in flight, and
      * {@code GET /runs/{id}/events} (SSE) can stay open for the life of a run — neither should
      * extend the session; only an explicit action does. {@code AntPathMatcher}'s single {@code *}
      * never crosses a path separator, so the two patterns are listed separately.
      */
     private static final Set<String> NON_INTERACTIVE_GET_PATTERNS =
-            Set.of("/api/v1/runs/*", "/api/v1/runs/*/events");
+            Set.of("/api/v1/runs", "/api/v1/runs/*", "/api/v1/runs/*/events");
 
     /**
      * Suppresses Boot's {@code UserDetailsServiceAutoConfiguration} fallback, which activates
@@ -60,6 +63,7 @@ public class SecurityConfig {
     }
 
     @Bean
+    @Order(1)
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http, SessionService sessionService, Clock clock, WebSecurityProperties webProperties)
             throws Exception {
@@ -115,6 +119,37 @@ public class SecurityConfig {
                                 Set.copyOf(webProperties.allowedOrigins()), Set.copyOf(webProperties.allowedHosts())),
                         UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(new NoStoreCacheControlFilter(), UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    /**
+     * Everything outside {@code /api/**}: the static web client ({@code SpaWebConfig}). No session
+     * or CSRF here — the pages carry no data, every read goes through the chain above — only the
+     * browser-hardening headers. {@code style-src 'unsafe-inline'} because MUI (emotion) injects
+     * {@code <style>} elements at runtime. Must stay ordered after the API chain: it matches any
+     * request.
+     */
+    @Bean
+    @Order(2)
+    public SecurityFilterChain webClientFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(headers -> headers
+                        // SpaWebConfig sets Cache-Control per path (immutable assets, revalidated
+                        // index.html); Security's no-store default would defeat both.
+                        .cacheControl(cache -> cache.disable())
+                        .frameOptions(frame -> frame.deny())
+                        .contentTypeOptions(contentTypeOptions -> {})
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                                        + "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")))
+                .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+                .httpBasic(basic -> basic.disable())
+                .formLogin(form -> form.disable())
+                .logout(logout -> logout.disable());
 
         return http.build();
     }

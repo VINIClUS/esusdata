@@ -9,7 +9,7 @@ import {
   indicatorResultsPath,
 } from '../src/api/normalizers.ts'
 import * as normalizers from '../src/api/normalizers.ts'
-import { configuredJobId } from '../src/api/run-config.ts'
+import { pickScopeOption } from '../src/app/scope-model.ts'
 import { realContextForScope } from '../src/app/display-context.ts'
 import { matchesIndicatorTab } from '../src/features/indicadores/filter.ts'
 import { detailTabContent } from '../src/features/indicadores/detail-tabs.ts'
@@ -200,9 +200,16 @@ test('keeps publication pending while cancellation is requested', () => {
   )
 })
 
-test('configures the execution endpoint with a backend job ID', () => {
-  assert.equal(configuredJobId({ VITE_JOB_ID: '  job-1  ' }), 'job-1')
-  assert.equal(configuredJobId({ VITE_RUN_ID: 'run-1' }), undefined)
+test('builds the scope-discovery queries', () => {
+  assert.equal(normalizers.publishedPeriodsPath('3541307'), '/results/periods?municipalityIbge=3541307')
+  assert.equal(normalizers.recentRunsPath('3541307', 1), '/runs?municipalityIbge=3541307&limit=1')
+})
+
+test('keeps a remembered scope choice only while the API still offers it', () => {
+  assert.equal(pickScopeOption(['2026-08', '2026-07'], '2026-07'), '2026-07')
+  assert.equal(pickScopeOption(['2026-08', '2026-07'], '2026-01'), '2026-08')
+  assert.equal(pickScopeOption(['2026-08'], null), '2026-08')
+  assert.equal(pickScopeOption([], '2026-08'), undefined)
 })
 
 test('keeps a blocked result unavailable instead of turning it into zero', () => {
@@ -269,7 +276,7 @@ test('derives the real-mode panel from the catalog and published results', () =>
   assert.equal(painel.qualidade.percentual, null)
 })
 
-test('uses the configured API scope in real-mode display context', () => {
+test('uses the runtime API scope in real-mode display context', () => {
   assert.deepEqual(
     realContextForScope({
       municipalityIbge: '3304557',
@@ -277,6 +284,10 @@ test('uses the configured API scope in real-mode display context', () => {
     }),
     { municipio: 'IBGE 3304557', competencia: '09/2026' },
   )
+  assert.deepEqual(realContextForScope({}), {
+    municipio: 'Nenhum município autorizado',
+    competencia: 'Sem resultados',
+  })
 })
 
 test('maps every detail tab to content instead of only changing its underline', () => {

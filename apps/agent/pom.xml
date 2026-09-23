@@ -153,4 +153,66 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- -Pweb builds apps/web and ships it in the jar under static/, served by
+         esusdata.web.SpaWebConfig. Off by default so everyday `mvn verify` skips the frontend.
+         Node is downloaded into target/ and pinned here (§1.12.8), not taken from the machine. The
+         bundle talks to the real API: VITE_USE_MOCKS=false (ADR 0015). -->
+    <profile>
+      <id>web</id>
+      <build>
+        <resources>
+          <resource>
+            <directory>${project.basedir}/../web/dist</directory>
+            <targetPath>static</targetPath>
+          </resource>
+        </resources>
+        <plugins>
+          <plugin>
+            <groupId>com.github.eirslett</groupId>
+            <artifactId>frontend-maven-plugin</artifactId>
+            <version>2.0.2</version>
+            <configuration>
+              <workingDirectory>${project.basedir}/../web</workingDirectory>
+              <installDirectory>${project.build.directory}</installDirectory>
+              <nodeVersion>v24.21.0</nodeVersion>
+            </configuration>
+            <executions>
+              <execution>
+                <id>install-node-and-npm</id>
+                <goals>
+                  <goal>install-node-and-npm</goal>
+                </goals>
+                <phase>generate-resources</phase>
+              </execution>
+              <execution>
+                <id>npm-ci</id>
+                <goals>
+                  <goal>npm</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <arguments>ci</arguments>
+                </configuration>
+              </execution>
+              <execution>
+                <id>npm-run-build</id>
+                <goals>
+                  <goal>npm</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <arguments>run build</arguments>
+                  <environmentVariables>
+                    <VITE_USE_MOCKS>false</VITE_USE_MOCKS>
+                  </environmentVariables>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

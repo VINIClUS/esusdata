@@ -4,6 +4,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
 import java.util.List;
+import java.util.TreeSet;
 import esusdata.auth.model.Permission;
 import esusdata.auth.model.ScopeKind;
 /**
@@ -114,6 +115,24 @@ public final class ScopeResolver {
             }
         }
         return false;
+    }
+
+    /**
+     * The municipalities whose unscoped aggregate {@code permission} reaches, sorted — for a
+     * municipality-scoped permission such as {@code READ_CLINICAL}, exactly the ones {@link
+     * #hasPermission(String, Permission, String)} would accept (installation-scoped grants, which
+     * name no municipality, are not listed). Team-scoped grants are left out for the same reason
+     * they never authorize the aggregate.
+     */
+    public List<String> municipalitiesWithAggregateAccess(String userId, Permission permission) {
+        TreeSet<String> municipalities = new TreeSet<>();
+        for (EffectiveGrant grant : effectiveGrants(userId)) {
+            if (grant.permission() == permission && grant.scopeKind() == ScopeKind.MUNICIPALITY
+                    && grant.cnes() == null && grant.ine() == null) {
+                municipalities.add(grant.municipalityIbge());
+            }
+        }
+        return List.copyOf(municipalities);
     }
 
     public boolean hasInstallationPermission(String userId, Permission permission) {

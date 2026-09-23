@@ -51,8 +51,13 @@ indicador é Java puro; driver Postgres só em `source.pec` e `run.acquisition`;
 # backend (testes incluem ArchUnit e o contrato OpenAPI)
 cd apps/agent && mvn verify -Dsurefire.reuseForks=false
 
-# frontend (dados mockados por padrão: VITE_USE_MOCKS)
+# frontend (dados mockados por padrão: VITE_USE_MOCKS; com VITE_USE_MOCKS=false fala com o
+# backend em :8080 pelo proxy do Vite — município e competência vêm da API, ADR 0015)
 cd apps/web && npm install && npm run dev
+
+# jar com o frontend embutido (Node fixado baixado em target/, bundle sem mocks), servido pelo
+# próprio backend em http://127.0.0.1:8080/ — é o que o empacotamento (ADR 0014) usa
+cd apps/agent && mvn -Pweb package -DskipTests
 
 # plano de execução (ADR 0010, ADR 0011) — build separado, opcional; sem o binário o backend usa
 # o adaptador JDBC in-process (observatorio.execution-plane.binary vazio). O filho é dono de todo

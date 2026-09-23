@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -30,6 +31,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 import esusdata.web.ApiNotFoundException;
 import esusdata.run.job.JobNotCancellableException;
@@ -55,6 +57,7 @@ public class RunController {
     private static final Duration IDEMPOTENCY_KEY_TTL = Duration.ofHours(24);
     private static final int DEFAULT_MAX_ATTEMPTS = 3;
     private static final int MAX_CANCEL_ATTEMPTS = 4;
+    private static final int MAX_LIST_LIMIT = 100;
 
     private final JobRepository jobRepository;
     private final IdempotencyResolver idempotencyResolver;
@@ -110,6 +113,24 @@ public class RunController {
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .location(URI.create("/api/v1/runs/" + job.jobId()))
                 .body(responseFactory.toResponse(job));
+    }
+
+    /**
+     * Recent jobs of one municipality, so a client finds the current run without knowing its id.
+     * Same {@code RUN_INDICATOR} scope as {@code GET /runs/{id}}.
+     */
+    @GetMapping("/api/v1/runs")
+    public List<RunResponse> list(
+            @AuthenticationPrincipal AuthenticatedSession session,
+            @RequestParam String municipalityIbge,
+            @RequestParam(defaultValue = "20") int limit) {
+        if (limit < 1 || limit > MAX_LIST_LIMIT) {
+            throw new IllegalArgumentException("limit must be between 1 and " + MAX_LIST_LIMIT + ": " + limit);
+        }
+        authorization.requireObjectScope(session, Permission.RUN_INDICATOR, municipalityIbge);
+        return jobRepository.findRecent(municipalityIbge, limit).stream()
+                .map(responseFactory::toResponse)
+                .toList();
     }
 
     @GetMapping("/api/v1/runs/{id}")

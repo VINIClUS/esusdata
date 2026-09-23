@@ -29,12 +29,12 @@ if (-not (Test-Path (Join-Path $javaHome 'jmods'))) {
     throw "JDK at $javaHome has no jmods\ - jlink needs a full JDK"
 }
 
-# 1. Backend jar.
+# 1. Backend jar, with the web client under static/ (-Pweb).
 $pom = Join-Path $root 'apps\agent\pom.xml'
 if ($RunTests) {
-    mvn -B -f $pom verify '-Dsurefire.reuseForks=false'
+    mvn -B -f $pom -Pweb verify '-Dsurefire.reuseForks=false'
 } else {
-    mvn -B -f $pom package '-DskipTests'
+    mvn -B -f $pom -Pweb package '-DskipTests'
 }
 $version = (mvn -B -f $pom -q help:evaluate '-Dexpression=project.version' '-DforceStdout').Trim()
 $jar = "esusdata-agent-$version.jar"
