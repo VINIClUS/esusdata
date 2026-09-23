@@ -11,8 +11,8 @@
     <relativePath/>
   </parent>
 
-  <groupId>br.gov.observatorioaps</groupId>
-  <artifactId>observatorio-aps-agent</artifactId>
+  <groupId>esusdata</groupId>
+  <artifactId>esusdata-agent</artifactId>
   <version>0.1.0</version>
   <packaging>jar</packaging>
   <name>Observatório APS — agent</name>

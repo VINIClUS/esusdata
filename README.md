@@ -24,28 +24,25 @@ docs/fichas/     fichas metodológicas dos indicadores
 ```
 
 `deployment/` e `indicator-packs/` da §1.5 ainda não existem: o pacote C1 compila dentro de
-`apps/agent` (`indicatorpacks.c1`), e empacotamento é fase posterior.
+`apps/agent` (`indicator.pack.c1`), e empacotamento é fase posterior.
 
-### `apps/agent` — módulos e camadas
+### `apps/agent` — pacotes
 
-Pacote base `br.gov.observatorioaps`. Cada módulo da Tech Spec §1.5 é um pacote com camadas
-`domain` / `application` / `infrastructure` (ADR 0009):
+Pacote base `esusdata`. Uma pasta por assunto, sem camadas obrigatórias (ADR 0013):
 
-| Pacote | Módulo da spec | Responsabilidade |
-|---|---|---|
-| `identityaccess` | identity-access | usuários, papéis, concessões, sessões, escopo |
-| `sourceconnector` | source-connector | registro de fontes, conexão, segredo, orçamento de leitura |
-| `pecadapter` | pec-adapter | matriz de compatibilidade e consultas verificadas ao PEC |
-| `extractionstore` | extraction-store | extrato mínimo, manifesto, verificação |
-| `indicatorengine` | indicator-engine | `ExactRatio`, classificação — sem JDBC nem HTTP |
-| `indicatorpacks` | indicator-packs | regras compiladas (C1) |
-| `jobrunner` | job-runner | fila persistente, worker único, cancelamento, recuperação |
-| `resultstore` | result-store | staging, publicação, evidência, reprodutibilidade |
-| `api` | — | adaptador HTTP por recurso: `auth`, `access`, `sources`, `results`, `runs`, `packs`, `ready`, `security`, `error` |
-| `platform` | — | SQLite e lock de processo |
+| Pacote | Responsabilidade |
+|---|---|
+| `auth` | usuários, papéis, concessões, sessões, escopo; `security/` tem filtros e `SecurityConfig` |
+| `source` | registro e diagnóstico de fontes; `pec/` tem conexão, segredo, orçamento e matriz de compatibilidade |
+| `run` | `controller/` HTTP e SSE, `worker/` executor, `job/` fila e máquina de estados, `acquisition/` in-process ou plano de execução, `extract/` extrato e manifesto |
+| `indicator` | motor puro (`model/`) e regras compiladas (`pack/c1`) — sem JDBC nem HTTP |
+| `result` | staging, publicação, evidência, reprodutibilidade |
+| `config` | SQLite, Flyway, lock de processo |
+| `web` | `ApiError`, handler global de exceções, `/ready` |
 
-Os limites entre módulos e entre camadas são impostos por
-`src/test/java/.../architecture/ModuleBoundaryTest.java`, não por convenção.
+Três regras ArchUnit em `src/test/java/esusdata/architecture/ModuleBoundaryTest.java`: motor de
+indicador é Java puro; driver Postgres só em `source.pec` e `run.acquisition`; `auth`, `source` e
+`indicator` não dependem de `run`.
 
 ## Rodar
 
@@ -61,11 +58,11 @@ cd apps/web && npm install && npm run dev
 # o pipeline de geração do data file (parse, validação por registro, gzip, SHA-256, teto de
 # bytes); Java mantém lock, reconcile, manifesto e publicação atômica. Handshake de
 # compatibilidade, streaming e geração do extrato (JDBC vs. Rust, mesmo fixture) estão cobertos
-# por ExecutionPlaneDifferentialLiveTest, gated atrás de -Dobservatorio.execution-plane.binary.
+# por ExecPlaneDifferentialLiveTest, gated atrás de -Dobservatorio.execution-plane.binary.
 # O mesmo teste cobre cancelar depois de linhas já emitidas (1 de ~55 execuções não cancelou e
 # seguiu até max_duration_ms, sem causa encontrada — ver ADR 0011) e compara com o JDBC a
 # classificação de senha errada e de fonte inalcançável, sem cooldown ENG-51. O cancelamento via
-# EOF em stdin (pai morto) continua verificado só manualmente. ExecutionPlaneLivePecTest roda os
+# EOF em stdin (pai morto) continua verificado só manualmente. ExecPlaneLivePecTest roda os
 # mesmos casos contra o PEC real (túnel do ADR 0003 + pec.env) só com o opt-in explícito
 # -Dobservatorio.execution-plane.live-pec=true — o comando abaixo nunca toca o PEC real —, e
 # ainda não teve uma execução verde.
