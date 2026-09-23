@@ -138,3 +138,6 @@ também o teto de bytes temporários e a falta de espaço livre, que antes só e
   > plano previa (construtor novo + ramificação nova). Senha errada e porta fechada são
   > classificadas igual nos dois adaptadores e sem cooldown
   > (`ExecPlaneDifferentialLiveTest`). Segue pendente só o `jpackage`.
+
+  > **Atualização (2026-09-23).** Empacotamento resolvido pelo ADR 0014: o binário vai dentro da
+  > app image e vem ligado por padrão, com a ressalva de equivalência de produção registrada lá.

@@ -1,0 +1,79 @@
+#!/bin/sh
+# postinst script for APPLICATION_PACKAGE
+#
+# see: dh_installdeb(1)
+
+set -e
+
+# summary of how this script can be called:
+#        * <postinst> `configure' <most-recently-configured-version>
+#        * <old-postinst> `abort-upgrade' <new version>
+#        * <conflictor's-postinst> `abort-remove' `in-favour' <package>
+#          <new-version>
+#        * <postinst> `abort-remove'
+#        * <deconfigured's-postinst> `abort-deconfigure' `in-favour'
+#          <failed-install-package> <version> `removing'
+#          <conflicting-package> <version>
+# for details, see https://www.debian.org/doc/debian-policy/ or
+# the debian-policy package
+
+package_type=deb
+LAUNCHER_AS_SERVICE_SCRIPTS
+
+# Observatório APS (ADR 0014, §1.12.5): service user and the directories outside the app image.
+# Runs before the jpackage-generated service registration below, which starts the unit.
+# Existing data, configuration and ownership are never touched on upgrade.
+setup_observatorio ()
+{
+  if ! getent group observatorio >/dev/null; then
+    groupadd --system observatorio
+  fi
+  if ! getent passwd observatorio >/dev/null; then
+    useradd --system --gid observatorio --no-create-home --home-dir /var/lib/observatorio-aps \
+      --shell /usr/sbin/nologin --comment "Observatorio APS" observatorio
+  fi
+  if [ ! -d /var/lib/observatorio-aps ]; then
+    install -d -o observatorio -g observatorio -m 0700 /var/lib/observatorio-aps
+  fi
+  if [ ! -d /etc/observatorio-aps ]; then
+    install -d -o root -g observatorio -m 0750 /etc/observatorio-aps
+  fi
+  if [ ! -e /etc/observatorio-aps/application.yml ]; then
+    cat > /etc/observatorio-aps/application.yml <<'YML'
+# Observatório APS — local overrides. Loaded after the defaults shipped in
+# /opt/observatorio-aps/lib/app/observatorio-aps.yml; anything set here wins.
+# Restart after editing: systemctl restart observatorio-aps
+#
+# observatorio:
+#   source:
+#     allowed-destinations: ["10.0.0.5:5432"]
+#     # owner observatorio, mode 0600
+#     secret-file: /etc/observatorio-aps/pec.env
+#   execution-plane:
+#     # "" (with quotes) turns the Rust execution plane off and uses in-process JDBC
+#     binary: ""
+# server:
+#   address: 127.0.0.1
+YML
+    chown root:observatorio /etc/observatorio-aps/application.yml
+    chmod 0640 /etc/observatorio-aps/application.yml
+  fi
+}
+
+case "$1" in
+    configure)
+setup_observatorio
+DESKTOP_COMMANDS_INSTALL
+LAUNCHER_AS_SERVICE_COMMANDS_INSTALL
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0

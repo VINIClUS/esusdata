@@ -1,0 +1,89 @@
+# Builds the jpackage installers (ADR 0014, Tech Spec §1.12.5): each package is built on its own
+# OS. Actions are pinned by commit SHA and the Rust toolchain by version (§1.12.8).
+name: package
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - 'deployment/**'
+      - 'apps/agent/**'
+      - 'apps/execplane/**'
+      - 'contracts/**'
+      - '.github/workflows/package.yml'
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: '1.98.1'
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Rust toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal && rustup default "$RUST_TOOLCHAIN"
+      - name: Execution plane tests
+        run: cargo test --release --locked --manifest-path apps/execplane/Cargo.toml
+      # Full verify, including ExecPlaneDifferentialLiveTest against the binary being packaged
+      # (Testcontainers uses the runner's Docker).
+      - name: Package
+        run: deployment/jpackage/package-linux.sh
+      - name: Smoke test app image
+        run: deployment/jpackage/smoke-app-image.sh
+      - name: Inspect deb
+        run: |
+          dpkg-deb -I target/jpackage/*.deb
+          dpkg -c target/jpackage/*.deb | grep -v '/lib/runtime/'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: observatorio-aps-linux-deb
+          path: target/jpackage/*.deb
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal
+          rustup default $env:RUST_TOOLCHAIN
+      # jpackage 21 drives WiX 3 (candle/light). Installed explicitly rather than trusting the
+      # runner image to still carry it.
+      - name: WiX Toolset 3
+        shell: pwsh
+        run: |
+          if (-not (Get-Command candle.exe -ErrorAction SilentlyContinue)) {
+            choco install wixtoolset --version 3.14.1 --no-progress -y
+          }
+          $wix = Get-ChildItem 'C:\Program Files (x86)' -Directory -Filter 'WiX Toolset v3*' |
+            Sort-Object Name -Descending | Select-Object -First 1
+          if ($wix) { "$($wix.FullName)\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH }
+      # ADR 0014: tests skipped — the POSIX-only secret check and directory fsync fail on Windows.
+      - name: Package
+        shell: pwsh
+        run: deployment/jpackage/package-windows.ps1
+      - name: Smoke test app image
+        shell: bash
+        run: deployment/jpackage/smoke-app-image.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: observatorio-aps-windows-msi
+          path: target/jpackage/*.msi
+          if-no-files-found: error
