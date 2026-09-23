@@ -94,7 +94,7 @@ defaults empacotados; mudar o diretório de dados exige também `systemctl edit 
 O `.msi` do Windows sai do workflow `package` (`deployment/jpackage/package-windows.ps1`); ainda
 sem serviço do Windows e sem aquisição funcional no Windows — ver ADR 0014.
 
-O `.deb` exige Ubuntu 24.04+ ou Debian 13 (depende de `libasound2t64`). O workflow `package` o
+O `.deb` exige Ubuntu 24.04+ ou Debian 13 (depende de `libasound2t64`); só é testado no Ubuntu 24.04. O workflow `package` o
 instala num runner com systemd e percorre o ciclo de vida com `deployment/jpackage/test-deb-lifecycle.sh`
 (instalar, reiniciar, reinstalar, remover, purgar). Localmente, só numa VM descartável:
 `sudo deployment/jpackage/test-deb-lifecycle.sh target/jpackage/observatorio-aps_*.deb`.

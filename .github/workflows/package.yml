@@ -105,6 +105,9 @@ jobs:
         with:
           name: observatorio-aps-linux-deb
           path: dist
+      # The runner image's package lists are as old as the image; dependencies must resolve.
+      - name: Refresh apt lists
+        run: sudo apt-get update
       - name: Install, run, reinstall, remove, purge
         run: sudo deployment/jpackage/test-deb-lifecycle.sh dist/*.deb
 
@@ -145,7 +148,7 @@ jobs:
           cat >notes.md <<'MD'
           ## Instalação
 
-          - **Linux (Ubuntu 24.04+ / Debian 13)**: `sudo apt install ./observatorio-aps_*_amd64.deb`
+          - **Linux (testado no Ubuntu 24.04; exige `libasound2t64`, Ubuntu 24.04+ / Debian 13)**: `sudo apt install ./observatorio-aps_*_amd64.deb`
             — serviço systemd `observatorio-aps`, dados em `/var/lib/observatorio-aps`, configuração
             local em `/etc/observatorio-aps/application.yml`.
           - **Windows (.msi)**: prévia — ainda sem serviço do Windows e sem aquisição do PEC (ADR 0014).

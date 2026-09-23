@@ -21,7 +21,7 @@ package_type=deb
 LAUNCHER_AS_SERVICE_SCRIPTS
 
 # Observatório APS (ADR 0014, §1.12.5): service user and the directories outside the app image.
-# Runs before the jpackage-generated service registration below, which starts the unit.
+# Runs before the service registration below, which starts the unit.
 # Existing data, configuration and ownership are never touched on upgrade.
 setup_observatorio ()
 {
@@ -70,7 +70,10 @@ case "$1" in
     configure)
 setup_observatorio
 DESKTOP_COMMANDS_INSTALL
-LAUNCHER_AS_SERVICE_COMMANDS_INSTALL
+# Enabled by name, not by the /lib/systemd/system/... path jpackage would pass: with /lib a
+# symlink to /usr/lib (usrmerge), enabling by path makes a "linked" unit file whose state is
+# "bad" and that the jpackage prerm then refuses to disable, so the package could not be removed.
+register_services observatorio-aps-observatorio-aps.service
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

@@ -60,5 +60,5 @@ test da app image. `.github/workflows/package.yml` roda os dois em runners do pr
   verifica usuário, permissões, serviço sem privilégio respondendo `/ready`, restart, reinstalação
   preservando `/etc`, e remove/purge preservando dados, configuração e usuário
   (`deployment/jpackage/test-deb-lifecycle.sh`). Suporte do `.deb`: Ubuntu 24.04+ / Debian 13
-  (`libasound2t64`). Tags `vX.Y.Z` iguais à versão do pom geram um draft de GitHub Release com
+  (`libasound2t64`), testado só no Ubuntu 24.04. Tags `vX.Y.Z` iguais à versão do pom geram um draft de GitHub Release com
   `.deb`, `.msi` e `SHA256SUMS`; publicar é ação humana enquanto o MSI não operar.

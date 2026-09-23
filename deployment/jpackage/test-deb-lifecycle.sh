@@ -119,7 +119,9 @@ expect_running_as_user
 
 step "remove keeps data, configuration and user"
 DEBIAN_FRONTEND=noninteractive apt-get remove -y "$pkg"
-if systemctl is-active --quiet "$service"; then fail "$service still active after remove"; fi
+# The alias goes away with disable, so ask about the real unit and look for the JVM itself.
+if systemctl is-active --quiet "$pkg-$service"; then fail "$pkg-$service still active after remove"; fi
+if pgrep -u "$user" >/dev/null; then fail "processes of $user still running after remove"; fi
 [ ! -e /opt/observatorio-aps ] || fail "/opt/observatorio-aps left after remove"
 [ ! -e "/lib/systemd/system/$pkg-$service.service" ] || fail "unit file left after remove"
 expect_state_kept
