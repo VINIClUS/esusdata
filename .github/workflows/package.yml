@@ -155,6 +155,16 @@ jobs:
 
           Confira os downloads com `sha256sum -c SHA256SUMS`.
           MD
-          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes \
-            --title "Observatório APS $VERSION" --notes-file notes.md \
-            dist/*.deb dist/*.msi dist/SHA256SUMS
+          assets=(dist/*.deb dist/*.msi dist/SHA256SUMS)
+          # gh creates the draft and uploads the assets in separate calls, so a re-run may find
+          # the draft already there: refresh its assets, but never touch a published release.
+          if draft="$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [ "$draft" != true ]; then
+              echo "release $GITHUB_REF_NAME is already published" >&2
+              exit 1
+            fi
+            gh release upload "$GITHUB_REF_NAME" --clobber "${assets[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes \
+              --title "Observatório APS $VERSION" --notes-file notes.md "${assets[@]}"
+          fi
