@@ -374,3 +374,23 @@ fn check_probe_duration(start: &Instant, budget: &stream::Budget) -> Result<(), 
         _ => Ok(()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The handshake's query checksum must equal the matrix's on every build host. A CRLF
+    /// checkout (Git on Windows before .gitattributes pinned contracts/ to LF) changed these bytes
+    /// and made every live acquisition fail closed with "query checksum mismatch" (ADR 0014).
+    #[test]
+    fn embedded_query_matches_the_matrix_checksum() {
+        let matrix: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../contracts/compatibility/pec-adapters.json"
+        ))
+        .unwrap();
+        let checksum = format!("sha256:{}", hex_encode(Sha256::digest(QUERY_TEXT.as_bytes())));
+        for entry in matrix["tested_with"].as_array().unwrap() {
+            assert_eq!(entry["query_checksum"], checksum.as_str());
+        }
+    }
+}

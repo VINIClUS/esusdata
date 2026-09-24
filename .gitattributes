@@ -1,0 +1,4 @@
+# Checksummed contract files (frozen query text, compatibility matrix) must be byte-identical on
+# every OS: a CRLF checkout on Windows changed the query checksum and failed every live
+# acquisition of the Windows package (ADR 0014).
+contracts/** text eol=lf
