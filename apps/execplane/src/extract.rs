@@ -135,14 +135,11 @@ impl Write for BoundedWriter {
         let current = self.written.load(Ordering::Relaxed);
         let remaining = self.max_bytes.saturating_sub(current);
         if buf.len() as u64 > remaining {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                BudgetMarker(format!(
-                    "temporary extract byte ceiling exceeded: {} > {}",
-                    current.saturating_add(buf.len() as u64),
-                    self.max_bytes
-                )),
-            ));
+            return Err(io::Error::other(BudgetMarker(format!(
+                "temporary extract byte ceiling exceeded: {} > {}",
+                current.saturating_add(buf.len() as u64),
+                self.max_bytes
+            ))));
         }
         let n = self.file.write(buf)?;
         self.written.fetch_add(n as u64, Ordering::Relaxed);
@@ -202,7 +199,7 @@ impl ExtractSink {
                 "maxTempFileBytes must be positive".to_string(),
             ));
         }
-        let max_bytes = max_temp_file_bytes as u64;
+        let max_bytes = max_temp_file_bytes.unsigned_abs(); // positive, checked above
         let base_dir = temp_path
             .parent()
             .ok_or_else(|| {
@@ -278,7 +275,10 @@ impl ExtractSink {
             .file
             .sync_all()
             .map_err(|e| ExtractError::Io(format!("could not fsync extract temp file: {e}")))?;
-        let compressed_bytes = self.written.load(Ordering::Relaxed) as i64;
+        let compressed_bytes =
+            i64::try_from(self.written.load(Ordering::Relaxed)).map_err(|_| {
+                ExtractError::Io("extract size does not fit the manifest's i64".to_string())
+            })?;
         Ok(Completion {
             row_count,
             exclusion_count,
@@ -322,13 +322,14 @@ fn validate(encounter: &Encounter, scope: &Scope) -> Result<(), ExtractError> {
             "record does not match the bound acquisition scope".to_string(),
         ));
     }
-    for optional in [&encounter.cnes, &encounter.ine, &encounter.cbo] {
-        if let Some(value) = optional {
-            if is_blank(value) {
-                return Err(ExtractError::InvalidRecord(
-                    "encounter optional fields cannot be blank".to_string(),
-                ));
-            }
+    for value in [&encounter.cnes, &encounter.ine, &encounter.cbo]
+        .into_iter()
+        .flatten()
+    {
+        if is_blank(value) {
+            return Err(ExtractError::InvalidRecord(
+                "encounter optional fields cannot be blank".to_string(),
+            ));
         }
     }
     Ok(())
@@ -444,7 +445,7 @@ mod tests {
     #[test]
     fn rejects_an_incomplete_source_ref() {
         let mut e = encounter("1", "2026-03-15", "3541307");
-        e.source_ref.record_id = "".to_string();
+        e.source_ref.record_id = String::new();
         assert!(matches!(
             validate(&e, &scope()),
             Err(ExtractError::InvalidRecord(msg)) if msg.contains("source reference")
@@ -453,6 +454,8 @@ mod tests {
 
     #[test]
     fn round_trips_gzip_and_checksum_through_a_real_temp_file() {
+        use std::io::Read;
+
         let dir =
             std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -473,13 +476,15 @@ mod tests {
         // Independently recomputes the checksum over the file's raw bytes — the same integrity
         // check DelegatedExtractPublication runs Java-side before publishing.
         let raw = std::fs::read(&temp_path).unwrap();
-        assert_eq!(raw.len() as i64, completion.compressed_bytes);
+        assert_eq!(
+            i64::try_from(raw.len()).unwrap(),
+            completion.compressed_bytes
+        );
         let mut hasher = Sha256::new();
         hasher.update(&raw);
         assert_eq!(crate::hex_encode(hasher.finalize()), completion.checksum);
 
         // And gunzips to exactly the two JSON lines written.
-        use std::io::Read;
         let mut decoder = flate2::read::GzDecoder::new(&raw[..]);
         let mut decompressed = String::new();
         decoder.read_to_string(&mut decompressed).unwrap();
@@ -542,9 +547,7 @@ mod tests {
 
     fn rand_suffix() -> u64 {
         use std::time::{SystemTime, UNIX_EPOCH};
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        (now.as_secs() << 30) ^ u64::from(now.subsec_nanos())
     }
 }

@@ -12,6 +12,10 @@ const PROGRAMADO_IDS: [i64; 2] = [2, 3];
 const ESPONTANEO_IDS: [i64; 3] = [5, 6, 7];
 const PROGRESS_INTERVAL: i64 = 1000;
 
+#[expect(
+    clippy::struct_field_names,
+    reason = "mirrors the wire's max_* budget fields one for one"
+)]
 pub struct Budget {
     pub max_rows: i64,
     pub max_duration_ms: i64,
@@ -44,14 +48,17 @@ pub enum StreamOutcome {
 /// ADR 0011, superseding ADR 0010's "child never writes the extract" decision). A background
 /// thread reads the rest of stdin for `{"type":"cancel"}` — or its own EOF, meaning the parent
 /// died — and forwards it to PostgreSQL's own cancel signal, the equivalent of
-/// `Statement.cancel()` (plan §2.7). A second background thread enforces max_duration_ms itself:
+/// `Statement.cancel()` (plan §2.7). A second background thread enforces `max_duration_ms` itself:
 /// `tcp_user_timeout` only bounds unacknowledged *transmitted* data, so a connection that stays
 /// fully acknowledged but never sends a response (server stalled, not blackholed) would otherwise
 /// leave `rows.next()` blocked past the budget with nothing to interrupt it — this watchdog fires
 /// the same cancel signal proactively once the deadline passes, whether or not the main thread is
 /// currently blocked in a read. `max_rows`/`max_payload_bytes`/duration are this process's job
 /// (plan §2.4/ADR 0010): it is the side actually reading rows off the wire.
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the bound acquisition scope and budget, passed as the wire carries them"
+)]
 pub fn stream_query(
     txn: &mut Transaction,
     cancel_token: CancelToken,
@@ -79,7 +86,13 @@ pub fn stream_query(
         [&municipality_ibge, &period_start, &period_end_exclusive];
     let mut rows = match txn.query_raw(positional_query.as_str(), params) {
         Ok(rows) => rows,
-        Err(err) => return Ok(classify_failure(err, &cancel_requested, &duration_exceeded)),
+        Err(err) => {
+            return Ok(classify_failure(
+                &err,
+                &cancel_requested,
+                &duration_exceeded,
+            ))
+        }
     };
 
     let mut row_count: i64 = 0;
@@ -111,7 +124,11 @@ pub fn stream_query(
                 break;
             }
             Err(err) => {
-                return Ok(classify_failure(err, &cancel_requested, &duration_exceeded));
+                return Ok(classify_failure(
+                    &err,
+                    &cancel_requested,
+                    &duration_exceeded,
+                ));
             }
         };
 
@@ -135,12 +152,7 @@ pub fn stream_query(
         let uuid_ficha: Option<String> = row.get(6);
 
         let care_date_str = care_date.format("%Y-%m-%d").to_string();
-        payload_bytes += fixed_payload_bytes(&care_date_str);
-        for field in [&cnes, &ine, &cbo, &uuid_ficha] {
-            if let Some(value) = field {
-                payload_bytes += value.len() as i64;
-            }
-        }
+        payload_bytes += row_payload_bytes(&care_date_str, [&cnes, &ine, &cbo, &uuid_ficha]);
         if payload_bytes > budget.max_payload_bytes {
             return Ok(StreamOutcome::BudgetExceeded(format!(
                 "payload byte ceiling exceeded: {payload_bytes} > {}",
@@ -166,18 +178,7 @@ pub fn stream_query(
             cbo,
         };
         if let Err(err) = sink.write(&encounter) {
-            return Ok(match err {
-                crate::extract::ExtractError::InvalidRecord(detail) => {
-                    StreamOutcome::InvalidRecord(detail)
-                }
-                crate::extract::ExtractError::BudgetExceeded(detail) => {
-                    StreamOutcome::BudgetExceeded(detail)
-                }
-                crate::extract::ExtractError::Io(detail) => StreamOutcome::Failed {
-                    detail,
-                    sqlstate: None,
-                },
-            });
+            return Ok(sink_failure(err));
         }
 
         if row_count % PROGRESS_INTERVAL == 0 {
@@ -188,8 +189,22 @@ pub fn stream_query(
     Ok(StreamOutcome::Success)
 }
 
+/// A write the extract sink refused, as the outcome this stream reports for it.
+fn sink_failure(err: crate::extract::ExtractError) -> StreamOutcome {
+    match err {
+        crate::extract::ExtractError::InvalidRecord(detail) => StreamOutcome::InvalidRecord(detail),
+        crate::extract::ExtractError::BudgetExceeded(detail) => {
+            StreamOutcome::BudgetExceeded(detail)
+        }
+        crate::extract::ExtractError::Io(detail) => StreamOutcome::Failed {
+            detail,
+            sqlstate: None,
+        },
+    }
+}
+
 pub fn check_duration(start: &Instant, budget: &Budget) -> Option<StreamOutcome> {
-    let elapsed_ms = start.elapsed().as_millis() as i64;
+    let elapsed_ms = i64::try_from(start.elapsed().as_millis()).unwrap_or(i64::MAX);
     if elapsed_ms > budget.max_duration_ms {
         return Some(StreamOutcome::BudgetExceeded(format!(
             "duration ceiling exceeded: {elapsed_ms}ms > {}ms",
@@ -199,7 +214,7 @@ pub fn check_duration(start: &Instant, budget: &Budget) -> Option<StreamOutcome>
     None
 }
 
-/// PostgreSQL reports the same SQLSTATE (57014, QUERY_CANCELED) whether a client explicitly
+/// PostgreSQL reports the same SQLSTATE (57014, `QUERY_CANCELED`) whether a client explicitly
 /// cancels or `statement_timeout` simply expires — `cancel_requested` (set only by this
 /// process's own cancel-listener thread) is what tells the two apart. An expired
 /// `statement_timeout` is this process's own read budget being enforced server-side, not a
@@ -207,7 +222,7 @@ pub fn check_duration(start: &Instant, budget: &Budget) -> Option<StreamOutcome>
 /// no mapping for `CANCELLED` outside of an actual `CancellationSignal`, and would otherwise
 /// misfile a budget overrun as `UNCLASSIFIED_ERROR`.
 fn classify_failure(
-    err: postgres::Error,
+    err: &postgres::Error,
     cancel_requested: &AtomicBool,
     duration_exceeded: &AtomicBool,
 ) -> StreamOutcome {
@@ -250,7 +265,7 @@ fn classify_failure(
     }
     StreamOutcome::Failed {
         detail: err.to_string(),
-        sqlstate: sqlstate_of(&err),
+        sqlstate: sqlstate_of(err),
     }
 }
 
@@ -262,7 +277,7 @@ pub fn sqlstate_of(err: &postgres::Error) -> Option<String> {
     if let Some(code) = err.code() {
         return Some(code.code().to_string());
     }
-    let transport = err.is_closed() || err.source().is_some_and(|source| source.is::<io::Error>());
+    let transport = err.is_closed() || err.source().is_some_and(<dyn Error>::is::<io::Error>);
     transport.then(|| "08006".to_string())
 }
 
@@ -280,7 +295,21 @@ fn classify(tipo_atendimento_id: i64) -> &'static str {
 /// (pk long + tipoAtendimentoId int + nuAtendimento int, counted once per row regardless of
 /// whether this process reports them individually) plus the care-date string's UTF-8 length.
 fn fixed_payload_bytes(care_date_str: &str) -> i64 {
-    8 + 4 + 4 + 4 + care_date_str.len() as i64
+    8 + 4 + 4 + 4 + len_i64(care_date_str)
+}
+
+/// `fixed_payload_bytes` plus the UTF-8 length of each optional field present.
+fn row_payload_bytes(care_date_str: &str, optional: [&Option<String>; 4]) -> i64 {
+    optional
+        .into_iter()
+        .flatten()
+        .fold(fixed_payload_bytes(care_date_str), |sum, value| {
+            sum + len_i64(value)
+        })
+}
+
+fn len_i64(value: &str) -> i64 {
+    i64::try_from(value.len()).unwrap_or(i64::MAX)
 }
 
 /// The frozen query text uses JDBC's `?` placeholder convention (pgJDBC rewrites it internally
@@ -323,7 +352,7 @@ fn spawn_cancel_listener(cancel_token: CancelToken, cancel_requested: Arc<Atomic
     });
 }
 
-/// Fires once, proactively, when max_duration_ms elapses — independent of whether the main
+/// Fires once, proactively, when `max_duration_ms` elapses — independent of whether the main
 /// thread is currently making progress. If the query already finished (or the process already
 /// exited) before the deadline, this either finds nothing left to cancel or never gets the chance
 /// to run at all (`std::process::exit` tears down lingering threads with it).
@@ -333,11 +362,10 @@ fn spawn_duration_watchdog(
     max_duration_ms: i64,
     duration_exceeded: Arc<AtomicBool>,
 ) {
-    let deadline = Duration::from_millis(max_duration_ms.max(0) as u64);
+    let deadline = Duration::from_millis(max_duration_ms.max(0).unsigned_abs());
     std::thread::spawn(move || {
-        let elapsed = start.elapsed();
-        if elapsed < deadline {
-            std::thread::sleep(deadline - elapsed);
+        if let Some(remaining) = deadline.checked_sub(start.elapsed()) {
+            std::thread::sleep(remaining);
         }
         duration_exceeded.store(true, Ordering::SeqCst);
         let _ = cancel_token.cancel_query(NoTls);

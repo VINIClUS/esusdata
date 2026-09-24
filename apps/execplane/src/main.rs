@@ -34,6 +34,10 @@ fn main() {
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one linear acquire protocol; split alongside the pending diagnose mode, which reshapes it"
+)]
 fn run() -> Result<i32, Box<dyn Error>> {
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
@@ -50,12 +54,12 @@ fn run() -> Result<i32, Box<dyn Error>> {
         .dbname(&envelope.database)
         .user(&envelope.user)
         .password(envelope.password.as_bytes())
-        .connect_timeout(Duration::from_millis(envelope.budget.connect_timeout_ms.max(0) as u64))
+        .connect_timeout(Duration::from_millis(envelope.budget.connect_timeout_ms.max(0).unsigned_abs()))
         // Bounds a blackholed TCP connection (packets sent, never acknowledged) the same way
         // PecDataSourceFactory's pgJDBC `socketTimeout` property does on the JDBC path — without
         // this, a dead connection leaves a blocking socket read waiting indefinitely, and neither
         // max_duration_ms nor cooperative cancellation can free the sole acquisition worker.
-        .tcp_user_timeout(Duration::from_millis(envelope.budget.max_duration_ms.max(0) as u64));
+        .tcp_user_timeout(Duration::from_millis(envelope.budget.max_duration_ms.max(0).unsigned_abs()));
     let connect_result = config.connect(NoTls);
     // Zeroed regardless of outcome — mirrors PecDataSourceFactory/writeAcquireEnvelope's own
     // finally-block zeroing on both sides of this same secret.
@@ -296,7 +300,11 @@ fn write_line(value: &serde_json::Value) -> Result<(), Box<dyn Error>> {
 }
 
 fn hex_encode(bytes: impl AsRef<[u8]>) -> String {
-    bytes.as_ref().iter().map(|b| format!("{b:02x}")).collect()
+    use std::fmt::Write as _;
+    bytes.as_ref().iter().fold(String::new(), |mut hex, b| {
+        let _ = write!(hex, "{b:02x}");
+        hex
+    })
 }
 
 /// Everything the `probe` message reports, measured inside the already-open read-only

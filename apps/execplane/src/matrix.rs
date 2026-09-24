@@ -39,6 +39,10 @@ pub fn objects_to_probe(
     read_model: &str,
     installation_role: &str,
 ) -> Vec<MatrixObject> {
+    #[expect(
+        clippy::expect_used,
+        reason = "the matrix is embedded at build time and covered by tests; malformed is a build bug"
+    )]
     let matrix: Matrix =
         serde_json::from_str(MATRIX_JSON).expect("packaged compatibility matrix is malformed");
     matrix

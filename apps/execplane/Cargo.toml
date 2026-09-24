@@ -24,3 +24,21 @@ flate2 = "1.1"
 fs4 = "1.1"
 
 [dev-dependencies]
+
+# Static-analysis gate (ADR 0018): CI runs `cargo clippy --all-targets -- -D warnings`, so every
+# warning below fails the build. A single exception is `#[expect(clippy::…, reason = "…")]` at
+# the site, never a blanket allow.
+[lints.rust]
+unsafe_code = "forbid"
+unused_qualifications = "warn"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
