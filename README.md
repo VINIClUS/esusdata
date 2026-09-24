@@ -59,8 +59,10 @@ cd apps/web && npm install && npm run dev
 # próprio backend em http://127.0.0.1:8080/ — é o que o empacotamento (ADR 0014) usa
 cd apps/agent && mvn -Pweb package -DskipTests
 
-# plano de execução (ADR 0010, ADR 0011) — build separado, opcional; sem o binário o backend usa
-# o adaptador JDBC in-process (observatorio.execution-plane.binary vazio). O filho é dono de todo
+# plano de execução (ADR 0010, ADR 0011, ADR 0016) — único caminho de aquisição: sem
+# observatorio.execution-plane.binary apontando para o binário compilado o backend não inicia, então
+# rodá-lo localmente exige o cargo build abaixo antes. O mvn verify não depende do binário (os
+# testes usam o adaptador JDBC de src/test como referência). O filho é dono de todo
 # o pipeline de geração do data file (parse, validação por registro, gzip, SHA-256, teto de
 # bytes); Java mantém lock, reconcile, manifesto e publicação atômica. Handshake de
 # compatibilidade, streaming e geração do extrato (JDBC vs. Rust, mesmo fixture) estão cobertos
@@ -68,13 +70,13 @@ cd apps/agent && mvn -Pweb package -DskipTests
 # O mesmo teste cobre cancelar depois de linhas já emitidas (1 de ~55 execuções não cancelou e
 # seguiu até max_duration_ms, sem causa encontrada — ver ADR 0011) e compara com o JDBC a
 # classificação de senha errada e de fonte inalcançável, sem cooldown ENG-51. O cancelamento via
-# EOF em stdin (pai morto) continua verificado só manualmente. ExecPlaneLivePecTest roda os
-# mesmos casos contra o PEC real (túnel do ADR 0003 + pec.env) só com o opt-in explícito
-# -Dobservatorio.execution-plane.live-pec=true — o comando abaixo nunca toca o PEC real —, e
-# ainda não teve uma execução verde.
-# Ainda não há prova de equivalência contra as fingerprints de produção empacotadas; mesmo assim
-# o pacote (ADR 0014) liga o plano de execução por padrão. Para desligar numa instalação:
-# observatorio.execution-plane.binary: "" em /etc/observatorio-aps/application.yml.
+# EOF em stdin (pai morto) continua verificado só manualmente. ExecPlaneLivePecTest roda contra
+# um PEC real com a identidade verdadeira da instalação (PEC_SOURCE_ID, PEC_VERSION e
+# PEC_MUNICIPALITY_IBGE no arquivo de segredo, escolhido com
+# -Dobservatorio.execution-plane.live-pec.env-file), só com o opt-in explícito
+# -Dobservatorio.execution-plane.live-pec=true — o comando abaixo nunca toca o PEC real. Passou
+# 4/4 contra o PEC 5.5.28 em produção, com as fingerprints do Rust e do JDBC idênticas às da
+# matriz (docs/discovery/2026-09-24-pec-5528.md).
 cd apps/execplane && cargo build --release && cargo test
 cd apps/agent && mvn verify -Dsurefire.reuseForks=false \
   -Dobservatorio.execution-plane.binary=$PWD/../execplane/target/release/observatorio-execplane

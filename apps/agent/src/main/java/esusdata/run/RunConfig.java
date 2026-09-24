@@ -1,11 +1,11 @@
 package esusdata.run;
 
 import esusdata.source.SourceConnectionProperties;
-import esusdata.run.acquisition.InProcessAcquisition;
 import esusdata.run.acquisition.ExecPlaneAcquisition;
 import esusdata.source.pec.PecSecretResolver;
 import esusdata.source.pec.EnvFileSecretResolver;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
@@ -308,18 +308,21 @@ public class RunConfig {
     }
 
     /**
-     * Plan §2.1: an empty {@code observatorio.execution-plane.binary} keeps the in-process JDBC
-     * adapter as the default — {@code mvn verify} and any deployment without the packaged Rust
-     * binary must never depend on one existing.
+     * ADR 0016: the Rust execution plane is the only production acquisition path — there is no
+     * in-process JDBC fallback. A missing or non-executable {@code observatorio.execution-plane.binary}
+     * fails startup here rather than failing every run later.
      */
     @Bean
     public Acquisition acquisitionPort(
-            PecDataSourceFactory pecDataSourceFactory, SqliteProperties properties, Clock clock,
+            SqliteProperties properties, Clock clock,
             ExecPlaneProperties executionPlaneProperties, PecSecretResolver pecSecretResolver,
             AllowedDestinations allowedDestinations) {
         String binary = executionPlaneProperties.binary();
-        if (binary == null || binary.isBlank()) {
-            return new InProcessAcquisition(pecDataSourceFactory, properties.extractsDirectory(), clock);
+        if (binary == null || binary.isBlank() || !Files.isExecutable(Path.of(binary))) {
+            throw new IllegalStateException(
+                    "observatorio.execution-plane.binary must point to the observatorio-execplane executable "
+                            + "(ADR 0016: the execution plane is the only acquisition path); got '"
+                            + (binary == null ? "" : binary) + "'");
         }
         return new ExecPlaneAcquisition(
                 List.of(binary), pecSecretResolver, allowedDestinations, properties.extractsDirectory(), clock,

@@ -117,9 +117,9 @@ exclusivos do Java (`DelegatedExtractPublication`).
 _Avoid_: worker, wrapper (worker é `JobWorker`; wrapper é o instalador do SO)
 
 **Porta de aquisição** (`AcquisitionPort`):
-Interface de domínio que a execução usa para adquirir um extrato, com duas implementações: leitura
-in-process via JDBC (`JdbcAcquisitionAdapter`) ou delegada a um plano de execução
-(`SubprocessAcquisitionAdapter`).
+Interface de domínio que a execução usa para adquirir um extrato. Em produção tem uma só
+implementação, delegada ao plano de execução (`ExecPlaneAcquisition`, ADR 0016). A leitura
+in-process via JDBC (`InProcessAcquisition`) existe só nos testes, como referência.
 
 **Comando de aquisição** (`AcquisitionCommand`):
 Os dados de uma solicitação de aquisição — fonte, identidade, escopo, orçamento — como a execução

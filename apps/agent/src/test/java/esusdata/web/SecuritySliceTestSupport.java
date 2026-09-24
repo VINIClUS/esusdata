@@ -26,6 +26,9 @@ public abstract class SecuritySliceTestSupport {
 
     @DynamicPropertySource
     public static void props(DynamicPropertyRegistry registry) {
+        // Any executable satisfies RunConfig's startup check; this context never acquires.
+        registry.add("observatorio.execution-plane.binary",
+                () -> ProcessHandle.current().info().command().orElseThrow());
         registry.add("server.port", () -> PORT);
         registry.add("observatorio.data.directory", dataDir::toString);
         registry.add("observatorio.web.allowed-hosts", () -> "127.0.0.1:" + PORT);

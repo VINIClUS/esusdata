@@ -85,10 +85,10 @@ class ExecPlaneAcquisitionTest {
                 StubExecPlaneMain.class.getName(), scenario);
         PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromJson("""
                 {
-                  "schema_version": "1",
+                  "schema_version": "2",
                   "validation_status": "VALIDATED",
                   "tested_with": [{
-                    "pec_version": "5.4.37",
+                    "pec_versions": ["5.4.37"],
                     "postgresql_version": "9.6.13",
                     "adapter_version": "0.1.0",
                     "read_model": "PEC_DW",

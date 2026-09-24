@@ -20,11 +20,11 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * Capability {@code individual_encounter_modality} against PEC 5.4.37 / PostgreSQL 9.6.13,
- * read model {@code PEC_DW}. Query text frozen in
+ * Capability {@code individual_encounter_modality} against PEC 5.4.37 and 5.5.28 / PostgreSQL
+ * 9.6.13, read model {@code PEC_DW}. Query text frozen in
  * {@code contracts/compatibility/queries/individual_encounter_modality@0.1.0.sql}, fingerprinted
  * in {@code contracts/compatibility/pec-adapters.json}; grounded in
- * {@code docs/discovery/2026-09-19-pec-ct133.md}.
+ * {@code docs/discovery/2026-09-19-pec-ct133.md} and {@code docs/discovery/2026-09-24-pec-5528.md}.
  *
  * <p>Binds the municipal cut on {@code tb_dim_municipio.co_ibge} (7-digit text), never on the
  * installation-local surrogate key {@code co_dim_municipio} — {@code tb_dim_municipio} is a

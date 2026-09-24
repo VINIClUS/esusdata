@@ -60,7 +60,7 @@ class PecCompatibilityMatrixTest {
     @Test
     void emptyMatrixCannotSelectAnAdapter() {
         PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromJson(
-                "{\"schema_version\":\"1\",\"validation_status\":\"VALIDATED\",\"tested_with\":[]}");
+                "{\"schema_version\":\"2\",\"validation_status\":\"VALIDATED\",\"tested_with\":[]}");
 
         assertThatThrownBy(() -> matrix.findExact(
                 "individual_encounter_modality", "0.1.0", CT133_IDENTITY, "9.6.13"))
@@ -81,6 +81,43 @@ class PecCompatibilityMatrixTest {
                 new PecSourceIdentity("matrix-test", "5.4.38", "PEC_DW", "PRONTUARIO"), "9.6.13"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("exact compatibility entry");
+    }
+
+    @Test
+    void everyListedPecVersionSelectsTheSameEntry() {
+        PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromClasspathResource();
+
+        var validatedOnCt133 = matrix.findExact(
+                "individual_encounter_modality", "0.1.0", CT133_IDENTITY, "9.6.13");
+        var validatedOn5528 = matrix.findExact(
+                "individual_encounter_modality", "0.1.0",
+                new PecSourceIdentity("matrix-test", "5.5.28", "PEC_DW", "PRONTUARIO"), "9.6.13");
+
+        assertThat(validatedOn5528).isEqualTo(validatedOnCt133);
+        assertThat(validatedOn5528.pecVersions()).containsExactly("5.4.37", "5.5.28");
+    }
+
+    @Test
+    void aVersionBetweenTwoListedOnesIsNotARange() {
+        PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromClasspathResource();
+
+        assertThatThrownBy(() -> matrix.findExact(
+                "individual_encounter_modality", "0.1.0",
+                new PecSourceIdentity("matrix-test", "5.5.0", "PEC_DW", "PRONTUARIO"), "9.6.13"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("exact compatibility entry");
+    }
+
+    @Test
+    void aSchemaVersion1MatrixWithAScalarPecVersionIsRejected() {
+        PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromJson(
+                "{\"schema_version\":\"1\",\"validation_status\":\"VALIDATED\","
+                        + "\"tested_with\":[{\"pec_version\":\"5.4.37\"}]}");
+
+        assertThatThrownBy(() -> matrix.findExact(
+                "individual_encounter_modality", "0.1.0", CT133_IDENTITY, "9.6.13"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unsupported compatibility matrix schema");
     }
 
     @Test

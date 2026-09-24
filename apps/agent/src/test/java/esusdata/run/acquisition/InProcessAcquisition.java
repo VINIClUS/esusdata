@@ -22,11 +22,11 @@ import java.time.Clock;
 import java.time.Instant;
 
 /**
- * The default, in-process {@link Acquisition}: opens a source-bound connection, validates
- * compatibility, streams the frozen capability query, and writes/finalizes a fresh extract —
- * exactly the body {@code RunExecutor.runLive} used to inline before ADR-0009's hexagonal
- * boundary was extended to this seam. A future out-of-process execution plane substitutes a
- * different {@link Acquisition} implementation here without {@code jobrunner} changing at all.
+ * The in-process JDBC {@link Acquisition}: opens a source-bound connection, validates
+ * compatibility, streams the frozen capability query, and writes/finalizes a fresh extract.
+ * Test-only since ADR 0016 — production acquires exclusively through {@link ExecPlaneAcquisition};
+ * this class remains as the independent JDBC reading the differential tests compare the Rust
+ * child against, and as the acquisition the job-runner fixtures drive without a compiled binary.
  */
 public final class InProcessAcquisition implements Acquisition {
 

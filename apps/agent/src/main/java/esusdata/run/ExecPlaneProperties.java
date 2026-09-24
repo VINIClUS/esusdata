@@ -6,9 +6,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import java.time.Duration;
 
 /**
- * Plan §2.1: an empty {@code binary} means no Rust execution plane is installed, and
- * {@link RunConfig} falls back to the in-process {@code InProcessAcquisition} — a
- * fresh install or a machine without the packaged binary must never fail to acquire.
+ * ADR 0016: {@code binary} must name the packaged Rust execution plane — {@link RunConfig} refuses to
+ * start without it. The empty default exists only so that refusal carries our message, not a
+ * binding error.
  */
 @ConfigurationProperties(prefix = "observatorio.execution-plane")
 public record ExecPlaneProperties(

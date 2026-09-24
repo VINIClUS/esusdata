@@ -9,8 +9,8 @@ observatorio:
   source:
     secret-file: C:/ProgramData/ObservatorioAPS/config/pec.env
   execution-plane:
-    # ADR 0010: the Rust execution plane ships inside the app image and is on by default (ADR 0014).
-    # Turn it off with `binary: ""` in the config directory's application.yml.
+    # ADR 0016: the Rust execution plane ships inside the app image and is the only acquisition
+    # path — the service refuses to start without it.
     binary: ${observatorio.install-dir}/observatorio-execplane.exe
 
 # §1.4: individual installation by default.

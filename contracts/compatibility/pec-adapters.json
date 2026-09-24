@@ -1,16 +1,16 @@
 {
-  "schema_version": "1",
+  "schema_version": "2",
   "validation_status": "VALIDATED",
   "tested_with": [
     {
-      "pec_version": "5.4.37",
+      "pec_versions": ["5.4.37", "5.5.28"],
       "postgresql_version": "9.6.13",
       "adapter_version": "0.1.0",
       "read_model": "PEC_DW",
       "installation_role": "PRONTUARIO",
       "capability": "individual_encounter_modality",
       "status": "VALIDATED",
-      "status_reason": "Leaf-id mapping {2,3}=programado, {5,6,7}=espontâneo covers 100% of tb_fat_atendimento_individual across the full observed history (2023-07-03 to 2026-04-30, 294114 rows). Ids 8, 9, 10, 11 of tb_dim_tipo_atendimento never occur on this instance and remain NOT_TESTED — if a future extraction encounters them, the run must raise a limitation rather than silently classifying them.",
+      "status_reason": "Leaf-id mapping {2,3}=programado, {5,6,7}=espontâneo covers 100% of tb_fat_atendimento_individual across the full observed history on both validated installations: PEC 5.4.37 on CT 133 (2023-07-03 to 2026-04-30, 294114 rows) and PEC 5.5.28 on the municipal production host (2023-07-03 to 2026-08-31, 326627 rows). Ids 8, 9, 10, 11 of tb_dim_tipo_atendimento never occur on this instance and remain NOT_TESTED — if a future extraction encounters them, the run must raise a limitation rather than silently classifying them.",
       "objects_used": [
         {
           "object": "tb_fat_atendimento_individual",
@@ -68,8 +68,8 @@
       "query_checksum": "sha256:d3056dab5cb643fa03eb8a7b3b963e69532e12d1e23b3f5c3010d3a965b90246",
       "fixture_checksum": "sha256:8909c30b9acd60ffc1b96b8c0c2d77fa2bbe46b0d19bc7f4f9bfb6ae54164148",
       "test_result": "PASS",
-      "test_evidence_ref": "docs/discovery/2026-09-19-pec-ct133.md; apps/agent/src/test/java/esusdata/source/pec/IndividualEncounterModalityCapabilityLiveTest.java; apps/agent/src/test/java/esusdata/source/pec/IndividualEncounterModalityCapabilityIsolationTest.java; apps/agent/src/test/java/esusdata/integration/Eng19ReproducibilityWithoutPecLiveTest.java",
-      "test_notes": "Validated twice, independently: (1) live against the production PEC on CT 133 through the actual adapter code, reproducing 7100 programados / 2929 espontaneos / 0 fora / 10029 total for competencia 2026-03, byte-identical to the psql baseline, and again end-to-end through a full acquire-extract-disconnect-recompute cycle (ENG-19). (2) against a synthetic Testcontainers postgres:9.6 fixture (fixture_checksum above) with two municipalities that deliberately share the same unidade/equipe/cbo surrogate ids, proving the join binds on tb_dim_municipio.co_ibge and not on any installation-local key (ENG-37, ENG-38).",
+      "test_evidence_ref": "docs/discovery/2026-09-19-pec-ct133.md; docs/discovery/2026-09-24-pec-5528.md; apps/agent/src/test/java/esusdata/run/acquisition/ExecPlaneLivePecTest.java; apps/agent/src/test/java/esusdata/source/pec/IndividualEncounterModalityCapabilityLiveTest.java; apps/agent/src/test/java/esusdata/source/pec/IndividualEncounterModalityCapabilityIsolationTest.java; apps/agent/src/test/java/esusdata/integration/Eng19ReproducibilityWithoutPecLiveTest.java",
+      "test_notes": "Validated twice, independently: (1) live against the production PEC on CT 133 through the actual adapter code, reproducing 7100 programados / 2929 espontaneos / 0 fora / 10029 total for competencia 2026-03, byte-identical to the psql baseline, and again end-to-end through a full acquire-extract-disconnect-recompute cycle (ENG-19). (2) against a synthetic Testcontainers postgres:9.6 fixture (fixture_checksum above) with two municipalities that deliberately share the same unidade/equipe/cbo surrogate ids, proving the join binds on tb_dim_municipio.co_ibge and not on any installation-local key (ENG-37, ENG-38). (3) PEC 5.5.28 added 2026-09-24: live against the municipal production PEC 5.5.28 / PostgreSQL 9.6.13, all seven signature_fingerprints recomputed byte-identical twice — by JdbcCompatibilityCatalog over JDBC and by ExecPlaneAcquisition from the Rust execution plane's own probe — and competencia 2026-03 acquired end-to-end through the Rust child (10029 rows, 0 exclusions).",
       "approved_at": "2026-09-19",
       "approved_by": "vasrtr@gmail.com"
     }

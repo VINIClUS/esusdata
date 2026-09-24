@@ -58,7 +58,7 @@ import java.util.concurrent.TimeUnit;
  * comparison mismatches and acquisition is refused), never silently.
  *
  * <p>{@link AcquisitionListener#onProgress()} fires only when the child sends its own {@code
- * progress} message, unlike {@code InProcessAcquisition} which fires it at two fixed points
+ * progress} message, unlike the test-only JDBC {@code InProcessAcquisition}, which fires it at two fixed points
  * (connection open, extract finalize). Plan §2.7 pre-authorizes this divergence — no decision
  * path reads {@code last_progress_at}, it only feeds diagnostics.
  *
@@ -391,6 +391,10 @@ public final class ExecPlaneAcquisition implements Acquisition {
                 return "fingerprint mismatch for " + object + ": expected "
                         + expected.getValue() + " but computed " + actual;
             }
+            // Evidence trail: the fingerprint computed from what the child measured, per object.
+            log.info("execution plane probe matched {} for source {} (PEC {}): {}",
+                    object, acquisitionCommand.sourceIdentity().sourceId(),
+                    acquisitionCommand.sourceIdentity().pecVersion(), actual);
         }
         return null;
     }

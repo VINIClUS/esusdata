@@ -13,7 +13,7 @@ struct Matrix {
 
 #[derive(Deserialize)]
 struct MatrixEntry {
-    pec_version: String,
+    pec_versions: Vec<String>,
     adapter_version: String,
     read_model: String,
     installation_role: String,
@@ -46,7 +46,7 @@ pub fn objects_to_probe(
         .find(|entry| {
             entry.capability == capability
                 && entry.adapter_version == adapter_version
-                && entry.pec_version == pec_version
+                && entry.pec_versions.iter().any(|listed| listed == pec_version)
                 && entry.read_model == read_model
                 && entry.installation_role == installation_role
         })
@@ -69,6 +69,18 @@ mod tests {
         );
         assert_eq!(objects.len(), 7);
         assert!(objects.iter().any(|o| o.object == "tb_fat_atendimento_individual"));
+    }
+
+    #[test]
+    fn finds_the_same_entry_for_every_listed_pec_version() {
+        let objects = objects_to_probe(
+            "individual_encounter_modality",
+            "0.1.0",
+            "5.5.28",
+            "PEC_DW",
+            "PRONTUARIO",
+        );
+        assert_eq!(objects.len(), 7);
     }
 
     #[test]

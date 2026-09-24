@@ -38,6 +38,9 @@ class ApplicationBootTest {
 
     @DynamicPropertySource
     static void dataDirectory(DynamicPropertyRegistry registry) {
+        // Any executable satisfies RunConfig's startup check; this context never acquires.
+        registry.add("observatorio.execution-plane.binary",
+                () -> ProcessHandle.current().info().command().orElseThrow());
         registry.add("observatorio.data.directory", dataDir::toString);
         // Cheap Argon2id parameters — this test only needs the bean to construct, never to hash.
         registry.add("observatorio.security.argon2-memory-kib", () -> "8");

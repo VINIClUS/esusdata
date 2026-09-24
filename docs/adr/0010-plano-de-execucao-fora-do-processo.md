@@ -103,6 +103,9 @@ das contagens de linha já é conhecido do lado Java, e essas contagens vêm do 
 - `mvn verify` nunca depende de um binário Rust compilado:
   `observatorio.execution-plane.binary` vazio mantém `JdbcAcquisitionAdapter` como adaptador
   padrão. A ausência do binário é um estado suportado, não um erro de build.
+  > **Superado por ADR 0016.** Não há mais fallback: sem o binário a aplicação não inicia.
+  > `mvn verify` continua sem depender dele, porque os testes usam o adaptador JDBC como
+  > referência, de `src/test`.
 - `SourceAcquisitionLimiter` ("uma extração por fonte", §1.9.2), que hoje é implícito ao ciclo de
   vida da conexão JDBC, passa a ser explicitamente adquirido pelo adaptador em torno de todo o
   ciclo de vida do processo filho.
