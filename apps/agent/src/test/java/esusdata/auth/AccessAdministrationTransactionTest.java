@@ -1,23 +1,24 @@
 package esusdata.auth;
 
-import esusdata.auth.model.Grant;
-import esusdata.auth.model.Role;
-import esusdata.auth.model.ScopeKind;
-import esusdata.auth.model.UserState;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.support.TransactionTemplate;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+
+import esusdata.auth.model.Grant;
+import esusdata.auth.model.Role;
+import esusdata.auth.model.ScopeKind;
+import esusdata.auth.model.UserState;
 import esusdata.web.ApiFixtureSupport;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.transaction.support.TransactionTemplate;
+
 /** §1.12.7 L541: access mutations and session invalidation must be one atomic operation. */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class AccessAdministrationTransactionTest extends ApiFixtureSupport {
+class AccessAdministrationTransactionTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
     private static final String ACTOR = "access-admin";
@@ -30,8 +31,9 @@ public class AccessAdministrationTransactionTest extends ApiFixtureSupport {
         String target = createUser("grant-target-" + System.nanoTime());
         AccessAdministrationService service = serviceWhoseGuardFails();
 
-        assertThatThrownBy(() -> service.grant(target, Role.MANAGER, ScopeKind.MUNICIPALITY,
-                MUNICIPALITY, null, null, ACTOR)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() ->
+                        service.grant(target, Role.MANAGER, ScopeKind.MUNICIPALITY, MUNICIPALITY, null, null, ACTOR))
+                .isInstanceOf(IllegalStateException.class);
 
         assertThat(grantRepository.activeGrantsForUser(target)).isEmpty();
     }
@@ -47,7 +49,9 @@ public class AccessAdministrationTransactionTest extends ApiFixtureSupport {
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(grantRepository.activeGrantsForUser(target))
-                .singleElement().extracting(Grant::grantId).isEqualTo(existing.grantId());
+                .singleElement()
+                .extracting(Grant::grantId)
+                .isEqualTo(existing.grantId());
     }
 
     @Test
@@ -62,7 +66,8 @@ public class AccessAdministrationTransactionTest extends ApiFixtureSupport {
 
     private AccessAdministrationService serviceWhoseGuardFails() {
         AuthorizationVersionGuard failingGuard = mock(AuthorizationVersionGuard.class);
-        doThrow(new IllegalStateException("guard failed")).when(failingGuard)
+        doThrow(new IllegalStateException("guard failed"))
+                .when(failingGuard)
                 .bumpAndRevokeSessions(anyString(), anyString(), anyString(), anyString());
         return new AccessAdministrationService(
                 userRepository, grantRepository, failingGuard, transactionTemplate, clock);

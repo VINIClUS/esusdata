@@ -1,14 +1,14 @@
 package esusdata.source;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import esusdata.auth.model.Role;
+import esusdata.web.ApiFixtureSupport;
+import java.net.URI;
+import java.net.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.annotation.DirtiesContext;
 
-import java.net.URI;
-import java.net.http.HttpResponse;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.ApiFixtureSupport;
 /**
  * §1.10 / §1.12.7 L550: source registration and its diagnostic. This Spring test slice runs with
  * no {@code observatorio.source.allowed-destinations} configured — "a fresh install authorizes no
@@ -18,7 +18,7 @@ import esusdata.web.ApiFixtureSupport;
  * explicitly NOT exercised by this class; only the refusal paths are.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class SourceApiTest extends ApiFixtureSupport {
+class SourceApiTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
     private static final String MUNICIPALITY_B = "3304557";
@@ -30,8 +30,8 @@ public class SourceApiTest extends ApiFixtureSupport {
         String cookie = reauthenticatedSessionCookie(admin);
         String sourceId = "src-" + System.nanoTime();
 
-        HttpResponse<String> response = authenticatedPost(cookie,
-                URI.create(BASE_URL + "/api/v1/sources"), createSourceJson(sourceId));
+        HttpResponse<String> response =
+                authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/sources"), createSourceJson(sourceId));
 
         assertThat(response.statusCode()).isEqualTo(201);
         assertThat(response.body()).contains("PEC_DB_PASSWORD");
@@ -46,8 +46,8 @@ public class SourceApiTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
 
-        HttpResponse<String> response = authenticatedPost(cookie,
-                URI.create(BASE_URL + "/api/v1/sources/" + sourceId + "/test"), null);
+        HttpResponse<String> response =
+                authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/sources/" + sourceId + "/test"), null);
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("DESTINATION_NOT_ALLOWED");
@@ -60,8 +60,8 @@ public class SourceApiTest extends ApiFixtureSupport {
         grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
         String cookie = sessionCookie(admin);
 
-        HttpResponse<String> response = authenticatedPost(cookie,
-                URI.create(BASE_URL + "/api/v1/sources"), createSourceJson("src-" + System.nanoTime()));
+        HttpResponse<String> response = authenticatedPost(
+                cookie, URI.create(BASE_URL + "/api/v1/sources"), createSourceJson("src-" + System.nanoTime()));
 
         assertThat(response.statusCode()).isEqualTo(401);
         assertThat(response.body()).contains("REAUTHENTICATION_REQUIRED");
@@ -75,8 +75,8 @@ public class SourceApiTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY_B);
 
-        HttpResponse<String> response = authenticatedPost(cookie,
-                URI.create(BASE_URL + "/api/v1/sources"), createSourceJson(sourceId, MUNICIPALITY));
+        HttpResponse<String> response = authenticatedPost(
+                cookie, URI.create(BASE_URL + "/api/v1/sources"), createSourceJson(sourceId, MUNICIPALITY));
 
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(response.body()).doesNotContain(sourceId).doesNotContain(MUNICIPALITY_B);
@@ -89,17 +89,17 @@ public class SourceApiTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
 
-        HttpResponse<String> response = authenticatedPost(cookie,
-                URI.create(BASE_URL + "/api/v1/sources/" + sourceId + "/test"), null);
+        HttpResponse<String> response =
+                authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/sources/" + sourceId + "/test"), null);
 
         assertThat(response.statusCode()).isEqualTo(404);
     }
 
-    private String createSourceJson(String sourceId) {
+    private static String createSourceJson(String sourceId) {
         return createSourceJson(sourceId, MUNICIPALITY);
     }
 
-    private String createSourceJson(String sourceId, String municipalityIbge) {
+    private static String createSourceJson(String sourceId, String municipalityIbge) {
         return "{\"id\":\"" + sourceId + "\",\"sourceFamily\":\"PEC_POSTGRESQL\","
                 + "\"pecInstallationRole\":\"PRONTUARIO\",\"sourceLocationKind\":\"PRIMARY\","
                 + "\"host\":\"127.0.0.1\",\"port\":5432,\"databaseName\":\"esus\","

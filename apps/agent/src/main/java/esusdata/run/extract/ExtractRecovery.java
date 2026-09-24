@@ -1,9 +1,10 @@
 package esusdata.run.extract;
 
-import tools.jackson.databind.ObjectMapper;
-
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryStream;
@@ -12,11 +13,9 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
-import java.nio.channels.OverlappingFileLockException;
 import java.util.HashSet;
 import java.util.Set;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Reconciles extract publication pairs after a process interruption. A finalized data file with a
@@ -32,8 +31,7 @@ public final class ExtractRecovery {
     private static final String MANIFEST_TEMP_SUFFIX = ".manifest.json.tmp";
     private static final String LOCK_SUFFIX = ".extract.lock";
 
-    private ExtractRecovery() {
-    }
+    private ExtractRecovery() {}
 
     /**
      * Reconciles all recognizable extract ids in {@code baseDir}. Missing directories are treated
@@ -62,7 +60,8 @@ public final class ExtractRecovery {
         Set<String> extractionIds = new HashSet<>();
         try (DirectoryStream<Path> entries = Files.newDirectoryStream(baseDir)) {
             for (Path entry : entries) {
-                String extractionId = extractionIdFromFilename(entry.getFileName().toString());
+                String extractionId =
+                        extractionIdFromFilename(entry.getFileName().toString());
                 if (extractionId != null) {
                     ExtractValidation.validateExtractionId(baseDir, extractionId);
                     extractionIds.add(extractionId);
@@ -87,12 +86,17 @@ public final class ExtractRecovery {
         for (String extractionId : extractionIds) {
             if (extractionId.equals(ownedExtractionId)) {
                 reconcileOne(baseDir, extractionId);
-                continue;
+            } else {
+                reconcileUnlessLocked(baseDir, extractionId);
             }
-            try (WriterLock ignored = tryAcquireLock(baseDir, extractionId)) {
-                if (ignored != null) {
-                    reconcileOne(baseDir, extractionId);
-                }
+        }
+    }
+
+    /** Leaves an extraction alone while another writer holds its lock. */
+    private static void reconcileUnlessLocked(Path baseDir, String extractionId) throws IOException {
+        try (WriterLock ignored = tryAcquireLock(baseDir, extractionId)) {
+            if (ignored != null) {
+                reconcileOne(baseDir, extractionId);
             }
         }
     }
@@ -102,7 +106,8 @@ public final class ExtractRecovery {
         WriterLock lock = tryAcquireLock(baseDir, extractionId);
         if (lock == null) {
             throw new FileAlreadyExistsException(
-                    baseDir.resolve(extractionId + LOCK_SUFFIX).toString(), null,
+                    baseDir.resolve(extractionId + LOCK_SUFFIX).toString(),
+                    null,
                     "extract is already being written: " + extractionId);
         }
         return lock;
@@ -144,52 +149,76 @@ public final class ExtractRecovery {
         boolean manifestTempExists = Files.exists(manifestTemp, LinkOption.NOFOLLOW_LINKS);
 
         if (manifestExists && dataExists) {
-            if (manifestTempExists) delete(manifestTemp);
-            if (dataTempExists) delete(dataTemp);
-            if (manifestTempExists || dataTempExists) forceDirectory(baseDir);
+            deleteIfFound(manifestTemp, manifestTempExists);
+            deleteIfFound(dataTemp, dataTempExists);
+            if (manifestTempExists || dataTempExists) {
+                forceDirectory(baseDir);
+            }
             return;
         }
 
         if (manifestExists) {
             delete(manifestFile);
-            if (manifestTempExists) delete(manifestTemp);
-            if (dataTempExists) delete(dataTemp);
+            deleteIfFound(manifestTemp, manifestTempExists);
+            deleteIfFound(dataTemp, dataTempExists);
             forceDirectory(baseDir);
             return;
         }
 
         if (dataExists && manifestTempExists) {
             try {
-                ExtractionManifest manifest = readStagedManifest(manifestTemp, extractionId);
-                ExtractValidation.validateManifest(manifest);
-                if (!Files.isRegularFile(dataFile, LinkOption.NOFOLLOW_LINKS)) {
-                    throw new IllegalStateException("Interrupted extract data file is not regular: " + dataFile);
-                }
-                new ExtractReader().readDataFile(dataFile, manifest);
-                publishNewFile(manifestTemp, manifestFile);
-                if (dataTempExists) delete(dataTemp);
-                forceDirectory(baseDir);
-            } catch (IOException | RuntimeException failure) {
+                completeInterruptedPublication(
+                        extractionId, dataFile, dataTemp, dataTempExists, manifestFile, manifestTemp, baseDir);
+            } catch (IOException
+                    | RuntimeException failure) { // NOPMD - roll back the partial publication on any failure
                 removePartialPublication(dataFile, dataTemp, manifestTemp, baseDir, failure);
             }
             return;
         }
 
-        if (dataExists) delete(dataFile);
-        if (manifestTempExists) delete(manifestTemp);
-        if (dataTempExists) delete(dataTemp);
-        if (dataExists || manifestTempExists || dataTempExists) forceDirectory(baseDir);
+        deleteIfFound(dataFile, dataExists);
+        deleteIfFound(manifestTemp, manifestTempExists);
+        deleteIfFound(dataTemp, dataTempExists);
+        if (dataExists || manifestTempExists || dataTempExists) {
+            forceDirectory(baseDir);
+        }
     }
 
-    private static ExtractionManifest readStagedManifest(Path manifestTemp, String extractionId)
+    /** The data file was published but its manifest was not: verify the data, then publish the manifest. */
+    private static void completeInterruptedPublication(
+            String extractionId,
+            Path dataFile,
+            Path dataTemp,
+            boolean dataTempExists,
+            Path manifestFile,
+            Path manifestTemp,
+            Path baseDir)
             throws IOException {
+        ExtractionManifest manifest = readStagedManifest(manifestTemp, extractionId);
+        ExtractValidation.validateManifest(manifest);
+        if (!Files.isRegularFile(dataFile, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IllegalStateException("Interrupted extract data file is not regular: " + dataFile);
+        }
+        new ExtractReader().readDataFile(dataFile, manifest);
+        publishNewFile(manifestTemp, manifestFile);
+        deleteIfFound(dataTemp, dataTempExists);
+        forceDirectory(baseDir);
+    }
+
+    private static void deleteIfFound(Path path, boolean exists) throws IOException {
+        if (exists) {
+            delete(path);
+        }
+    }
+
+    private static ExtractionManifest readStagedManifest(Path manifestTemp, String extractionId) throws IOException {
         if (!Files.isRegularFile(manifestTemp, LinkOption.NOFOLLOW_LINKS)) {
             throw new IllegalStateException("Staged manifest is not a regular file: " + manifestTemp);
         }
         ExtractionManifest manifest;
         try (InputStream input = Files.newInputStream(manifestTemp, LinkOption.NOFOLLOW_LINKS)) {
-            manifest = new ObjectMapper().readValue(
-                    new String(input.readAllBytes(), StandardCharsets.UTF_8), ExtractionManifest.class);
+            manifest = new ObjectMapper()
+                    .readValue(new String(input.readAllBytes(), StandardCharsets.UTF_8), ExtractionManifest.class);
         }
         if (!extractionId.equals(manifest.extractionId())) {
             throw new IllegalStateException("Staged manifest extractionId does not match: " + extractionId);
@@ -198,8 +227,7 @@ public final class ExtractRecovery {
     }
 
     private static void removePartialPublication(
-            Path dataFile, Path dataTemp, Path manifestTemp, Path baseDir, Throwable failure)
-            throws IOException {
+            Path dataFile, Path dataTemp, Path manifestTemp, Path baseDir, Throwable failure) throws IOException {
         try {
             delete(dataFile);
             delete(dataTemp);
@@ -212,8 +240,7 @@ public final class ExtractRecovery {
     }
 
     private static String extractionIdFromFilename(String filename) {
-        for (String suffix : new String[]{
-                DATA_SUFFIX, DATA_TEMP_SUFFIX, MANIFEST_SUFFIX, MANIFEST_TEMP_SUFFIX}) {
+        for (String suffix : new String[] {DATA_SUFFIX, DATA_TEMP_SUFFIX, MANIFEST_SUFFIX, MANIFEST_TEMP_SUFFIX}) {
             if (filename.endsWith(suffix)) {
                 String extractionId = filename.substring(0, filename.length() - suffix.length());
                 return extractionId.isEmpty() ? null : extractionId;
@@ -223,7 +250,9 @@ public final class ExtractRecovery {
     }
 
     private static void rejectLinks(Path... paths) {
-        for (Path path : paths) ExtractValidation.rejectSymbolicLink(path, "extract recovery path");
+        for (Path path : paths) {
+            ExtractValidation.rejectSymbolicLink(path, "extract recovery path");
+        }
     }
 
     private static void delete(Path path) throws IOException {
@@ -235,17 +264,16 @@ public final class ExtractRecovery {
         ExtractValidation.rejectSymbolicLink(temporaryFile, "extract recovery temporary file");
         ExtractValidation.rejectSymbolicLink(finalFile, "extract recovery publication target");
         if (Files.exists(finalFile, LinkOption.NOFOLLOW_LINKS)) {
-            throw new java.nio.file.FileAlreadyExistsException(finalFile.toString());
+            throw new FileAlreadyExistsException(finalFile.toString());
         }
         Files.createLink(finalFile, temporaryFile);
         Files.delete(temporaryFile);
     }
 
     private static void forceDirectory(Path directory) throws IOException {
-        try (java.nio.channels.FileChannel channel = java.nio.channels.FileChannel.open(
-                directory, java.nio.file.StandardOpenOption.READ)) {
+        try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {
             channel.force(true);
-        } catch (UnsupportedOperationException | java.nio.file.AccessDeniedException ignored) {
+        } catch (UnsupportedOperationException | AccessDeniedException ignored) {
             // Directory fsync is unavailable on some platforms; file contents are still forced.
         }
     }
@@ -255,6 +283,7 @@ public final class ExtractRecovery {
             try {
                 channel.close();
             } catch (IOException ignored) {
+                // Best-effort cleanup: callers are already returning or failing on their own terms.
             }
         }
     }
@@ -274,6 +303,7 @@ public final class ExtractRecovery {
             try {
                 lock.release();
             } catch (IOException ignored) {
+                // Closing the channel below releases the lock anyway.
             }
             closeQuietly(channel);
         }

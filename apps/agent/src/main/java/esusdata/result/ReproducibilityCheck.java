@@ -13,11 +13,10 @@ import java.nio.file.Path;
  */
 public final class ReproducibilityCheck {
 
-    public record Outcome(boolean reproducible, String reason) {
-    }
-
     private final Path extractsBaseDir;
     private final ExtractReader reader = new ExtractReader();
+
+    public record Outcome(boolean reproducible, String reason) {}
 
     public ReproducibilityCheck(Path extractsBaseDir) {
         this.extractsBaseDir = extractsBaseDir;
@@ -28,7 +27,8 @@ public final class ReproducibilityCheck {
             var manifest = reader.readManifest(extractsBaseDir, extractionId);
             reader.readEncounters(extractsBaseDir, manifest); // re-verifies checksum & row count
             return new Outcome(true, null);
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException
+                | RuntimeException e) { // NOPMD - any failure re-reading the extract is a failed check, reported
             return new Outcome(false, e.getMessage());
         }
     }

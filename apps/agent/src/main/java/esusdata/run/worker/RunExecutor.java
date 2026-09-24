@@ -1,33 +1,33 @@
 package esusdata.run.worker;
 
-import esusdata.indicator.model.CanonicalEncounter;
-import esusdata.run.extract.ExtractStore;
-import esusdata.run.extract.ExtractionManifest;
 import esusdata.auth.GrantRevalidator;
 import esusdata.auth.model.Permission;
+import esusdata.indicator.model.CanonicalEncounter;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.pack.c1.C1Rule;
+import esusdata.result.PublicationService;
 import esusdata.result.model.EvidenceEntry;
 import esusdata.result.model.InputFingerprint;
 import esusdata.result.model.PublicationOutcome;
 import esusdata.result.model.PublicationRefusedException;
 import esusdata.result.model.PublicationRequest;
-import esusdata.result.PublicationService;
 import esusdata.result.model.ResultStagingArea;
+import esusdata.result.model.StagingRequest;
+import esusdata.run.acquisition.Acquisition;
 import esusdata.run.acquisition.AcquisitionCommand;
 import esusdata.run.acquisition.AcquisitionListener;
-import esusdata.run.acquisition.Acquisition;
 import esusdata.run.acquisition.CancellationSignal;
+import esusdata.run.extract.ExtractStore;
+import esusdata.run.extract.ExtractionManifest;
+import esusdata.run.job.JobRepository;
+import esusdata.source.SourceRepository;
+import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.PecConnectionProperties;
 import esusdata.source.pec.PecSourceIdentity;
 import esusdata.source.pec.ReadBudget;
-import esusdata.source.model.SourceRecord;
-import esusdata.source.SourceRepository;
-import esusdata.result.model.StagingRequest;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
-import esusdata.run.job.JobRepository;
+
 /**
  * Orchestrates one job run: read (from an already-finalized extract, or from a fresh PEC
  * acquisition via {@link Acquisition}) → compute (C1) → stage → publish. Today this class is
@@ -108,14 +108,19 @@ public final class RunExecutor {
     }
 
     public record RunContext(
-            String jobId, String runId, String sourceId, long executionGeneration,
-            String processInstanceId, String extractionId, String municipalityIbge,
-            String referencePeriod, String indicatorPack, String ruleVersion,
-            String idempotencyPrincipal) {
-    }
+            String jobId,
+            String runId,
+            String sourceId,
+            long executionGeneration,
+            String processInstanceId,
+            String extractionId,
+            String municipalityIbge,
+            String referencePeriod,
+            String indicatorPack,
+            String ruleVersion,
+            String idempotencyPrincipal) {}
 
-    public record RunOutcome(String stagingId, String resultId, IndicatorResult result) {
-    }
+    public record RunOutcome(String stagingId, String resultId, IndicatorResult result) {}
 
     public RunOutcome runFromExtract(RunContext context, CancellationSignal cancellation) throws IOException {
         requireC1(context);
@@ -125,7 +130,8 @@ public final class RunExecutor {
         ExtractionManifest manifest = extractStore.readManifest(context.extractionId());
         YearMonth requestedPeriod = YearMonth.parse(context.referencePeriod());
         String expectedPeriodStart = requestedPeriod.atDay(1).toString();
-        String expectedPeriodEndExclusive = requestedPeriod.plusMonths(1).atDay(1).toString();
+        String expectedPeriodEndExclusive =
+                requestedPeriod.plusMonths(1).atDay(1).toString();
         if (!manifest.sourceId().equals(context.sourceId())
                 || !manifest.municipalityIbge().equals(context.municipalityIbge())
                 || !manifest.periodStart().equals(expectedPeriodStart)
@@ -162,20 +168,24 @@ public final class RunExecutor {
         grantRevalidator.requireCurrentlyAuthorized(
                 context.idempotencyPrincipal(), context.municipalityIbge(), Permission.RUN_INDICATOR);
 
-        SourceRecord source = sourceRepository.findById(context.sourceId())
-                .orElseThrow(() -> new IllegalStateException(
-                        "source " + context.sourceId() + " is not registered"));
+        SourceRecord source = sourceRepository
+                .findById(context.sourceId())
+                .orElseThrow(() -> new IllegalStateException("source " + context.sourceId() + " is not registered"));
         if (!source.municipalityIbge().equals(context.municipalityIbge())) {
-            throw new IllegalStateException(
-                    "source " + source.id() + " is authorized for municipality "
-                            + source.municipalityIbge() + " but job " + context.jobId()
-                            + " requested municipality " + context.municipalityIbge());
+            throw new IllegalStateException("source " + source.id() + " is authorized for municipality "
+                    + source.municipalityIbge() + " but job " + context.jobId()
+                    + " requested municipality " + context.municipalityIbge());
         }
         acquisitionGuard.requireUnblocked(context.sourceId());
 
         PecConnectionProperties properties = new PecConnectionProperties(
-                source.id(), source.host(), source.port(), source.databaseName(),
-                source.dbUser(), source.secretRef(), source.municipalityIbge());
+                source.id(),
+                source.host(),
+                source.port(),
+                source.databaseName(),
+                source.dbUser(),
+                source.secretRef(),
+                source.municipalityIbge());
         PecSourceIdentity sourceIdentity = new PecSourceIdentity(
                 source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole());
         ReadBudget budget = ReadBudget.initialEngineeringProposal();
@@ -186,14 +196,13 @@ public final class RunExecutor {
         String extractionId = "live-" + context.jobId() + "-g" + context.executionGeneration();
 
         AcquisitionCommand command = new AcquisitionCommand(
-                properties, sourceIdentity, budget, extractionId, periodStart, periodEndExclusive,
-                SOURCE_ZONE_ID);
+                properties, sourceIdentity, budget, extractionId, periodStart, periodEndExclusive, SOURCE_ZONE_ID);
 
         ExtractionManifest manifest = acquisitionPort.acquire(command, cancellation, new AcquisitionListener() {
             @Override
             public void onProgress() {
-                jobRepository.markProgress(context.jobId(), context.processInstanceId(),
-                        context.executionGeneration(), clock.instant());
+                jobRepository.markProgress(
+                        context.jobId(), context.processInstanceId(), context.executionGeneration(), clock.instant());
             }
 
             @Override
@@ -201,8 +210,7 @@ public final class RunExecutor {
                 // Block new LIVE_READ_ONLY acquisitions on this source for the same
                 // timeout-derived margin JobRecovery applies to an abandoned RUNNING job, rather
                 // than only guarding against a process restart (ENG-51).
-                acquisitionGuard.block(context.sourceId(),
-                        clock.instant().plus(liveAcquisitionCooldownMargin), reason);
+                acquisitionGuard.block(context.sourceId(), clock.instant().plus(liveAcquisitionCooldownMargin), reason);
             }
         });
         cancellation.checkCancelled();
@@ -211,34 +219,43 @@ public final class RunExecutor {
         return computeStageAndPublish(context, manifest, encounters, cancellation);
     }
 
-    private void requireC1(RunContext context) {
+    private static void requireC1(RunContext context) {
         // This executor only ever computes C1 — reject anything else before doing any I/O rather
         // than silently publishing a C1 result under a different pack/version's name.
         if (!C1Rule.INDICATOR_PACK.equals(context.indicatorPack())
                 || !C1Rule.RULE_VERSION.equals(context.ruleVersion())) {
-            throw new IllegalArgumentException(
-                    "job requests " + context.indicatorPack() + "@" + context.ruleVersion()
-                            + " but this executor only computes "
-                            + C1Rule.INDICATOR_PACK + "@" + C1Rule.RULE_VERSION);
+            throw new IllegalArgumentException("job requests " + context.indicatorPack() + "@" + context.ruleVersion()
+                    + " but this executor only computes "
+                    + C1Rule.INDICATOR_PACK + "@" + C1Rule.RULE_VERSION);
         }
     }
 
     private RunOutcome computeStageAndPublish(
-            RunContext context, ExtractionManifest manifest,
-            List<CanonicalEncounter> encounters, CancellationSignal cancellation) {
+            RunContext context,
+            ExtractionManifest manifest,
+            List<CanonicalEncounter> encounters,
+            CancellationSignal cancellation) {
         YearMonth requestedPeriod = YearMonth.parse(context.referencePeriod());
         String dataCutoff = requestedPeriod.atEndOfMonth().toString();
-        IndicatorResult result = C1Rule.compute(
-                encounters, context.municipalityIbge(), context.referencePeriod(), dataCutoff);
+        IndicatorResult result =
+                C1Rule.compute(encounters, context.municipalityIbge(), context.referencePeriod(), dataCutoff);
         cancellation.checkCancelled();
 
         String stagingId = "stg-" + UUID.randomUUID();
         String inputFingerprint = computeInputFingerprint(manifest, result);
 
         stagingArea.open(new StagingRequest(
-                stagingId, context.jobId(), context.executionGeneration(), context.processInstanceId(),
-                clock.instant(), C1Rule.INDICATOR_PACK, result, manifest.extractionId(),
-                manifest.adapterVersion(), EVIDENCE_GRAIN, inputFingerprint));
+                stagingId,
+                context.jobId(),
+                context.executionGeneration(),
+                context.processInstanceId(),
+                clock.instant(),
+                C1Rule.INDICATOR_PACK,
+                result,
+                manifest.extractionId(),
+                manifest.adapterVersion(),
+                EVIDENCE_GRAIN,
+                inputFingerprint));
         stagingArea.writeEvidence(stagingId, toEvidence(encounters, result));
         cancellation.checkCancelled();
         stagingArea.seal(stagingId);
@@ -252,22 +269,32 @@ public final class RunExecutor {
         }
 
         PublicationOutcome outcome = publicationService.publish(new PublicationRequest(
-                context.jobId(), context.runId(), stagingId, context.sourceId(),
-                context.executionGeneration(), context.processInstanceId(), manifest,
-                RESULT_NATURE, VALIDATION_STATUS, appBuild, clock.instant(),
-                context.idempotencyPrincipal(), context.municipalityIbge()));
+                context.jobId(),
+                context.runId(),
+                stagingId,
+                context.sourceId(),
+                context.executionGeneration(),
+                context.processInstanceId(),
+                manifest,
+                RESULT_NATURE,
+                VALIDATION_STATUS,
+                appBuild,
+                clock.instant(),
+                context.idempotencyPrincipal(),
+                context.municipalityIbge()));
 
         return new RunOutcome(stagingId, outcome.resultId(), result);
     }
 
-    private String computeInputFingerprint(ExtractionManifest manifest, IndicatorResult result) {
+    private static String computeInputFingerprint(ExtractionManifest manifest, IndicatorResult result) {
         SortedMap<String, String> fields = new TreeMap<>();
         fields.put("source_id", manifest.sourceId());
         fields.put("municipality_ibge", manifest.municipalityIbge());
         fields.put("extraction_id", manifest.extractionId());
         fields.put("extraction_checksum", manifest.checksum());
-        fields.put("acquisition_plan", manifest.extractionId().startsWith("live-")
-                ? "LIVE_READ_ONLY" : "IMMUTABLE_EXTRACT");
+        fields.put(
+                "acquisition_plan",
+                manifest.extractionId().startsWith("live-") ? "LIVE_READ_ONLY" : "IMMUTABLE_EXTRACT");
         fields.put("indicator_pack", C1Rule.INDICATOR_PACK);
         fields.put("rule_version", result.ruleVersion());
         fields.put("reference_period", result.referencePeriod());
@@ -277,7 +304,7 @@ public final class RunExecutor {
         return InputFingerprint.compute(fields);
     }
 
-    private List<EvidenceEntry> toEvidence(List<CanonicalEncounter> encounters, IndicatorResult result) {
+    private static List<EvidenceEntry> toEvidence(List<CanonicalEncounter> encounters, IndicatorResult result) {
         List<EvidenceEntry> entries = new ArrayList<>(encounters.size());
         for (CanonicalEncounter e : encounters) {
             String decision = switch (e.modality()) {
@@ -286,8 +313,15 @@ public final class RunExecutor {
                 case UNMAPPED -> "EXCLUDED_UNMAPPED";
             };
             entries.add(new EvidenceEntry(
-                    e.sourceRef().entityType(), e.sourceRef().recordId(), e.careDate(),
-                    e.modality().name(), e.cnes(), e.ine(), e.cbo(), decision, result.ruleVersion()));
+                    e.sourceRef().entityType(),
+                    e.sourceRef().recordId(),
+                    e.careDate(),
+                    e.modality().name(),
+                    e.cnes(),
+                    e.ine(),
+                    e.cbo(),
+                    decision,
+                    result.ruleVersion()));
         }
         return entries;
     }

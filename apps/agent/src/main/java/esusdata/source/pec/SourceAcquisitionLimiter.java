@@ -14,8 +14,7 @@ public final class SourceAcquisitionLimiter {
 
     private static final ConcurrentMap<String, Semaphore> PERMITS = new ConcurrentHashMap<>();
 
-    private SourceAcquisitionLimiter() {
-    }
+    private SourceAcquisitionLimiter() {}
 
     public static Permit acquireOrFail(String sourceId) {
         if (sourceId == null || sourceId.isBlank()) {
@@ -23,9 +22,8 @@ public final class SourceAcquisitionLimiter {
         }
         Semaphore semaphore = PERMITS.computeIfAbsent(sourceId, ignored -> new Semaphore(1, true));
         if (!semaphore.tryAcquire()) {
-            throw new SourceBudgetExceededException(
-                    SourceBudgetExceededException.CODE + ": one active acquisition is already running for source "
-                            + sourceId);
+            throw new SourceBudgetExceededException(SourceBudgetExceededException.CODE
+                    + ": one active acquisition is already running for source " + sourceId);
         }
         return new Permit(semaphore);
     }

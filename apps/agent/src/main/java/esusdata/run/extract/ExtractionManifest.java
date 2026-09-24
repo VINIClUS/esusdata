@@ -25,6 +25,4 @@ public record ExtractionManifest(
         long exclusionCount,
         String checksum,
         String queryChecksum,
-        String adapterVersion
-) {
-}
+        String adapterVersion) {}

@@ -18,15 +18,17 @@ import java.util.TreeMap;
  */
 public final class InputFingerprint {
 
-    private InputFingerprint() {
-    }
+    private InputFingerprint() {}
 
     public static String compute(Map<String, String> fields) {
         SortedMap<String, String> sorted = new TreeMap<>(fields);
         StringBuilder canonical = new StringBuilder();
         for (Map.Entry<String, String> entry : sorted.entrySet()) {
-            canonical.append(entry.getKey()).append('=')
-                    .append(entry.getValue() == null ? "" : entry.getValue()).append('\n');
+            canonical
+                    .append(entry.getKey())
+                    .append('=')
+                    .append(entry.getValue() == null ? "" : entry.getValue())
+                    .append('\n');
         }
         return "sha256:" + sha256Hex(canonical.toString());
     }

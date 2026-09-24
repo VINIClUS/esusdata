@@ -33,6 +33,4 @@ public record PublishedResult(
         String canonicalSchemaVersion,
         String evidenceGrain,
         String appBuild,
-        String publishedAt
-) {
-}
+        String publishedAt) {}

@@ -1,6 +1,5 @@
 package esusdata.source.pec;
 
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -47,8 +46,7 @@ public final class IndividualEncounterModalityCapability {
      * same bytes rather than keep a second, driftable copy of the query text. Its SHA-256 is
      * recorded as {@code query_checksum} in the adapter matrix.
      */
-    private static final String QUERY_RESOURCE =
-            "/compatibility/queries/individual_encounter_modality@0.1.0.sql";
+    private static final String QUERY_RESOURCE = "/compatibility/queries/individual_encounter_modality@0.1.0.sql";
 
     public static final String QUERY = loadQuery();
 
@@ -62,8 +60,7 @@ public final class IndividualEncounterModalityCapability {
     private static final int FETCH_SIZE = 1000;
 
     private static String loadQuery() {
-        try (InputStream resource =
-                IndividualEncounterModalityCapability.class.getResourceAsStream(QUERY_RESOURCE)) {
+        try (InputStream resource = IndividualEncounterModalityCapability.class.getResourceAsStream(QUERY_RESOURCE)) {
             if (resource == null) {
                 throw new IllegalStateException("Packaged capability query is missing: " + QUERY_RESOURCE);
             }
@@ -76,15 +73,13 @@ public final class IndividualEncounterModalityCapability {
     private static String computeQueryChecksum() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return "sha256:" + HexFormat.of().formatHex(
-                    digest.digest(QUERY.getBytes(StandardCharsets.UTF_8)));
+            return "sha256:" + HexFormat.of().formatHex(digest.digest(QUERY.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
     }
 
-    private IndividualEncounterModalityCapability() {
-    }
+    private IndividualEncounterModalityCapability() {}
 
     /**
      * Streams matching encounters to {@code consumer}, checking the {@link BudgetGuard} once per
@@ -95,12 +90,8 @@ public final class IndividualEncounterModalityCapability {
      * <p>Validates adapter compatibility against the frozen matrix entry before executing any query
      * — an unsupported source version or schema fingerprint blocks acquisition (ENG-43).
      */
-    public static void stream(
-            PecAcquisition acquisition,
-            Consumer<RawEncounterRecord> consumer
-    ) throws SQLException {
-        stream(acquisition, consumer,
-                new JdbcCompatibilityCatalog());
+    public static void stream(PecAcquisition acquisition, Consumer<RawEncounterRecord> consumer) throws SQLException {
+        stream(acquisition, consumer, new JdbcCompatibilityCatalog());
     }
 
     /**
@@ -110,11 +101,9 @@ public final class IndividualEncounterModalityCapability {
      * PEC; validation itself is never bypassed.
      */
     public static void stream(
-            PecAcquisition acquisition,
-            Consumer<RawEncounterRecord> consumer,
-            CompatibilityCatalog catalog
-    ) throws SQLException {
-        stream(acquisition, consumer, catalog, ps -> { }, () -> { });
+            PecAcquisition acquisition, Consumer<RawEncounterRecord> consumer, CompatibilityCatalog catalog)
+            throws SQLException {
+        stream(acquisition, consumer, catalog, ps -> {}, () -> {});
     }
 
     /**
@@ -129,11 +118,13 @@ public final class IndividualEncounterModalityCapability {
             Consumer<RawEncounterRecord> consumer,
             CompatibilityCatalog catalog,
             Consumer<PreparedStatement> onStatementPrepared,
-            Runnable cancellationCheck
-    ) throws SQLException {
+            Runnable cancellationCheck)
+            throws SQLException {
         if (acquisition == null) {
             throw new IllegalArgumentException("A source-bound PEC acquisition is required");
         }
+        // borrowed from the caller's acquisition, which owns and closes it
+        @SuppressWarnings("PMD.CloseResource")
         PecSourceConnection sourceConnection = acquisition.sourceConnection();
         LocalDate periodStart = acquisition.periodStart();
         LocalDate periodEndExclusive = acquisition.periodEndExclusive();
@@ -144,12 +135,12 @@ public final class IndividualEncounterModalityCapability {
         String municipalityIbge = requireAuthorizedMunicipality(sourceProperties);
         beginReadOnlyRepeatableReadTransaction(connection);
         try {
-            validateAdapterCompatibility(connection, sourceIdentity, catalog,
-                    PecCompatibilityMatrix.fromClasspathResource(), guard);
+            validateAdapterCompatibility(
+                    connection, sourceIdentity, catalog, PecCompatibilityMatrix.fromClasspathResource(), guard);
             guard.checkDuration();
 
-            try (PreparedStatement ps = connection.prepareStatement(
-                    QUERY, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
+            try (PreparedStatement ps =
+                    connection.prepareStatement(QUERY, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
                 ps.setFetchSize(FETCH_SIZE);
                 ps.setString(1, municipalityIbge);
                 ps.setDate(2, Date.valueOf(periodStart));
@@ -168,15 +159,7 @@ public final class IndividualEncounterModalityCapability {
                         String cbo = readBoundedString(rs, 6, guard);
                         String uuidFicha = readBoundedString(rs, 7, guard);
                         RawEncounterRecord record = new RawEncounterRecord(
-                                rs.getLong(1),
-                                rs.getInt(2),
-                                careDate,
-                                cnes,
-                                ine,
-                                cbo,
-                                uuidFicha,
-                                rs.getInt(8)
-                        );
+                                rs.getLong(1), rs.getInt(2), careDate, cnes, ine, cbo, uuidFicha, rs.getInt(8));
                         consumer.accept(record);
                     }
                     guard.checkDuration();
@@ -186,7 +169,8 @@ public final class IndividualEncounterModalityCapability {
             if (isPostgresBudgetCancellation(failure)) {
                 throw new SourceBudgetExceededException(
                         SourceBudgetExceededException.CODE + ": PostgreSQL read budget expired: "
-                                + failure.getMessage(), failure);
+                                + failure.getMessage(),
+                        failure);
             }
             throw failure;
         }
@@ -198,8 +182,8 @@ public final class IndividualEncounterModalityCapability {
                 return true;
             }
             String state = current.getSQLState();
-            String message = current.getMessage() == null
-                    ? "" : current.getMessage().toLowerCase(Locale.ROOT);
+            String message =
+                    current.getMessage() == null ? "" : current.getMessage().toLowerCase(Locale.ROOT);
             if ("57014".equals(state) && message.contains("statement timeout")) {
                 return true;
             }
@@ -220,12 +204,10 @@ public final class IndividualEncounterModalityCapability {
     }
 
     private static long fixedPayloadBytes(LocalDate careDate) {
-        return Long.BYTES + Integer.BYTES + Integer.BYTES + Integer.BYTES
-                + utf8Length(careDate.toString());
+        return Long.BYTES + Integer.BYTES + Integer.BYTES + Integer.BYTES + utf8Length(careDate.toString());
     }
 
-    private static String readBoundedString(
-            ResultSet resultSet, int column, BudgetGuard guard) throws SQLException {
+    private static String readBoundedString(ResultSet resultSet, int column, BudgetGuard guard) throws SQLException {
         try (Reader reader = resultSet.getCharacterStream(column)) {
             if (reader == null) {
                 return null;
@@ -256,10 +238,9 @@ public final class IndividualEncounterModalityCapability {
                 bytes++;
             } else if (c <= 0x7FF) {
                 bytes += 2;
-            } else if (Character.isHighSurrogate(c) && i + 1 < end
-                    && Character.isLowSurrogate(value[i + 1])) {
+            } else if (Character.isHighSurrogate(c) && i + 1 < end && Character.isLowSurrogate(value[i + 1])) {
                 bytes += 4;
-                i++;
+                i++; // NOPMD - AvoidReassigningLoopVariables: a surrogate pair is one code point
             } else {
                 bytes += 3;
             }
@@ -291,20 +272,17 @@ public final class IndividualEncounterModalityCapability {
     }
 
     static void validateAdapterCompatibility(
-            Connection connection,
-            PecSourceIdentity sourceIdentity,
-            CompatibilityCatalog catalog
-    ) throws SQLException {
-        validateAdapterCompatibility(connection, sourceIdentity, catalog,
-                PecCompatibilityMatrix.fromClasspathResource());
+            Connection connection, PecSourceIdentity sourceIdentity, CompatibilityCatalog catalog) throws SQLException {
+        validateAdapterCompatibility(
+                connection, sourceIdentity, catalog, PecCompatibilityMatrix.fromClasspathResource());
     }
 
     static void validateAdapterCompatibility(
             Connection connection,
             PecSourceIdentity sourceIdentity,
             CompatibilityCatalog catalog,
-            PecCompatibilityMatrix matrix
-    ) throws SQLException {
+            PecCompatibilityMatrix matrix)
+            throws SQLException {
         validateAdapterCompatibility(connection, sourceIdentity, catalog, matrix, null);
     }
 
@@ -313,11 +291,10 @@ public final class IndividualEncounterModalityCapability {
             PecSourceIdentity sourceIdentity,
             CompatibilityCatalog catalog,
             PecCompatibilityMatrix matrix,
-            BudgetGuard guard
-    ) throws SQLException {
+            BudgetGuard guard)
+            throws SQLException {
         if (sourceIdentity == null || !sourceIdentity.isComplete()) {
-            throw new IllegalStateException(
-                    "PecSourceIdentity is required before acquiring a PEC capability");
+            throw new IllegalStateException("PecSourceIdentity is required before acquiring a PEC capability");
         }
         if (catalog == null) {
             throw new IllegalStateException("CompatibilityCatalog is required before acquiring a PEC capability");
@@ -330,26 +307,25 @@ public final class IndividualEncounterModalityCapability {
         if (guard != null) {
             guard.checkDuration();
         }
-        PecCompatibilityMatrix.Entry entry = matrix.findExact(
-                CAPABILITY, ADAPTER_VERSION, sourceIdentity, postgresVersion);
+        PecCompatibilityMatrix.Entry entry =
+                matrix.findExact(CAPABILITY, ADAPTER_VERSION, sourceIdentity, postgresVersion);
 
         if (!QUERY_CHECKSUM.equals(entry.queryChecksum())) {
-            throw new IllegalStateException(
-                    "Query checksum mismatch: matrix has " + entry.queryChecksum()
-                            + " but live query has " + QUERY_CHECKSUM
-                            + " — adapter query was changed without updating the compatibility matrix (ENG-43).");
+            throw new IllegalStateException("Query checksum mismatch: matrix has " + entry.queryChecksum()
+                    + " but live query has " + QUERY_CHECKSUM
+                    + " — adapter query was changed without updating the compatibility matrix (ENG-43).");
         }
 
         for (Map.Entry<String, String> expected : entry.objectFingerprints().entrySet()) {
             String object = expected.getKey();
-            String actual = catalog.fingerprint(connection, object, entry.objectColumns().get(object));
+            String actual = catalog.fingerprint(
+                    connection, object, entry.objectColumns().get(object));
             if (guard != null) {
                 guard.checkDuration();
             }
             if (!expected.getValue().equals(actual)) {
-                throw new IllegalStateException(
-                        "Compatibility fingerprint mismatch for " + object
-                                + ": expected " + expected.getValue() + " but connected source returned " + actual);
+                throw new IllegalStateException("Compatibility fingerprint mismatch for " + object + ": expected "
+                        + expected.getValue() + " but connected source returned " + actual);
             }
         }
     }

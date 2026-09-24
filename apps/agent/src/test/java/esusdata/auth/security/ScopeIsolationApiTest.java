@@ -1,22 +1,22 @@
 package esusdata.auth.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import esusdata.auth.model.Role;
+import esusdata.auth.model.ScopeDeniedException;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.result.model.EvidenceEntry;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
-
+import esusdata.web.ApiFixtureSupport;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.ApiFixtureSupport;
-import esusdata.auth.model.ScopeDeniedException;
 /**
  * ENG-04/ENG-38 at the HTTP level. Three isolation axes, each proven against the real
  * {@code ScopeResolver}/{@code GrantRevalidator} the running app uses — nothing stubbed:
@@ -24,7 +24,7 @@ import esusdata.auth.model.ScopeDeniedException;
  * grant refused on the municipal aggregate.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class ScopeIsolationApiTest extends ApiFixtureSupport {
+class ScopeIsolationApiTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY_A = "3541307";
     private static final String MUNICIPALITY_B = "3550308";
@@ -48,7 +48,10 @@ public class ScopeIsolationApiTest extends ApiFixtureSupport {
     void evidenceIsNarrowedToTheCallersOwnTeamWithinTheSameMunicipality() throws Exception {
         String manager = createUser("publisher-" + System.nanoTime());
         grantMunicipality(manager, Role.MANAGER, MUNICIPALITY_A);
-        String resultId = publishResult(manager, MUNICIPALITY_A, "2026-04",
+        String resultId = publishResult(
+                manager,
+                MUNICIPALITY_A,
+                "2026-04",
                 computedResult(MUNICIPALITY_A),
                 List.of(
                         entry("rec-team-1", "0000346268"),
@@ -92,8 +95,12 @@ public class ScopeIsolationApiTest extends ApiFixtureSupport {
         // fail-closed behavior.
         String manager = createUser("publisher-c-" + System.nanoTime());
         grantMunicipality(manager, Role.MANAGER, MUNICIPALITY_A);
-        String resultId = publishResult(manager, MUNICIPALITY_A, "2026-03",
-                computedResult(MUNICIPALITY_A), List.of(entry("rec-audit-1", "0000346268")));
+        String resultId = publishResult(
+                manager,
+                MUNICIPALITY_A,
+                "2026-03",
+                computedResult(MUNICIPALITY_A),
+                List.of(entry("rec-audit-1", "0000346268")));
 
         String auditor = createUser("auditor-installation-" + System.nanoTime());
         grantInstallation(auditor, Role.AUDITOR);
@@ -121,11 +128,15 @@ public class ScopeIsolationApiTest extends ApiFixtureSupport {
         String teamUser = createUser("team-race-" + System.nanoTime());
         grantTeam(teamUser, Role.TEAM_SCOPED_PROFESSIONAL, MUNICIPALITY_A, "2750325", "0000346268");
         var session = new esusdata.auth.model.AuthenticatedSession(
-                "unused-session-id", teamUser, clock.instant(), clock.instant(),
-                clock.instant().plusSeconds(3600), 1, null);
+                "unused-session-id",
+                teamUser,
+                clock.instant(),
+                clock.instant(),
+                clock.instant().plusSeconds(3600),
+                1,
+                null);
 
-        authorization.requireAnyMunicipalScope(
-                session, esusdata.auth.model.Permission.READ_CLINICAL, MUNICIPALITY_A);
+        authorization.requireAnyMunicipalScope(session, esusdata.auth.model.Permission.READ_CLINICAL, MUNICIPALITY_A);
 
         String grantId = grantRepository.activeGrantsForUser(teamUser).get(0).grantId();
         grantRepository.revoke(grantId, clock.instant(), "simulated-race");
@@ -135,17 +146,33 @@ public class ScopeIsolationApiTest extends ApiFixtureSupport {
                 .isInstanceOf(ScopeDeniedException.class);
     }
 
-    private IndicatorResult computedResult(String municipalityIbge) {
+    private static IndicatorResult computedResult(String municipalityIbge) {
         return new IndicatorResult(
-                IndicatorResult.IndicatorStatus.COMPUTED, "60.0000", BigInteger.valueOf(3),
-                BigInteger.valueOf(5), "PROGRAMADOS_MAIS_ESPONTANEOS", Classification.BOM,
-                "2026-03", "c1-mais-acesso@0.1.0", "2026-03-31", municipalityIbge, List.of(),
+                IndicatorResult.IndicatorStatus.COMPUTED,
+                "60.0000",
+                BigInteger.valueOf(3),
+                BigInteger.valueOf(5),
+                "PROGRAMADOS_MAIS_ESPONTANEOS",
+                Classification.BOM,
+                "2026-03",
+                "c1-mais-acesso@0.1.0",
+                "2026-03-31",
+                municipalityIbge,
+                List.of(),
                 "c1-exact-ratio@1");
     }
 
-    private EvidenceEntry entry(String recordId, String ine) {
-        return new EvidenceEntry("tb_fat_atendimento_individual", recordId, "2026-04-05",
-                "PROGRAMADO", "2750325", ine, "225142", "IN_NUMERATOR", "c1@1");
+    private static EvidenceEntry entry(String recordId, String ine) {
+        return new EvidenceEntry(
+                "tb_fat_atendimento_individual",
+                recordId,
+                "2026-04-05",
+                "PROGRAMADO",
+                "2750325",
+                ine,
+                "225142",
+                "IN_NUMERATOR",
+                "c1@1");
     }
 
     private HttpResponse<String> getResults(String userId, String municipalityIbge) throws Exception {
@@ -155,15 +182,19 @@ public class ScopeIsolationApiTest extends ApiFixtureSupport {
     }
 
     private HttpResponse<String> getEvidence(String userId, String resultId, String municipalityIbge) throws Exception {
-        URI uri = URI.create(BASE_URL + "/api/v1/results/" + resultId + "/evidence?municipalityIbge="
-                + municipalityIbge);
+        URI uri =
+                URI.create(BASE_URL + "/api/v1/results/" + resultId + "/evidence?municipalityIbge=" + municipalityIbge);
         return get(userId, uri);
     }
 
     private HttpResponse<String> get(String userId, URI uri) throws Exception {
-        HttpClient client = HttpClient.newHttpClient();
-        return client.send(
-                HttpRequest.newBuilder(uri).header("Cookie", sessionCookie(userId)).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            return client.send(
+                    HttpRequest.newBuilder(uri)
+                            .header("Cookie", sessionCookie(userId))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+        }
     }
 }

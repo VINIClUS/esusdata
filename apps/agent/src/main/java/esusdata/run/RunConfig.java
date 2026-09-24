@@ -1,61 +1,61 @@
 package esusdata.run;
 
-import esusdata.source.SourceConnectionProperties;
-import esusdata.run.acquisition.ExecPlaneAcquisition;
-import esusdata.source.pec.PecSecretResolver;
-import esusdata.source.pec.EnvFileSecretResolver;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import esusdata.result.JdbcResultStagingArea;
-import esusdata.result.JdbcExtractionManifestRepository;
-import esusdata.result.JdbcEvidenceRepository;
-import esusdata.result.JdbcResultRepository;
-import esusdata.source.JdbcSourceRepository;
-import esusdata.run.job.JdbcAcquisitionGuardStore;
-import esusdata.run.job.JdbcJobRepository;
 import esusdata.auth.GrantRevalidator;
-import esusdata.run.worker.AcquisitionGuard;
-import esusdata.run.worker.CancellationRegistry;
-import esusdata.run.worker.IdempotencyResolver;
-import esusdata.run.worker.RunExecutor;
-import esusdata.run.worker.JobRecovery;
-import esusdata.run.job.AcquisitionGuardStore;
-import esusdata.run.job.JobRepository;
-import esusdata.run.worker.JobWorker;
-import esusdata.run.job.RetryPolicy;
-import esusdata.source.SourceDiagnosticsService;
-import esusdata.run.extract.ExtractStore;
-import esusdata.run.extract.FileExtractStore;
-import esusdata.result.model.EvidenceRepository;
-import esusdata.result.model.ExtractionManifestRepository;
+import esusdata.config.SqliteConfig;
+import esusdata.config.SqliteProperties;
+import esusdata.result.JdbcEvidenceRepository;
+import esusdata.result.JdbcExtractionManifestRepository;
+import esusdata.result.JdbcResultRepository;
+import esusdata.result.JdbcResultStagingArea;
 import esusdata.result.PublicationService;
 import esusdata.result.ReproducibilityCheck;
+import esusdata.result.model.EvidenceRepository;
+import esusdata.result.model.ExtractionManifestRepository;
 import esusdata.result.model.ResultRepository;
 import esusdata.result.model.ResultStagingArea;
 import esusdata.run.acquisition.Acquisition;
+import esusdata.run.acquisition.ExecPlaneAcquisition;
+import esusdata.run.extract.ExtractStore;
+import esusdata.run.extract.FileExtractStore;
+import esusdata.run.job.AcquisitionGuardStore;
+import esusdata.run.job.JdbcAcquisitionGuardStore;
+import esusdata.run.job.JdbcJobRepository;
+import esusdata.run.job.JobRepository;
+import esusdata.run.job.RetryPolicy;
+import esusdata.run.worker.AcquisitionGuard;
+import esusdata.run.worker.CancellationRegistry;
+import esusdata.run.worker.IdempotencyResolver;
+import esusdata.run.worker.JobRecovery;
+import esusdata.run.worker.JobWorker;
+import esusdata.run.worker.RunExecutor;
+import esusdata.source.JdbcSourceRepository;
+import esusdata.source.SourceConnectionProperties;
+import esusdata.source.SourceDiagnosticsService;
 import esusdata.source.SourceRepository;
 import esusdata.source.pec.AllowedDestinations;
+import esusdata.source.pec.EnvFileSecretResolver;
 import esusdata.source.pec.PecDataSourceFactory;
+import esusdata.source.pec.PecSecretResolver;
 import esusdata.source.pec.ReadBudget;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.Clock;
-import java.time.Duration;
-import java.util.UUID;
-import esusdata.config.SqliteConfig;
-import esusdata.config.SqliteProperties;
 /**
  * Wires the job-runner + result-store beans on top of {@link SqliteConfig}. Every bean
  * here that touches {@code jobs}/{@code results}/{@code result_staging}/{@code evidence} depends,
@@ -87,19 +87,19 @@ public class RunConfig {
     // --- resultstore -----------------------------------------------------------------------
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public SourceRepository sourceRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcSourceRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public ExtractionManifestRepository extractionManifestRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcExtractionManifestRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public ResultStagingArea resultStagingArea(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcResultStagingArea(sqliteJdbcTemplate);
     }
@@ -115,7 +115,7 @@ public class RunConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public PublicationService publicationService(
             JdbcTemplate sqliteJdbcTemplate,
             TransactionTemplate sqliteTransactionTemplate,
@@ -124,28 +124,33 @@ public class RunConfig {
             ReproducibilityCheck reproducibilityCheck,
             SqliteProperties properties,
             GrantRevalidator grantRevalidator) {
-        return new PublicationService(sqliteJdbcTemplate, sqliteTransactionTemplate,
+        return new PublicationService(
+                sqliteJdbcTemplate,
+                sqliteTransactionTemplate,
                 jobRepository,
-                extractionManifestRepository, reproducibilityCheck, properties.extractsDirectory(),
+                extractionManifestRepository,
+                reproducibilityCheck,
+                properties.extractsDirectory(),
                 grantRevalidator);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public ResultRepository resultRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcResultRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public EvidenceRepository evidenceRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcEvidenceRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public SourceDiagnosticsService sourceDiagnosticsService(
-            SourceRepository sourceRepository, AllowedDestinations allowedDestinations,
+            SourceRepository sourceRepository,
+            AllowedDestinations allowedDestinations,
             PecDataSourceFactory pecDataSourceFactory) {
         return new SourceDiagnosticsService(sourceRepository, allowedDestinations, pecDataSourceFactory);
     }
@@ -153,7 +158,7 @@ public class RunConfig {
     // --- jobrunner -------------------------------------------------------------------------
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public JobRepository jobRepository(JdbcTemplate sqliteJdbcTemplate, TransactionTemplate sqliteTransactionTemplate) {
         return new JdbcJobRepository(sqliteJdbcTemplate, sqliteTransactionTemplate);
     }
@@ -174,7 +179,7 @@ public class RunConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public AcquisitionGuardStore acquisitionGuardStore(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcAcquisitionGuardStore(sqliteJdbcTemplate);
     }
@@ -206,8 +211,14 @@ public class RunConfig {
             RetryPolicy retryPolicy,
             Clock clock,
             Duration liveAcquisitionCooldownMargin) {
-        return new JobRecovery(jobRepository, sqliteTransactionTemplate, resultStagingArea,
-                acquisitionGuard, retryPolicy, clock, liveAcquisitionCooldownMargin);
+        return new JobRecovery(
+                jobRepository,
+                sqliteTransactionTemplate,
+                resultStagingArea,
+                acquisitionGuard,
+                retryPolicy,
+                clock,
+                liveAcquisitionCooldownMargin);
     }
 
     /**
@@ -222,11 +233,14 @@ public class RunConfig {
      * protects that ordering rather than gating anything itself.
      */
     @Bean
-    @DependsOn({"flywayMigration", "jobRepository"})
+    @DependsOn({SqliteConfig.FLYWAY_MIGRATION, "jobRepository"})
     public JobRecovery.RecoveryReport jobRecoveryReport(JobRecovery jobRecovery, String processInstanceId) {
         JobRecovery.RecoveryReport report = jobRecovery.reconcile(processInstanceId);
-        log.info("Job recovery on boot: {} requeued, {} failed, {} cancelled",
-                report.requeued(), report.failed(), report.cancelled());
+        log.info(
+                "Job recovery on boot: {} requeued, {} failed, {} cancelled",
+                report.requeued(),
+                report.failed(),
+                report.cancelled());
         return report;
     }
 
@@ -243,9 +257,18 @@ public class RunConfig {
             Acquisition acquisitionPort,
             AcquisitionGuard acquisitionGuard,
             Duration liveAcquisitionCooldownMargin) {
-        return new RunExecutor(extractStore, jobRepository,
-                resultStagingArea, publicationService, appBuild, clock, grantRevalidator,
-                sourceRepository, acquisitionPort, acquisitionGuard, liveAcquisitionCooldownMargin);
+        return new RunExecutor(
+                extractStore,
+                jobRepository,
+                resultStagingArea,
+                publicationService,
+                appBuild,
+                clock,
+                grantRevalidator,
+                sourceRepository,
+                acquisitionPort,
+                acquisitionGuard,
+                liveAcquisitionCooldownMargin);
     }
 
     // JobWorker implements SmartLifecycle — Spring's lifecycle processor calls start()/stop()
@@ -262,8 +285,14 @@ public class RunConfig {
             Clock clock,
             String processInstanceId,
             @Value("${observatorio.job-runner.poll-interval-ms:2000}") long pollIntervalMs) {
-        return new JobWorker(jobRepository, indicatorRunExecutor, resultStagingArea,
-                cancellationRegistry, retryPolicy, clock, processInstanceId,
+        return new JobWorker(
+                jobRepository,
+                indicatorRunExecutor,
+                resultStagingArea,
+                cancellationRegistry,
+                retryPolicy,
+                clock,
+                processInstanceId,
                 Duration.ofMillis(pollIntervalMs));
     }
 
@@ -314,8 +343,10 @@ public class RunConfig {
      */
     @Bean
     public Acquisition acquisitionPort(
-            SqliteProperties properties, Clock clock,
-            ExecPlaneProperties executionPlaneProperties, PecSecretResolver pecSecretResolver,
+            SqliteProperties properties,
+            Clock clock,
+            ExecPlaneProperties executionPlaneProperties,
+            PecSecretResolver pecSecretResolver,
             AllowedDestinations allowedDestinations) {
         String binary = executionPlaneProperties.binary();
         if (binary == null || binary.isBlank() || !Files.isExecutable(Path.of(binary))) {
@@ -325,7 +356,11 @@ public class RunConfig {
                             + (binary == null ? "" : binary) + "'");
         }
         return new ExecPlaneAcquisition(
-                List.of(binary), pecSecretResolver, allowedDestinations, properties.extractsDirectory(), clock,
+                List.of(binary),
+                pecSecretResolver,
+                allowedDestinations,
+                properties.extractsDirectory(),
+                clock,
                 executionPlaneProperties.exitGrace());
     }
 

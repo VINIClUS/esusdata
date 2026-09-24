@@ -1,10 +1,9 @@
 package esusdata.source;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.SQLException;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 class SourceDiagnosticsServiceTest {
 
@@ -20,14 +19,14 @@ class SourceDiagnosticsServiceTest {
 
     @Test
     void driverMessagesAreReplacedWithGenericDetails() {
-        assertThat(SourceDiagnosticsService.detailFor(new SQLException(
-                "password authentication failed for user=secret-user", "28P01")))
+        assertThat(SourceDiagnosticsService.detailFor(
+                        new SQLException("password authentication failed for user=secret-user", "28P01")))
                 .isEqualTo("source authentication failed");
-        assertThat(SourceDiagnosticsService.detailFor(new SQLException(
-                "permission denied for table patients", "42501")))
+        assertThat(SourceDiagnosticsService.detailFor(
+                        new SQLException("permission denied for table patients", "42501")))
                 .isEqualTo("source permission denied");
-        assertThat(SourceDiagnosticsService.detailFor(new SQLException(
-                "connection reset with password=secret", "08006")))
+        assertThat(SourceDiagnosticsService.detailFor(
+                        new SQLException("connection reset with password=secret", "08006")))
                 .isEqualTo("source connection failed");
     }
 }

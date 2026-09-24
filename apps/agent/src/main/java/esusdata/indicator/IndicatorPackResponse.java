@@ -10,6 +10,4 @@ public record IndicatorPackResponse(
         String unit,
         List<String> dependsOn,
         boolean executionEnabled,
-        List<String> blockedGates
-) {
-}
+        List<String> blockedGates) {}

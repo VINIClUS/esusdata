@@ -1,43 +1,39 @@
 package esusdata.run.worker;
 
-import esusdata.result.JdbcResultStagingArea;
-import esusdata.result.JdbcExtractionManifestRepository;
-import esusdata.result.JdbcResultRepository;
-import esusdata.source.JdbcSourceRepository;
+import esusdata.auth.GrantRevalidator;
 import esusdata.auth.JdbcGrantRepository;
 import esusdata.auth.JdbcUserRepository;
-import esusdata.run.job.JdbcAcquisitionGuardStore;
-import esusdata.run.job.JdbcJobRepository;
-import esusdata.run.extract.FileExtractStore;
-import esusdata.source.pec.CompatibilityCatalog;
-import esusdata.run.acquisition.Acquisition;
-import esusdata.run.acquisition.InProcessAcquisition;
-import esusdata.config.SqliteConfig;
+import esusdata.auth.ScopeResolver;
 import esusdata.auth.model.Grant;
 import esusdata.auth.model.GrantRepository;
-import esusdata.auth.GrantRevalidator;
 import esusdata.auth.model.Role;
 import esusdata.auth.model.ScopeKind;
-import esusdata.auth.ScopeResolver;
 import esusdata.auth.model.UserAccount;
 import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
-import esusdata.result.model.ExtractionManifestRepository;
+import esusdata.config.SqliteConfig;
+import esusdata.result.JdbcExtractionManifestRepository;
+import esusdata.result.JdbcResultRepository;
+import esusdata.result.JdbcResultStagingArea;
 import esusdata.result.PublicationService;
 import esusdata.result.ReproducibilityCheck;
+import esusdata.result.model.ExtractionManifestRepository;
 import esusdata.result.model.ResultRepository;
 import esusdata.result.model.ResultStagingArea;
-import esusdata.source.model.SourceRecord;
+import esusdata.run.acquisition.Acquisition;
+import esusdata.run.acquisition.InProcessAcquisition;
+import esusdata.run.extract.FileExtractStore;
+import esusdata.run.job.JdbcAcquisitionGuardStore;
+import esusdata.run.job.JdbcJobRepository;
+import esusdata.run.job.JobRepository;
+import esusdata.run.job.RetryPolicy;
+import esusdata.source.JdbcSourceRepository;
 import esusdata.source.SourceRepository;
+import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
+import esusdata.source.pec.CompatibilityCatalog;
 import esusdata.source.pec.EnvFileSecretResolver;
 import esusdata.source.pec.PecDataSourceFactory;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.core.env.MapPropertySource;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
-
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
@@ -45,9 +41,12 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import esusdata.run.job.EnqueueRequest;
-import esusdata.run.job.RetryPolicy;
-import esusdata.run.job.JobRepository;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.core.env.MapPropertySource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
 /**
  * Assembles the job-runner/result-store/identity-access beans as plain objects over a real {@code
  * SqliteConfig}-migrated database — the same pattern {@code SqliteConfigTest}
@@ -101,15 +100,18 @@ public final class JobRunnerTestFixture implements AutoCloseable {
      *     .stream}'s own seam so a synthetic PostgreSQL fixture can supply probes for testing.
      */
     public JobRunnerTestFixture(
-            Path dataDir, Clock clock, PecDataSourceFactory pecDataSourceFactory,
+            Path dataDir,
+            Clock clock,
+            PecDataSourceFactory pecDataSourceFactory,
             CompatibilityCatalog compatibilityCatalog) {
         this.clock = clock;
         this.extractsDir = dataDir.resolve("extracts");
 
         context = new AnnotationConfigApplicationContext();
         context.register(SqliteConfig.class);
-        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("test",
-                Map.of("observatorio.data.directory", dataDir.toString())));
+        context.getEnvironment()
+                .getPropertySources()
+                .addFirst(new MapPropertySource("test", Map.of("observatorio.data.directory", dataDir.toString())));
         context.refresh();
 
         jdbc = context.getBean(JdbcTemplate.class);
@@ -127,26 +129,46 @@ public final class JobRunnerTestFixture implements AutoCloseable {
         grantRevalidator = new GrantRevalidator(scopeResolver, userRepository);
 
         publicationService = new PublicationService(
-                jdbc, transactionTemplate, jobRepository, extractionManifestRepository, reproducibilityCheck,
-                extractsDir, grantRevalidator);
+                jdbc,
+                transactionTemplate,
+                jobRepository,
+                extractionManifestRepository,
+                reproducibilityCheck,
+                extractsDir,
+                grantRevalidator);
         // No destination is ever allow-listed by default — extract-only tests never call
         // PecDataSourceFactory.open, and EnvFileSecretResolver only touches this path lazily,
         // inside resolve(), which live-acquisition tests exercise with their own real secret file.
-        PecDataSourceFactory factory = pecDataSourceFactory != null ? pecDataSourceFactory
+        PecDataSourceFactory factory = pecDataSourceFactory != null
+                ? pecDataSourceFactory
                 : new PecDataSourceFactory(
                         new AllowedDestinations(Set.of()), new EnvFileSecretResolver(dataDir.resolve("unused.env")));
         Acquisition acquisitionPort = compatibilityCatalog != null
                 ? new InProcessAcquisition(factory, extractsDir, clock, compatibilityCatalog)
                 : new InProcessAcquisition(factory, extractsDir, clock);
         executor = new RunExecutor(
-                new FileExtractStore(extractsDir), jobRepository, stagingArea, publicationService,
-                "test-build", clock, grantRevalidator, sourceRepository, acquisitionPort,
-                acquisitionGuard(), liveAcquisitionCooldownMargin);
+                new FileExtractStore(extractsDir),
+                jobRepository,
+                stagingArea,
+                publicationService,
+                "test-build",
+                clock,
+                grantRevalidator,
+                sourceRepository,
+                acquisitionPort,
+                acquisitionGuard(),
+                liveAcquisitionCooldownMargin);
     }
 
     public JobRecovery jobRecovery() {
-        return new JobRecovery(jobRepository, transactionTemplate, stagingArea,
-                acquisitionGuard(), retryPolicy, clock, liveAcquisitionCooldownMargin);
+        return new JobRecovery(
+                jobRepository,
+                transactionTemplate,
+                stagingArea,
+                acquisitionGuard(),
+                retryPolicy,
+                clock,
+                liveAcquisitionCooldownMargin);
     }
 
     public AcquisitionGuard acquisitionGuard() {
@@ -154,16 +176,34 @@ public final class JobRunnerTestFixture implements AutoCloseable {
     }
 
     public JobWorker worker(String processInstanceId) {
-        return new JobWorker(jobRepository, executor, stagingArea, cancellationRegistry,
-                retryPolicy, clock, processInstanceId, Duration.ofMillis(50));
+        return new JobWorker(
+                jobRepository,
+                executor,
+                stagingArea,
+                cancellationRegistry,
+                retryPolicy,
+                clock,
+                processInstanceId,
+                Duration.ofMillis(50));
     }
 
     /** Registers a default source row so FK constraints on jobs/extraction_manifests/results are satisfiable. */
     public String registerSource(String sourceId, String municipalityIbge) {
         sourceRepository.upsert(new SourceRecord(
-                sourceId, 1, "PEC_POSTGRESQL", "PRONTUARIO", "PRIMARY",
-                "127.0.0.1", 5432, "esus", "esus_leitura", "PEC_DB_PASSWORD",
-                municipalityIbge, "5.4.37", "PEC_DW", Instant.EPOCH.toString()));
+                sourceId,
+                1,
+                "PEC_POSTGRESQL",
+                "PRONTUARIO",
+                "PRIMARY",
+                "127.0.0.1", // NOPMD - AvoidUsingHardCodedIP: loopback test server
+                5432,
+                "esus",
+                "esus_leitura",
+                "PEC_DB_PASSWORD",
+                municipalityIbge,
+                "5.4.37",
+                "PEC_DW",
+                Instant.EPOCH.toString()));
         return sourceId;
     }
 
@@ -174,11 +214,30 @@ public final class JobRunnerTestFixture implements AutoCloseable {
      */
     public String registerPrincipal(String userId, String municipalityIbge) {
         userRepository.insert(new UserAccount(
-                userId, userId, userId, "UNSET", "ARGON2ID", "{}", "v1", 1, UserState.ACTIVE,
-                clock.instant(), "test-fixture", null));
+                userId,
+                userId,
+                userId,
+                "UNSET",
+                "ARGON2ID",
+                "{}",
+                "v1",
+                1,
+                UserState.ACTIVE,
+                clock.instant(),
+                "test-fixture",
+                null));
         grantRepository.insert(new Grant(
-                "grant-" + UUID.randomUUID(), userId, Role.MANAGER, ScopeKind.MUNICIPALITY,
-                municipalityIbge, null, null, clock.instant(), "test-fixture", null, null));
+                "grant-" + UUID.randomUUID(),
+                userId,
+                Role.MANAGER,
+                ScopeKind.MUNICIPALITY,
+                municipalityIbge,
+                null,
+                null,
+                clock.instant(),
+                "test-fixture",
+                null,
+                null));
         return userId;
     }
 

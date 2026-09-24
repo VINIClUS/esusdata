@@ -1,9 +1,8 @@
 package esusdata.run.job;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-
 import java.time.Instant;
 import java.util.Optional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** JDBC implementation of {@link AcquisitionGuardStore} against SQLite's {@code source_acquisition_guard}. */
 public final class JdbcAcquisitionGuardStore implements AcquisitionGuardStore {
@@ -27,9 +26,12 @@ public final class JdbcAcquisitionGuardStore implements AcquisitionGuardStore {
 
     @Override
     public Optional<Instant> blockedUntil(String sourceId) {
-        return jdbc.query(
-                "select blocked_until from source_acquisition_guard where source_id = ?",
-                (rs, rowNum) -> Instant.parse(rs.getString(1)), sourceId)
-                .stream().findFirst();
+        return jdbc
+                .query(
+                        "select blocked_until from source_acquisition_guard where source_id = ?",
+                        (rs, rowNum) -> Instant.parse(rs.getString(1)),
+                        sourceId)
+                .stream()
+                .findFirst();
     }
 }

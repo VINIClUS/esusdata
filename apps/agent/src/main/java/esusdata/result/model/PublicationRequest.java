@@ -22,6 +22,4 @@ public record PublicationRequest(
         String appBuild,
         Instant publishedAt,
         String authorizedPrincipal,
-        String authorizedMunicipalityIbge
-) {
-}
+        String authorizedMunicipalityIbge) {}

@@ -1,0 +1,4 @@
+# Mechanical reformatting commits (ADR 0018). Use with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# style: apply Palantir Java Format and rustfmt
+abd93cbcf435c87ea2d53300bcf7424b8c3f10a6

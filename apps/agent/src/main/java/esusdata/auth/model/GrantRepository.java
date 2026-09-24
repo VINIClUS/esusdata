@@ -13,7 +13,7 @@ public interface GrantRepository {
 
     List<Grant> activeGrantsForUser(String userId);
 
-    /** @return {@code true} if a grant with this id was active and is now revoked by this call. */
+    /** Revokes a grant; {@code true} only if it was active and this call revoked it. */
     boolean revoke(String grantId, Instant at, String revokedBy);
 
     void revokeAllForUser(String userId, Instant at, String revokedBy);

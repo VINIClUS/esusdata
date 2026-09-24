@@ -48,8 +48,13 @@ indicador é Java puro; driver Postgres só em `source.pec` e `run.acquisition`;
 ## Rodar
 
 ```bash
-# backend (testes incluem ArchUnit e o contrato OpenAPI)
+# backend (testes incluem ArchUnit e o contrato OpenAPI; o verify também roda Spotless, Error
+# Prone e PMD, ADR 0018 — mvn spotless:apply corrige a formatação)
 cd apps/agent && mvn verify -Dsurefire.reuseForks=false
+cd apps/agent && mvn spotless:apply
+
+# plano de execução: o mesmo portão do CI (ADR 0018)
+cd apps/execplane && cargo fmt && cargo clippy --locked --all-targets -- -D warnings
 
 # frontend (dados mockados por padrão: VITE_USE_MOCKS; com VITE_USE_MOCKS=false fala com o
 # backend em :8080 pelo proxy do Vite — município e competência vêm da API, ADR 0015)

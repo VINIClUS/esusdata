@@ -1,13 +1,13 @@
 package esusdata.run.extract;
 
+import esusdata.indicator.model.CanonicalEncounter;
+import esusdata.indicator.model.CanonicalModality;
+import esusdata.indicator.model.SourceRef;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.YearMonth;
-import esusdata.indicator.model.CanonicalEncounter;
-import esusdata.indicator.model.CanonicalModality;
 
-import esusdata.indicator.model.SourceRef;
 /**
  * Test-only synthetic extract builder for the job-runner/result-store test suites. Reuses {@link
  * ExtractWriter}'s package-private {@link ExtractionScope} constructor so no test ever needs a
@@ -19,13 +19,19 @@ public final class ExtractFixtures {
     public static final String QUERY_CHECKSUM = "sha256:" + "1".repeat(64);
     public static final String ADAPTER_VERSION = "test-adapter@1";
 
-    private ExtractFixtures() {
-    }
+    private ExtractFixtures() {}
 
     /** Writes a small extract with a deterministic mix of PROGRAMADO/ESPONTANEO/UNMAPPED encounters. */
     public static ExtractionManifest write(
-            Path baseDir, String extractionId, String sourceId, String municipalityIbge,
-            String referencePeriod, int programado, int espontaneo, int unmapped) throws IOException {
+            Path baseDir,
+            String extractionId,
+            String sourceId,
+            String municipalityIbge,
+            String referencePeriod,
+            int programado,
+            int espontaneo,
+            int unmapped)
+            throws IOException {
         YearMonth month = YearMonth.parse(referencePeriod);
         String periodStart = month.atDay(1).toString();
         String periodEndExclusive = month.plusMonths(1).atDay(1).toString();
@@ -43,8 +49,12 @@ public final class ExtractFixtures {
                 writer.write(encounter(sourceId, municipalityIbge, month, seq++, CanonicalModality.UNMAPPED));
             }
             return writer.finalizeExtract(
-                    Instant.parse("2026-09-19T12:00:00Z"), "America/Sao_Paulo",
-                    QUERY_CHECKSUM, ADAPTER_VERSION, "COMPLETE", "SNAPSHOT");
+                    Instant.parse("2026-09-19T12:00:00Z"),
+                    "America/Sao_Paulo",
+                    QUERY_CHECKSUM,
+                    ADAPTER_VERSION,
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
     }
 
@@ -54,6 +64,11 @@ public final class ExtractFixtures {
         String careDate = month.atDay(day).toString();
         return new CanonicalEncounter(
                 new SourceRef(sourceId, "tb_fat_atendimento_individual", "rec-" + seq),
-                municipalityIbge, careDate, modality, "2750325", "0000346268", "225142");
+                municipalityIbge,
+                careDate,
+                modality,
+                "2750325",
+                "0000346268",
+                "225142");
     }
 }

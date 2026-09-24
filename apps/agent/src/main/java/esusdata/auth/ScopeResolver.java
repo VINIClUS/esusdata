@@ -1,12 +1,13 @@
 package esusdata.auth;
 
+import esusdata.auth.model.Permission;
+import esusdata.auth.model.ScopeKind;
+import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
-import java.util.List;
-import java.util.TreeSet;
-import esusdata.auth.model.Permission;
-import esusdata.auth.model.ScopeKind;
 /**
  * Expands a user's active {@code user_grants} through {@code role_permissions} into effective
  * (permission, scope) pairs — read fresh from the database on every call, never cached in a
@@ -16,16 +17,16 @@ import esusdata.auth.model.ScopeKind;
  */
 public final class ScopeResolver {
 
-    public record EffectiveGrant(
-            Permission permission, ScopeKind scopeKind, String municipalityIbge, String cnes, String ine) {
-    }
-
     private static final RowMapper<EffectiveGrant> MAPPER = (rs, rowNum) -> new EffectiveGrant(
             Permission.fromDbValue(rs.getString("permission")),
             ScopeKind.valueOf(rs.getString("scope_kind")),
-            rs.getString("municipality_ibge"), rs.getString("cnes"), rs.getString("ine"));
-
+            rs.getString("municipality_ibge"),
+            rs.getString("cnes"),
+            rs.getString("ine"));
     private final JdbcTemplate jdbc;
+
+    public record EffectiveGrant(
+            Permission permission, ScopeKind scopeKind, String municipalityIbge, String cnes, String ine) {}
 
     public ScopeResolver(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -65,30 +66,36 @@ public final class ScopeResolver {
             return false;
         }
         for (EffectiveGrant grant : effectiveGrants(userId)) {
-            if (grant.permission() != permission) {
-                continue;
-            }
-            if (grant.scopeKind() == ScopeKind.INSTALLATION && isInstallationEligible(permission)) {
-                return true;
-            }
-            if (grant.scopeKind() != ScopeKind.MUNICIPALITY || !municipalityIbge.equals(grant.municipalityIbge())) {
-                continue;
-            }
-            boolean grantIsMunicipalityWide = grant.cnes() == null && grant.ine() == null;
-            if (grantIsMunicipalityWide) {
-                return true;
-            }
-            boolean objectIsMunicipalAggregate = objectCnes == null && objectIne == null;
-            if (objectIsMunicipalAggregate) {
-                continue;
-            }
-            boolean cnesMatches = grant.cnes() == null || grant.cnes().equals(objectCnes);
-            boolean ineMatches = grant.ine() == null || grant.ine().equals(objectIne);
-            if (cnesMatches && ineMatches) {
+            if (grantAuthorizes(grant, permission, municipalityIbge, objectCnes, objectIne)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** Whether this one grant authorizes the object, by the rules documented on {@link #hasPermission}. */
+    private static boolean grantAuthorizes(
+            EffectiveGrant grant, Permission permission, String municipalityIbge, String objectCnes, String objectIne) {
+        if (grant.permission() != permission) {
+            return false;
+        }
+        if (grant.scopeKind() == ScopeKind.INSTALLATION && isInstallationEligible(permission)) {
+            return true;
+        }
+        if (grant.scopeKind() != ScopeKind.MUNICIPALITY || !municipalityIbge.equals(grant.municipalityIbge())) {
+            return false;
+        }
+        boolean grantIsMunicipalityWide = grant.cnes() == null && grant.ine() == null;
+        if (grantIsMunicipalityWide) {
+            return true;
+        }
+        boolean objectIsMunicipalAggregate = objectCnes == null && objectIne == null;
+        if (objectIsMunicipalAggregate) {
+            return false;
+        }
+        boolean cnesMatches = grant.cnes() == null || grant.cnes().equals(objectCnes);
+        boolean ineMatches = grant.ine() == null || grant.ine().equals(objectIne);
+        return cnesMatches && ineMatches;
     }
 
     /**
@@ -109,8 +116,7 @@ public final class ScopeResolver {
             if (grant.scopeKind() == ScopeKind.INSTALLATION && isInstallationEligible(permission)) {
                 return true;
             }
-            if (grant.scopeKind() == ScopeKind.MUNICIPALITY
-                    && municipalityIbge.equals(grant.municipalityIbge())) {
+            if (grant.scopeKind() == ScopeKind.MUNICIPALITY && municipalityIbge.equals(grant.municipalityIbge())) {
                 return true;
             }
         }
@@ -125,10 +131,12 @@ public final class ScopeResolver {
      * they never authorize the aggregate.
      */
     public List<String> municipalitiesWithAggregateAccess(String userId, Permission permission) {
-        TreeSet<String> municipalities = new TreeSet<>();
+        SortedSet<String> municipalities = new TreeSet<>();
         for (EffectiveGrant grant : effectiveGrants(userId)) {
-            if (grant.permission() == permission && grant.scopeKind() == ScopeKind.MUNICIPALITY
-                    && grant.cnes() == null && grant.ine() == null) {
+            if (grant.permission() == permission
+                    && grant.scopeKind() == ScopeKind.MUNICIPALITY
+                    && grant.cnes() == null
+                    && grant.ine() == null) {
                 municipalities.add(grant.municipalityIbge());
             }
         }

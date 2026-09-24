@@ -1,14 +1,13 @@
 package esusdata.source.pec;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** Immutable view of the packaged PEC adapter compatibility contract. */
 public final class PecCompatibilityMatrix {
@@ -28,7 +27,8 @@ public final class PecCompatibilityMatrix {
         }
         try (resource) {
             return new PecCompatibilityMatrix(new ObjectMapper().readTree(resource));
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException
+                | RuntimeException e) { // NOPMD - any read failure of the packaged matrix is fatal, with its cause
             throw new IllegalStateException("Could not read packaged compatibility matrix", e);
         }
     }
@@ -36,23 +36,18 @@ public final class PecCompatibilityMatrix {
     public static PecCompatibilityMatrix fromJson(String json) {
         try {
             return new PecCompatibilityMatrix(new ObjectMapper().readTree(json));
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e) { // NOPMD - any parse or shape failure, converted with its cause
             throw new IllegalArgumentException("Invalid compatibility matrix JSON", e);
         }
     }
 
     public Entry findExact(
-            String capability,
-            String adapterVersion,
-            PecSourceIdentity identity,
-            String postgresVersion
-    ) {
+            String capability, String adapterVersion, PecSourceIdentity identity, String postgresVersion) {
         requireNonBlank(capability, "capability");
         requireNonBlank(adapterVersion, "adapterVersion");
         requireNonBlank(postgresVersion, "postgresVersion");
         if (identity == null || !identity.isComplete()) {
-            throw new IllegalStateException(
-                    "PecSourceIdentity is required and must include an installation role");
+            throw new IllegalStateException("PecSourceIdentity is required and must include an installation role");
         }
         if (!root.isObject()
                 || !"2".equals(text(root, "schema_version"))
@@ -68,19 +63,17 @@ public final class PecCompatibilityMatrix {
             if (matches(candidate, capability, adapterVersion, identity, postgresVersion)) {
                 Entry entry = parseEntry(candidate);
                 if (!"VALIDATED".equals(entry.status())) {
-                    throw new IllegalStateException(
-                            "Exact compatibility entry is not VALIDATED: " + entry.status());
+                    throw new IllegalStateException("Exact compatibility entry is not VALIDATED: " + entry.status());
                 }
                 return entry;
             }
         }
-        throw new IllegalStateException(
-                "No exact compatibility entry for capability=" + capability
-                        + ", adapterVersion=" + adapterVersion
-                        + ", PEC=" + identity.pecVersion()
-                        + ", PostgreSQL=" + postgresVersion
-                        + ", model=" + identity.readModel()
-                        + ", role=" + identity.installationRole());
+        throw new IllegalStateException("No exact compatibility entry for capability=" + capability
+                + ", adapterVersion=" + adapterVersion
+                + ", PEC=" + identity.pecVersion()
+                + ", PostgreSQL=" + postgresVersion
+                + ", model=" + identity.readModel()
+                + ", role=" + identity.installationRole());
     }
 
     private static boolean matches(
@@ -88,8 +81,7 @@ public final class PecCompatibilityMatrix {
             String capability,
             String adapterVersion,
             PecSourceIdentity identity,
-            String postgresVersion
-    ) {
+            String postgresVersion) {
         return capability.equals(text(candidate, "capability"))
                 && adapterVersion.equals(text(candidate, "adapter_version"))
                 && pecVersions(candidate).contains(identity.pecVersion())
@@ -113,7 +105,9 @@ public final class PecCompatibilityMatrix {
                 throw new IllegalStateException("Compatibility object fingerprint entry is incomplete");
             }
             List<String> requestedColumns = new ArrayList<>();
-            for (JsonNode column : columnsNode) requestedColumns.add(column.asString());
+            for (JsonNode column : columnsNode) {
+                requestedColumns.add(column.asString());
+            }
             if (fingerprints.put(name, fingerprint) != null) {
                 throw new IllegalStateException("Compatibility matrix contains duplicate object: " + name);
             }
@@ -134,7 +128,9 @@ public final class PecCompatibilityMatrix {
             return List.of();
         }
         List<String> listed = new ArrayList<>();
-        for (JsonNode version : versions) listed.add(version.asString());
+        for (JsonNode version : versions) {
+            listed.add(version.asString());
+        }
         return List.copyOf(listed);
     }
 
@@ -159,7 +155,5 @@ public final class PecCompatibilityMatrix {
             String status,
             String queryChecksum,
             Map<String, String> objectFingerprints,
-            Map<String, List<String>> objectColumns
-    ) {
-    }
+            Map<String, List<String>> objectColumns) {}
 }

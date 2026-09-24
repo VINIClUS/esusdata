@@ -1,30 +1,23 @@
 package esusdata.run.acquisition;
 
-import esusdata.run.extract.ExtractionManifest;
 import esusdata.run.extract.DelegatedExtractPublication;
+import esusdata.run.extract.ExtractionManifest;
+import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.ColumnMetadata;
 import esusdata.source.pec.CompatibilityFingerprint;
 import esusdata.source.pec.CompatibilityProbeResult;
-import esusdata.source.pec.ProbeItem;
-import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.IndividualEncounterModalityCapability;
-
-import esusdata.source.pec.AllowedDestinations;
-
+import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecSecretResolver;
+import esusdata.source.pec.ProbeItem;
 import esusdata.source.pec.ReadBudget;
 import esusdata.source.pec.SourceAcquisitionLimiter;
 import esusdata.source.pec.SourceBudgetExceededException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.SQLException;
@@ -39,6 +32,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
 /**
  * {@link Acquisition} that delegates the live PEC read to a spawned child process, talking
  * NDJSON over its stdin/stdout (plan §2.2). The child never touches SQLite or the job queue, and
@@ -71,6 +69,9 @@ import java.util.concurrent.TimeUnit;
 public final class ExecPlaneAcquisition implements Acquisition {
 
     private static final Logger log = LoggerFactory.getLogger(ExecPlaneAcquisition.class);
+    /** Every protocol message carries its kind under this key. */
+    private static final String TYPE = "type";
+
     private static final String CAPABILITY = "individual_encounter_modality";
 
     private final List<String> command;
@@ -83,16 +84,31 @@ public final class ExecPlaneAcquisition implements Acquisition {
     private final ObjectMapper mapper = new ObjectMapper();
 
     public ExecPlaneAcquisition(
-            List<String> command, PecSecretResolver secretResolver, AllowedDestinations allowedDestinations,
-            Path extractsBaseDir, Clock clock, Duration exitGrace) {
-        this(command, secretResolver, allowedDestinations, PecCompatibilityMatrix.fromClasspathResource(),
-                extractsBaseDir, clock, exitGrace);
+            List<String> command,
+            PecSecretResolver secretResolver,
+            AllowedDestinations allowedDestinations,
+            Path extractsBaseDir,
+            Clock clock,
+            Duration exitGrace) {
+        this(
+                command,
+                secretResolver,
+                allowedDestinations,
+                PecCompatibilityMatrix.fromClasspathResource(),
+                extractsBaseDir,
+                clock,
+                exitGrace);
     }
 
     /** Package-visible seam for tests to inject a synthetic matrix, mirroring the JDBC path's own seam. */
     ExecPlaneAcquisition(
-            List<String> command, PecSecretResolver secretResolver, AllowedDestinations allowedDestinations,
-            PecCompatibilityMatrix matrix, Path extractsBaseDir, Clock clock, Duration exitGrace) {
+            List<String> command,
+            PecSecretResolver secretResolver,
+            AllowedDestinations allowedDestinations,
+            PecCompatibilityMatrix matrix,
+            Path extractsBaseDir,
+            Clock clock,
+            Duration exitGrace) {
         this.command = command;
         this.secretResolver = secretResolver;
         this.allowedDestinations = allowedDestinations;
@@ -103,6 +119,8 @@ public final class ExecPlaneAcquisition implements Acquisition {
     }
 
     @Override
+    // javac's try lint / PMD: the permit is held for the block's scope and released on close, never read.
+    @SuppressWarnings({"try", "PMD.UnusedLocalVariable"})
     public ExtractionManifest acquire(
             AcquisitionCommand acquisitionCommand, CancellationSignal cancellation, AcquisitionListener listener) {
         // §1.12.6/ENG-46: the allowlist is deployment-administered and never crosses the process
@@ -112,16 +130,19 @@ public final class ExecPlaneAcquisition implements Acquisition {
         // on its own and connect to whatever that second lookup returns, defeating the check
         // (mirrors PecDataSourceFactory pinning the same InetAddress into its JDBC URL).
         InetAddress validatedAddress = allowedDestinations.assertAllowed(
-                acquisitionCommand.connectionProperties().host(), acquisitionCommand.connectionProperties().port());
-        try (SourceAcquisitionLimiter.Permit permit =
-                SourceAcquisitionLimiter.acquireOrFail(acquisitionCommand.connectionProperties().sourceId())) {
+                acquisitionCommand.connectionProperties().host(),
+                acquisitionCommand.connectionProperties().port());
+        try (SourceAcquisitionLimiter.Permit permit = SourceAcquisitionLimiter.acquireOrFail(
+                acquisitionCommand.connectionProperties().sourceId())) {
             return runChild(acquisitionCommand, validatedAddress.getHostAddress(), cancellation, listener);
         }
     }
 
     private ExtractionManifest runChild(
-            AcquisitionCommand acquisitionCommand, String validatedHost,
-            CancellationSignal cancellation, AcquisitionListener listener) {
+            AcquisitionCommand acquisitionCommand,
+            String validatedHost,
+            CancellationSignal cancellation,
+            AcquisitionListener listener) {
         Instant startedAt = clock.instant();
 
         // Opened before any process is spawned (fatia 3 / ADR 0011 — a deliberate move earlier
@@ -147,8 +168,12 @@ public final class ExecPlaneAcquisition implements Acquisition {
     }
 
     private ExtractionManifest runChild(
-            AcquisitionCommand acquisitionCommand, String validatedHost, CancellationSignal cancellation,
-            AcquisitionListener listener, DelegatedExtractPublication publication, Instant startedAt) {
+            AcquisitionCommand acquisitionCommand,
+            String validatedHost,
+            CancellationSignal cancellation,
+            AcquisitionListener listener,
+            DelegatedExtractPublication publication,
+            Instant startedAt) {
         Process process;
         try {
             process = new ProcessBuilder(command).redirectErrorStream(false).start();
@@ -161,55 +186,54 @@ public final class ExecPlaneAcquisition implements Acquisition {
 
         try {
             writeAcquireEnvelope(process.getOutputStream(), acquisitionCommand, validatedHost, publication.tempFile());
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
+            BufferedReader reader =
+                    new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
 
             JsonNode probe;
             try {
                 probe = readMessage(reader);
             } catch (IOException malformed) {
-                return abnormalTermination(process, cancellation, listener,
+                return abnormalTermination(
+                        process,
+                        cancellation,
+                        listener,
                         "malformed message before handshake: " + malformed.getMessage());
             }
             // An error before the probe carries its own "uncertain" flag: false only when the
             // child never got a live connection (e.g. a rejected password), so a failed login
             // doesn't put the source on the ENG-51 cooldown — same as a JDBC connection-open
             // failure. Anything else short of a probe is still a protocol violation.
-            if (probe != null && "error".equals(text(probe, "type"))) {
+            if (probe != null && "error".equals(text(probe, TYPE))) {
                 return failFromErrorMessage(process, cancellation, listener, probe);
             }
-            if (probe == null || !"probe".equals(text(probe, "type"))) {
-                return abnormalTermination(process, cancellation, listener,
-                        "expected a 'probe' message, got: " + probe);
+            if (probe == null || !"probe".equals(text(probe, TYPE))) {
+                return abnormalTermination(
+                        process, cancellation, listener, "expected a 'probe' message, got: " + probe);
             }
 
             String mismatch = compareFingerprints(acquisitionCommand, probe);
             if (mismatch != null) {
-                writeLine(process.getOutputStream(), Map.of(
-                        "type", "abort", "code", "COMPATIBILITY_MISMATCH", "detail", mismatch));
+                writeLine(
+                        process.getOutputStream(),
+                        Map.of(TYPE, "abort", "code", "COMPATIBILITY_MISMATCH", "detail", mismatch));
                 waitForExit(process);
                 listener.onUncertainOutcome("compatibility mismatch: " + mismatch);
-                throw new IllegalStateException(
-                        "execution plane compatibility mismatch (ENG-43): " + mismatch);
+                throw new IllegalStateException("execution plane compatibility mismatch (ENG-43): " + mismatch);
             }
 
-            writeLine(process.getOutputStream(), Map.of("type", "proceed"));
+            writeLine(process.getOutputStream(), Map.of(TYPE, "proceed"));
 
             cancellation.bindInterrupt(() -> {
                 try {
-                    writeLine(process.getOutputStream(), Map.of("type", "cancel"));
-                } catch (RuntimeException ignored) {
+                    writeLine(process.getOutputStream(), Map.of(TYPE, "cancel"));
+                } catch (RuntimeException ignored) { // NOPMD - best-effort cancel write to a child that may be gone
                     // Best-effort only — the child may already have exited.
                 }
             });
 
             return consumeUntilComplete(
-                    process, reader, publication, cancellation, listener,
-                    startedAt, acquisitionCommand.sourceZoneId());
-        } catch (IOException e) {
-            killProcess(process);
-            throw new PecAcquisitionException("execution plane I/O failure: " + e.getMessage(), e);
-        } catch (RuntimeException e) {
+                    process, reader, publication, cancellation, listener, startedAt, acquisitionCommand.sourceZoneId());
+        } catch (RuntimeException e) { // NOPMD - kill the child on any failure, then rethrow
             // A bad AcquisitionCommand or a stdin write racing the child's exit can throw
             // unchecked after spawn. Every path that should flag ENG-51 uncertainty already does
             // so closer to its source — this catch exists only to guarantee the child is never
@@ -223,45 +247,58 @@ public final class ExecPlaneAcquisition implements Acquisition {
     }
 
     /**
-     * Reads {@code progress}/{@code complete}/{@code error} messages until the child closes its
+     * Reads {@code "progress"}/{@code "complete"}/{@code "error"} messages until the child closes its
      * stdout, then requires both an exit code of {@code 0} <em>and</em> a {@code complete} message
      * — either alone is a protocol violation, not a success. Only once both hold does this call
      * {@link DelegatedExtractPublication#publish} to verify the child's report against the file it
      * actually produced and publish it.
      */
     private ExtractionManifest consumeUntilComplete(
-            Process process, BufferedReader reader, DelegatedExtractPublication publication,
-            CancellationSignal cancellation, AcquisitionListener listener,
-            Instant startedAt, String sourceZoneId) throws IOException {
+            Process process,
+            BufferedReader reader,
+            DelegatedExtractPublication publication,
+            CancellationSignal cancellation,
+            AcquisitionListener listener,
+            Instant startedAt,
+            String sourceZoneId) {
         JsonNode complete = null;
         while (true) {
             JsonNode message;
             try {
                 message = readMessage(reader);
             } catch (IOException malformed) {
-                return abnormalTermination(process, cancellation, listener, "malformed message: " + malformed.getMessage());
+                return abnormalTermination(
+                        process, cancellation, listener, "malformed message: " + malformed.getMessage());
             }
             if (message == null) {
                 break;
             }
-            String type = text(message, "type");
+            String type = text(message, TYPE);
             if ("progress".equals(type)) {
                 listener.onProgress();
-                continue;
-            }
-            if ("complete".equals(type)) {
+            } else if ("complete".equals(type)) {
                 // Not yet trusted — still needs the exit-code check below. A child that reports
                 // complete and then exits non-zero (or never exits 0 at all) is exactly the
                 // "complete-then-nonzero" protocol violation this two-part check exists to catch.
                 complete = message;
-                continue;
-            }
-            if ("error".equals(type)) {
+            } else if ("error".equals(type)) {
                 return failFromErrorMessage(process, cancellation, listener, message);
+            } else {
+                return abnormalTermination(process, cancellation, listener, "unexpected message type: " + type);
             }
-            return abnormalTermination(process, cancellation, listener, "unexpected message type: " + type);
         }
+        return publishAfterCleanExit(process, complete, publication, cancellation, listener, startedAt, sourceZoneId);
+    }
 
+    /** Requires exit code 0 after a {@code complete} message, then publishes what the child reported. */
+    private ExtractionManifest publishAfterCleanExit(
+            Process process,
+            JsonNode complete,
+            DelegatedExtractPublication publication,
+            CancellationSignal cancellation,
+            AcquisitionListener listener,
+            Instant startedAt,
+            String sourceZoneId) {
         int exitValue = waitForExit(process);
         if (exitValue != 0 || complete == null) {
             listener.onUncertainOutcome("execution plane exited " + exitValue
@@ -278,19 +315,23 @@ public final class ExecPlaneAcquisition implements Acquisition {
 
         try {
             return publication.publish(
-                    rowCount, exclusionCount, checksum, compressedBytes, startedAt, sourceZoneId,
+                    rowCount,
+                    exclusionCount,
+                    checksum,
+                    compressedBytes,
+                    startedAt,
+                    sourceZoneId,
                     IndividualEncounterModalityCapability.QUERY_CHECKSUM,
-                    IndividualEncounterModalityCapability.ADAPTER_VERSION, "COMPLETE", "SNAPSHOT");
-        } catch (IOException | RuntimeException publishFailure) {
+                    IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                    "COMPLETE",
+                    "SNAPSHOT");
+        } catch (IOException publishFailure) {
             // The child already reported success and exited 0 — the live read is over. A failure
             // verifying/publishing the local file is not "uncertain" in the ENG-51 sense (mirrors
             // the pre-fatia-3 finalizeExtract IOException branch): the source itself isn't
             // implicated. Metadata/integrity mismatches (checksum, size, counts) surface as
-            // IllegalStateException, which FailureClassifier already treats as
-            // INCOMPATIBLE_OR_INVALID_EXTRACT DEFINITIVE.
-            if (publishFailure instanceof RuntimeException runtimeFailure) {
-                throw runtimeFailure;
-            }
+            // IllegalStateException, which propagates unchanged and FailureClassifier already
+            // treats as INCOMPATIBLE_OR_INVALID_EXTRACT DEFINITIVE.
             throw new PecAcquisitionException(
                     "could not publish execution plane extract: " + publishFailure.getMessage(), publishFailure);
         }
@@ -312,7 +353,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
         throw translate(text(message, "code"), text(message, "sqlstate"), detail);
     }
 
-    private ExtractionManifest abnormalTermination(
+    private static ExtractionManifest abnormalTermination(
             Process process, CancellationSignal cancellation, AcquisitionListener listener, String detail) {
         killProcess(process);
         listener.onUncertainOutcome("execution plane protocol violation: " + detail);
@@ -322,17 +363,16 @@ public final class ExecPlaneAcquisition implements Acquisition {
 
     /**
      * Plan §2.7.1's translation table, mapped onto exception types {@code FailureClassifier}
-     * already has a branch for. An error carrying a {@code sqlstate} becomes a {@code
+     * already has a branch for. An error carrying a {@code "sqlstate"} field becomes a {@code
      * PecAcquisitionException} caused by a {@link SQLException} with that same state — exactly the
      * shape the JDBC path throws — so the classifier's existing SQLSTATE dispatch ({@code 28*} →
      * {@code SOURCE_AUTHENTICATION_FAILED}, {@code 08*} → transient) applies unchanged, rather
      * than the plan's original new constructor plus a second, parallel classifier branch. Any
      * other unrecognized {@code code} falls through to the generic {@code UNCLASSIFIED_ERROR}.
      */
-    private RuntimeException translate(String code, String sqlState, String detail) {
+    private static RuntimeException translate(String code, String sqlState, String detail) {
         if ("COMPATIBILITY_MISMATCH".equals(code)) {
-            return new IllegalStateException(
-                    "execution plane compatibility mismatch (ENG-43): " + detail);
+            return new IllegalStateException("execution plane compatibility mismatch (ENG-43): " + detail);
         }
         if (SourceBudgetExceededException.CODE.equals(code)) {
             return new SourceBudgetExceededException(detail);
@@ -357,9 +397,11 @@ public final class ExecPlaneAcquisition implements Acquisition {
         PecCompatibilityMatrix.Entry entry;
         try {
             entry = matrix.findExact(
-                    CAPABILITY, IndividualEncounterModalityCapability.ADAPTER_VERSION,
-                    acquisitionCommand.sourceIdentity(), postgresVersion);
-        } catch (RuntimeException noEntry) {
+                    CAPABILITY,
+                    IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                    acquisitionCommand.sourceIdentity(),
+                    postgresVersion);
+        } catch (RuntimeException noEntry) { // NOPMD - any lookup failure is a reported compatibility mismatch
             return "no compatibility matrix entry: " + noEntry.getMessage();
         }
         if (!IndividualEncounterModalityCapability.QUERY_CHECKSUM.equals(entry.queryChecksum())) {
@@ -369,8 +411,8 @@ public final class ExecPlaneAcquisition implements Acquisition {
         if (!entry.queryChecksum().equals(probeQueryChecksum)) {
             // The one place the child's own query text is checked against the frozen contract
             // (plan §2.3) — without this, a child running a different query would still pass.
-            return "query checksum mismatch: matrix has " + entry.queryChecksum()
-                    + " but execution plane reported " + probeQueryChecksum;
+            return "query checksum mismatch: matrix has " + entry.queryChecksum() + " but execution plane reported "
+                    + probeQueryChecksum;
         }
         JsonNode objects = probe.get("objects");
         for (Map.Entry<String, String> expected : entry.objectFingerprints().entrySet()) {
@@ -381,20 +423,23 @@ public final class ExecPlaneAcquisition implements Acquisition {
             }
             String actual;
             try {
-                CompatibilityProbeResult probeResult =
-                        buildProbeResult(object, objectNode, entry.objectColumns().get(object));
+                CompatibilityProbeResult probeResult = buildProbeResult(
+                        object, objectNode, entry.objectColumns().get(object));
                 actual = CompatibilityFingerprint.compute(probeResult);
-            } catch (RuntimeException invalid) {
+            } catch (RuntimeException invalid) { // NOPMD - any fingerprint failure is a reported compatibility mismatch
                 return "could not compute fingerprint for " + object + ": " + invalid.getMessage();
             }
             if (!expected.getValue().equals(actual)) {
-                return "fingerprint mismatch for " + object + ": expected "
-                        + expected.getValue() + " but computed " + actual;
+                return "fingerprint mismatch for " + object + ": expected " + expected.getValue() + " but computed "
+                        + actual;
             }
             // Evidence trail: the fingerprint computed from what the child measured, per object.
-            log.info("execution plane probe matched {} for source {} (PEC {}): {}",
-                    object, acquisitionCommand.sourceIdentity().sourceId(),
-                    acquisitionCommand.sourceIdentity().pecVersion(), actual);
+            log.info(
+                    "execution plane probe matched {} for source {} (PEC {}): {}",
+                    object,
+                    acquisitionCommand.sourceIdentity().sourceId(),
+                    acquisitionCommand.sourceIdentity().pecVersion(),
+                    actual);
         }
         return null;
     }
@@ -406,81 +451,102 @@ public final class ExecPlaneAcquisition implements Acquisition {
      * {@code JdbcCompatibilityCatalog} uses (plan §1.3/§2.2) — there is no second implementation
      * of the ENG-43 signature algorithm for a child to drift from.
      */
-    private CompatibilityProbeResult buildProbeResult(String object, JsonNode objectNode, List<String> columnsUsed) {
+    private static CompatibilityProbeResult buildProbeResult(
+            String object, JsonNode objectNode, List<String> columnsUsed) {
+        List<ProbeItem> items = new ArrayList<>();
+        for (String requested : columnsUsed) {
+            items.add(probeItem(object, objectNode, requested));
+        }
+        return new CompatibilityProbeResult(object, columnMetadata(objectNode), items);
+    }
+
+    private static Map<String, ColumnMetadata> columnMetadata(JsonNode objectNode) {
         Map<String, ColumnMetadata> columns = new LinkedHashMap<>();
         JsonNode columnsNode = objectNode.get("columns");
         if (columnsNode != null) {
             for (JsonNode column : columnsNode) {
-                columns.put(text(column, "name"), new ColumnMetadata(
-                        text(column, "data_type"), text(column, "udt_name"), text(column, "is_nullable"),
-                        column.path("ordinal_position").asInt(0)));
+                columns.put(
+                        text(column, "name"),
+                        new ColumnMetadata(
+                                text(column, "data_type"),
+                                text(column, "udt_name"),
+                                text(column, "is_nullable"),
+                                column.path("ordinal_position").asInt(0)));
             }
         }
+        return columns;
+    }
 
-        List<ProbeItem> items = new ArrayList<>();
-        for (String requested : columnsUsed) {
-            if (requested.startsWith("UNIQUE_KEY=")) {
-                JsonNode uniqueKey = objectNode.get("unique_key");
-                String matchedType = uniqueKey == null ? null : text(uniqueKey, "matched_constraint_type");
-                boolean violation = uniqueKey != null
-                        && uniqueKey.path("uniqueness_violation_found").asBoolean(false);
-                items.add(new ProbeItem.UniqueKeyItem(requested, matchedType, violation));
-                continue;
-            }
-            if (requested.startsWith("REQUIRED_DIMENSIONS=")) {
-                JsonNode requiredDimensions = objectNode.get("required_dimensions");
-                // Neither the block nor its field being entirely absent is the same claim as the
-                // field being explicitly null (a completed probe that found no violation) — a
-                // child built against a mismatched protocol that drops either one must not be
-                // read as "coverage OK" by default.
-                if (requiredDimensions == null || !requiredDimensions.has("violating_fact_event_id")) {
-                    throw new IllegalStateException(
-                            "execution plane omitted required_dimensions evidence for " + object);
-                }
-                JsonNode idNode = requiredDimensions.get("violating_fact_event_id");
-                Long violatingFactId = idNode.isNull() ? null : idNode.asLong();
-                items.add(new ProbeItem.RequiredDimensionsItem(requested, violatingFactId));
-                continue;
-            }
-            if (requested.startsWith("LEAF_SEMANTICS=")) {
-                List<ProbeItem.LeafRow> rows = new ArrayList<>();
-                JsonNode leafSemantics = objectNode.get("leaf_semantics");
-                JsonNode rowsNode = leafSemantics == null ? null : leafSemantics.get("rows");
-                if (rowsNode != null) {
-                    for (JsonNode row : rowsNode) {
-                        JsonNode parentNode = row.get("parent_id");
-                        Integer parent = (parentNode == null || parentNode.isNull()) ? null : parentNode.asInt();
-                        rows.add(new ProbeItem.LeafRow(row.path("id").asInt(0), text(row, "description"), parent));
-                    }
-                }
-                items.add(new ProbeItem.LeafSemanticsItem(requested, rows));
-                continue;
-            }
-            if (requested.startsWith("LEAF_IDS=")) {
-                Set<Integer> found = new HashSet<>();
-                JsonNode leafIds = objectNode.get("leaf_ids");
-                JsonNode foundIdsNode = leafIds == null ? null : leafIds.get("found_ids");
-                if (foundIdsNode != null) {
-                    for (JsonNode id : foundIdsNode) {
-                        found.add(id.asInt());
-                    }
-                }
-                items.add(new ProbeItem.LeafIdsItem(requested, found));
-                continue;
-            }
-            items.add(new ProbeItem.ColumnItem(requested));
+    private static ProbeItem probeItem(String object, JsonNode objectNode, String requested) {
+        if (requested.startsWith("UNIQUE_KEY=")) {
+            JsonNode uniqueKey = objectNode.get("unique_key");
+            String matchedType = uniqueKey == null ? null : text(uniqueKey, "matched_constraint_type");
+            boolean violation = uniqueKey != null
+                    && uniqueKey.path("uniqueness_violation_found").asBoolean(false);
+            return new ProbeItem.UniqueKeyItem(requested, matchedType, violation);
         }
-        return new CompatibilityProbeResult(object, columns, items);
+        if (requested.startsWith("REQUIRED_DIMENSIONS=")) {
+            return requiredDimensionsItem(object, objectNode, requested);
+        }
+        if (requested.startsWith("LEAF_SEMANTICS=")) {
+            return leafSemanticsItem(objectNode, requested);
+        }
+        if (requested.startsWith("LEAF_IDS=")) {
+            return leafIdsItem(objectNode, requested);
+        }
+        return new ProbeItem.ColumnItem(requested);
+    }
+
+    private static ProbeItem requiredDimensionsItem(String object, JsonNode objectNode, String requested) {
+        JsonNode requiredDimensions = objectNode.get("required_dimensions");
+        // Neither the block nor its field being entirely absent is the same claim as the
+        // field being explicitly null (a completed probe that found no violation) — a
+        // child built against a mismatched protocol that drops either one must not be
+        // read as "coverage OK" by default.
+        if (requiredDimensions == null || !requiredDimensions.has("violating_fact_event_id")) {
+            throw new IllegalStateException("execution plane omitted required_dimensions evidence for " + object);
+        }
+        JsonNode idNode = requiredDimensions.get("violating_fact_event_id");
+        Long violatingFactId = idNode.isNull() ? null : idNode.asLong();
+        return new ProbeItem.RequiredDimensionsItem(requested, violatingFactId);
+    }
+
+    private static ProbeItem leafSemanticsItem(JsonNode objectNode, String requested) {
+        List<ProbeItem.LeafRow> rows = new ArrayList<>();
+        JsonNode leafSemantics = objectNode.get("leaf_semantics");
+        JsonNode rowsNode = leafSemantics == null ? null : leafSemantics.get("rows");
+        if (rowsNode != null) {
+            for (JsonNode row : rowsNode) {
+                JsonNode parentNode = row.get("parent_id");
+                Integer parent = (parentNode == null || parentNode.isNull()) ? null : parentNode.asInt();
+                rows.add(new ProbeItem.LeafRow(row.path("id").asInt(0), text(row, "description"), parent));
+            }
+        }
+        return new ProbeItem.LeafSemanticsItem(requested, rows);
+    }
+
+    private static ProbeItem leafIdsItem(JsonNode objectNode, String requested) {
+        Set<Integer> found = new HashSet<>();
+        JsonNode leafIds = objectNode.get("leaf_ids");
+        JsonNode foundIdsNode = leafIds == null ? null : leafIds.get("found_ids");
+        if (foundIdsNode != null) {
+            for (JsonNode id : foundIdsNode) {
+                found.add(id.asInt());
+            }
+        }
+        return new ProbeItem.LeafIdsItem(requested, found);
     }
 
     private void writeAcquireEnvelope(
             OutputStream stdin, AcquisitionCommand acquisitionCommand, String validatedHost, Path extractTempPath) {
-        char[] password = secretResolver.resolve(acquisitionCommand.connectionProperties().secretRef());
+        char[] password =
+                secretResolver.resolve(acquisitionCommand.connectionProperties().secretRef());
         try {
             ReadBudget budget = acquisitionCommand.budget();
             Map<String, Object> budgetFields = new LinkedHashMap<>();
             budgetFields.put("connect_timeout_ms", budget.connectionTimeout().toMillis());
-            budgetFields.put("acquisition_timeout_ms", budget.acquisitionTimeout().toMillis());
+            budgetFields.put(
+                    "acquisition_timeout_ms", budget.acquisitionTimeout().toMillis());
             budgetFields.put("statement_timeout_ms", budget.statementTimeoutMs());
             budgetFields.put("lock_timeout_ms", budget.lockTimeoutMs());
             budgetFields.put("idle_in_transaction_timeout_ms", budget.idleInTransactionTimeoutMs());
@@ -490,7 +556,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             budgetFields.put("max_temp_file_bytes", budget.maxTempFileBytes());
 
             Map<String, Object> envelope = new LinkedHashMap<>();
-            envelope.put("type", "acquire");
+            envelope.put(TYPE, "acquire");
             envelope.put("source_id", acquisitionCommand.connectionProperties().sourceId());
             envelope.put("host", validatedHost);
             envelope.put("port", acquisitionCommand.connectionProperties().port());
@@ -499,13 +565,18 @@ public final class ExecPlaneAcquisition implements Acquisition {
             // Password crosses only via this stdin envelope — never argv (/proc/<pid>/cmdline is
             // world-readable) and never an environment variable.
             envelope.put("password", new String(password));
-            envelope.put("municipality_ibge", acquisitionCommand.connectionProperties().municipalityIbge());
+            envelope.put(
+                    "municipality_ibge",
+                    acquisitionCommand.connectionProperties().municipalityIbge());
             envelope.put("pec_version", acquisitionCommand.sourceIdentity().pecVersion());
             envelope.put("read_model", acquisitionCommand.sourceIdentity().readModel());
-            envelope.put("installation_role", acquisitionCommand.sourceIdentity().installationRole());
+            envelope.put(
+                    "installation_role", acquisitionCommand.sourceIdentity().installationRole());
             envelope.put("extraction_id", acquisitionCommand.extractionId());
             envelope.put("period_start", acquisitionCommand.periodStart().toString());
-            envelope.put("period_end_exclusive", acquisitionCommand.periodEndExclusive().toString());
+            envelope.put(
+                    "period_end_exclusive",
+                    acquisitionCommand.periodEndExclusive().toString());
             envelope.put("source_zone_id", acquisitionCommand.sourceZoneId());
             // Fatia 3 / ADR 0011: the child writes the extract's data file itself, at this one
             // reserved path — the same path DelegatedExtractPublication already took the
@@ -532,7 +603,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
         }
         try {
             return mapper.readTree(line);
-        } catch (RuntimeException malformed) {
+        } catch (RuntimeException malformed) { // NOPMD - Jackson 3 throws unchecked; converted with its cause
             throw new IOException("invalid JSON line from execution plane: " + line, malformed);
         }
     }
@@ -541,7 +612,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
         String json;
         try {
             json = mapper.writeValueAsString(payload);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e) { // NOPMD - Jackson 3 throws unchecked; converted with its cause
             throw new PecAcquisitionException("could not serialize message to execution plane: " + e.getMessage(), e);
         }
         synchronized (stdin) {
@@ -554,18 +625,20 @@ public final class ExecPlaneAcquisition implements Acquisition {
         }
     }
 
-    private void drainStderr(Process process) {
-        Thread stderrThread = new Thread(() -> {
-            try (BufferedReader err = new BufferedReader(
-                    new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = err.readLine()) != null) {
-                    log.info("execution plane: {}", line);
-                }
-            } catch (IOException ignored) {
-                // The process ended; nothing left to drain.
-            }
-        }, "execplane-stderr");
+    private static void drainStderr(Process process) {
+        Thread stderrThread = new Thread(
+                () -> {
+                    try (BufferedReader err = new BufferedReader(
+                            new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = err.readLine()) != null) {
+                            log.info("execution plane: {}", line);
+                        }
+                    } catch (IOException ignored) {
+                        // The process ended; nothing left to drain.
+                    }
+                },
+                "execplane-stderr");
         stderrThread.setDaemon(true);
         stderrThread.start();
     }
@@ -600,7 +673,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
         }
     }
 
-    private void killProcess(Process process) {
+    private static void killProcess(Process process) {
         if (!process.isAlive()) {
             return;
         }

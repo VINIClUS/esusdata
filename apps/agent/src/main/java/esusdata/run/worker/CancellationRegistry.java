@@ -1,9 +1,10 @@
 package esusdata.run.worker;
 
+import esusdata.run.job.CancellationToken;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import esusdata.run.job.CancellationToken;
+
 /** Process-wide registry of the currently-running job's {@link CancellationToken}. */
 public final class CancellationRegistry {
 

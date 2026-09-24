@@ -1,14 +1,13 @@
 package esusdata.result;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import esusdata.run.extract.ExtractFixtures;
 import esusdata.run.extract.ExtractionManifest;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * §1.9.5: "resultado apontando para arquivo perdido fica indisponível/limitado, nunca
@@ -21,8 +20,8 @@ class ReproducibilityCheckTest {
 
     @Test
     void healthyExtractIsReproducible() throws Exception {
-        ExtractionManifest manifest = ExtractFixtures.write(
-                extractsDir, "ext-ok", "src-1", "3541307", "2026-03", 3, 2, 0);
+        ExtractionManifest manifest =
+                ExtractFixtures.write(extractsDir, "ext-ok", "src-1", "3541307", "2026-03", 3, 2, 0);
 
         var outcome = new ReproducibilityCheck(extractsDir).verify(manifest.extractionId());
         assertThat(outcome.reproducible()).isTrue();
@@ -30,8 +29,8 @@ class ReproducibilityCheckTest {
 
     @Test
     void missingDataFileIsNotReproducible() throws Exception {
-        ExtractionManifest manifest = ExtractFixtures.write(
-                extractsDir, "ext-missing", "src-1", "3541307", "2026-03", 3, 2, 0);
+        ExtractionManifest manifest =
+                ExtractFixtures.write(extractsDir, "ext-missing", "src-1", "3541307", "2026-03", 3, 2, 0);
         Files.delete(extractsDir.resolve(manifest.extractionId() + ".jsonl.gz"));
 
         var outcome = new ReproducibilityCheck(extractsDir).verify(manifest.extractionId());
@@ -41,10 +40,10 @@ class ReproducibilityCheckTest {
 
     @Test
     void corruptedDataFileIsNotReproducible() throws Exception {
-        ExtractionManifest manifest = ExtractFixtures.write(
-                extractsDir, "ext-corrupt", "src-1", "3541307", "2026-03", 3, 2, 0);
+        ExtractionManifest manifest =
+                ExtractFixtures.write(extractsDir, "ext-corrupt", "src-1", "3541307", "2026-03", 3, 2, 0);
         Path dataFile = extractsDir.resolve(manifest.extractionId() + ".jsonl.gz");
-        Files.write(dataFile, new byte[]{0, 1, 2, 3});
+        Files.write(dataFile, new byte[] {0, 1, 2, 3});
 
         var outcome = new ReproducibilityCheck(extractsDir).verify(manifest.extractionId());
         assertThat(outcome.reproducible()).isFalse();

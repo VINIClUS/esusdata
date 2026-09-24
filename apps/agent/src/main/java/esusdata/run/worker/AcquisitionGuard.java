@@ -1,10 +1,11 @@
 package esusdata.run.worker;
 
+import esusdata.run.job.AcquisitionGuardStore;
+import esusdata.run.job.SourceAcquisitionBlockedException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
-import esusdata.run.job.AcquisitionGuardStore;
-import esusdata.run.job.SourceAcquisitionBlockedException;
+
 /**
  * ENG-51: "restart não abre extração sobreposta sem confirmar término anterior." After an
  * abandoned live acquisition, a new {@code LIVE_READ_ONLY} attempt against the same source is
@@ -37,7 +38,8 @@ public final class AcquisitionGuard {
         if (blockedUntil.isPresent() && blockedUntil.get().isAfter(clock.instant())) {
             throw new SourceAcquisitionBlockedException(
                     "source " + sourceId + " is on cooldown until " + blockedUntil.get()
-                            + " after an abandoned acquisition (ENG-51)", blockedUntil.get());
+                            + " after an abandoned acquisition (ENG-51)",
+                    blockedUntil.get());
         }
     }
 }

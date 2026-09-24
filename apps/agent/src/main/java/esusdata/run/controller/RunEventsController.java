@@ -1,23 +1,14 @@
 package esusdata.run.controller;
 
-import esusdata.auth.model.AuthenticatedSession;
-import esusdata.auth.model.Permission;
+import esusdata.auth.ApiAuthorization;
 import esusdata.auth.ScopeResolver;
 import esusdata.auth.SessionService;
+import esusdata.auth.model.AuthenticatedSession;
+import esusdata.auth.model.Permission;
 import esusdata.run.job.Job;
 import esusdata.run.job.JobRepository;
 import esusdata.run.job.JobState;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
+import esusdata.web.ApiNotFoundException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.EnumSet;
@@ -28,8 +19,17 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import esusdata.web.ApiNotFoundException;
-import esusdata.auth.ApiAuthorization;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
 /**
  * {@code GET /runs/{id}/events} — §1.10 L397: "a consulta do job é a fonte de verdade" and, with
  * no replay in the MVP, "reconexão reenvia estado atual". Implemented as a scheduler polling
@@ -63,10 +63,15 @@ public class RunEventsController {
     private final long authorizationRevalidationIntervalMs;
 
     public RunEventsController(
-            JobRepository jobRepository, RunResponseFactory responseFactory, ApiAuthorization authorization,
-            ScopeResolver scopeResolver, SessionService sessionService, SseConnectionLimiter limiter,
+            JobRepository jobRepository,
+            RunResponseFactory responseFactory,
+            ApiAuthorization authorization,
+            ScopeResolver scopeResolver,
+            SessionService sessionService,
+            SseConnectionLimiter limiter,
             @Qualifier("sseScheduler") ScheduledExecutorService sseScheduler,
-            @Qualifier("sseReauthScheduler") ScheduledExecutorService sseReauthScheduler, Clock clock,
+            @Qualifier("sseReauthScheduler") ScheduledExecutorService sseReauthScheduler,
+            Clock clock,
             @Value("${observatorio.job-runner.poll-interval-ms:2000}") long pollIntervalMs,
             @Value("${observatorio.security.authorization-revalidation-interval-seconds:30}")
                     long authorizationRevalidationIntervalSeconds) {
@@ -80,10 +85,10 @@ public class RunEventsController {
         this.reauthScheduler = sseReauthScheduler;
         this.clock = clock;
         this.pollIntervalMs = Math.max(1, pollIntervalMs);
-        long effectiveAuthorizationRevalidationIntervalSeconds = Math.min(30,
-                Math.max(1, authorizationRevalidationIntervalSeconds));
-        this.authorizationRevalidationIntervalMs = TimeUnit.SECONDS.toMillis(
-                effectiveAuthorizationRevalidationIntervalSeconds);
+        long effectiveAuthorizationRevalidationIntervalSeconds =
+                Math.min(30, Math.max(1, authorizationRevalidationIntervalSeconds));
+        this.authorizationRevalidationIntervalMs =
+                TimeUnit.SECONDS.toMillis(effectiveAuthorizationRevalidationIntervalSeconds);
     }
 
     @GetMapping(value = "/api/v1/runs/{id}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -138,7 +143,9 @@ public class RunEventsController {
         // busy_timeout=5000 must not queue up catch-up executions back-to-back once it returns.
         ScheduledFuture<?> pollFuture = scheduler.scheduleWithFixedDelay(
                 () -> poll(id, terminalAttemptFirstObservedAt, lastSent, emitter, emitterLock, stopped, onDone),
-                0, pollIntervalMs, TimeUnit.MILLISECONDS);
+                0,
+                pollIntervalMs,
+                TimeUnit.MILLISECONDS);
         pollFutureHolder.set(pollFuture);
         if (stopped.get()) {
             // A zero-delay scheduler may run the first poll before this assignment. Completion is
@@ -148,9 +155,9 @@ public class RunEventsController {
         }
 
         ScheduledFuture<?> reauthFuture = reauthScheduler.scheduleAtFixedRate(
-                () -> reauthorize(session, sessionId, userId, municipalityIbge, emitter, emitterLock, stopped,
-                        onDone),
-                authorizationRevalidationIntervalMs, authorizationRevalidationIntervalMs,
+                () -> reauthorize(session, sessionId, userId, municipalityIbge, emitter, emitterLock, stopped, onDone),
+                authorizationRevalidationIntervalMs,
+                authorizationRevalidationIntervalMs,
                 TimeUnit.MILLISECONDS);
         reauthFutureHolder.set(reauthFuture);
         if (stopped.get()) {
@@ -161,9 +168,13 @@ public class RunEventsController {
     }
 
     private void poll(
-            String jobId, AtomicReference<Instant> terminalAttemptFirstObservedAt,
+            String jobId,
+            AtomicReference<Instant> terminalAttemptFirstObservedAt,
             AtomicReference<JobSnapshot> lastSent,
-            SseEmitter emitter, Object emitterLock, AtomicBoolean stopped, Runnable onDone) {
+            SseEmitter emitter,
+            Object emitterLock,
+            AtomicBoolean stopped,
+            Runnable onDone) {
         if (stopped.get()) {
             return;
         }
@@ -171,49 +182,34 @@ public class RunEventsController {
             Job current = jobRepository.findById(jobId).orElse(null);
             if (current == null) {
                 onDone.run();
-                completeWithError(emitter, emitterLock,
-                        new IllegalStateException("job " + jobId + " no longer exists"));
+                completeWithError(
+                        emitter, emitterLock, new IllegalStateException("job " + jobId + " no longer exists"));
                 return;
             }
 
             JobSnapshot snapshot = new JobSnapshot(
-                    current.state(), current.attempt(), current.lastProgressAt(),
+                    current.state(),
+                    current.attempt(),
+                    current.lastProgressAt(),
                     List.copyOf(jobRepository.findAttempts(jobId)));
             boolean terminal = TERMINAL.contains(current.state());
             if (!terminal) {
                 terminalAttemptFirstObservedAt.set(null);
-            }
-            if (!terminal && snapshot.equals(lastSent.get())) {
-                return;
-            }
-            RunResponse response = responseFactory.toResponse(current);
-            boolean finalAttemptVisible = current.attempt() == 0
-                    || response.attempts().stream().anyMatch(attempt -> attempt.attempt() == current.attempt());
-            boolean terminalAttemptWaitExpired = false;
-            if (terminal && !finalAttemptVisible) {
-                Instant now = clock.instant();
-                Instant firstObservedAt = terminalAttemptFirstObservedAt.get();
-                if (firstObservedAt == null && terminalAttemptFirstObservedAt.compareAndSet(null, now)) {
-                    firstObservedAt = now;
-                } else if (firstObservedAt == null) {
-                    firstObservedAt = terminalAttemptFirstObservedAt.get();
-                }
-                terminalAttemptWaitExpired = !now.isBefore(firstObservedAt.plusMillis(TERMINAL_ATTEMPT_WAIT_MS));
-            }
-            if (terminal && !finalAttemptVisible && !terminalAttemptWaitExpired) {
-                return;
-            }
-            synchronized (emitterLock) {
-                if (stopped.get()) {
+                if (snapshot.equals(lastSent.get())) {
                     return;
                 }
-                if (!snapshot.equals(lastSent.get())) {
-                    if (terminalAttemptWaitExpired) {
-                        log.warn("closing terminal SSE stream for job {} without final attempt history", jobId);
-                    }
-                    emitter.send(SseEmitter.event().name("run").data(response, MediaType.APPLICATION_JSON));
-                    lastSent.set(snapshot);
+            }
+            RunResponse response = responseFactory.toResponse(current);
+            boolean terminalAttemptWaitExpired = false;
+            if (terminal && !finalAttemptVisible(current, response)) {
+                if (!terminalAttemptWaitExpired(terminalAttemptFirstObservedAt)) {
+                    return;
                 }
+                terminalAttemptWaitExpired = true;
+            }
+            if (!sendIfChanged(
+                    jobId, snapshot, response, terminalAttemptWaitExpired, lastSent, emitter, emitterLock, stopped)) {
+                return;
             }
             if (terminal) {
                 onDone.run();
@@ -222,15 +218,67 @@ public class RunEventsController {
         } catch (java.io.IOException e) {
             onDone.run();
             completeWithError(emitter, emitterLock, e);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e) { // NOPMD - an SSE poll must always release and complete the emitter
             onDone.run();
             completeWithError(emitter, emitterLock, e);
         }
     }
 
+    private static boolean finalAttemptVisible(Job current, RunResponse response) {
+        return current.attempt() == 0
+                || response.attempts().stream().anyMatch(attempt -> attempt.attempt() == current.attempt());
+    }
+
+    /**
+     * Starts the grace period on the first terminal poll that lacks the final attempt, and reports
+     * whether it has run out.
+     */
+    private boolean terminalAttemptWaitExpired(AtomicReference<Instant> terminalAttemptFirstObservedAt) {
+        Instant now = clock.instant();
+        Instant firstObservedAt = terminalAttemptFirstObservedAt.get();
+        if (firstObservedAt == null && terminalAttemptFirstObservedAt.compareAndSet(null, now)) {
+            firstObservedAt = now;
+        } else if (firstObservedAt == null) {
+            firstObservedAt = terminalAttemptFirstObservedAt.get();
+        }
+        return !now.isBefore(firstObservedAt.plusMillis(TERMINAL_ATTEMPT_WAIT_MS));
+    }
+
+    /** Sends the snapshot unless it was already sent; false if the stream stopped meanwhile. */
+    private static boolean sendIfChanged(
+            String jobId,
+            JobSnapshot snapshot,
+            RunResponse response,
+            boolean terminalAttemptWaitExpired,
+            AtomicReference<JobSnapshot> lastSent,
+            SseEmitter emitter,
+            Object emitterLock,
+            AtomicBoolean stopped)
+            throws java.io.IOException {
+        synchronized (emitterLock) {
+            if (stopped.get()) {
+                return false;
+            }
+            if (!snapshot.equals(lastSent.get())) {
+                if (terminalAttemptWaitExpired) {
+                    log.warn("closing terminal SSE stream for job {} without final attempt history", jobId);
+                }
+                emitter.send(SseEmitter.event().name("run").data(response, MediaType.APPLICATION_JSON));
+                lastSent.set(snapshot);
+            }
+        }
+        return true;
+    }
+
     private void reauthorize(
-            AuthenticatedSession session, String sessionId, String userId, String municipalityIbge,
-            SseEmitter emitter, Object emitterLock, AtomicBoolean stopped, Runnable onDone) {
+            AuthenticatedSession session,
+            String sessionId,
+            String userId,
+            String municipalityIbge,
+            SseEmitter emitter,
+            Object emitterLock,
+            AtomicBoolean stopped,
+            Runnable onDone) {
         if (stopped.get()) {
             return;
         }
@@ -264,25 +312,24 @@ public class RunEventsController {
         } catch (java.io.IOException e) {
             onDone.run();
             completeWithError(emitter, emitterLock, e);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e) { // NOPMD - an SSE poll must always release and complete the emitter
             onDone.run();
             completeWithError(emitter, emitterLock, e);
         }
     }
 
-    private void complete(SseEmitter emitter, Object emitterLock) {
+    private static void complete(SseEmitter emitter, Object emitterLock) {
         synchronized (emitterLock) {
             emitter.complete();
         }
     }
 
-    private void completeWithError(SseEmitter emitter, Object emitterLock, Throwable error) {
+    private static void completeWithError(SseEmitter emitter, Object emitterLock, Throwable error) {
         synchronized (emitterLock) {
             emitter.completeWithError(error);
         }
     }
 
     private record JobSnapshot(
-            JobState state, int attempt, Instant lastProgressAt, List<JobRepository.AttemptRecord> attempts) {
-    }
+            JobState state, int attempt, Instant lastProgressAt, List<JobRepository.AttemptRecord> attempts) {}
 }

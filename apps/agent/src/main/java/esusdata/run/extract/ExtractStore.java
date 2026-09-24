@@ -1,7 +1,6 @@
 package esusdata.run.extract;
 
 import esusdata.indicator.model.CanonicalEncounter;
-
 import java.io.IOException;
 import java.util.List;
 

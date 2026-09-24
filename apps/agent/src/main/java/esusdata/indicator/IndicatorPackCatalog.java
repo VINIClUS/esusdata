@@ -12,6 +12,15 @@ import java.util.Optional;
  */
 public final class IndicatorPackCatalog {
 
+    private static final List<PackEntry> PACKS = List.of(new PackEntry(
+            C1Rule.INDICATOR_PACK,
+            C1Rule.RULE_VERSION,
+            "PREVINE_BRASIL_QUALIDADE",
+            "percentual",
+            List.of(),
+            false,
+            C1Rule.ReleaseGates.knownIncomplete().incompleteReasons()));
+
     public record PackEntry(
             String id,
             String ruleVersion,
@@ -19,18 +28,9 @@ public final class IndicatorPackCatalog {
             String unit,
             List<String> dependsOn,
             boolean executionEnabled,
-            List<String> blockedGates
-    ) {
-    }
+            List<String> blockedGates) {}
 
-    private static final List<PackEntry> PACKS = List.of(
-            new PackEntry(
-                    C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION, "PREVINE_BRASIL_QUALIDADE",
-                    "percentual", List.of(), false,
-                    C1Rule.ReleaseGates.knownIncomplete().incompleteReasons()));
-
-    private IndicatorPackCatalog() {
-    }
+    private IndicatorPackCatalog() {}
 
     public static List<PackEntry> all() {
         return PACKS;

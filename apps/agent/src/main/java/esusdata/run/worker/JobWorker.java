@@ -2,11 +2,13 @@ package esusdata.run.worker;
 
 import esusdata.result.model.PublicationRefusedException;
 import esusdata.result.model.ResultStagingArea;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.context.SmartLifecycle;
-import org.springframework.dao.DataAccessException;
-
+import esusdata.run.job.CancellationToken;
+import esusdata.run.job.Job;
+import esusdata.run.job.JobCancelledException;
+import esusdata.run.job.JobRepository;
+import esusdata.run.job.JobState;
+import esusdata.run.job.RetryPolicy;
+import esusdata.run.job.SourceAcquisitionBlockedException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -14,14 +16,11 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import esusdata.run.job.EnqueueRequest;
-import esusdata.run.job.Job;
-import esusdata.run.job.JobCancelledException;
-import esusdata.run.job.JobState;
-import esusdata.run.job.RetryPolicy;
-import esusdata.run.job.SourceAcquisitionBlockedException;
-import esusdata.run.job.CancellationToken;
-import esusdata.run.job.JobRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.SmartLifecycle;
+import org.springframework.dao.DataAccessException;
+
 /**
  * The MVP's single calculation worker (§1.9.4: "um worker de cálculo ativo por instalação"). Runs
  * on its own non-daemon thread so the process stays alive as long as the service is running —
@@ -113,7 +112,7 @@ public final class JobWorker implements SmartLifecycle {
         }
     }
 
-    private void sleep(Duration duration) {
+    private static void sleep(Duration duration) {
         try {
             Thread.sleep(duration.toMillis());
         } catch (InterruptedException e) {
@@ -141,7 +140,7 @@ public final class JobWorker implements SmartLifecycle {
         Job job = maybeJob.get();
         try {
             processJob(job);
-        } catch (RuntimeException unexpected) {
+        } catch (RuntimeException unexpected) { // NOPMD - the only worker thread must survive; see comment below
             // processJob's own catch blocks (handleFailure, finalizeCancellationIfOwned) make
             // their own unguarded DB calls — findById, neutralize, requeueForRetry/markFailed,
             // recordAttempt — to resolve the job's outcome. If any of those hits transient
@@ -152,8 +151,7 @@ public final class JobWorker implements SmartLifecycle {
             // process still thinks is running). The job is left wherever its own CAS updates last
             // landed it — never silently marked done — for the next poll cycle or JobRecovery to
             // resolve.
-            log.error("processing job " + job.jobId() + " failed unexpectedly; worker continues polling",
-                    unexpected);
+            log.error("processing job " + job.jobId() + " failed unexpectedly; worker continues polling", unexpected);
         }
         return true;
     }
@@ -162,15 +160,23 @@ public final class JobWorker implements SmartLifecycle {
         CancellationToken token = cancellationRegistry.register(job.jobId());
         try {
             Job persisted = jobRepository.findById(job.jobId()).orElse(null);
-            if (persisted != null && persisted.state() == JobState.CANCEL_REQUESTED
+            if (persisted != null
+                    && persisted.state() == JobState.CANCEL_REQUESTED
                     && processInstanceId.equals(persisted.processInstanceId())
                     && persisted.executionGeneration() == job.executionGeneration()) {
                 token.requestCancel();
             }
             RunExecutor.RunContext context = new RunExecutor.RunContext(
-                    job.jobId(), job.runId(), job.sourceId(), job.executionGeneration(),
-                    job.processInstanceId(), job.extractionId(), job.municipalityIbge(),
-                    job.referencePeriod(), job.indicatorPack(), job.ruleVersion(),
+                    job.jobId(),
+                    job.runId(),
+                    job.sourceId(),
+                    job.executionGeneration(),
+                    job.processInstanceId(),
+                    job.extractionId(),
+                    job.municipalityIbge(),
+                    job.referencePeriod(),
+                    job.indicatorPack(),
+                    job.ruleVersion(),
                     job.idempotencyPrincipal());
             token.checkCancelled();
             if (job.isImmutableExtract()) {
@@ -181,15 +187,16 @@ public final class JobWorker implements SmartLifecycle {
                 // Unreachable through EnqueueRequest, which requires one of extractionId/sourceId
                 // at creation time — kept as defense-in-depth against a job inserted by another
                 // path (a migration, a direct SQL fixture) that bypasses that constructor.
-                finalizeDefinitiveFailure(job, "UNSUPPORTED_ACQUISITION_MODE",
+                finalizeDefinitiveFailure(
+                        job,
+                        "UNSUPPORTED_ACQUISITION_MODE",
                         "job has neither extraction_id (IMMUTABLE_EXTRACT) nor source_id (LIVE_READ_ONLY).");
-                return;
             }
             // PublicationService records the successful attempt in the same transaction that
             // makes the result and SUCCEEDED job visible.
         } catch (JobCancelledException | PublicationRefusedException cancelledOrRaced) {
             finalizeCancellationIfOwned(job);
-        } catch (Exception failure) {
+        } catch (Exception failure) { // NOPMD - every job failure is classified by handleFailure
             handleFailure(job, failure);
         } finally {
             cancellationRegistry.unregister(job.jobId());
@@ -204,7 +211,8 @@ public final class JobWorker implements SmartLifecycle {
     private void finalizeCancellationIfOwned(Job job) {
         Instant now = clock.instant();
         Job refreshed = jobRepository.findById(job.jobId()).orElse(null);
-        if (refreshed == null || refreshed.state() != JobState.CANCEL_REQUESTED
+        if (refreshed == null
+                || refreshed.state() != JobState.CANCEL_REQUESTED
                 || !processInstanceId.equals(refreshed.processInstanceId())
                 || refreshed.executionGeneration() != job.executionGeneration()) {
             return;
@@ -212,8 +220,7 @@ public final class JobWorker implements SmartLifecycle {
         if (refreshed.stagingId() != null) {
             stagingArea.neutralize(refreshed.stagingId());
         }
-        jobRepository.markCancelledAndRecordAttempt(
-                job.jobId(), processInstanceId, job.executionGeneration(), now);
+        jobRepository.markCancelledAndRecordAttempt(job.jobId(), processInstanceId, job.executionGeneration(), now);
     }
 
     private void handleFailure(Job job, Throwable failure) {
@@ -245,19 +252,30 @@ public final class JobWorker implements SmartLifecycle {
                 // would have accomplished nothing.
                 nextAttemptAt = blocked.blockedUntil();
             }
-            jobRepository.requeueForRetryAndRecordAttempt(job.jobId(), processInstanceId,
-                    job.executionGeneration(), fromState, nextAttemptAt,
-                    classification.code(), classification.detail(), now);
+            jobRepository.requeueForRetryAndRecordAttempt(
+                    job.jobId(),
+                    processInstanceId,
+                    job.executionGeneration(),
+                    fromState,
+                    nextAttemptAt,
+                    classification.code(),
+                    classification.detail(),
+                    now);
         } else {
-            jobRepository.markFailedAndRecordAttempt(job.jobId(), processInstanceId,
-                    job.executionGeneration(), fromState, classification.code(),
-                    classification.detail(), now);
+            jobRepository.markFailedAndRecordAttempt(
+                    job.jobId(),
+                    processInstanceId,
+                    job.executionGeneration(),
+                    fromState,
+                    classification.code(),
+                    classification.detail(),
+                    now);
         }
     }
 
     private void finalizeDefinitiveFailure(Job job, String code, String detail) {
         Instant now = clock.instant();
-        jobRepository.markFailedAndRecordAttempt(job.jobId(), processInstanceId,
-                job.executionGeneration(), JobState.RUNNING, code, detail, now);
+        jobRepository.markFailedAndRecordAttempt(
+                job.jobId(), processInstanceId, job.executionGeneration(), JobState.RUNNING, code, detail, now);
     }
 }

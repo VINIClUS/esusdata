@@ -8,8 +8,8 @@ package esusdata.source.pec;
  *
  * @param sourceId          persistent identity of the source (§1.4.1), independent of host changes
  * @param host              validated against {@link AllowedDestinations} before any connection attempt
- * @param port
- * @param database
+ * @param port              PostgreSQL port of the PEC database
+ * @param database          PEC database name
  * @param user              the PEC role used for reads — never {@code postgres} (§1.12.7)
  * @param secretRef         opaque reference to where the password is stored; never the password itself
  * @param municipalityIbge  7-digit IBGE code this source is authorized for (§1.4.2)
@@ -21,22 +21,20 @@ public record PecConnectionProperties(
         String database,
         String user,
         String secretRef,
-        String municipalityIbge
-) {
+        String municipalityIbge) {
     public PecConnectionProperties {
         if (host == null || host.isBlank()) {
             throw new IllegalArgumentException("host is required");
         }
-        if (port <= 0 || port > 65535) {
+        if (port <= 0 || port > 65_535) {
             throw new IllegalArgumentException("port out of range: " + port);
         }
         if (database == null || database.isBlank()) {
             throw new IllegalArgumentException("database is required");
         }
         if (!isValidPostgresIdentifier(database)) {
-            throw new IllegalArgumentException(
-                    "database name is not a valid PostgreSQL identifier: " + database
-                            + " — must be alphanumeric or underscore, no JDBC URL parameter injection allowed");
+            throw new IllegalArgumentException("database name is not a valid PostgreSQL identifier: " + database
+                    + " — must be alphanumeric or underscore, no JDBC URL parameter injection allowed");
         }
         if (user == null || user.isBlank()) {
             throw new IllegalArgumentException("user is required");
@@ -46,8 +44,7 @@ public record PecConnectionProperties(
                     "Refusing to configure a source with the 'postgres' superuser (Tech Spec §1.12.7)");
         }
         if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
-            throw new IllegalArgumentException(
-                    "municipality_ibge must be a 7-digit code, got: " + municipalityIbge);
+            throw new IllegalArgumentException("municipality_ibge must be a 7-digit code, got: " + municipalityIbge);
         }
     }
 

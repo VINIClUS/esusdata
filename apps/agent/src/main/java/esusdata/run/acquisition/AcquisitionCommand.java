@@ -3,7 +3,6 @@ package esusdata.run.acquisition;
 import esusdata.source.pec.PecConnectionProperties;
 import esusdata.source.pec.PecSourceIdentity;
 import esusdata.source.pec.ReadBudget;
-
 import java.time.LocalDate;
 
 /**
@@ -18,6 +17,4 @@ public record AcquisitionCommand(
         String extractionId,
         LocalDate periodStart,
         LocalDate periodEndExclusive,
-        String sourceZoneId
-) {
-}
+        String sourceZoneId) {}

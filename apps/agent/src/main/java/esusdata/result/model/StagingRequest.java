@@ -15,6 +15,4 @@ public record StagingRequest(
         String extractionId,
         String adapterVersion,
         String evidenceGrain,
-        String inputFingerprint
-) {
-}
+        String inputFingerprint) {}

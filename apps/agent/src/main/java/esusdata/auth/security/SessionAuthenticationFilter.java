@@ -1,21 +1,20 @@
 package esusdata.auth.security;
 
-import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.SessionService;
+import esusdata.auth.model.AuthenticatedSession;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
-import org.springframework.web.filter.OncePerRequestFilter;
-
 import java.io.IOException;
 import java.time.Clock;
 import java.util.Optional;
 import java.util.function.Predicate;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Populates the security context from the opaque {@value SessionCookie#NAME} cookie —
@@ -45,7 +44,9 @@ public final class SessionAuthenticationFilter extends OncePerRequestFilter {
     private final RequestAttributeSecurityContextRepository securityContextRepository;
 
     public SessionAuthenticationFilter(
-            SessionService sessionService, Clock clock, Predicate<HttpServletRequest> nonInteractive,
+            SessionService sessionService,
+            Clock clock,
+            Predicate<HttpServletRequest> nonInteractive,
             RequestAttributeSecurityContextRepository securityContextRepository) {
         this.sessionService = sessionService;
         this.clock = clock;
@@ -54,14 +55,12 @@ public final class SessionAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String rawToken = readCookie(request);
         if (rawToken != null) {
             boolean interactive = !nonInteractive.test(request);
-            Optional<AuthenticatedSession> session =
-                    sessionService.validate(rawToken, clock.instant(), interactive);
+            Optional<AuthenticatedSession> session = sessionService.validate(rawToken, clock.instant(), interactive);
             session.ifPresent(s -> {
                 SecurityContext context = SecurityContextHolder.getContext();
                 context.setAuthentication(new SessionAuthenticationToken(s, rawToken));
@@ -71,7 +70,7 @@ public final class SessionAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private String readCookie(HttpServletRequest request) {
+    private static String readCookie(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return null;

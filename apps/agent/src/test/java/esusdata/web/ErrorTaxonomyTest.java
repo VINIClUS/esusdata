@@ -1,27 +1,26 @@
 package esusdata.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import esusdata.auth.model.Role;
 import esusdata.indicator.pack.c1.C1Rule;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * §1.10 L399: distinguishable failure classes surface through {@code GET /runs/{id}} as a named
  * {@code failureCode}, never collapsed into a generic error and never a fabricated success.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class ErrorTaxonomyTest extends ApiFixtureSupport {
+class ErrorTaxonomyTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 
@@ -41,7 +40,9 @@ public class ErrorTaxonomyTest extends ApiFixtureSupport {
         // authorizes no destination").
         registerSource(sourceId, MUNICIPALITY);
 
-        HttpResponse<String> created = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
+        HttpResponse<String> created = authenticatedPostWithIdempotency(
+                cookie,
+                "idem-" + System.nanoTime(),
                 "{\"municipalityIbge\":\"" + MUNICIPALITY + "\",\"indicatorPack\":\"" + C1Rule.INDICATOR_PACK
                         + "\",\"ruleVersion\":\"" + C1Rule.RULE_VERSION + "\",\"referencePeriod\":\"2026-03\","
                         + "\"sourceId\":\"" + sourceId + "\"}");
@@ -62,7 +63,9 @@ public class ErrorTaxonomyTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
 
-        HttpResponse<String> created = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
+        HttpResponse<String> created = authenticatedPostWithIdempotency(
+                cookie,
+                "idem-" + System.nanoTime(),
                 "{\"municipalityIbge\":\"" + MUNICIPALITY + "\",\"indicatorPack\":\"unknown-pack\","
                         + "\"ruleVersion\":\"unknown-pack@1\",\"referencePeriod\":\"2026-03\","
                         + "\"sourceId\":\"" + sourceId + "\"}");
@@ -75,16 +78,20 @@ public class ErrorTaxonomyTest extends ApiFixtureSupport {
         assertThat(finalBody).contains("\"resultId\":null");
     }
 
-    private String pollUntilTerminal(String cookie, String jobId) throws Exception {
+    private static String pollUntilTerminal(String cookie, String jobId) throws Exception {
         Instant deadline = Instant.now().plus(Duration.ofSeconds(10));
         String body = null;
         while (Instant.now().isBefore(deadline)) {
-            HttpResponse<String> response = HttpClient.newHttpClient().send(
-                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs/" + jobId))
-                            .header("Cookie", cookie).GET().build(),
-                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(
+                            HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs/" + jobId))
+                                    .header("Cookie", cookie)
+                                    .GET()
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
             body = response.body();
-            if (body.contains("\"state\":\"SUCCEEDED\"") || body.contains("\"state\":\"FAILED\"")
+            if (body.contains("\"state\":\"SUCCEEDED\"")
+                    || body.contains("\"state\":\"FAILED\"")
                     || body.contains("\"state\":\"CANCELLED\"")) {
                 return body;
             }
@@ -93,7 +100,7 @@ public class ErrorTaxonomyTest extends ApiFixtureSupport {
         throw new AssertionError("job " + jobId + " did not reach a terminal state in time; last body: " + body);
     }
 
-    private String extractField(String json, String field) {
+    private static String extractField(String json, String field) {
         String marker = "\"" + field + "\":\"";
         int start = json.indexOf(marker) + marker.length();
         int end = json.indexOf('"', start);

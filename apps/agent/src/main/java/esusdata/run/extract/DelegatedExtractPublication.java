@@ -1,8 +1,6 @@
 package esusdata.run.extract;
 
 import esusdata.run.acquisition.AcquisitionCommand;
-import tools.jackson.databind.ObjectMapper;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -14,6 +12,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Objects;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Publishes an extract whose data file was written by an external process — the Rust execution
@@ -49,23 +48,20 @@ public final class DelegatedExtractPublication implements AutoCloseable {
     private final Path tempFile;
 
     /** Opens a publication bound to the exact source, period, and read policy of one acquisition. */
-    public DelegatedExtractPublication(
-            Path baseDir,
-            String extractionId,
-            AcquisitionCommand acquisitionCommand
-    ) throws IOException {
-        this(baseDir, extractionId,
+    public DelegatedExtractPublication(Path baseDir, String extractionId, AcquisitionCommand acquisitionCommand)
+            throws IOException {
+        this(
+                baseDir,
+                extractionId,
                 Objects.requireNonNull(acquisitionCommand, "acquisitionCommand is required")
-                        .budget().maxTempFileBytes(),
+                        .budget()
+                        .maxTempFileBytes(),
                 scopeFor(acquisitionCommand));
     }
 
     DelegatedExtractPublication(
-            Path baseDir,
-            String extractionId,
-            long maxTempFileBytes,
-            ExtractionScope acquisitionScope
-    ) throws IOException {
+            Path baseDir, String extractionId, long maxTempFileBytes, ExtractionScope acquisitionScope)
+            throws IOException {
         this.baseDir = baseDir;
         this.extractionId = extractionId;
         if (maxTempFileBytes <= 0) {
@@ -75,6 +71,8 @@ public final class DelegatedExtractPublication implements AutoCloseable {
         this.acquisitionScope = Objects.requireNonNull(acquisitionScope, "acquisitionScope is required");
         ExtractValidation.validateExtractionId(baseDir, extractionId);
         Files.createDirectories(baseDir);
+        // owned by this publication from here on; released by close() or on a failed constructor
+        @SuppressWarnings("PMD.CloseResource")
         ExtractRecovery.WriterLock lock = ExtractRecovery.acquireWriterLock(baseDir, extractionId);
         try {
             // Reconciles any abandoned publication left by a previous attempt at this same
@@ -90,7 +88,7 @@ public final class DelegatedExtractPublication implements AutoCloseable {
             // existed, so it is never "uncertain" in the ENG-51 sense.
             ExtractPublication.ensureTempSpace(baseDir, maxTempFileBytes);
             this.writerLock = lock;
-        } catch (IOException | RuntimeException failure) {
+        } catch (IOException | RuntimeException failure) { // NOPMD - release the lock on any failure, then rethrow
             lock.close();
             throw failure;
         }
@@ -124,14 +122,21 @@ public final class DelegatedExtractPublication implements AutoCloseable {
             String queryChecksum,
             String adapterVersion,
             String completenessStatus,
-            String consistencyLevel
-    ) throws IOException {
+            String consistencyLevel)
+            throws IOException {
         validateChildReport(rowCount, exclusionCount, checksum, compressedBytes);
         verifyTempFile(compressedBytes, checksum);
         ExtractPublication.validateManifestArguments(
-                acquisitionScope.sourceId(), acquisitionScope.municipalityIbge(),
-                acquisitionScope.periodStart(), acquisitionScope.periodEndExclusive(),
-                startedAt, sourceZoneId, queryChecksum, adapterVersion, completenessStatus, consistencyLevel);
+                acquisitionScope.sourceId(),
+                acquisitionScope.municipalityIbge(),
+                acquisitionScope.periodStart(),
+                acquisitionScope.periodEndExclusive(),
+                startedAt,
+                sourceZoneId,
+                queryChecksum,
+                adapterVersion,
+                completenessStatus,
+                consistencyLevel);
 
         Path finalFile = baseDir.resolve(extractionId + ".jsonl.gz");
         Path manifestFile = baseDir.resolve(extractionId + ".manifest.json");
@@ -140,12 +145,22 @@ public final class DelegatedExtractPublication implements AutoCloseable {
 
         Instant finishedAt = Instant.now();
         ExtractionManifest manifest = new ExtractionManifest(
-                extractionId, acquisitionScope.sourceId(), acquisitionScope.municipalityIbge(),
-                acquisitionScope.periodStart(), acquisitionScope.periodEndExclusive(),
-                startedAt.toString(), finishedAt.toString(),
-                ExtractWriter.CANONICAL_SCHEMA_VERSION, completenessStatus, consistencyLevel, sourceZoneId,
-                rowCount, exclusionCount, checksum, queryChecksum, adapterVersion
-        );
+                extractionId,
+                acquisitionScope.sourceId(),
+                acquisitionScope.municipalityIbge(),
+                acquisitionScope.periodStart(),
+                acquisitionScope.periodEndExclusive(),
+                startedAt.toString(),
+                finishedAt.toString(),
+                ExtractWriter.CANONICAL_SCHEMA_VERSION,
+                completenessStatus,
+                consistencyLevel,
+                sourceZoneId,
+                rowCount,
+                exclusionCount,
+                checksum,
+                queryChecksum,
+                adapterVersion);
         ExtractValidation.validateManifest(manifest);
 
         Path manifestTemp = baseDir.resolve(extractionId + ".manifest.json.tmp");
@@ -180,17 +195,15 @@ public final class DelegatedExtractPublication implements AutoCloseable {
             throw new IllegalArgumentException("execution plane reported a negative row_count: " + rowCount);
         }
         if (exclusionCount < 0 || exclusionCount > rowCount) {
-            throw new IllegalArgumentException(
-                    "execution plane reported an invalid exclusion_count: " + exclusionCount
-                            + " for row_count=" + rowCount);
+            throw new IllegalArgumentException("execution plane reported an invalid exclusion_count: " + exclusionCount
+                    + " for row_count=" + rowCount);
         }
         if (!ExtractValidation.isSha256Digest(checksum)) {
             throw new IllegalArgumentException("execution plane reported a checksum that is not a SHA-256 digest");
         }
         if (compressedBytes < 0 || compressedBytes > maxTempFileBytes) {
-            throw new IllegalArgumentException(
-                    "execution plane reported an invalid compressed_bytes: " + compressedBytes
-                            + " > " + maxTempFileBytes);
+            throw new IllegalArgumentException("execution plane reported an invalid compressed_bytes: "
+                    + compressedBytes + " > " + maxTempFileBytes);
         }
     }
 
@@ -205,21 +218,18 @@ public final class DelegatedExtractPublication implements AutoCloseable {
     private void verifyTempFile(long compressedBytes, String checksum) throws IOException {
         ExtractValidation.rejectSymbolicLink(tempFile, "extract temporary file");
         if (!Files.isRegularFile(tempFile, LinkOption.NOFOLLOW_LINKS)) {
-            throw new IllegalStateException(
-                    "execution plane did not produce a regular extract temp file: " + tempFile);
+            throw new IllegalStateException("execution plane did not produce a regular extract temp file: " + tempFile);
         }
         long actualSize = Files.size(tempFile);
         if (actualSize != compressedBytes) {
-            throw new IllegalStateException(
-                    "execution plane reported compressed_bytes=" + compressedBytes
-                            + " but the temp file is " + actualSize + " bytes");
+            throw new IllegalStateException("execution plane reported compressed_bytes=" + compressedBytes
+                    + " but the temp file is " + actualSize + " bytes");
         }
         String actualChecksum = sha256Hex(tempFile);
         String expectedChecksum = checksum.startsWith("sha256:") ? checksum.substring("sha256:".length()) : checksum;
         if (!actualChecksum.equalsIgnoreCase(expectedChecksum)) {
             throw new IllegalStateException(
-                    "execution plane reported checksum " + checksum
-                            + " but the temp file hashes to " + actualChecksum);
+                    "execution plane reported checksum " + checksum + " but the temp file hashes to " + actualChecksum);
         }
     }
 
@@ -232,7 +242,7 @@ public final class DelegatedExtractPublication implements AutoCloseable {
         }
         byte[] buffer = new byte[8192];
         try (InputStream in = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS);
-             DigestInputStream digestIn = new DigestInputStream(in, digest)) {
+                DigestInputStream digestIn = new DigestInputStream(in, digest)) {
             while (digestIn.read(buffer) != -1) {
                 // Reading is the side effect: DigestInputStream updates the digest as bytes pass.
             }

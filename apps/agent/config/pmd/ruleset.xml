@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="esusdata"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+  <description>
+    Static-analysis gate (ADR 0018), run over main and test sources. Every Java category is on;
+    each exclusion below says why the rule does not fit this code base. A single finding is
+    suppressed only with "// NOPMD - reason" or @SuppressWarnings("PMD.Rule") next to it.
+  </description>
+
+  <rule ref="category/java/bestpractices.xml">
+    <!-- Checked below, outside tests: tests assert the row with assertThat(rs.next()). -->
+    <exclude name="CheckResultSet"/>
+    <!-- Tests assert one whole outcome (a manifest, a response) field by field. -->
+    <exclude name="UnitTestContainsTooManyAsserts"/>
+    <!-- Checked below, outside tests. -->
+    <exclude name="AvoidUsingHardCodedIP"/>
+    <!-- SLF4J's {} placeholders already defer formatting; the arguments are plain accessors. -->
+    <exclude name="GuardLogStatement"/>
+    <!-- Single-method interfaces here are ports (ADR 0009), not lambda targets. -->
+    <exclude name="ImplicitFunctionalInterface"/>
+  </rule>
+
+  <rule ref="category/java/codestyle.xml">
+    <!-- final on every local and parameter is noise; Error Prone's FieldCanBeFinal covers fields. -->
+    <exclude name="LocalVariableCouldBeFinal"/>
+    <exclude name="MethodArgumentCouldBeFinal"/>
+    <!-- Name length is a judgement call, not a defect (descriptive test and domain names). -->
+    <exclude name="LongVariable"/>
+    <exclude name="ShortVariable"/>
+    <exclude name="ShortMethodName"/>
+    <!-- Guard clauses with early returns are the house style. -->
+    <exclude name="OnlyOneReturn"/>
+    <!-- var is allowed. -->
+    <exclude name="UseExplicitTypes"/>
+    <!-- Implicit default constructors and implicit super() are fine. -->
+    <exclude name="AtLeastOneConstructor"/>
+    <exclude name="CallSuperInConstructor"/>
+    <!-- Package-private is deliberate (flat packages, ADR 0013; JUnit 5 tests). -->
+    <exclude name="CommentDefaultAccessModifier"/>
+    <!-- Checked below, outside tests. -->
+    <exclude name="TooManyStaticImports"/>
+    <!-- Configured below. -->
+    <exclude name="FieldNamingConventions"/>
+    <exclude name="MethodNamingConventions"/>
+    <exclude name="EmptyControlStatement"/>
+  </rule>
+  <!-- A commented empty block states why nothing happens there. -->
+  <rule ref="category/java/codestyle.xml/EmptyControlStatement">
+    <properties>
+      <property name="allowCommentedBlocks" value="true"/>
+    </properties>
+  </rule>
+  <!-- "log" is the logger's name throughout (private static final Logger log). -->
+  <rule ref="category/java/codestyle.xml/FieldNamingConventions">
+    <properties>
+      <property name="exclusions" value="serialVersionUID,serialPersistentFields,log"/>
+    </properties>
+  </rule>
+  <!-- Test names may carry a spec id prefix, e.g. met03_… for MET-03. -->
+  <rule ref="category/java/codestyle.xml/MethodNamingConventions">
+    <properties>
+      <property name="junitJupiterTestPattern" value="[a-z][a-zA-Z0-9]*(_[a-zA-Z0-9]+)*"/>
+    </properties>
+  </rule>
+  <!-- AssertJ and Mockito are used through static imports in tests. -->
+  <rule ref="category/java/codestyle.xml/TooManyStaticImports">
+    <properties>
+      <property name="violationSuppressXPath" value="/CompilationUnit/ClassDeclaration[ends-with(@SimpleName, 'Test')]"/>
+    </properties>
+  </rule>
+
+  <rule ref="category/java/design.xml">
+    <!-- Fluent APIs (AssertJ, JdbcTemplate, Jackson, builders) chain by design. -->
+    <exclude name="LawOfDemeter"/>
+    <!-- Size and coupling heuristics: module boundaries are enforced by ArchUnit
+         (ModuleBoundaryTest) and method complexity by CognitiveComplexity and NPathComplexity
+         below, which CyclomaticComplexity only duplicates. -->
+    <exclude name="CyclomaticComplexity"/>
+    <exclude name="TooManyMethods"/>
+    <exclude name="ExcessiveImports"/>
+    <exclude name="CouplingBetweenObjects"/>
+    <exclude name="GodClass"/>
+    <exclude name="LoosePackageCoupling"/>
+    <!-- Records mirror table rows and protocol envelopes one component per column/field. -->
+    <exclude name="ExcessiveParameterList"/>
+    <!-- Test methods and fixtures declare "throws Exception" per JUnit convention. -->
+    <exclude name="SignatureDeclareThrowsException"/>
+  </rule>
+  <rule ref="category/java/design.xml/SignatureDeclareThrowsException">
+    <properties>
+      <property name="violationSuppressXPath" value="/CompilationUnit/ClassDeclaration[ends-with(@SimpleName, 'Test')]"/>
+    </properties>
+  </rule>
+
+  <rule ref="category/java/errorprone.xml">
+    <!-- Named constants already carry every protocol code or threshold with meaning; the rest
+         are 0/1-style bounds. -->
+    <exclude name="AvoidLiteralsInIfCondition"/>
+    <!-- Record-style accessors (session(), budget()) on final classes are the house style. -->
+    <exclude name="AvoidFieldNameMatchingMethodName"/>
+    <!-- Checked below, outside tests: fixture ids and SQL repeat on purpose. -->
+    <exclude name="AvoidDuplicateLiterals"/>
+    <!-- Configured below. -->
+    <exclude name="AssignmentInOperand"/>
+    <exclude name="EmptyCatchBlock"/>
+  </rule>
+  <!-- Allows the read loop idiom and index++ in a bind call; nothing else. -->
+  <rule ref="category/java/errorprone.xml/AssignmentInOperand">
+    <properties>
+      <property name="allowWhile" value="true"/>
+      <property name="allowIncrementDecrement" value="true"/>
+    </properties>
+  </rule>
+  <rule ref="category/java/errorprone.xml/EmptyCatchBlock">
+    <properties>
+      <property name="allowCommentedBlocks" value="true"/>
+    </properties>
+  </rule>
+  <rule ref="category/java/errorprone.xml/AvoidDuplicateLiterals">
+    <properties>
+      <property name="violationSuppressXPath" value="/CompilationUnit/ClassDeclaration[ends-with(@SimpleName, 'Test')]"/>
+    </properties>
+  </rule>
+
+  <rule ref="category/java/multithreading.xml">
+    <!-- A Java EE rule: this agent owns its worker and child-process threads by design (§1.9). -->
+    <exclude name="DoNotUseThreads"/>
+    <!-- Flags every HashMap, shared or not; shared state here is guarded explicitly. -->
+    <exclude name="UseConcurrentHashMap"/>
+    <!-- volatile flags are used as intended (single-writer visibility). -->
+    <exclude name="AvoidUsingVolatile"/>
+    <!-- Only matter for virtual-thread pinning; this agent runs none (platform threads only). -->
+    <exclude name="AvoidSynchronizedStatement"/>
+    <exclude name="AvoidSynchronizedAtMethodLevel"/>
+  </rule>
+
+  <rule ref="category/java/performance.xml">
+    <!-- Micro-optimisation the JIT's escape analysis already handles. -->
+    <exclude name="AvoidInstantiatingObjectsInLoops"/>
+  </rule>
+
+  <rule ref="category/java/security.xml"/>
+
+  <rule ref="category/java/bestpractices.xml/CheckResultSet">
+    <properties>
+      <property name="violationSuppressXPath" value="/CompilationUnit/ClassDeclaration[ends-with(@SimpleName, 'Test')]"/>
+    </properties>
+  </rule>
+
+  <!-- The allowlist and loopback tests need literal addresses; production code must not. -->
+  <rule ref="category/java/bestpractices.xml/AvoidUsingHardCodedIP">
+    <properties>
+      <property name="violationSuppressXPath" value="/CompilationUnit/ClassDeclaration[ends-with(@SimpleName, 'Test')]"/>
+    </properties>
+  </rule>
+</ruleset>

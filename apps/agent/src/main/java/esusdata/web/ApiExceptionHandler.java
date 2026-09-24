@@ -3,20 +3,19 @@ package esusdata.web;
 import esusdata.auth.AccessAdministrationService;
 import esusdata.auth.ReauthenticationGuard;
 import esusdata.auth.UserProvisioning;
+import esusdata.auth.model.ScopeDeniedException;
+import esusdata.result.model.EvidenceNotFoundException;
+import esusdata.result.model.InvalidCursorException;
+import esusdata.run.controller.SseConnectionLimiter;
+import esusdata.run.controller.TooManyEventStreamsException;
+import esusdata.run.job.JobNotCancellableException;
 import esusdata.run.job.JobRequestConflictException;
 import esusdata.source.model.SourceNotFoundException;
-import esusdata.result.model.EvidenceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import esusdata.auth.AuthController;
 
-import esusdata.result.model.InvalidCursorException;
-import esusdata.run.job.JobNotCancellableException;
-import esusdata.auth.model.ScopeDeniedException;
-import esusdata.run.controller.TooManyEventStreamsException;
-import esusdata.run.controller.SseConnectionLimiter;
 /**
  * Global HTTP error mapping for the domain controllers (results, evidence, indicator packs, and
  * onward). {@code AuthController}'s own {@code @ExceptionHandler}s stay local to that controller
@@ -32,10 +31,13 @@ public class ApiExceptionHandler {
      * it caught — the diagnostic difference lives only in {@code auth_audit}, not in the response.
      */
     @ExceptionHandler({
-            ScopeDeniedException.class, ApiNotFoundException.class, EvidenceNotFoundException.class,
-            AccessAdministrationService.UserNotFoundException.class,
-            AccessAdministrationService.GrantNotFoundException.class,
-            SourceNotFoundException.class})
+        ScopeDeniedException.class,
+        ApiNotFoundException.class,
+        EvidenceNotFoundException.class,
+        AccessAdministrationService.UserNotFoundException.class,
+        AccessAdministrationService.GrantNotFoundException.class,
+        SourceNotFoundException.class
+    })
     ResponseEntity<ApiError> handleNotFoundOrOutOfScope() {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiError("NOT_FOUND", "not found"));
     }
@@ -49,21 +51,18 @@ public class ApiExceptionHandler {
     /** ENG-45: refused unconditionally by {@code AccessAdministrationService}, never silently ignored. */
     @ExceptionHandler(AccessAdministrationService.SelfGrantForbiddenException.class)
     ResponseEntity<ApiError> handleSelfGrantForbidden(AccessAdministrationService.SelfGrantForbiddenException e) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ApiError("SELF_GRANT_FORBIDDEN", e.getMessage()));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiError("SELF_GRANT_FORBIDDEN", e.getMessage()));
     }
 
     /** A sole admin self-blocking would brick the installation — see {@code AccessAdministrationService.block}. */
     @ExceptionHandler(AccessAdministrationService.SelfBlockForbiddenException.class)
     ResponseEntity<ApiError> handleSelfBlockForbidden(AccessAdministrationService.SelfBlockForbiddenException e) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ApiError("SELF_BLOCK_FORBIDDEN", e.getMessage()));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiError("SELF_BLOCK_FORBIDDEN", e.getMessage()));
     }
 
     @ExceptionHandler(UserProvisioning.UsernameAlreadyExistsException.class)
     ResponseEntity<ApiError> handleUsernameAlreadyExists(UserProvisioning.UsernameAlreadyExistsException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ApiError("USERNAME_ALREADY_EXISTS", e.getMessage()));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError("USERNAME_ALREADY_EXISTS", e.getMessage()));
     }
 
     /** §1.12.7 L539: the caller is authenticated but must step up with a fresh password check. */
@@ -83,8 +82,7 @@ public class ApiExceptionHandler {
     /** The job's current state lost the cancel CAS — already terminal, or the worker won the race. */
     @ExceptionHandler(JobNotCancellableException.class)
     ResponseEntity<ApiError> handleJobNotCancellable(JobNotCancellableException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ApiError("JOB_NOT_CANCELLABLE", e.getMessage()));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError("JOB_NOT_CANCELLABLE", e.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

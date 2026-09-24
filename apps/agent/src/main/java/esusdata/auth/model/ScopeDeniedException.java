@@ -1,6 +1,8 @@
 package esusdata.auth.model;
 
 import esusdata.web.ApiExceptionHandler;
+import java.io.Serial;
+
 /**
  * An authenticated principal lacks the permission/scope for a specific, existing object. Mapped
  * by {@link ApiExceptionHandler} to the SAME 404 response a genuinely nonexistent object gets —
@@ -8,6 +10,9 @@ import esusdata.web.ApiExceptionHandler;
  * Callers must never special-case this against {@link ApiNotFoundException}.
  */
 public final class ScopeDeniedException extends RuntimeException {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     public ScopeDeniedException(String message) {
         super(message);
     }

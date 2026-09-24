@@ -1,12 +1,12 @@
 package esusdata.result;
 
+import esusdata.result.model.PublishedResult;
 import esusdata.result.model.ResultRepository;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
-import java.util.List;
-import java.util.Optional;
-import esusdata.result.model.PublishedResult;
 /**
  * Reads published results. Every method requires an explicit municipality scope — §1.12.1:
  * "consultas sempre recebem escopo autorizado." There is no unscoped read path in this class.
@@ -14,19 +14,35 @@ import esusdata.result.model.PublishedResult;
 public final class JdbcResultRepository implements ResultRepository {
 
     private static final RowMapper<PublishedResult> MAPPER = (rs, rowNum) -> new PublishedResult(
-            rs.getString("result_id"), rs.getString("job_id"), rs.getString("run_id"),
-            rs.getString("source_id"), rs.getString("indicator_pack"), rs.getString("rule_version"),
-            rs.getString("municipality_ibge"), rs.getString("reference_period"),
-            rs.getString("status"), rs.getString("value_text"), rs.getString("numerator_text"),
-            rs.getString("denominator_text"), rs.getString("denominator_kind"),
-            rs.getString("classification"), rs.getString("data_cutoff"),
-            rs.getString("extraction_id"), rs.getString("adapter_version"),
-            rs.getString("calculation_policy_version"), rs.getString("limitations_json"),
-            rs.getString("input_fingerprint"), rs.getString("result_nature"),
-            rs.getString("validation_status"), rs.getString("completeness_status"),
-            rs.getString("consistency_level"), rs.getString("reproducibility_level"),
-            rs.getString("canonical_schema_version"), rs.getString("evidence_grain"),
-            rs.getString("app_build"), rs.getString("published_at"));
+            rs.getString("result_id"),
+            rs.getString("job_id"),
+            rs.getString("run_id"),
+            rs.getString("source_id"),
+            rs.getString("indicator_pack"),
+            rs.getString("rule_version"),
+            rs.getString("municipality_ibge"),
+            rs.getString("reference_period"),
+            rs.getString("status"),
+            rs.getString("value_text"),
+            rs.getString("numerator_text"),
+            rs.getString("denominator_text"),
+            rs.getString("denominator_kind"),
+            rs.getString("classification"),
+            rs.getString("data_cutoff"),
+            rs.getString("extraction_id"),
+            rs.getString("adapter_version"),
+            rs.getString("calculation_policy_version"),
+            rs.getString("limitations_json"),
+            rs.getString("input_fingerprint"),
+            rs.getString("result_nature"),
+            rs.getString("validation_status"),
+            rs.getString("completeness_status"),
+            rs.getString("consistency_level"),
+            rs.getString("reproducibility_level"),
+            rs.getString("canonical_schema_version"),
+            rs.getString("evidence_grain"),
+            rs.getString("app_build"),
+            rs.getString("published_at"));
 
     private final JdbcTemplate jdbc;
 
@@ -34,8 +50,8 @@ public final class JdbcResultRepository implements ResultRepository {
         this.jdbc = jdbc;
     }
 
-    public List<PublishedResult> findPublished(
-            String municipalityIbge, String indicatorPack, String referencePeriod) {
+    @Override
+    public List<PublishedResult> findPublished(String municipalityIbge, String indicatorPack, String referencePeriod) {
         requireScope(municipalityIbge);
         return jdbc.query("""
                 select * from results
@@ -44,6 +60,7 @@ public final class JdbcResultRepository implements ResultRepository {
                 """, MAPPER, municipalityIbge, indicatorPack, referencePeriod);
     }
 
+    @Override
     public List<String> findPublishedPeriods(String municipalityIbge) {
         requireScope(municipalityIbge);
         return jdbc.queryForList("""
@@ -58,23 +75,36 @@ public final class JdbcResultRepository implements ResultRepository {
      * scope returns empty — identical to "not found" from the caller's perspective (§1.10.1:
      * "objeto inexistente e objeto fora do escopo têm a mesma resposta externa 404").
      */
+    @Override
     public Optional<PublishedResult> findByIdInScope(String resultId, String municipalityIbge) {
         requireScope(municipalityIbge);
-        return jdbc.query("select * from results where result_id = ? and municipality_ibge = ?",
-                MAPPER, resultId, municipalityIbge).stream().findFirst();
+        return jdbc
+                .query(
+                        "select * from results where result_id = ? and municipality_ibge = ?",
+                        MAPPER,
+                        resultId,
+                        municipalityIbge)
+                .stream()
+                .findFirst();
     }
 
     /** Lets {@code GET /runs/{id}} surface where a SUCCEEDED job's result landed. */
+    @Override
     public Optional<String> findResultIdByJobId(String jobId, String municipalityIbge) {
         requireScope(municipalityIbge);
-        return jdbc.query("select result_id from results where job_id = ? and municipality_ibge = ?",
-                (rs, rowNum) -> rs.getString("result_id"), jobId, municipalityIbge).stream().findFirst();
+        return jdbc
+                .query(
+                        "select result_id from results where job_id = ? and municipality_ibge = ?",
+                        (rs, rowNum) -> rs.getString("result_id"),
+                        jobId,
+                        municipalityIbge)
+                .stream()
+                .findFirst();
     }
 
-    private void requireScope(String municipalityIbge) {
+    private static void requireScope(String municipalityIbge) {
         if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
-            throw new IllegalArgumentException(
-                    "a 7-digit municipality scope is required to read results");
+            throw new IllegalArgumentException("a 7-digit municipality scope is required to read results");
         }
     }
 }

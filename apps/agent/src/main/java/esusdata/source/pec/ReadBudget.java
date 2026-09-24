@@ -33,8 +33,7 @@ public record ReadBudget(
         long maxRows,
         long maxDurationMs,
         long maxPayloadBytes,
-        long maxTempFileBytes
-) {
+        long maxTempFileBytes) {
     public static final long DEFAULT_MAX_PAYLOAD_BYTES = 64L * 1024 * 1024;
     public static final long DEFAULT_MAX_TEMP_FILE_BYTES = 128L * 1024 * 1024;
 
@@ -47,15 +46,24 @@ public record ReadBudget(
             long lockTimeoutMs,
             long idleInTransactionTimeoutMs,
             long maxRows,
-            long maxDurationMs
-    ) {
-        this(poolMaxSize, connectionTimeout, acquisitionTimeout, statementTimeoutMs, lockTimeoutMs,
-                idleInTransactionTimeoutMs, maxRows, maxDurationMs,
-                DEFAULT_MAX_PAYLOAD_BYTES, DEFAULT_MAX_TEMP_FILE_BYTES);
+            long maxDurationMs) {
+        this(
+                poolMaxSize,
+                connectionTimeout,
+                acquisitionTimeout,
+                statementTimeoutMs,
+                lockTimeoutMs,
+                idleInTransactionTimeoutMs,
+                maxRows,
+                maxDurationMs,
+                DEFAULT_MAX_PAYLOAD_BYTES,
+                DEFAULT_MAX_TEMP_FILE_BYTES);
     }
 
     public ReadBudget {
-        if (poolMaxSize <= 0) throw new IllegalArgumentException("poolMaxSize must be positive");
+        if (poolMaxSize <= 0) {
+            throw new IllegalArgumentException("poolMaxSize must be positive");
+        }
         if (connectionTimeout == null || connectionTimeout.isNegative() || connectionTimeout.isZero()) {
             throw new IllegalArgumentException("connectionTimeout must be positive");
         }
@@ -88,7 +96,6 @@ public record ReadBudget(
                 200_000,
                 60_000,
                 DEFAULT_MAX_PAYLOAD_BYTES,
-                DEFAULT_MAX_TEMP_FILE_BYTES
-        );
+                DEFAULT_MAX_TEMP_FILE_BYTES);
     }
 }

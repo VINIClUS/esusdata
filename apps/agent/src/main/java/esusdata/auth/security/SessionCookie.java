@@ -4,6 +4,5 @@ package esusdata.auth.security;
 public final class SessionCookie {
     public static final String NAME = "OBS_SESSION";
 
-    private SessionCookie() {
-    }
+    private SessionCookie() {}
 }

@@ -1,29 +1,29 @@
 package esusdata.result;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import esusdata.auth.model.Role;
 import esusdata.indicator.model.CanonicalEncounter;
 import esusdata.indicator.model.CanonicalModality;
-import esusdata.indicator.model.SourceRef;
-import esusdata.auth.model.Role;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.SourceRef;
 import esusdata.indicator.pack.c1.C1Rule;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
-
+import esusdata.web.ApiFixtureSupport;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.ApiFixtureSupport;
 /**
  * §4.4 L1802: C1's portões A/B/D/E remain BLOCKED — the API must show that honestly (numerator/
  * denominator exact, value null, limitations listed) rather than collapsing it into a fake 0% or
  * dropping the result. This slice does not unblock any gate.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class BlockedResultRenderingTest extends ApiFixtureSupport {
+class BlockedResultRenderingTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 
@@ -62,18 +62,27 @@ public class BlockedResultRenderingTest extends ApiFixtureSupport {
         assertThat(body).contains("Portão A");
     }
 
-    private CanonicalEncounter encounter(int seq, CanonicalModality modality) {
+    private static CanonicalEncounter encounter(int seq, CanonicalModality modality) {
         return new CanonicalEncounter(
                 new SourceRef("src-blocked", "tb_fat_atendimento_individual", "rec-" + seq),
-                MUNICIPALITY, "2026-03-1" + seq, modality, "2750325", "0000346268", "225142");
+                MUNICIPALITY,
+                "2026-03-1" + seq,
+                modality,
+                "2750325",
+                "0000346268",
+                "225142");
     }
 
     private HttpResponse<String> getResults(String userId) throws Exception {
         URI uri = URI.create(BASE_URL + "/api/v1/results?municipalityIbge=" + MUNICIPALITY
                 + "&indicatorPack=c1-mais-acesso&referencePeriod=2026-03");
-        HttpClient client = HttpClient.newHttpClient();
-        return client.send(
-                HttpRequest.newBuilder(uri).header("Cookie", sessionCookie(userId)).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            return client.send(
+                    HttpRequest.newBuilder(uri)
+                            .header("Cookie", sessionCookie(userId))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+        }
     }
 }

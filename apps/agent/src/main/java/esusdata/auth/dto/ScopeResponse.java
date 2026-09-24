@@ -6,5 +6,4 @@ package esusdata.auth.dto;
  * aggregates would need a schema migration plus a rule-pack change, out of this recorte (see the
  * plan's CNES/INE section).
  */
-public record ScopeResponse(String municipalityIbge, String cnes, String ine) {
-}
+public record ScopeResponse(String municipalityIbge, String cnes, String ine) {}

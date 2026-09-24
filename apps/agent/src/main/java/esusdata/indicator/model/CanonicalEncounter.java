@@ -12,6 +12,4 @@ public record CanonicalEncounter(
         CanonicalModality modality,
         String cnes,
         String ine,
-        String cbo
-) {
-}
+        String cbo) {}

@@ -1,17 +1,17 @@
 package esusdata.result;
 
-import esusdata.result.dto.EvidenceCursor;
-
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import esusdata.result.dto.EvidenceCursor;
 import esusdata.result.model.InvalidCursorException;
+import org.junit.jupiter.api.Test;
+
 /**
  * §1.10.1 L405: cursor opaco, vinculado ao resultado/ordenação/escopo, e que não concede acesso
  * por si só. Pure unit test — no Spring context, no database.
  */
-public class EvidenceCursorTest {
+class EvidenceCursorTest {
 
     @Test
     void roundTripsTheSeqUnderTheSameResultOrderingAndScope() {
@@ -66,7 +66,8 @@ public class EvidenceCursorTest {
     void aCursorMintedForADifferentScopeIsRejected() {
         // The "cursor não concede acesso" half of §1.10.1 L405: replaying a cursor minted for a
         // team-narrowed scope under a different (broader or different-team) scope must fail closed.
-        String token = EvidenceCursor.of("result-1", "seq_asc", "3541307|0000346268|null", 42L).encode();
+        String token = EvidenceCursor.of("result-1", "seq_asc", "3541307|0000346268|null", 42L)
+                .encode();
 
         assertThatThrownBy(() -> EvidenceCursor.decode(token, "result-1", "seq_asc", "3541307|null|null"))
                 .isInstanceOf(InvalidCursorException.class);

@@ -1,26 +1,18 @@
 package esusdata.run.controller;
 
+import esusdata.auth.ApiAuthorization;
 import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.Permission;
-import esusdata.run.worker.CancellationRegistry;
+import esusdata.result.model.ExtractionManifestRepository;
 import esusdata.run.job.EnqueueRequest;
-import esusdata.run.worker.IdempotencyResolver;
 import esusdata.run.job.Job;
+import esusdata.run.job.JobNotCancellableException;
 import esusdata.run.job.JobRepository;
 import esusdata.run.job.JobState;
-import esusdata.result.model.ExtractionManifestRepository;
+import esusdata.run.worker.CancellationRegistry;
+import esusdata.run.worker.IdempotencyResolver;
 import esusdata.source.SourceRepository;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
+import esusdata.web.ApiNotFoundException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -33,9 +25,17 @@ import java.time.YearMonth;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
-import esusdata.web.ApiNotFoundException;
-import esusdata.run.job.JobNotCancellableException;
-import esusdata.auth.ApiAuthorization;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 /**
  * §1.10: run lifecycle — {@code POST /runs} (202, ENG-05/ENG-24 idempotent), {@code GET
  * /runs/{id}} (state/attempts/failure taxonomy — "a consulta do job é a fonte de verdade"), {@code
@@ -69,10 +69,14 @@ public class RunController {
     private final Clock clock;
 
     public RunController(
-            JobRepository jobRepository, IdempotencyResolver idempotencyResolver,
-            CancellationRegistry cancellationRegistry, RunResponseFactory responseFactory,
-            SourceRepository sourceRepository, ExtractionManifestRepository extractionManifestRepository,
-            ApiAuthorization authorization, Clock clock) {
+            JobRepository jobRepository,
+            IdempotencyResolver idempotencyResolver,
+            CancellationRegistry cancellationRegistry,
+            RunResponseFactory responseFactory,
+            SourceRepository sourceRepository,
+            ExtractionManifestRepository extractionManifestRepository,
+            ApiAuthorization authorization,
+            Clock clock) {
         this.jobRepository = jobRepository;
         this.idempotencyResolver = idempotencyResolver;
         this.cancellationRegistry = cancellationRegistry;
@@ -92,8 +96,8 @@ public class RunController {
         try {
             YearMonth.parse(request.referencePeriod());
         } catch (java.time.format.DateTimeParseException e) {
-            throw new IllegalArgumentException("referencePeriod must be an ISO YearMonth (yyyy-MM): "
-                    + request.referencePeriod());
+            throw new IllegalArgumentException(
+                    "referencePeriod must be an ISO YearMonth (yyyy-MM): " + request.referencePeriod(), e);
         }
         authorization.requireObjectScope(session, Permission.RUN_INDICATOR, request.municipalityIbge());
         requireIdempotencyKey(idempotencyKey);
@@ -102,12 +106,21 @@ public class RunController {
         Instant now = clock.instant();
         String requestHash = computeRequestHash(request);
         EnqueueRequest enqueueRequest = new EnqueueRequest(
-                "job-" + UUID.randomUUID(), "run-" + UUID.randomUUID(), request.municipalityIbge(),
-                request.indicatorPack(), request.ruleVersion(), request.referencePeriod(),
-                DEFAULT_MAX_ATTEMPTS, request.sourceId(), request.extractionId(), session.userId(),
-                idempotencyKey, requestHash,
+                "job-" + UUID.randomUUID(),
+                "run-" + UUID.randomUUID(),
+                request.municipalityIbge(),
+                request.indicatorPack(),
+                request.ruleVersion(),
+                request.referencePeriod(),
+                DEFAULT_MAX_ATTEMPTS,
+                request.sourceId(),
+                request.extractionId(),
+                session.userId(),
+                idempotencyKey,
+                requestHash,
                 idempotencyKey == null ? null : now.plus(IDEMPOTENCY_KEY_TTL),
-                requestedScopeJson(request.municipalityIbge()), now);
+                requestedScopeJson(request.municipalityIbge()),
+                now);
 
         Job job = idempotencyResolver.resolve(enqueueRequest);
         return ResponseEntity.status(HttpStatus.ACCEPTED)
@@ -152,22 +165,7 @@ public class RunController {
                     return responseFactory.toResponse(job);
                 }
             }
-            Instant now = clock.instant();
-            boolean cancelled = switch (job.state()) {
-                case QUEUED -> jobRepository.cancelQueued(id, now);
-                case RUNNING, STAGED -> {
-                    boolean requested = jobRepository.requestCancel(
-                            id, job.processInstanceId(), job.executionGeneration(), now);
-                    if (requested) {
-                        // Best-effort interrupt of an in-flight statement — the CAS above is what
-                        // actually matters; this only shortens how long it takes to notice.
-                        cancellationRegistry.requestCancel(id);
-                    }
-                    yield requested;
-                }
-                default -> false;
-            };
-            if (cancelled) {
+            if (tryCancel(id, job, clock.instant())) {
                 return responseFactory.toResponse(jobRepository.findById(id).orElseThrow());
             }
             // A worker may win more than one ownership CAS while this request is in flight.
@@ -183,7 +181,25 @@ public class RunController {
                 "job " + id + " cannot be cancelled from its current state (" + job.state() + ")");
     }
 
-    private boolean isCancellable(JobState state) {
+    /** One ownership CAS against the job's current state; true if this call cancelled or requested it. */
+    private boolean tryCancel(String id, Job job, Instant now) {
+        return switch (job.state()) {
+            case QUEUED -> jobRepository.cancelQueued(id, now);
+            case RUNNING, STAGED -> {
+                boolean requested =
+                        jobRepository.requestCancel(id, job.processInstanceId(), job.executionGeneration(), now);
+                if (requested) {
+                    // Best-effort interrupt of an in-flight statement — the CAS above is what
+                    // actually matters; this only shortens how long it takes to notice.
+                    cancellationRegistry.requestCancel(id);
+                }
+                yield requested;
+            }
+            default -> false;
+        };
+    }
+
+    private static boolean isCancellable(JobState state) {
         return state == JobState.QUEUED || state == JobState.RUNNING || state == JobState.STAGED;
     }
 
@@ -205,21 +221,26 @@ public class RunController {
      * {@code extractionId}, when present, only SELECTS IMMUTABLE_EXTRACT replay over a fresh
      * LIVE_READ_ONLY acquisition — it is not an alternative to {@code sourceId}.
      */
-    private void requireFieldsPresent(CreateRunRequest request) {
-        if (request.municipalityIbge() == null || request.municipalityIbge().isBlank()
-                || request.indicatorPack() == null || request.indicatorPack().isBlank()
-                || request.ruleVersion() == null || request.ruleVersion().isBlank()
-                || request.referencePeriod() == null || request.referencePeriod().isBlank()
-                || request.sourceId() == null || request.sourceId().isBlank()) {
+    private static void requireFieldsPresent(CreateRunRequest request) {
+        if (request.municipalityIbge() == null
+                || request.municipalityIbge().isBlank()
+                || request.indicatorPack() == null
+                || request.indicatorPack().isBlank()
+                || request.ruleVersion() == null
+                || request.ruleVersion().isBlank()
+                || request.referencePeriod() == null
+                || request.referencePeriod().isBlank()
+                || request.sourceId() == null
+                || request.sourceId().isBlank()) {
             throw new IllegalArgumentException(
-                "municipalityIbge, indicatorPack, ruleVersion, referencePeriod, and sourceId are required");
+                    "municipalityIbge, indicatorPack, ruleVersion, referencePeriod, and sourceId are required");
         }
         if (request.extractionId() != null && request.extractionId().isBlank()) {
             throw new IllegalArgumentException("extractionId must not be blank when supplied");
         }
     }
 
-    private void requireIdempotencyKey(String idempotencyKey) {
+    private static void requireIdempotencyKey(String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new IllegalArgumentException("Idempotency-Key is required");
         }
@@ -230,8 +251,7 @@ public class RunController {
      * differently-scoped reference is deliberately reported as the same external 404, so the
      * caller cannot use a job failure detail as a cross-municipality metadata oracle.
      */
-    private void requireReferencedObjectsInScope(
-            AuthenticatedSession session, CreateRunRequest request) {
+    private void requireReferencedObjectsInScope(AuthenticatedSession session, CreateRunRequest request) {
         var source = sourceRepository.findById(request.sourceId()).orElse(null);
         if (source == null || !request.municipalityIbge().equals(source.municipalityIbge())) {
             authorization.auditDenied(session, Permission.RUN_INDICATOR, request.municipalityIbge());
@@ -239,7 +259,9 @@ public class RunController {
         }
 
         if (request.extractionId() != null) {
-            var stored = extractionManifestRepository.findById(request.extractionId()).orElse(null);
+            var stored = extractionManifestRepository
+                    .findById(request.extractionId())
+                    .orElse(null);
             if (stored == null
                     || !request.municipalityIbge().equals(stored.manifest().municipalityIbge())
                     || !request.sourceId().equals(stored.manifest().sourceId())) {
@@ -249,7 +271,7 @@ public class RunController {
         }
     }
 
-    private String requestedScopeJson(String municipalityIbge) {
+    private static String requestedScopeJson(String municipalityIbge) {
         return "{\"municipalityIbge\":\"" + municipalityIbge + "\"}";
     }
 
@@ -258,7 +280,7 @@ public class RunController {
      * differing only in {@code referencePeriod} (the field most likely to be dropped by accident)
      * must still conflict under a reused key, never silently adopt the first job.
      */
-    private String computeRequestHash(CreateRunRequest request) {
+    private static String computeRequestHash(CreateRunRequest request) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             updateCanonicalField(digest, request.municipalityIbge());
@@ -274,7 +296,7 @@ public class RunController {
     }
 
     /** Length-prefixed UTF-8 fields make delimiters data, not structure, and preserve null vs empty. */
-    private void updateCanonicalField(MessageDigest digest, String value) {
+    private static void updateCanonicalField(MessageDigest digest, String value) {
         if (value == null) {
             digest.update((byte) 0);
             return;
@@ -284,5 +306,4 @@ public class RunController {
         digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
         digest.update(bytes);
     }
-
 }

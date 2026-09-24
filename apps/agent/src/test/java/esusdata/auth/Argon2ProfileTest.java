@@ -1,8 +1,8 @@
 package esusdata.auth;
 
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * §1.12.7 L534: "Argon2id com salt individual, parâmetros versionados... registrar parâmetros
@@ -42,8 +42,12 @@ class Argon2ProfileTest {
     void effectiveParamsJsonRecordsWhatWasActuallyUsedNotTheCurrentBaseline() {
         String json = profile.effectiveParamsJson();
 
-        assertThat(json).contains("\"saltLength\":16").contains("\"hashLength\":32")
-                .contains("\"parallelism\":1").contains("\"memoryKib\":8").contains("\"iterations\":1");
+        assertThat(json)
+                .contains("\"saltLength\":16")
+                .contains("\"hashLength\":32")
+                .contains("\"parallelism\":1")
+                .contains("\"memoryKib\":8")
+                .contains("\"iterations\":1");
     }
 
     @Test
@@ -52,7 +56,7 @@ class Argon2ProfileTest {
         // with DIFFERENT current parameters must still verify a hash produced under the old ones.
         String hash = profile.encode("a-strong-enough-passphrase");
         SecurityProperties laterBaseline =
-                new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19456, 3, 1, 16, 32, "v2", 30, 24);
+                new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19_456, 3, 1, 16, 32, "v2", 30, 24);
         Argon2Profile laterProfile = new Argon2Profile(laterBaseline);
 
         assertThat(laterProfile.matches("a-strong-enough-passphrase", hash)).isTrue();
@@ -64,14 +68,16 @@ class Argon2ProfileTest {
         // profile is correct at the cost that will really run in production, not only at the
         // cheap cost every other test in this class uses for speed.
         SecurityProperties production =
-                new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19456, 2, 1, 16, 32, "v1", 30, 24);
+                new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19_456, 2, 1, 16, 32, "v1", 30, 24);
         Argon2Profile productionProfile = new Argon2Profile(production);
 
         String hash = productionProfile.encode("a-strong-enough-passphrase");
 
-        assertThat(productionProfile.matches("a-strong-enough-passphrase", hash)).isTrue();
+        assertThat(productionProfile.matches("a-strong-enough-passphrase", hash))
+                .isTrue();
         assertThat(productionProfile.matches("a-different-passphrase", hash)).isFalse();
         assertThat(productionProfile.effectiveParamsJson())
-                .contains("\"memoryKib\":19456").contains("\"iterations\":2");
+                .contains("\"memoryKib\":19456")
+                .contains("\"iterations\":2");
     }
 }

@@ -27,6 +27,12 @@
     <networknt-json-schema.version>3.0.7</networknt-json-schema.version>
     <!-- sqlite-jdbc pinned above the BOM's 3.53.2.1: asserts the WAL-reset floor (>=3.51.3, §1.12.1) -->
     <sqlite-jdbc.version>3.53.2.1</sqlite-jdbc.version>
+    <!-- Static-analysis gate (ADR 0018): outside the BOM, pinned exactly (§1.12.8) -->
+    <spotless.version>3.10.2</spotless.version>
+    <palantir-java-format.version>2.99.0</palantir-java-format.version>
+    <error-prone.version>2.50.0</error-prone.version>
+    <pmd-plugin.version>3.28.0</pmd-plugin.version>
+    <pmd.version>7.27.0</pmd.version>
   </properties>
 
   <dependencies>
@@ -150,6 +156,131 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <!-- Static-analysis gate (ADR 0018): every javac lint and Error Prone warning fails the
+           build, main and test sources alike, plus the off-by-default checks listed below. javac
+           reaches the compiler internals Error Prone needs through .mvn/jvm.config (the mvn
+           launcher finds it from -f too). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <showWarnings>true</showWarnings>
+          <compilerArgs>
+            <arg>-XDcompilePolicy=simple</arg>
+            <arg>--should-stop=ifError=FLOW</arg>
+            <!-- JDK 21 only: https://github.com/google/error-prone/issues/5426 -->
+            <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+            <arg>-Xlint:all</arg>
+            <arg>-Werror</arg>
+            <arg>
+              -Xplugin:ErrorProne
+              -XepDisableWarningsInGeneratedCode
+              -Xep:AnnotationPosition:ERROR
+              -Xep:BooleanLiteral:ERROR
+              -Xep:CheckedExceptionNotThrown:ERROR
+              -Xep:ClassNamedLikeTypeParameter:ERROR
+              -Xep:ConstantPatternCompile:ERROR
+              -Xep:DeduplicateConstants:ERROR
+              -Xep:FieldCanBeFinal:ERROR
+              -Xep:FieldCanBeLocal:ERROR
+              -Xep:FieldCanBeStatic:ERROR
+              -Xep:ForEachIterable:ERROR
+              -Xep:InterfaceWithOnlyStatics:ERROR
+              -Xep:LongLiteralLowerCaseSuffix:ERROR
+              -Xep:MethodCanBeStatic:ERROR
+              -Xep:MissingBraces:ERROR
+              -Xep:MissingDefault:ERROR
+              -Xep:NonCanonicalStaticMemberImport:ERROR
+              -Xep:PrivateConstructorForUtilityClass:ERROR
+              -Xep:RedundantOverride:ERROR
+              -Xep:RedundantThrows:ERROR
+              -Xep:ReturnsNullCollection:ERROR
+              -Xep:StronglyTypeTime:ERROR
+              -Xep:SwitchDefault:ERROR
+              -Xep:SystemExitOutsideMain:ERROR
+              -Xep:SystemOut:ERROR
+              -Xep:UnnecessaryAnonymousClass:ERROR
+              -Xep:UnnecessaryBoxedAssignment:ERROR
+              -Xep:UnnecessaryBoxedVariable:ERROR
+              -Xep:UnnecessaryDefaultInEnumSwitch:ERROR
+              -Xep:UnnecessaryStaticImport:ERROR
+              -Xep:UnusedException:ERROR
+              -Xep:UnusedTypeParameter:ERROR
+              -Xep:UseEnumSwitch:ERROR
+              -Xep:WildcardImport:ERROR
+            </arg>
+          </compilerArgs>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>com.google.errorprone</groupId>
+              <artifactId>error_prone_core</artifactId>
+              <version>${error-prone.version}</version>
+            </path>
+          </annotationProcessorPaths>
+        </configuration>
+      </plugin>
+      <!-- Static-analysis gate (ADR 0018): PMD with the project ruleset over main and test
+           sources; any violation fails verify. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <version>${pmd-plugin.version}</version>
+        <configuration>
+          <rulesets>
+            <ruleset>${project.basedir}/config/pmd/ruleset.xml</ruleset>
+          </rulesets>
+          <targetJdk>${java.version}</targetJdk>
+          <includeTests>true</includeTests>
+          <printFailingErrors>true</printFailingErrors>
+          <failOnViolation>true</failOnViolation>
+          <failurePriority>5</failurePriority>
+          <linkXRef>false</linkXRef>
+          <analysisCache>true</analysisCache>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+        <dependencies>
+          <dependency>
+            <groupId>net.sourceforge.pmd</groupId>
+            <artifactId>pmd-java</artifactId>
+            <version>${pmd.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>net.sourceforge.pmd</groupId>
+            <artifactId>pmd-core</artifactId>
+            <version>${pmd.version}</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+      <!-- Static-analysis gate (ADR 0018): formatting is checked at verify, never applied silently;
+           `mvn spotless:apply` rewrites the tree. palantir-java-format also orders and prunes
+           imports, so no separate import steps. -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless.version}</version>
+        <configuration>
+          <java>
+            <palantirJavaFormat>
+              <version>${palantir-java-format.version}</version>
+              <style>PALANTIR</style>
+            </palantirJavaFormat>
+            <formatAnnotations/>
+          </java>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

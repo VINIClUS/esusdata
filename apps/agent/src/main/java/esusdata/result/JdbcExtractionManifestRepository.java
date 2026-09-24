@@ -1,13 +1,13 @@
 package esusdata.result;
 
 import esusdata.result.model.ExtractionManifestRepository;
+import esusdata.result.model.StoredManifest;
 import esusdata.run.extract.ExtractionManifest;
+import java.nio.file.Path;
+import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
-import java.nio.file.Path;
-import java.util.Optional;
-import esusdata.result.model.StoredManifest;
 /**
  * Persists {@link ExtractionManifest} rows once a manifest has been finalized on disk. Never
  * writes a manifest whose data file has not already been verified — callers finalize/verify the
@@ -41,15 +41,17 @@ public final class JdbcExtractionManifestRepository implements ExtractionManifes
         this.jdbc = jdbc;
     }
 
+    @Override
     public boolean existsById(String extractionId) {
         Integer count = jdbc.queryForObject(
-                "select count(*) from extraction_manifests where extraction_id = ?",
-                Integer.class, extractionId);
+                "select count(*) from extraction_manifests where extraction_id = ?", Integer.class, extractionId);
         return count != null && count > 0;
     }
 
+    @Override
     public void save(ExtractionManifest manifest, Path filePath) {
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO extraction_manifests (extraction_id, source_id, municipality_ibge,
                     period_start, period_end_exclusive, started_at, finished_at,
                     canonical_schema_version, completeness_status, consistency_level,
@@ -57,16 +59,28 @@ public final class JdbcExtractionManifestRepository implements ExtractionManifes
                     file_path, adapter_version)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
-                manifest.extractionId(), manifest.sourceId(), manifest.municipalityIbge(),
-                manifest.periodStart(), manifest.periodEndExclusive(), manifest.startedAt(),
-                manifest.finishedAt(), manifest.canonicalSchemaVersion(),
-                manifest.completenessStatus(), manifest.consistencyLevel(), manifest.sourceZoneId(),
-                manifest.rowCount(), manifest.exclusionCount(), manifest.checksum(),
-                manifest.queryChecksum(), filePath.toString(), manifest.adapterVersion());
+                manifest.extractionId(),
+                manifest.sourceId(),
+                manifest.municipalityIbge(),
+                manifest.periodStart(),
+                manifest.periodEndExclusive(),
+                manifest.startedAt(),
+                manifest.finishedAt(),
+                manifest.canonicalSchemaVersion(),
+                manifest.completenessStatus(),
+                manifest.consistencyLevel(),
+                manifest.sourceZoneId(),
+                manifest.rowCount(),
+                manifest.exclusionCount(),
+                manifest.checksum(),
+                manifest.queryChecksum(),
+                filePath.toString(),
+                manifest.adapterVersion());
     }
 
+    @Override
     public Optional<StoredManifest> findById(String extractionId) {
-        return jdbc.query("select * from extraction_manifests where extraction_id = ?",
-                MAPPER, extractionId).stream().findFirst();
+        return jdbc.query("select * from extraction_manifests where extraction_id = ?", MAPPER, extractionId).stream()
+                .findFirst();
     }
 }

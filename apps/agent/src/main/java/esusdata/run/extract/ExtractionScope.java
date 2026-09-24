@@ -3,12 +3,7 @@ package esusdata.run.extract;
 import java.time.LocalDate;
 
 /** Immutable source and period authorized for one extraction attempt. */
-public record ExtractionScope(
-        String sourceId,
-        String municipalityIbge,
-        String periodStart,
-        String periodEndExclusive
-) {
+public record ExtractionScope(String sourceId, String municipalityIbge, String periodStart, String periodEndExclusive) {
     public ExtractionScope {
         if (sourceId == null || sourceId.isBlank()) {
             throw new IllegalArgumentException("acquisition scope sourceId is required");
@@ -30,21 +25,20 @@ public record ExtractionScope(
                 && careDate.isBefore(LocalDate.parse(periodEndExclusive));
     }
 
-    public void requireMatches(String sourceId, String municipalityIbge,
-                        String periodStart, String periodEndExclusive) {
+    public void requireMatches(
+            String sourceId, String municipalityIbge, String periodStart, String periodEndExclusive) {
         if (!this.sourceId.equals(sourceId)
                 || !this.municipalityIbge.equals(municipalityIbge)
                 || !this.periodStart.equals(periodStart)
                 || !this.periodEndExclusive.equals(periodEndExclusive)) {
-            throw new IllegalArgumentException(
-                    "manifest does not match the bound acquisition scope");
+            throw new IllegalArgumentException("manifest does not match the bound acquisition scope");
         }
     }
 
     private static LocalDate parseDate(String value, String field) {
         try {
             return LocalDate.parse(value);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e) { // NOPMD - parse failure or null, converted with its cause
             throw new IllegalArgumentException("acquisition scope " + field + " must be an ISO date", e);
         }
     }
