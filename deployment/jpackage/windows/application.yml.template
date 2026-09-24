@@ -13,8 +13,5 @@
 #     # Administrators, which is what the service accepts (readable only by its owner,
 #     # LocalService and SYSTEM).
 #     secret-file: C:/ProgramData/ObservatorioAPS/config/pec.env
-#   execution-plane:
-#     # "" (with quotes) turns the Rust execution plane off and uses in-process JDBC
-#     binary: ""
 # server:
 #   address: 127.0.0.1

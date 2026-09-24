@@ -58,7 +58,7 @@ import java.util.concurrent.TimeUnit;
  * comparison mismatches and acquisition is refused), never silently.
  *
  * <p>{@link AcquisitionListener#onProgress()} fires only when the child sends its own {@code
- * progress} message, unlike {@code InProcessAcquisition} which fires it at two fixed points
+ * progress} message, unlike the test-only JDBC {@code InProcessAcquisition}, which fires it at two fixed points
  * (connection open, extract finalize). Plan §2.7 pre-authorizes this divergence — no decision
  * path reads {@code last_progress_at}, it only feeds diagnostics.
  *

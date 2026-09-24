@@ -55,9 +55,6 @@ setup_observatorio ()
 #     allowed-destinations: ["10.0.0.5:5432"]
 #     # owner observatorio, mode 0600
 #     secret-file: /etc/observatorio-aps/pec.env
-#   execution-plane:
-#     # "" (with quotes) turns the Rust execution plane off and uses in-process JDBC
-#     binary: ""
 # server:
 #   address: 127.0.0.1
 YML

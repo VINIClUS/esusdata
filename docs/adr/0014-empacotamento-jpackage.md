@@ -33,6 +33,8 @@ test da app image. `.github/workflows/package.yml` roda os dois em runners do pr
   que está provado: `ExecPlaneDifferentialLiveTest` passa contra o binário que é empacotado — o
   script Linux compila o Rust antes e roda o `mvn verify` com ele. Para desligar:
   `observatorio.execution-plane.binary: ""` (aspas explícitas) no `application.yml` de config.
+  > **Superado por ADR 0016.** A equivalência foi provada contra o PEC 5.5.28 em produção, e o
+  > plano de execução passou a ser o único caminho. Não existe mais como desligá-lo.
 - **Serviço Linux.** `.deb` com `--launcher-as-service`. O unit (`observatorio-aps-observatorio-aps.service`,
   nome imposto pelo jpackage, com `Alias=observatorio-aps.service`) roda como usuário de sistema
   `observatorio`, `ProtectSystem=strict`, escrita só em `/var/lib/observatorio-aps`. O `postinst`
