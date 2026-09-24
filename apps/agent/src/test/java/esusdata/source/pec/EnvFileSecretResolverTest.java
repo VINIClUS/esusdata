@@ -72,7 +72,7 @@ class EnvFileSecretResolverTest {
     @EnabledOnOs(OS.WINDOWS)
     void acceptsSecretFilesReadableBySystemOnNtfs() throws IOException {
         Path file = writeSecretFile("DB_PASSWORD=secret\n");
-        grantRead(file, principal("NT AUTHORITY\\SYSTEM"));
+        grant(file, principal("NT AUTHORITY\\SYSTEM"), AclEntryPermission.READ_DATA);
 
         assertThat(new EnvFileSecretResolver(file).resolve("DB_PASSWORD"))
                 .containsExactly("secret".toCharArray());
@@ -83,11 +83,23 @@ class EnvFileSecretResolverTest {
     void rejectsSecretFilesReadableByOtherPrincipalsOnNtfs() throws IOException {
         Path file = writeSecretFile("DB_PASSWORD=secret\n");
         // A principal whose English name resolves on any Windows display language.
-        grantRead(file, principal("NT AUTHORITY\\LocalService"));
+        grant(file, principal("NT AUTHORITY\\LocalService"), AclEntryPermission.READ_DATA);
 
         assertThatThrownBy(() -> new EnvFileSecretResolver(file).resolve("DB_PASSWORD"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("can read it");
+                .hasMessageContaining("the ACL grants");
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void rejectsSecretFilesWritableByOtherPrincipalsOnNtfs() throws IOException {
+        Path file = writeSecretFile("DB_PASSWORD=secret\n");
+        // Write without read still lets the principal swap the credential or rewrite the ACL.
+        grant(file, principal("NT AUTHORITY\\LocalService"), AclEntryPermission.WRITE_ACL);
+
+        assertThatThrownBy(() -> new EnvFileSecretResolver(file).resolve("DB_PASSWORD"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("the ACL grants");
     }
 
     private Path writeSecretFile(String content) throws IOException {
@@ -104,10 +116,11 @@ class EnvFileSecretResolverTest {
         return file;
     }
 
-    private static void grantRead(Path file, UserPrincipal principal) throws IOException {
+    private static void grant(Path file, UserPrincipal principal, AclEntryPermission permission)
+            throws IOException {
         AclFileAttributeView view = Files.getFileAttributeView(file, AclFileAttributeView.class);
         List<AclEntry> acl = new ArrayList<>(view.getAcl());
-        acl.add(allow(principal, Set.of(AclEntryPermission.READ_DATA)));
+        acl.add(allow(principal, Set.of(permission)));
         view.setAcl(acl);
     }
 

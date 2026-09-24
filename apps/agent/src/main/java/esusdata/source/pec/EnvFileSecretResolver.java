@@ -8,7 +8,6 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.AclEntry;
-import java.nio.file.attribute.AclEntryPermission;
 import java.nio.file.attribute.AclEntryType;
 import java.nio.file.attribute.AclFileAttributeView;
 import java.nio.file.attribute.PosixFileAttributeView;
@@ -108,8 +107,9 @@ public final class EnvFileSecretResolver implements PecSecretResolver {
     }
 
     /**
-     * NTFS: every ACE that allows reading must belong to the file owner, the user this process
-     * runs as, or SYSTEM (ADR 0014). Principals compare by SID. Administrators pass only as the
+     * NTFS: every ACE that allows anything must belong to the file owner, the user this process
+     * runs as, or SYSTEM (ADR 0014) — as the POSIX check refuses any group or other bit: whoever
+     * can write the file or its ACL can replace the credential or grant themselves read. Principals compare by SID. Administrators pass only as the
      * owner, the default for files an elevated administrator creates: its name is localized
      * ("BUILTIN\\Administradores") and Java cannot look a principal up by SID.
      */
@@ -127,12 +127,11 @@ public final class EnvFileSecretResolver implements PecSecretResolver {
         List<AclEntry> acl = Files.getFileAttributeView(
                 envFile, AclFileAttributeView.class, LinkOption.NOFOLLOW_LINKS).getAcl();
         for (AclEntry entry : acl) {
-            if (entry.type() == AclEntryType.ALLOW
-                    && entry.permissions().contains(AclEntryPermission.READ_DATA)
+            if (entry.type() == AclEntryType.ALLOW && !entry.permissions().isEmpty()
                     && !allowed.contains(entry.principal())) {
-                throw new IllegalStateException("Secret file must be readable only by its owner,"
-                        + " the account running the service and SYSTEM, but " + entry.principal().getName()
-                        + " can read it: " + envFile);
+                throw new IllegalStateException("Secret file must be accessible only to its owner,"
+                        + " the account running the service and SYSTEM, but the ACL grants "
+                        + entry.principal().getName() + " " + entry.permissions() + ": " + envFile);
             }
         }
     }

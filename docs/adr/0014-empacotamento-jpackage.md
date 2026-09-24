@@ -61,8 +61,9 @@ test da app image. `.github/workflows/package.yml` roda os dois em runners do pr
     não pode criá-la); e o atalho "Observatorio APS" no Menu Iniciar, um `.url` para
     `http://localhost:8080/` — o cliente web servido pelo serviço.
 - **Segredo no NTFS.** `EnvFileSecretResolver` usa a ACL quando não há atributos POSIX: toda ACE
-  que permite ler o `pec.env` tem de ser do dono do arquivo, da conta do processo ou de SYSTEM
-  (comparação por SID). Administradores só passam como dono — o padrão para arquivo criado por
+  que permite qualquer acesso ao `pec.env` — ler, escrever ou mudar ACL/dono — tem de ser do dono
+  do arquivo, da conta do processo ou de SYSTEM (comparação por SID), como o check POSIX recusa
+  qualquer bit de grupo ou outros. Administradores só passam como dono — o padrão para arquivo criado por
   administrador elevado, e o que o `pec.env` criado em `config\` recebe. O Java não resolve
   principal por SID nem por nome em inglês num Windows pt-BR (`BUILTIN\Administrators` falha; só
   `NT AUTHORITY\SYSTEM` e `NT AUTHORITY\LocalService` resolvem), então não há como aceitar
