@@ -55,7 +55,7 @@ public final class PecCompatibilityMatrix {
                     "PecSourceIdentity is required and must include an installation role");
         }
         if (!root.isObject()
-                || !"1".equals(text(root, "schema_version"))
+                || !"2".equals(text(root, "schema_version"))
                 || !"VALIDATED".equals(text(root, "validation_status"))) {
             throw new IllegalStateException("Unsupported compatibility matrix schema");
         }
@@ -92,7 +92,7 @@ public final class PecCompatibilityMatrix {
     ) {
         return capability.equals(text(candidate, "capability"))
                 && adapterVersion.equals(text(candidate, "adapter_version"))
-                && identity.pecVersion().equals(text(candidate, "pec_version"))
+                && pecVersions(candidate).contains(identity.pecVersion())
                 && postgresVersion.equals(text(candidate, "postgresql_version"))
                 && identity.readModel().equals(text(candidate, "read_model"))
                 && identity.installationRole().equals(text(candidate, "installation_role"));
@@ -120,11 +120,22 @@ public final class PecCompatibilityMatrix {
             columns.put(name, List.copyOf(requestedColumns));
         }
         return new Entry(
-                text(node, "pec_version"), text(node, "postgresql_version"),
+                pecVersions(node), text(node, "postgresql_version"),
                 text(node, "adapter_version"), text(node, "read_model"),
                 text(node, "installation_role"), text(node, "capability"),
                 text(node, "status"), text(node, "query_checksum"),
                 Map.copyOf(fingerprints), Map.copyOf(columns));
+    }
+
+    /** The entry's explicit list of validated PEC versions — never a range (schema v2). */
+    private static List<String> pecVersions(JsonNode node) {
+        JsonNode versions = node.get("pec_versions");
+        if (versions == null || !versions.isArray()) {
+            return List.of();
+        }
+        List<String> listed = new ArrayList<>();
+        for (JsonNode version : versions) listed.add(version.asString());
+        return List.copyOf(listed);
     }
 
     private static String text(JsonNode node, String field) {
@@ -139,7 +150,7 @@ public final class PecCompatibilityMatrix {
     }
 
     public record Entry(
-            String pecVersion,
+            List<String> pecVersions,
             String postgresVersion,
             String adapterVersion,
             String readModel,

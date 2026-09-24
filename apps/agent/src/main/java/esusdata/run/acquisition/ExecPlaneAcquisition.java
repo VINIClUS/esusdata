@@ -391,6 +391,10 @@ public final class ExecPlaneAcquisition implements Acquisition {
                 return "fingerprint mismatch for " + object + ": expected "
                         + expected.getValue() + " but computed " + actual;
             }
+            // Evidence trail: the fingerprint computed from what the child measured, per object.
+            log.info("execution plane probe matched {} for source {} (PEC {}): {}",
+                    object, acquisitionCommand.sourceIdentity().sourceId(),
+                    acquisitionCommand.sourceIdentity().pecVersion(), actual);
         }
         return null;
     }
