@@ -7,9 +7,19 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
+import java.nio.file.attribute.UserPrincipalLookupService;
+import java.nio.file.attribute.UserPrincipalNotFoundException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -71,19 +81,59 @@ public final class EnvFileSecretResolver implements PecSecretResolver {
             throw new IllegalStateException("Secret file must be a regular file: " + envFile);
         }
         try {
-            PosixFileAttributes attributes = Files.readAttributes(
-                    envFile, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-            Set<PosixFilePermission> permissions = attributes.permissions();
-            if (permissions.stream().anyMatch(permission -> permission.name().startsWith("GROUP_")
-                    || permission.name().startsWith("OTHERS_"))) {
+            if (Files.getFileAttributeView(envFile, PosixFileAttributeView.class,
+                    LinkOption.NOFOLLOW_LINKS) != null) {
+                validatePosixPermissions();
+            } else if (Files.getFileAttributeView(envFile, AclFileAttributeView.class,
+                    LinkOption.NOFOLLOW_LINKS) != null) {
+                validateAclPermissions();
+            } else {
                 throw new IllegalStateException(
-                        "Secret file permissions must be owner-only (0600 or stricter): " + envFile);
+                        "Cannot verify secret file permissions on this filesystem: " + envFile);
             }
-        } catch (UnsupportedOperationException e) {
-            throw new IllegalStateException(
-                    "Cannot verify secret file permissions on this filesystem: " + envFile, e);
         } catch (IOException e) {
             throw new IllegalStateException("Could not inspect secret file permissions: " + envFile, e);
+        }
+    }
+
+    private void validatePosixPermissions() throws IOException {
+        PosixFileAttributes attributes = Files.readAttributes(
+                envFile, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        Set<PosixFilePermission> permissions = attributes.permissions();
+        if (permissions.stream().anyMatch(permission -> permission.name().startsWith("GROUP_")
+                || permission.name().startsWith("OTHERS_"))) {
+            throw new IllegalStateException(
+                    "Secret file permissions must be owner-only (0600 or stricter): " + envFile);
+        }
+    }
+
+    /**
+     * NTFS: every ACE that allows reading must belong to the file owner, the user this process
+     * runs as, or SYSTEM (ADR 0014). Principals compare by SID. Administrators pass only as the
+     * owner, the default for files an elevated administrator creates: its name is localized
+     * ("BUILTIN\\Administradores") and Java cannot look a principal up by SID.
+     */
+    private void validateAclPermissions() throws IOException {
+        UserPrincipalLookupService lookup = envFile.getFileSystem().getUserPrincipalLookupService();
+        Set<UserPrincipal> allowed = new HashSet<>();
+        allowed.add(Files.getOwner(envFile, LinkOption.NOFOLLOW_LINKS));
+        // LookupAccountName accepts this English name on localized Windows too.
+        allowed.add(lookup.lookupPrincipalByName("NT AUTHORITY\\SYSTEM"));
+        try {
+            allowed.add(lookup.lookupPrincipalByName(System.getProperty("user.name")));
+        } catch (UserPrincipalNotFoundException e) {
+            // The owner and SYSTEM still apply; anything else fails closed below.
+        }
+        List<AclEntry> acl = Files.getFileAttributeView(
+                envFile, AclFileAttributeView.class, LinkOption.NOFOLLOW_LINKS).getAcl();
+        for (AclEntry entry : acl) {
+            if (entry.type() == AclEntryType.ALLOW
+                    && entry.permissions().contains(AclEntryPermission.READ_DATA)
+                    && !allowed.contains(entry.principal())) {
+                throw new IllegalStateException("Secret file must be readable only by its owner,"
+                        + " the account running the service and SYSTEM, but " + entry.principal().getName()
+                        + " can read it: " + envFile);
+            }
         }
     }
 }
