@@ -4,35 +4,31 @@ import esusdata.source.model.SourceNotFoundException;
 import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.PecConnectionProperties;
-import esusdata.source.pec.PecDataSourceFactory;
-import esusdata.source.pec.PecSourceConnection;
 import esusdata.source.pec.PecSourceIdentity;
 import esusdata.source.pec.ReadBudget;
+import esusdata.source.pec.SourceAcquisitionLimiter;
 import esusdata.source.pec.SourceBudgetExceededException;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.net.InetAddress;
 import java.util.Optional;
 
 /**
  * §1.10: {@code POST /sources/{id}/test} — "diagnóstico limitado de rede, leitura, capacidades e
- * orçamento; sem revelar segredo." Lives here, not in {@code api}, because {@code api} is
- * forbidden from depending on {@code sourceconnector} directly (ModuleBoundaryTest) — this class
- * is the seam, reusing the EXACT {@link AllowedDestinations}/{@link PecDataSourceFactory} the live
- * acquisition path uses. A passing diagnostic means the same connection {@code LIVE_READ_ONLY}
- * would actually open, never a separate, looser code path. The secret itself never leaves {@link
- * esusdata.source.pec.PecSecretResolver} — this class only ever sees the
- * connection outcome.
+ * orçamento; sem revelar segredo." The connection itself goes through {@link
+ * SourceConnectivityCheck}, implemented by the execution plane (ADR 0017): the same binary, the
+ * same session and the same {@link AllowedDestinations} check a live acquisition uses. A passing
+ * diagnostic means the same connection {@code LIVE_READ_ONLY} would actually open, never a
+ * separate, looser code path. This class only ever sees a SQLSTATE, never the secret nor the
+ * driver's message.
  *
- * <p>Reuses {@link esusdata.source.pec.SourceAcquisitionLimiter}'s one-active-
- * acquisition-per-source guard transitively through {@code PecDataSourceFactory.open} — testing a
- * source while a real job is acquiring from it fails fast as {@link Outcome#SOURCE_BUSY}, not a
- * hang or a race.
+ * <p>Holds {@link SourceAcquisitionLimiter}'s one-active-acquisition-per-source permit for the
+ * whole check — testing a source while a real job is acquiring from it fails fast as {@link
+ * Outcome#SOURCE_BUSY}, not a hang or a race.
  */
 public final class SourceDiagnosticsService {
 
     private final SourceRepository sourceRepository;
     private final AllowedDestinations allowedDestinations;
-    private final PecDataSourceFactory pecDataSourceFactory;
+    private final SourceConnectivityCheck connectivityCheck;
 
     public enum Outcome {
         DESTINATION_NOT_ALLOWED,
@@ -53,8 +49,8 @@ public final class SourceDiagnosticsService {
         return Outcome.CONNECTION_FAILED;
     }
 
-    static String detailFor(SQLException failure) {
-        return switch (classifySqlState(failure.getSQLState())) {
+    static String detailFor(String sqlState) {
+        return switch (classifySqlState(sqlState)) {
             case SOURCE_AUTHENTICATION_FAILED -> "source authentication failed";
             case SOURCE_PERMISSION_DENIED -> "source permission denied";
             default -> "source connection failed";
@@ -85,10 +81,10 @@ public final class SourceDiagnosticsService {
     public SourceDiagnosticsService(
             SourceRepository sourceRepository,
             AllowedDestinations allowedDestinations,
-            PecDataSourceFactory pecDataSourceFactory) {
+            SourceConnectivityCheck connectivityCheck) {
         this.sourceRepository = sourceRepository;
         this.allowedDestinations = allowedDestinations;
-        this.pecDataSourceFactory = pecDataSourceFactory;
+        this.connectivityCheck = connectivityCheck;
     }
 
     public Optional<SourceRecord> find(String sourceId) {
@@ -96,18 +92,21 @@ public final class SourceDiagnosticsService {
     }
 
     /**
-     * Runs the connectivity check against a registered source.
+     * Runs the diagnostic for one registered source.
      *
      * @throws SourceNotFoundException if {@code sourceId} does not resolve.
      */
+    // javac's try lint / PMD: the permit is held for the block's scope and released on close, never read.
+    @SuppressWarnings({"try", "PMD.UnusedLocalVariable"})
     public Diagnostics test(String sourceId) {
         SourceRecord source = sourceRepository
                 .findById(sourceId)
                 .orElseThrow(() -> new SourceNotFoundException("unknown source: " + sourceId));
         ReadBudget budget = ReadBudget.initialEngineeringProposal();
 
+        InetAddress validatedAddress;
         try {
-            allowedDestinations.assertAllowed(source.host(), source.port());
+            validatedAddress = allowedDestinations.assertAllowed(source.host(), source.port());
         } catch (AllowedDestinations.DestinationNotAllowedException e) {
             return new Diagnostics(Outcome.DESTINATION_NOT_ALLOWED, e.getMessage(), budget);
         }
@@ -122,19 +121,20 @@ public final class SourceDiagnosticsService {
                 source.municipalityIbge());
         PecSourceIdentity identity = new PecSourceIdentity(
                 source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole());
+        // Same refusal an acquisition gives a source whose installation role is still unknown.
+        if (!identity.isComplete()) {
+            throw new IllegalStateException("PecSourceIdentity is required before opening a PEC source connection");
+        }
 
-        // Worst-case wait here is the ReadBudget's own acquisitionTimeout/connectionTimeout
-        // (~10s) — the same path a real run would take. A shorter, diagnostic-specific budget is
-        // future work, not a correctness requirement of this recorte.
-        try (PecSourceConnection connection = pecDataSourceFactory.open(properties, identity, budget)) {
-            try (Statement statement = connection.jdbcConnection().createStatement()) {
-                statement.execute("SELECT 1");
+        try (SourceAcquisitionLimiter.Permit permit = SourceAcquisitionLimiter.acquireOrFail(source.id())) {
+            SourceConnectivityCheck.Result result =
+                    connectivityCheck.check(properties, validatedAddress.getHostAddress(), budget);
+            if (result.connected()) {
+                return new Diagnostics(Outcome.CONNECTED, null, budget);
             }
-            return new Diagnostics(Outcome.CONNECTED, null, budget);
+            return new Diagnostics(classifySqlState(result.sqlState()), detailFor(result.sqlState()), budget);
         } catch (SourceBudgetExceededException e) {
             return new Diagnostics(Outcome.SOURCE_BUSY, e.getMessage(), budget);
-        } catch (SQLException e) {
-            return new Diagnostics(classifySqlState(e.getSQLState()), detailFor(e), budget);
         }
     }
 }

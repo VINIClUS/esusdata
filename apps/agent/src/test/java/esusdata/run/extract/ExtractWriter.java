@@ -40,7 +40,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 public final class ExtractWriter implements AutoCloseable {
 
-    public static final String CANONICAL_SCHEMA_VERSION = "1";
+    public static final String CANONICAL_SCHEMA_VERSION = ExtractionManifest.CANONICAL_SCHEMA_VERSION;
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final Path baseDir;
