@@ -119,7 +119,8 @@ _Avoid_: worker, wrapper (worker é `JobWorker`; wrapper é o instalador do SO)
 **Porta de aquisição** (`AcquisitionPort`):
 Interface de domínio que a execução usa para adquirir um extrato. Em produção tem uma só
 implementação, delegada ao plano de execução (`ExecPlaneAcquisition`, ADR 0016). A leitura
-in-process via JDBC (`InProcessAcquisition`) existe só nos testes, como referência.
+in-process via JDBC (`InProcessAcquisition`) existe só nos testes, como referência. O diagnóstico
+de fonte também passa pelo plano de execução (ADR 0017); o pgJDBC é dependência só de teste.
 
 **Comando de aquisição** (`AcquisitionCommand`):
 Os dados de uma solicitação de aquisição — fonte, identidade, escopo, orçamento — como a execução

@@ -29,6 +29,8 @@ A matriz exigia `pec_version` exato. A 5.5.28, com o mesmo schema observado, nã
   job runner usam sem binário compilado. O resto do caminho JDBC (`IndividualEncounterModalityCapability`,
   `JdbcCompatibilityCatalog`, `PecDataSourceFactory`) fica em `main`: o diagnóstico de fonte ainda
   o usa.
+  *(Superado pelo ADR 0017: o diagnóstico passou para o plano de execução e esse código foi para
+  `src/test`.)*
 - **Matriz com lista explícita de versões (schema v2).** `pec_version` passa a ser
   `pec_versions`. Cada versão listada tem evidência própria de fingerprint, e nunca há faixa. Uma
   versão fora da lista continua falhando fechado, mesmo entre duas listadas. As fingerprints seguem

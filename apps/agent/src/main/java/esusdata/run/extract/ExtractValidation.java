@@ -51,7 +51,7 @@ final class ExtractValidation {
             throw new IllegalStateException("Extract completeness status must be exactly COMPLETE, got "
                     + manifest.completenessStatus() + " for extractionId=" + manifest.extractionId());
         }
-        if (!ExtractWriter.CANONICAL_SCHEMA_VERSION.equals(manifest.canonicalSchemaVersion())) {
+        if (!ExtractionManifest.CANONICAL_SCHEMA_VERSION.equals(manifest.canonicalSchemaVersion())) {
             throw new IllegalStateException("Unsupported canonical schema version " + manifest.canonicalSchemaVersion()
                     + " for extractionId=" + manifest.extractionId());
         }

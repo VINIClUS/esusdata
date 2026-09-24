@@ -4,8 +4,8 @@ mod matrix;
 mod probe;
 mod stream;
 
-use envelope::AcquireEnvelope;
-use postgres::{Config, IsolationLevel, NoTls};
+use envelope::{AcquireEnvelope, DiagnoseEnvelope, SessionBudget};
+use postgres::{Client, Config, IsolationLevel, NoTls};
 use serde_json::{json, Map};
 use sha2::{Digest, Sha256};
 use std::error::Error;
@@ -34,36 +34,51 @@ fn main() {
     }
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "one linear acquire protocol; split alongside the pending diagnose mode, which reshapes it"
-)]
 fn run() -> Result<i32, Box<dyn Error>> {
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
 
-    let acquire_line = lines
+    let first_line = lines
         .next()
-        .ok_or("stdin closed before an acquire envelope was received")??;
-    let mut envelope: AcquireEnvelope = serde_json::from_str(&acquire_line)?;
+        .ok_or("stdin closed before an envelope was received")??;
+    let message: serde_json::Value = serde_json::from_str(&first_line)?;
+    match message.get("type").and_then(serde_json::Value::as_str) {
+        Some("acquire") => acquire(serde_json::from_value(message)?, lines),
+        Some("diagnose") => diagnose(serde_json::from_value(message)?),
+        other => {
+            eprintln!("observatorio-execplane: expected 'acquire' or 'diagnose', got: {other:?}");
+            Ok(3)
+        }
+    }
+}
 
+/// Opens the one kind of session this process ever uses, for both `acquire` and `diagnose`.
+/// `Ok(None)` means the failure was already reported on stdout and the process should exit 1.
+fn connect_session(
+    host: &str,
+    port: u16,
+    database: &str,
+    user: &str,
+    password: &mut String,
+    budget: &SessionBudget,
+) -> Result<Option<Client>, Box<dyn Error>> {
     let mut config = Config::new();
     config
-        .host(&envelope.host)
-        .port(envelope.port)
-        .dbname(&envelope.database)
-        .user(&envelope.user)
-        .password(envelope.password.as_bytes())
-        .connect_timeout(Duration::from_millis(envelope.budget.connect_timeout_ms.max(0).unsigned_abs()))
+        .host(host)
+        .port(port)
+        .dbname(database)
+        .user(user)
+        .password(password.as_bytes())
+        .connect_timeout(Duration::from_millis(budget.connect_timeout_ms.max(0).unsigned_abs()))
         // Bounds a blackholed TCP connection (packets sent, never acknowledged) the same way
-        // PecDataSourceFactory's pgJDBC `socketTimeout` property does on the JDBC path — without
-        // this, a dead connection leaves a blocking socket read waiting indefinitely, and neither
+        // pgJDBC's `socketTimeout` property did on the retired JDBC path — without this, a dead
+        // connection leaves a blocking socket read waiting indefinitely, and neither
         // max_duration_ms nor cooperative cancellation can free the sole acquisition worker.
-        .tcp_user_timeout(Duration::from_millis(envelope.budget.max_duration_ms.max(0).unsigned_abs()));
+        .tcp_user_timeout(Duration::from_millis(budget.max_duration_ms.max(0).unsigned_abs()));
     let connect_result = config.connect(NoTls);
-    // Zeroed regardless of outcome — mirrors PecDataSourceFactory/writeAcquireEnvelope's own
-    // finally-block zeroing on both sides of this same secret.
-    envelope.password.zeroize();
+    // Zeroed regardless of outcome — mirrors the Java side's own finally-block zeroing of this
+    // same secret right after writing the envelope.
+    password.zeroize();
     let mut client = match connect_result {
         Ok(client) => client,
         Err(err) => {
@@ -78,30 +93,81 @@ fn run() -> Result<i32, Box<dyn Error>> {
                 "type": "error", "code": "SQL_ERROR", "sqlstate": sqlstate,
                 "detail": err.to_string(), "uncertain": false,
             }))?;
-            return Ok(1);
+            return Ok(None);
         }
     };
-    // Captured before any &mut borrow of client (e.g. build_transaction()) makes that
-    // impossible — CancelToken is independent of the connection it was derived from and stays
-    // usable from another thread for as long as the process runs (plan §2.7's cancellation path).
-    let cancel_token = client.cancel_token();
 
-    // Same session GUCs as PecDataSourceFactory's connectionInitSql, byte-identical
-    // application_name so the child is findable in pg_stat_activity under the name operators are
-    // told to look for.
+    // Same session GUCs the JDBC pool's connectionInitSql set, byte-identical application_name
+    // so the child is findable in pg_stat_activity under the name operators are told to look for.
     let session_setup = client.batch_execute(&format!(
         "SET application_name = 'observatorio-aps'; \
          SET default_transaction_read_only = on; \
          SET statement_timeout = {}; \
          SET lock_timeout = {}; \
          SET idle_in_transaction_session_timeout = {};",
-        envelope.budget.statement_timeout_ms,
-        envelope.budget.lock_timeout_ms,
-        envelope.budget.idle_in_transaction_timeout_ms,
+        budget.statement_timeout_ms, budget.lock_timeout_ms, budget.idle_in_transaction_timeout_ms,
     ));
     if let Err(err) = session_setup {
+        report_pre_probe_failure(&err)?;
+        return Ok(None);
+    }
+    Ok(Some(client))
+}
+
+/// `POST /sources/{id}/test` (ADR 0017): the same session an acquisition would open, then
+/// `SELECT 1` in a read-only transaction. Success is `diagnosed` **and** exit 0; failures reuse the
+/// pre-probe `error` shapes, so the SQLSTATE reaches Java the same way it does for an acquisition.
+fn diagnose(mut envelope: DiagnoseEnvelope) -> Result<i32, Box<dyn Error>> {
+    let Some(mut client) = connect_session(
+        &envelope.host,
+        envelope.port,
+        &envelope.database,
+        &envelope.user,
+        &mut envelope.password,
+        &envelope.budget,
+    )?
+    else {
+        return Ok(1);
+    };
+    let checked = client
+        .build_transaction()
+        .read_only(true)
+        .start()
+        .and_then(|mut txn| {
+            txn.query_one("SELECT 1", &[])?;
+            txn.rollback()
+        });
+    if let Err(err) = checked {
         return report_pre_probe_failure(&err);
     }
+    write_line(&json!({ "type": "diagnosed" }))?;
+    Ok(0)
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "one linear acquire protocol: handshake, decision, stream, outcome"
+)]
+fn acquire(
+    mut envelope: AcquireEnvelope,
+    mut lines: io::Lines<io::StdinLock<'static>>,
+) -> Result<i32, Box<dyn Error>> {
+    let session_budget = envelope.budget.session();
+    let Some(mut client) = connect_session(
+        &envelope.host,
+        envelope.port,
+        &envelope.database,
+        &envelope.user,
+        &mut envelope.password,
+        &session_budget,
+    )?
+    else {
+        return Ok(1);
+    };
+    // Captured before any &mut borrow of client (e.g. build_transaction()) makes that
+    // impossible — CancelToken is independent of the connection it was derived from and stays
+    // usable from another thread for as long as the process runs (plan §2.7's cancellation path).
+    let cancel_token = client.cancel_token();
 
     // ENG-43: the probe and (in the next slice) the frozen query itself run inside one
     // read-only repeatable-read transaction — the same snapshot, never reopened. This

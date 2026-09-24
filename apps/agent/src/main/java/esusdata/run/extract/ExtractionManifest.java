@@ -3,7 +3,7 @@ package esusdata.run.extract;
 /**
  * Extraction manifest — Tech Spec §1.6/§1.9.1: {@code extraction_id}, cortes, consultas/checksums,
  * contagens, exclusões, versão canônica, completude e consistência. Every field here is written
- * once, inside {@code ExtractWriter#finalizeExtract}, and never mutated afterward.
+ * once, at publication ({@code DelegatedExtractPublication#publish}), and never mutated afterward.
  *
  * <p>{@code finishedAt} is {@code null} until finalization succeeds — a manifest file is only
  * ever written as part of that same finalize call, so its mere existence on disk already implies
@@ -25,4 +25,8 @@ public record ExtractionManifest(
         long exclusionCount,
         String checksum,
         String queryChecksum,
-        String adapterVersion) {}
+        String adapterVersion) {
+
+    /** The canonical record schema every published extract is written in. */
+    public static final String CANONICAL_SCHEMA_VERSION = "1";
+}

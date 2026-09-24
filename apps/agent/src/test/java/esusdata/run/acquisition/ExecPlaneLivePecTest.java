@@ -7,12 +7,19 @@ import esusdata.run.extract.ExtractionManifest;
 import esusdata.run.job.CancellationToken;
 import esusdata.run.job.JobCancelledException;
 import esusdata.run.worker.FailureClassifier;
+import esusdata.source.JdbcSourceDiagnostics;
+import esusdata.source.SourceDiagnosticsService;
+import esusdata.source.SourceDiagnosticsService.Diagnostics;
+import esusdata.source.SourceDiagnosticsService.Outcome;
+import esusdata.source.SourceRepository;
+import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.EnvFileSecretResolver;
 import esusdata.source.pec.IndividualEncounterModalityCapability;
 import esusdata.source.pec.JdbcCompatibilityCatalog;
 import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecConnectionProperties;
+import esusdata.source.pec.PecDataSourceFactory;
 import esusdata.source.pec.PecSecretResolver;
 import esusdata.source.pec.PecSourceIdentity;
 import esusdata.source.pec.ReadBudget;
@@ -29,6 +36,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -301,6 +309,80 @@ class ExecPlaneLivePecTest {
         assertThat(listener.uncertainReasons).singleElement().asString().contains("cancelled cooperatively");
         assertThat(extractsDir.resolve("live-cancel.jsonl.gz")).doesNotExist();
         assertThat(activeObservatorioQueries()).isZero();
+    }
+
+    /**
+     * ADR 0017's gate against the production PEC: the execution plane's diagnostic returns the same
+     * {@link Diagnostics} as the pgJDBC one it replaced. One login each; the wrong-password case
+     * below costs ~11 failed logins on the server: HikariCP retries the JDBC reference's login until
+     * its acquisition timeout (~10), the execution plane tries once.
+     */
+    @Test
+    void diagnosticMatchesTheJdbcReference() {
+        Diagnostics reference =
+                jdbcDiagnostics(new EnvFileSecretResolver(envFile)).test(env.get("PEC_SOURCE_ID"));
+        Diagnostics candidate =
+                execPlaneDiagnostics(new EnvFileSecretResolver(envFile)).test(env.get("PEC_SOURCE_ID"));
+
+        assertThat(reference.outcome()).isEqualTo(Outcome.CONNECTED);
+        assertThat(candidate).isEqualTo(reference);
+    }
+
+    @Test
+    void wrongPasswordDiagnosticMatchesTheJdbcReference() {
+        PecSecretResolver wrong = secretRef -> "definitely-not-the-password".toCharArray();
+        Diagnostics reference = jdbcDiagnostics(wrong).test(env.get("PEC_SOURCE_ID"));
+        Diagnostics candidate = execPlaneDiagnostics(wrong).test(env.get("PEC_SOURCE_ID"));
+
+        assertThat(reference.outcome()).isEqualTo(Outcome.SOURCE_AUTHENTICATION_FAILED);
+        assertThat(candidate).isEqualTo(reference);
+    }
+
+    private SourceRepository singleSourceRepository() {
+        SourceRecord source = new SourceRecord(
+                env.get("PEC_SOURCE_ID"),
+                1,
+                "PEC_POSTGRESQL",
+                "PRONTUARIO",
+                "PRIMARY",
+                env.get("PEC_DB_HOST"),
+                port(),
+                env.get("PEC_DB_NAME"),
+                env.get("PEC_DB_USER"),
+                "PEC_DB_PASSWORD",
+                env.get("PEC_MUNICIPALITY_IBGE"),
+                env.get("PEC_VERSION"),
+                "PEC_DW",
+                "2026-09-24T00:00:00Z");
+        return new SourceRepository() {
+            @Override
+            public void upsert(SourceRecord ignored) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Optional<SourceRecord> findById(String id) {
+                return Optional.of(source).filter(candidate -> candidate.id().equals(id));
+            }
+        };
+    }
+
+    private AllowedDestinations allowedDestinations() {
+        return new AllowedDestinations(Set.of(new AllowedDestinations.HostPort(env.get("PEC_DB_HOST"), port())));
+    }
+
+    private JdbcSourceDiagnostics jdbcDiagnostics(PecSecretResolver secretResolver) {
+        return new JdbcSourceDiagnostics(
+                singleSourceRepository(),
+                allowedDestinations(),
+                new PecDataSourceFactory(allowedDestinations(), secretResolver));
+    }
+
+    private SourceDiagnosticsService execPlaneDiagnostics(PecSecretResolver secretResolver) {
+        return new SourceDiagnosticsService(
+                singleSourceRepository(),
+                allowedDestinations(),
+                new ExecPlaneConnectivityCheck(List.of(realBinary), secretResolver, Duration.ofSeconds(10)));
     }
 
     private long activeObservatorioQueries() throws Exception {

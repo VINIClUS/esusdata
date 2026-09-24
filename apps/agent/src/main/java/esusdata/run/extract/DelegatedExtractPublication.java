@@ -17,12 +17,12 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Publishes an extract whose data file was written by an external process — the Rust execution
  * plane, fatia 3 / ADR 0011, superseding ADR 0010's "the child never writes the extract" decision.
- * Unlike {@link ExtractWriter}, this class never touches the file's bytes: the child owns the
+ * Unlike {@code ExtractWriter} (the JDBC path's writer, test-only since ADR 0017), this class never touches the file's bytes: the child owns the
  * entire byte-level pipeline (parsing, per-record validation, gzip, SHA-256, the compressed-byte
- * ceiling). What stays exclusively Java's, matching {@link ExtractWriter}'s own division of
+ * ceiling). What stays exclusively Java's, matching {@code ExtractWriter}'s own division of
  * responsibility, is the {@code .extract.lock}, {@link ExtractRecovery#reconcile}, the manifest,
  * and the atomic hard-link publication via {@link ExtractPublication} — the same mechanics
- * {@link ExtractWriter} uses, not a second implementation.
+ * {@code ExtractWriter} uses, not a second implementation.
  *
  * <p>Because this class cannot see individual records, its pre-publication check is
  * metadata/integrity only: the reported row/exclusion counts are internally consistent, the
@@ -152,7 +152,7 @@ public final class DelegatedExtractPublication implements AutoCloseable {
                 acquisitionScope.periodEndExclusive(),
                 startedAt.toString(),
                 finishedAt.toString(),
-                ExtractWriter.CANONICAL_SCHEMA_VERSION,
+                ExtractionManifest.CANONICAL_SCHEMA_VERSION,
                 completenessStatus,
                 consistencyLevel,
                 sourceZoneId,
@@ -181,7 +181,7 @@ public final class DelegatedExtractPublication implements AutoCloseable {
      * Releases the lock without publishing — the normal path on any failure before or during
      * {@link #publish}. Any data the child already wrote is left as an orphaned {@code .tmp} file,
      * harmless, cleaned up by the next {@link ExtractRecovery#reconcile} call for this base
-     * directory (same recovery model {@link ExtractWriter#close()} relies on). Safe to call again
+     * directory (same recovery model {@code ExtractWriter#close()} relies on). Safe to call again
      * after {@link #publish} already closed the lock — {@link ExtractRecovery.WriterLock#close()}
      * is idempotent, the same property {@code ExtractWriter} already depends on.
      */

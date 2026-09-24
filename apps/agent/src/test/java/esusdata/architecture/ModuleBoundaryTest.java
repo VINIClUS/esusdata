@@ -14,8 +14,8 @@ import org.junit.jupiter.api.Test;
  *
  * <ul>
  *   <li>Tech Spec §1.5 / ENG-35: the indicator engine is pure Java — no JDBC, no HTTP, no PEC.</li>
- *   <li>ENG-29: the PostgreSQL driver is only reachable from the PEC connection code and the
- *       acquisition that reads through it — never from job, result, auth or web code.</li>
+ *   <li>ENG-29 / ADR 0017: production code never reaches the PostgreSQL driver — every PEC read
+ *       and the source diagnostic go through the execution plane; pgJDBC is test scope only.</li>
  *   <li>Source registry and auth never depend on the run pipeline; the dependency goes the other
  *       way.</li>
  * </ul>
@@ -41,10 +41,8 @@ class ModuleBoundaryTest {
     }
 
     @Test
-    void postgresDriverOnlyReachableFromPecConnectionAndAcquisition() {
+    void productionCodeNeverReachesThePostgresDriver() {
         noClasses()
-                .that()
-                .resideOutsideOfPackages(BASE + ".source.pec..", BASE + ".run.acquisition..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("org.postgresql..")
