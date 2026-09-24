@@ -87,19 +87,19 @@ public class RunConfig {
     // --- resultstore -----------------------------------------------------------------------
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public SourceRepository sourceRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcSourceRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public ExtractionManifestRepository extractionManifestRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcExtractionManifestRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public ResultStagingArea resultStagingArea(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcResultStagingArea(sqliteJdbcTemplate);
     }
@@ -115,7 +115,7 @@ public class RunConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public PublicationService publicationService(
             JdbcTemplate sqliteJdbcTemplate,
             TransactionTemplate sqliteTransactionTemplate,
@@ -135,19 +135,19 @@ public class RunConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public ResultRepository resultRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcResultRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public EvidenceRepository evidenceRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcEvidenceRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public SourceDiagnosticsService sourceDiagnosticsService(
             SourceRepository sourceRepository,
             AllowedDestinations allowedDestinations,
@@ -158,7 +158,7 @@ public class RunConfig {
     // --- jobrunner -------------------------------------------------------------------------
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public JobRepository jobRepository(JdbcTemplate sqliteJdbcTemplate, TransactionTemplate sqliteTransactionTemplate) {
         return new JdbcJobRepository(sqliteJdbcTemplate, sqliteTransactionTemplate);
     }
@@ -179,7 +179,7 @@ public class RunConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public AcquisitionGuardStore acquisitionGuardStore(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcAcquisitionGuardStore(sqliteJdbcTemplate);
     }
@@ -233,7 +233,7 @@ public class RunConfig {
      * protects that ordering rather than gating anything itself.
      */
     @Bean
-    @DependsOn({"flywayMigration", "jobRepository"})
+    @DependsOn({SqliteConfig.FLYWAY_MIGRATION, "jobRepository"})
     public JobRecovery.RecoveryReport jobRecoveryReport(JobRecovery jobRecovery, String processInstanceId) {
         JobRecovery.RecoveryReport report = jobRecovery.reconcile(processInstanceId);
         log.info(

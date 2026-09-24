@@ -27,7 +27,7 @@ class PecDataSourceFactoryTest {
     @Test
     void acquisitionEntryPointRequiresTheDeploymentIdentity() {
         assertThat(Arrays.stream(PecDataSourceFactory.class.getDeclaredMethods())
-                        .filter(method -> method.getName().equals("open"))
+                        .filter(method -> "open".equals(method.getName()))
                         .anyMatch(method ->
                                 Arrays.asList(method.getParameterTypes()).contains(PecSourceIdentity.class)))
                 .isTrue();
@@ -42,15 +42,16 @@ class PecDataSourceFactoryTest {
     @Test
     void sourceConnectionCreatesAnImmutablePeriodBoundAcquisition() {
         assertThat(Arrays.stream(PecSourceConnection.class.getDeclaredMethods())
-                        .anyMatch(method -> method.getName().equals("acquire")
-                                && method.getReturnType().getName().equals("esusdata.source.pec.PecAcquisition")))
+                        .anyMatch(method -> "acquire".equals(method.getName())
+                                && "esusdata.source.pec.PecAcquisition"
+                                        .equals(method.getReturnType().getName())))
                 .isTrue();
     }
 
     @Test
     void missingDeploymentIdentityBlocksOpeningBeforeDestinationValidation() {
         var properties = new PecConnectionProperties(
-                "missing-identity-source", "127.0.0.1", 15433, "esus", "reader", "DB_PASSWORD", "3541307");
+                "missing-identity-source", "127.0.0.1", 15_433, "esus", "reader", "DB_PASSWORD", "3541307");
         var factory = new PecDataSourceFactory(new AllowedDestinations(Set.of()), ignored -> "secret".toCharArray());
 
         assertThatThrownBy(() -> factory.open(properties, null, ReadBudget.initialEngineeringProposal()))
@@ -60,8 +61,8 @@ class PecDataSourceFactoryTest {
 
     @Test
     void identityForAnotherSourceCannotBePairedWithThisSourceProperties() {
-        var properties =
-                new PecConnectionProperties("source-a", "127.0.0.1", 15433, "esus", "reader", "DB_PASSWORD", "3541307");
+        var properties = new PecConnectionProperties(
+                "source-a", "127.0.0.1", 15_433, "esus", "reader", "DB_PASSWORD", "3541307");
         var factory = new PecDataSourceFactory(new AllowedDestinations(Set.of()), ignored -> "secret".toCharArray());
 
         assertThatThrownBy(() -> factory.open(
@@ -77,7 +78,9 @@ class PecDataSourceFactoryTest {
         var budget = new ReadBudget(
                 1, Duration.ofSeconds(1), Duration.ofSeconds(1), 10_000, 10_000, 10_000, 10, 10_000, 10_000, 10_000);
         var properties = new PecConnectionProperties(
-                "bound-budget-source", "127.0.0.1", 15433, "esus", "reader", "DB_PASSWORD", "3541307");
+                "bound-budget-source", "127.0.0.1", 15_433, "esus", "reader", "DB_PASSWORD", "3541307");
+        // binds a Mockito mock connection: nothing to release
+        @SuppressWarnings("PMD.CloseResource")
         var sourceConnection = PecSourceConnectionTestSupport.bind(
                 Mockito.mock(java.sql.Connection.class),
                 properties,
@@ -94,8 +97,10 @@ class PecDataSourceFactoryTest {
     void sourceConnectionReturnsTheIdentityWithWhichItWasBound() {
         var connection = Mockito.mock(java.sql.Connection.class);
         var properties = new PecConnectionProperties(
-                "bound-identity-source", "127.0.0.1", 15433, "esus", "reader", "DB_PASSWORD", "3541307");
+                "bound-identity-source", "127.0.0.1", 15_433, "esus", "reader", "DB_PASSWORD", "3541307");
 
+        // binds a Mockito mock connection: nothing to release
+        @SuppressWarnings("PMD.CloseResource")
         var bound = PecSourceConnectionTestSupport.bind(connection, properties, CT133_IDENTITY);
 
         assertThat(bound.sourceIdentity()).isSameAs(CT133_IDENTITY);
@@ -103,15 +108,14 @@ class PecDataSourceFactoryTest {
 
     @Test
     void pinsTheValidatedLiteralAddressAndMapsTheTwoTimeoutsSeparately() {
-        var properties =
-                new PecConnectionProperties("source-1", "127.0.0.1", 15433, "esus", "reader", "DB_PASSWORD", "3541307");
-        var allowlist = new AllowedDestinations(Set.of(new AllowedDestinations.HostPort("127.0.0.1", 15433)));
+        var properties = new PecConnectionProperties(
+                "source-1", "127.0.0.1", 15_433, "esus", "reader", "DB_PASSWORD", "3541307");
+        var allowlist = new AllowedDestinations(Set.of(new AllowedDestinations.HostPort("127.0.0.1", 15_433)));
         var budget = new ReadBudget(
                 2, Duration.ofSeconds(3), Duration.ofSeconds(7), 30_000, 10_000, 30_000, 200_000, 60_000);
 
-        HikariDataSource dataSource =
-                new PecDataSourceFactory(allowlist, ignored -> "secret".toCharArray()).create(properties, budget);
-        try {
+        try (HikariDataSource dataSource =
+                new PecDataSourceFactory(allowlist, ignored -> "secret".toCharArray()).create(properties, budget)) {
             assertThat(dataSource.getJdbcUrl()).isEqualTo("jdbc:postgresql://127.0.0.1:15433/esus");
             assertThat(dataSource.getTransactionIsolation()).isEqualTo("TRANSACTION_REPEATABLE_READ");
             assertThat(dataSource.getConnectionTimeout()).isEqualTo(7_000);
@@ -121,8 +125,6 @@ class PecDataSourceFactoryTest {
                     .isEqualTo(60);
             assertThat(dataSource.getDataSourceProperties().get("cancelSignalTimeout"))
                     .isEqualTo(3);
-        } finally {
-            dataSource.close();
         }
     }
 
@@ -138,21 +140,18 @@ class PecDataSourceFactoryTest {
                         new AllowedDestinations.HostPort(address.getHostAddress(), 5432)),
                 ignored -> new java.net.InetAddress[] {address});
 
-        HikariDataSource dataSource = new PecDataSourceFactory(allowlist, ignored -> "secret".toCharArray())
-                .create(properties, ReadBudget.initialEngineeringProposal());
-        try {
+        try (HikariDataSource dataSource = new PecDataSourceFactory(allowlist, ignored -> "secret".toCharArray())
+                .create(properties, ReadBudget.initialEngineeringProposal())) {
             assertThat(dataSource.getJdbcUrl())
                     .isEqualTo("jdbc:postgresql://[" + address.getHostAddress() + "]:5432/esus");
-        } finally {
-            dataSource.close();
         }
     }
 
     @Test
     void rejectsTimeoutsThatCannotBeRepresentedByPgJdbc() {
         var properties = new PecConnectionProperties(
-                "source-large-timeout", "127.0.0.1", 15433, "esus", "reader", "DB_PASSWORD", "3541307");
-        var allowlist = new AllowedDestinations(Set.of(new AllowedDestinations.HostPort("127.0.0.1", 15433)));
+                "source-large-timeout", "127.0.0.1", 15_433, "esus", "reader", "DB_PASSWORD", "3541307");
+        var allowlist = new AllowedDestinations(Set.of(new AllowedDestinations.HostPort("127.0.0.1", 15_433)));
         var budget = new ReadBudget(
                 2, Duration.ofSeconds(3), Duration.ofSeconds(7), 30_000, 10_000, 30_000, 200_000, Long.MAX_VALUE);
 
@@ -165,7 +164,7 @@ class PecDataSourceFactoryTest {
     @Test
     void releasesTheSourcePermitWhenPoolCreationFailsBeforeAConnectionIsOpened() {
         var properties = new PecConnectionProperties(
-                "permit-release-source", "127.0.0.1", 15433, "esus", "reader", "DB_PASSWORD", "3541307");
+                "permit-release-source", "127.0.0.1", 15_433, "esus", "reader", "DB_PASSWORD", "3541307");
         var factory = new PecDataSourceFactory(new AllowedDestinations(Set.of()), ignored -> "secret".toCharArray());
 
         assertThatThrownBy(() -> factory.open(

@@ -53,12 +53,11 @@ class PecDataSourceFactoryLiveTest {
                 new AllowedDestinations(Set.of(new AllowedDestinations.HostPort(properties.host(), properties.port())));
         var factory = new PecDataSourceFactory(allowlist, new EnvFileSecretResolver(ENV_FILE));
 
-        HikariDataSource ds = factory.create(properties, ReadBudget.initialEngineeringProposal());
-        try {
+        try (HikariDataSource ds = factory.create(properties, ReadBudget.initialEngineeringProposal())) {
             try (Connection c = ds.getConnection();
                     Statement st = c.createStatement()) {
                 try (ResultSet rs = st.executeQuery("select current_user, version()")) {
-                    rs.next();
+                    assertThat(rs.next()).isTrue();
                     assertThat(rs.getString(1)).isEqualTo("esus_leitura");
                     assertThat(rs.getString(2)).contains("PostgreSQL 9.6.13");
                 }
@@ -66,7 +65,7 @@ class PecDataSourceFactoryLiveTest {
                 try (ResultSet rs = st.executeQuery("select current_setting('statement_timeout'), "
                         + "current_setting('default_transaction_read_only'), "
                         + "current_setting('application_name')")) {
-                    rs.next();
+                    assertThat(rs.next()).isTrue();
                     assertThat(rs.getString(1)).isEqualTo("30s");
                     assertThat(rs.getString(2)).isEqualTo("on");
                     assertThat(rs.getString(3)).isEqualTo("observatorio-aps");
@@ -75,12 +74,10 @@ class PecDataSourceFactoryLiveTest {
                 // read-only at the connection/session level — defense in depth, not the only line.
                 try (ResultSet rs = st.executeQuery(
                         "select has_table_privilege('esus_leitura', 'tb_fat_atendimento_individual', 'INSERT')")) {
-                    rs.next();
+                    assertThat(rs.next()).isTrue();
                     assertThat(rs.getBoolean(1)).isFalse();
                 }
             }
-        } finally {
-            ds.close();
         }
     }
 

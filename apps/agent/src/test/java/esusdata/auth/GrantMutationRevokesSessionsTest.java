@@ -18,7 +18,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * its very next request, not by inspecting the {@code sessions} table directly.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class GrantMutationRevokesSessionsTest extends ApiFixtureSupport {
+class GrantMutationRevokesSessionsTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 

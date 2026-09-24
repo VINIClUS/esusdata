@@ -28,8 +28,16 @@ import tools.jackson.databind.ObjectMapper;
  * exit {@code 0}) the real binary must satisfy, so {@link DelegatedExtractPublication}'s
  * verification logic is genuinely exercised, not simulated.
  */
-// Stdout/stderr are the execution-plane protocol this stub stands in for, not logging.
-@SuppressWarnings("SystemOut")
+// Stdout/stderr are the execution-plane protocol this stub stands in for, not logging; the
+// System.in/System.out wrappers must never be closed; exit codes are the protocol's outcome;
+// fixture rows spell out their fields.
+@SuppressWarnings({
+    "SystemOut",
+    "PMD.SystemPrintln",
+    "PMD.CloseResource",
+    "PMD.DoNotTerminateVM",
+    "PMD.AvoidDuplicateLiterals"
+})
 public final class StubExecPlaneMain {
 
     // Raw column data for "test_object.col_a" — ExecPlaneAcquisitionTest's synthetic
@@ -83,8 +91,13 @@ public final class StubExecPlaneMain {
             System.exit(1);
             return;
         }
+        System.exit(afterProceed(scenario, extractTempPath, out, in));
+    }
 
-        switch (scenario) {
+    /** Plays the scenario after the adapter's "proceed"; returns the exit code. */
+    private static int afterProceed(String scenario, String extractTempPath, PrintStream out, BufferedReader in)
+            throws IOException {
+        return switch (scenario) {
             case "happy" -> {
                 out.println("{\"type\":\"progress\"}");
                 Completion completion = writeExtract(
@@ -93,7 +106,7 @@ public final class StubExecPlaneMain {
                                 row("1", "PROGRAMADO", "2026-03-05", "3541307"),
                                 row("2", "ESPONTANEO", "2026-03-10", "3541307")));
                 out.println(completeMessage(completion));
-                System.exit(0);
+                yield 0;
             }
             case "out-of-scope-row" -> {
                 // A real Rust child validates scope itself now (fatia 3 / ADR 0011) — a
@@ -105,88 +118,84 @@ public final class StubExecPlaneMain {
                 Completion completion =
                         writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "9999999")));
                 out.println(completeMessage(completion));
-                System.exit(0);
+                yield 0;
             }
             case "wrong-checksum" -> {
                 Completion actual =
                         writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
                 out.println(completeMessage(new Completion(
                         actual.rowCount, actual.exclusionCount, "0".repeat(64), actual.compressedBytes)));
-                System.exit(0);
+                yield 0;
             }
             case "wrong-size" -> {
                 Completion actual =
                         writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
                 out.println(completeMessage(new Completion(
                         actual.rowCount, actual.exclusionCount, actual.checksum, actual.compressedBytes + 1)));
-                System.exit(0);
+                yield 0;
             }
             case "exclusion-gt-rows" -> {
                 Completion actual =
                         writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
                 out.println(completeMessage(
                         new Completion(actual.rowCount, actual.rowCount + 1, actual.checksum, actual.compressedBytes)));
-                System.exit(0);
+                yield 0;
             }
             case "missing-file" -> {
                 // Reports success without ever touching extract_temp_path — proves
                 // DelegatedExtractPublication.publish itself checks the file exists, not just
                 // that the child claimed it does.
                 out.println(completeMessage(new Completion(0, 0, "0".repeat(64), 0)));
-                System.exit(0);
+                yield 0;
             }
             case "exit0-without-complete" -> {
                 writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
-                System.exit(0);
+                yield 0;
             }
             case "complete-then-nonzero" -> {
                 Completion completion =
                         writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
                 out.println(completeMessage(completion));
-                System.exit(1);
+                yield 1;
             }
-            case "crash-silent" -> {
+            case "crash-silent" ->
                 // Exits non-zero without ever sending a complete or error message — the
                 // "uncertain by default" case (no explicit uncertain:false to say otherwise).
-                System.exit(1);
-            }
+                1;
             case "clean-failure" -> {
                 out.println("{\"type\":\"error\",\"code\":\"DESTINATION_NOT_ALLOWED\","
                         + "\"detail\":\"host is not on the allowlist\",\"uncertain\":false}");
-                System.exit(1);
+                yield 1;
             }
             case "invalid-record" -> {
                 out.println("{\"type\":\"error\",\"code\":\"INVALID_EXTRACT_RECORD\","
                         + "\"detail\":\"record does not match the bound acquisition scope\",\"uncertain\":true}");
-                System.exit(1);
+                yield 1;
             }
             case "cancel-after-row" -> {
                 // At least one record already sits in the temp file before the cancel arrives —
                 // the case "cancel" below (heartbeat only, no row) never covered.
                 writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
                 out.println("{\"type\":\"progress\"}");
-                String next = in.readLine();
-                if (next != null && next.contains("\"type\":\"cancel\"")) {
-                    out.println("{\"type\":\"error\",\"code\":\"CANCELLED\","
-                            + "\"detail\":\"cancelled cooperatively\",\"uncertain\":true}");
-                    System.exit(2);
-                } else {
-                    System.exit(3);
-                }
+                yield awaitCancel(out, in);
             }
             case "cancel" -> {
                 out.println("{\"type\":\"progress\"}");
-                String next = in.readLine(); // blocks until the adapter's bound interrupt fires
-                if (next != null && next.contains("\"type\":\"cancel\"")) {
-                    out.println("{\"type\":\"error\",\"code\":\"CANCELLED\","
-                            + "\"detail\":\"cancelled cooperatively\",\"uncertain\":true}");
-                    System.exit(2);
-                } else {
-                    System.exit(3);
-                }
+                yield awaitCancel(out, in);
             }
-            default -> System.exit(3);
+            default -> 3;
+        };
+    }
+
+    /** Waits for the adapter's cancel (its bound interrupt) and answers it as the real child does. */
+    private static int awaitCancel(PrintStream out, BufferedReader in) throws IOException {
+        String next = in.readLine(); // blocks until the adapter's bound interrupt fires
+        if (next != null && next.contains("\"type\":\"cancel\"")) {
+            out.println("{\"type\":\"error\",\"code\":\"CANCELLED\","
+                    + "\"detail\":\"cancelled cooperatively\",\"uncertain\":true}");
+            return 2;
         }
+        return 3;
     }
 
     private static void preProbeError(String sqlState, String detail, boolean uncertain) {

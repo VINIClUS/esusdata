@@ -20,7 +20,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * {@code value: null} is distinct from {@code value: "0"} (§1.10 L395).
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class NumericRoundTripApiTest extends ApiFixtureSupport {
+class NumericRoundTripApiTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 
@@ -84,12 +84,13 @@ public class NumericRoundTripApiTest extends ApiFixtureSupport {
     private HttpResponse<String> getResults(String userId, String referencePeriod) throws Exception {
         URI uri = URI.create(BASE_URL + "/api/v1/results?municipalityIbge=" + MUNICIPALITY
                 + "&indicatorPack=c1-mais-acesso&referencePeriod=" + referencePeriod);
-        HttpClient client = HttpClient.newHttpClient();
-        return client.send(
-                HttpRequest.newBuilder(uri)
-                        .header("Cookie", sessionCookie(userId))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            return client.send(
+                    HttpRequest.newBuilder(uri)
+                            .header("Cookie", sessionCookie(userId))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+        }
     }
 }

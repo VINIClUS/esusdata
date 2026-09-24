@@ -6,12 +6,16 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import org.junit.jupiter.api.Test;
 
-public class SseConfigTest {
+class SseConfigTest {
 
     @Test
     void schedulersRemoveCancelledTasksFromTheirDelayQueues() {
         SseConfig config = new SseConfig();
+        // shut down with shutdownNow() in finally
+        @SuppressWarnings("PMD.CloseResource")
         ScheduledExecutorService pollScheduler = config.sseScheduler();
+        // shut down with shutdownNow() in finally
+        @SuppressWarnings("PMD.CloseResource")
         ScheduledExecutorService reauthScheduler = config.sseReauthScheduler();
         try {
             assertThat(((ScheduledThreadPoolExecutor) pollScheduler).getRemoveOnCancelPolicy())

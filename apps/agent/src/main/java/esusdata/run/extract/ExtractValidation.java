@@ -3,6 +3,7 @@ package esusdata.run.extract;
 import esusdata.indicator.model.CanonicalEncounter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -74,7 +75,7 @@ final class ExtractValidation {
         }
         try {
             ZoneId.of(requireNonBlank(manifest.sourceZoneId(), "sourceZoneId"));
-        } catch (RuntimeException e) {
+        } catch (DateTimeException e) {
             throw new IllegalStateException("Invalid sourceZoneId timestamp context: " + manifest.sourceZoneId(), e);
         }
 

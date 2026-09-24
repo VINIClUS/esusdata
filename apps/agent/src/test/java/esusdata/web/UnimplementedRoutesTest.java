@@ -17,47 +17,49 @@ import org.springframework.test.annotation.DirtiesContext;
  * plain 404, not a 501 announcing an unimplemented feature.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class UnimplementedRoutesTest extends ApiFixtureSupport {
+class UnimplementedRoutesTest extends ApiFixtureSupport {
 
     @Test
     void unauthenticatedProbesGet401NotA404ThatWouldLeakRouteExistence() throws Exception {
-        HttpClient client = HttpClient.newHttpClient();
+        try (HttpClient client = HttpClient.newHttpClient()) {
 
-        HttpResponse<String> imports = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/imports"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        HttpResponse<String> exports = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/exports"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> imports = client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/imports"))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> exports = client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/exports"))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
 
-        assertThat(imports.statusCode()).isEqualTo(401);
-        assertThat(exports.statusCode()).isEqualTo(401);
+            assertThat(imports.statusCode()).isEqualTo(401);
+            assertThat(exports.statusCode()).isEqualTo(401);
+        }
     }
 
     @Test
     void authenticatedProbesGetAPlain404NeverA501() throws Exception {
         String user = createUser("auditor-" + System.nanoTime());
         grantMunicipality(user, Role.AUDITOR, "3541307");
-        HttpClient client = HttpClient.newHttpClient();
+        try (HttpClient client = HttpClient.newHttpClient()) {
 
-        HttpResponse<String> imports = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/imports"))
-                        .header("Cookie", sessionCookie(user))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        HttpResponse<String> exports = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/exports"))
-                        .header("Cookie", sessionCookie(user))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> imports = client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/imports"))
+                            .header("Cookie", sessionCookie(user))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> exports = client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/exports"))
+                            .header("Cookie", sessionCookie(user))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
 
-        assertThat(imports.statusCode()).isEqualTo(404);
-        assertThat(exports.statusCode()).isEqualTo(404);
+            assertThat(imports.statusCode()).isEqualTo(404);
+            assertThat(exports.statusCode()).isEqualTo(404);
+        }
     }
 }

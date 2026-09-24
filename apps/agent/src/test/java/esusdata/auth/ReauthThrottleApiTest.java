@@ -15,7 +15,7 @@ import org.springframework.test.annotation.DirtiesContext;
 
 /** Reauthentication must use the same account/origin progressive throttle as login. */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class ReauthThrottleApiTest extends ApiFixtureSupport {
+class ReauthThrottleApiTest extends ApiFixtureSupport {
 
     @Autowired
     Argon2Profile argon2Profile;

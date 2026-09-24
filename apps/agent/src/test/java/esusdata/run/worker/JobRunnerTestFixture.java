@@ -195,7 +195,7 @@ public final class JobRunnerTestFixture implements AutoCloseable {
                 "PEC_POSTGRESQL",
                 "PRONTUARIO",
                 "PRIMARY",
-                "127.0.0.1",
+                "127.0.0.1", // NOPMD - AvoidUsingHardCodedIP: loopback test server
                 5432,
                 "esus",
                 "esus_leitura",

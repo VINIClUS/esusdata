@@ -123,6 +123,8 @@ public final class IndividualEncounterModalityCapability {
         if (acquisition == null) {
             throw new IllegalArgumentException("A source-bound PEC acquisition is required");
         }
+        // borrowed from the caller's acquisition, which owns and closes it
+        @SuppressWarnings("PMD.CloseResource")
         PecSourceConnection sourceConnection = acquisition.sourceConnection();
         LocalDate periodStart = acquisition.periodStart();
         LocalDate periodEndExclusive = acquisition.periodEndExclusive();
@@ -238,7 +240,7 @@ public final class IndividualEncounterModalityCapability {
                 bytes += 2;
             } else if (Character.isHighSurrogate(c) && i + 1 < end && Character.isLowSurrogate(value[i + 1])) {
                 bytes += 4;
-                i++;
+                i++; // NOPMD - AvoidReassigningLoopVariables: a surrogate pair is one code point
             } else {
                 bytes += 3;
             }

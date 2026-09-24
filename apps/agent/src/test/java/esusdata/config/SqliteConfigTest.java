@@ -75,25 +75,25 @@ class SqliteConfigTest {
             try (Connection c = ds.getConnection();
                     Statement st = c.createStatement()) {
                 try (ResultSet rs = st.executeQuery("PRAGMA foreign_keys")) {
-                    rs.next();
+                    assertThat(rs.next()).isTrue();
                     assertThat(rs.getInt(1))
                             .as("foreign_keys on connection #" + i)
                             .isEqualTo(1);
                 }
                 try (ResultSet rs = st.executeQuery("PRAGMA synchronous")) {
-                    rs.next();
+                    assertThat(rs.next()).isTrue();
                     assertThat(rs.getInt(1))
                             .as("synchronous on connection #" + i)
                             .isEqualTo(2);
                 }
                 try (ResultSet rs = st.executeQuery("PRAGMA busy_timeout")) {
-                    rs.next();
+                    assertThat(rs.next()).isTrue();
                     assertThat(rs.getInt(1))
                             .as("busy_timeout on connection #" + i)
                             .isEqualTo(5000);
                 }
                 try (ResultSet rs = st.executeQuery("PRAGMA journal_mode")) {
-                    rs.next();
+                    assertThat(rs.next()).isTrue();
                     assertThat(rs.getString(1))
                             .as("journal_mode on connection #" + i)
                             .isEqualToIgnoringCase("wal");
@@ -108,7 +108,7 @@ class SqliteConfigTest {
         try (Connection c = ds.getConnection();
                 Statement st = c.createStatement();
                 ResultSet rs = st.executeQuery("select sqlite_version()")) {
-            rs.next();
+            assertThat(rs.next()).isTrue();
             String version = rs.getString(1);
             int[] parts = SqliteConfig.parseVersion(version);
             assertThat(SqliteConfig.compareVersions(parts, SqliteConfig.MIN_SQLITE_VERSION))

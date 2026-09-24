@@ -56,7 +56,7 @@ class Argon2ProfileTest {
         // with DIFFERENT current parameters must still verify a hash produced under the old ones.
         String hash = profile.encode("a-strong-enough-passphrase");
         SecurityProperties laterBaseline =
-                new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19456, 3, 1, 16, 32, "v2", 30, 24);
+                new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19_456, 3, 1, 16, 32, "v2", 30, 24);
         Argon2Profile laterProfile = new Argon2Profile(laterBaseline);
 
         assertThat(laterProfile.matches("a-strong-enough-passphrase", hash)).isTrue();
@@ -68,7 +68,7 @@ class Argon2ProfileTest {
         // profile is correct at the cost that will really run in production, not only at the
         // cheap cost every other test in this class uses for speed.
         SecurityProperties production =
-                new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19456, 2, 1, 16, 32, "v1", 30, 24);
+                new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19_456, 2, 1, 16, 32, "v1", 30, 24);
         Argon2Profile productionProfile = new Argon2Profile(production);
 
         String hash = productionProfile.encode("a-strong-enough-passphrase");

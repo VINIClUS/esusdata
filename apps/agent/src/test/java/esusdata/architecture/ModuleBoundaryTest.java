@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Test;
 class ModuleBoundaryTest {
 
     private static final String BASE = "esusdata";
+
+    @SuppressWarnings("PMD.LooseCoupling") // ArchUnit's own collection type, no interface to use
     private static final JavaClasses CLASSES = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages(BASE);

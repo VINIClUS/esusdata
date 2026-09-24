@@ -21,96 +21,105 @@ import org.springframework.test.annotation.DirtiesContext;
 
 /** ENG-49: CSRF, Origin/Host validation, and the fixed security headers on every response. */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class CsrfAndOriginTest extends SecuritySliceTestSupport {
+class CsrfAndOriginTest extends SecuritySliceTestSupport {
 
     @Test
     void readyResponseCarriesTheFixedSecurityHeaders() throws Exception {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpResponse<String> response = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            HttpResponse<String> response = client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
 
-        assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
-        assertThat(response.headers().firstValue("X-Frame-Options")).contains("DENY");
-        assertThat(response.headers().firstValue("X-Content-Type-Options")).contains("nosniff");
-        assertThat(response.headers().firstValue("Content-Security-Policy")).isPresent();
-        assertThat(response.headers().allValues("Set-Cookie")).anyMatch(cookie -> cookie.startsWith("XSRF-TOKEN="));
+            assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+            assertThat(response.headers().firstValue("X-Frame-Options")).contains("DENY");
+            assertThat(response.headers().firstValue("X-Content-Type-Options")).contains("nosniff");
+            assertThat(response.headers().firstValue("Content-Security-Policy")).isPresent();
+            assertThat(response.headers().allValues("Set-Cookie")).anyMatch(cookie -> cookie.startsWith("XSRF-TOKEN="));
+        }
     }
 
     @Test
     void loginWithoutTheCsrfHeaderIsRejected() throws Exception {
         CookieManager cookieManager = new CookieManager();
-        HttpClient client = HttpClient.newBuilder().cookieHandler(cookieManager).build();
-        // Fetch the CSRF cookie first, deliberately never send it back as a header.
-        client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+        try (HttpClient client =
+                HttpClient.newBuilder().cookieHandler(cookieManager).build()) {
+            // Fetch the CSRF cookie first, deliberately never send it back as a header.
+            client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
 
-        HttpResponse<String> response = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/login"))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString("{\"username\":\"x\",\"password\":\"y\"}"))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/login"))
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString("{\"username\":\"x\",\"password\":\"y\"}"))
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
 
-        assertThat(response.statusCode()).isEqualTo(403);
+            assertThat(response.statusCode()).isEqualTo(403);
+        }
     }
 
     @Test
     void loginWithAMismatchedOriginIsRejected() throws Exception {
         CookieManager cookieManager = new CookieManager();
-        HttpClient client = HttpClient.newBuilder().cookieHandler(cookieManager).build();
-        client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        String csrfToken = csrfTokenFrom(cookieManager);
+        try (HttpClient client =
+                HttpClient.newBuilder().cookieHandler(cookieManager).build()) {
+            client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+            String csrfToken = csrfTokenFrom(cookieManager);
 
-        HttpResponse<String> response = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/login"))
-                        .header("Content-Type", "application/json")
-                        .header("X-XSRF-TOKEN", csrfToken)
-                        .header("Origin", "http://evil.example.com")
-                        .POST(HttpRequest.BodyPublishers.ofString("{\"username\":\"x\",\"password\":\"y\"}"))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/login"))
+                            .header("Content-Type", "application/json")
+                            .header("X-XSRF-TOKEN", csrfToken)
+                            .header("Origin", "http://evil.example.com")
+                            .POST(HttpRequest.BodyPublishers.ofString("{\"username\":\"x\",\"password\":\"y\"}"))
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
 
-        assertThat(response.statusCode()).isEqualTo(403);
-        assertThat(response.body()).contains("ORIGIN_NOT_ALLOWED");
+            assertThat(response.statusCode()).isEqualTo(403);
+            assertThat(response.body()).contains("ORIGIN_NOT_ALLOWED");
+        }
     }
 
     @Test
     void theViteDevelopmentOriginIsAcceptedForStateChangingRequests() throws Exception {
         CookieManager cookieManager = new CookieManager();
-        HttpClient client = HttpClient.newBuilder().cookieHandler(cookieManager).build();
-        client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        String csrfToken = csrfTokenFrom(cookieManager);
+        try (HttpClient client =
+                HttpClient.newBuilder().cookieHandler(cookieManager).build()) {
+            client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+            String csrfToken = csrfTokenFrom(cookieManager);
 
-        HttpResponse<String> response = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/login"))
-                        .header("Content-Type", "application/json")
-                        .header("X-XSRF-TOKEN", csrfToken)
-                        .header("Origin", "http://localhost:5173")
-                        .POST(HttpRequest.BodyPublishers.ofString("{\"username\":\"x\",\"password\":\"y\"}"))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/login"))
+                            .header("Content-Type", "application/json")
+                            .header("X-XSRF-TOKEN", csrfToken)
+                            .header("Origin", "http://localhost:5173")
+                            .POST(HttpRequest.BodyPublishers.ofString("{\"username\":\"x\",\"password\":\"y\"}"))
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
 
-        assertThat(response.statusCode()).isEqualTo(401);
+            assertThat(response.statusCode()).isEqualTo(401);
+        }
     }
 
     @Test
     void aRequestWithAnUnrecognizedHostHeaderIsRejected() throws Exception {
         String rawResponse;
         try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), PORT)) {
+            // the socket's stream, closed with the socket by the enclosing try
+            @SuppressWarnings("PMD.CloseResource")
             OutputStream out = socket.getOutputStream();
             String request = """
                     GET /api/v1/ready HTTP/1.1\r

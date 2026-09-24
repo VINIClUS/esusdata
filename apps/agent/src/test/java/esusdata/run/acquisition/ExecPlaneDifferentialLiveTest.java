@@ -105,6 +105,11 @@ class ExecPlaneDifferentialLiveTest {
     private PecSourceIdentity sourceIdentity;
     private String realBinary;
 
+    private static boolean fixtureLoaded;
+    private static final String BULK_MUNICIPALITY_IBGE = "9999999";
+    private static final int BULK_ROWS = 1_000_000;
+    private static boolean bulkRowsInserted;
+
     @BeforeEach
     void setUp() throws Exception {
         realBinary = System.getProperty(BINARY_PROPERTY);
@@ -123,8 +128,6 @@ class ExecPlaneDifferentialLiveTest {
         allowedDestinations = new AllowedDestinations(allowed);
         sourceIdentity = new PecSourceIdentity(SOURCE_ID, "5.4.37", "PEC_DW", "PRONTUARIO");
     }
-
-    private static boolean fixtureLoaded = false;
 
     private static void loadFixtureOnce() throws Exception {
         if (fixtureLoaded) {
@@ -308,7 +311,7 @@ class ExecPlaneDifferentialLiveTest {
                 ReadBudget.DEFAULT_MAX_PAYLOAD_BYTES,
                 ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES);
 
-        Throwable failure = org.assertj.core.api.Assertions.catchThrowable(() -> rustAdapter(syntheticMatrix)
+        Throwable failure = catchThrowable(() -> rustAdapter(syntheticMatrix)
                 .acquire(command("diff-rust-budget", tightBudget), new CancellationToken(), new RecordingListener()));
 
         assertThat(failure).isInstanceOf(SourceBudgetExceededException.class);
@@ -339,7 +342,7 @@ class ExecPlaneDifferentialLiveTest {
                 ReadBudget.DEFAULT_MAX_PAYLOAD_BYTES,
                 16);
 
-        Throwable failure = org.assertj.core.api.Assertions.catchThrowable(() -> rustAdapter(syntheticMatrix)
+        Throwable failure = catchThrowable(() -> rustAdapter(syntheticMatrix)
                 .acquire(
                         command("diff-rust-tiny-temp", tinyTempFile),
                         new CancellationToken(),
@@ -471,10 +474,6 @@ class ExecPlaneDifferentialLiveTest {
         assertThat(extractsDir.resolve("diff-rust-cancel.jsonl.gz")).doesNotExist();
         assertThat(activeObservatorioQueriesAfterSettling()).isZero();
     }
-
-    private static final String BULK_MUNICIPALITY_IBGE = "9999999";
-    private static final int BULK_ROWS = 1_000_000;
-    private static boolean bulkRowsInserted = false;
 
     private static void insertBulkRowsOnce() throws Exception {
         if (bulkRowsInserted) {

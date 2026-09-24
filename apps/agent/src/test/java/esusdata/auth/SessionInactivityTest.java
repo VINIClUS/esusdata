@@ -22,7 +22,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * against the real {@code sessions.last_interactive_at} column via {@code SessionAuthenticationFilter}.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class SessionInactivityTest extends ApiFixtureSupport {
+class SessionInactivityTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 

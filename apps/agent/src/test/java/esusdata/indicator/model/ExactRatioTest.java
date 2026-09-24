@@ -27,7 +27,7 @@ class ExactRatioTest {
     }
 
     @Test
-    void toScaledBigDecimalIsDisplayOnlyAndDoesNotAffectComparison() {
+    void scaledBigDecimalIsDisplayOnlyAndDoesNotAffectComparison() {
         ExactRatio oneThird = ExactRatio.of(1, 3);
         // Display rounds to 0.33, but the exact comparison must still say 1/3 > 33/100.
         assertThat(oneThird.toScaledBigDecimal(2).toPlainString()).isEqualTo("0.33");

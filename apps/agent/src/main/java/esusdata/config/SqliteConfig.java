@@ -37,6 +37,9 @@ import org.sqlite.SQLiteDataSource;
 @EnableConfigurationProperties(SqliteProperties.class)
 public class SqliteConfig {
 
+    /** Bean name of {@link #flywayMigration}: every bean touching SQLite tables depends on it. */
+    public static final String FLYWAY_MIGRATION = "flywayMigration";
+
     /** SQLite floor per §1.12.1 — the WAL-reset correction. */
     static final int[] MIN_SQLITE_VERSION = {3, 51, 3};
 
@@ -133,7 +136,9 @@ public class SqliteConfig {
 
     private static void assertMinimumVersion(Statement st) throws SQLException {
         try (ResultSet rs = st.executeQuery("select sqlite_version()")) {
-            rs.next();
+            if (!rs.next()) {
+                throw new IllegalStateException("select sqlite_version() returned no row");
+            }
             String version = rs.getString(1);
             int[] parts = parseVersion(version);
             if (compareVersions(parts, MIN_SQLITE_VERSION) < 0) {
@@ -153,6 +158,7 @@ public class SqliteConfig {
         return result;
     }
 
+    @SuppressWarnings("PMD.UseVarargs") // two fixed-length version triples, not an argument list
     static int compareVersions(int[] a, int[] b) {
         for (int i = 0; i < 3; i++) {
             int cmp = Integer.compare(a[i], b[i]);

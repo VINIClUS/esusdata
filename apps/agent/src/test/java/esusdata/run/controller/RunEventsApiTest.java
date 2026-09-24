@@ -35,7 +35,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * keep these tests from being needlessly slow without changing what they prove.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class RunEventsApiTest extends ApiFixtureSupport {
+class RunEventsApiTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 
@@ -434,6 +434,8 @@ public class RunEventsApiTest extends ApiFixtureSupport {
     }
 
     private static <T> T withTimeout(Callable<T> task, Duration timeout) throws Exception {
+        // shut down with shutdownNow() in finally: close() would wait on the blocked task
+        @SuppressWarnings("PMD.CloseResource")
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             return executor.submit(task).get(timeout.toMillis(), TimeUnit.MILLISECONDS);

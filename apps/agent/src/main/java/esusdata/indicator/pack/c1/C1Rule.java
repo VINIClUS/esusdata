@@ -165,23 +165,28 @@ public final class C1Rule {
         }
 
         for (CanonicalEncounter encounter : encounters) {
-            if (encounter == null) {
-                throw new IllegalArgumentException("encounters cannot contain null records");
-            }
-            if (!municipalityIbge.equals(encounter.municipalityIbge())) {
-                throw new IllegalArgumentException("encounter municipality does not match requested municipality: "
-                        + encounter.municipalityIbge());
-            }
-            LocalDate careDate;
-            try {
-                careDate = LocalDate.parse(encounter.careDate());
-            } catch (DateTimeParseException e) {
-                throw new IllegalArgumentException("encounter careDate is invalid: " + encounter.careDate(), e);
-            }
-            if (!requestedMonth.equals(YearMonth.from(careDate))) {
-                throw new IllegalArgumentException("encounter careDate does not match referencePeriod "
-                        + referencePeriod + ": " + encounter.careDate());
-            }
+            validateEncounterScope(encounter, municipalityIbge, requestedMonth, referencePeriod);
+        }
+    }
+
+    private static void validateEncounterScope(
+            CanonicalEncounter encounter, String municipalityIbge, YearMonth requestedMonth, String referencePeriod) {
+        if (encounter == null) {
+            throw new IllegalArgumentException("encounters cannot contain null records");
+        }
+        if (!municipalityIbge.equals(encounter.municipalityIbge())) {
+            throw new IllegalArgumentException(
+                    "encounter municipality does not match requested municipality: " + encounter.municipalityIbge());
+        }
+        LocalDate careDate;
+        try {
+            careDate = LocalDate.parse(encounter.careDate());
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("encounter careDate is invalid: " + encounter.careDate(), e);
+        }
+        if (!requestedMonth.equals(YearMonth.from(careDate))) {
+            throw new IllegalArgumentException("encounter careDate does not match referencePeriod " + referencePeriod
+                    + ": " + encounter.careDate());
         }
     }
 

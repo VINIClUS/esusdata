@@ -27,6 +27,8 @@ import org.springframework.test.context.DynamicPropertySource;
 class ApplicationBootTest {
 
     @TempDir
+    // JUnit injects a static @TempDir once for the whole class.
+    @SuppressWarnings("PMD.MutableStaticState")
     static Path dataDir;
 
     @Autowired

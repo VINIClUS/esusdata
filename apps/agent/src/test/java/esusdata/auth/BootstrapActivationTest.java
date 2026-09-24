@@ -65,7 +65,7 @@ class BootstrapActivationTest {
         transactionTemplate = new TransactionTemplate(context.getBean(DataSourceTransactionManager.class));
         userRepository = new JdbcUserRepository(jdbc);
         grantRepository = new JdbcGrantRepository(jdbc);
-        properties = new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19456, 2, 1, 16, 32, "v1", 30, 24);
+        properties = new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19_456, 2, 1, 16, 32, "v1", 30, 24);
         passwordPolicy = new PasswordPolicy(properties);
         argon2Profile = new Argon2Profile(properties);
     }

@@ -21,7 +21,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * same scope rules as the routes they feed.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class RuntimeScopeApiTest extends ApiFixtureSupport {
+class RuntimeScopeApiTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3304557";
     private static final String OTHER_MUNICIPALITY = "3550308";

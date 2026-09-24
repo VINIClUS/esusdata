@@ -54,18 +54,19 @@ public final class ExtractReader {
      * manifest before returning any record — an incomplete, incompatible, adulterated, or truncated
      * file is rejected before the engine ever sees it (ENG-20).
      */
-    public List<CanonicalEncounter> readEncounters(Path baseDir, ExtractionManifest manifest) throws IOException {
-        if (manifest == null) {
+    public List<CanonicalEncounter> readEncounters(Path baseDir, ExtractionManifest suppliedManifest)
+            throws IOException {
+        if (suppliedManifest == null) {
             throw new IllegalStateException("Extraction manifest is required");
         }
-        ExtractValidation.validateExtractionId(baseDir, manifest.extractionId());
-        ExtractionManifest publishedManifest = readManifest(baseDir, manifest.extractionId());
-        if (!publishedManifest.equals(manifest)) {
+        ExtractValidation.validateExtractionId(baseDir, suppliedManifest.extractionId());
+        ExtractionManifest publishedManifest = readManifest(baseDir, suppliedManifest.extractionId());
+        if (!publishedManifest.equals(suppliedManifest)) {
             throw new IllegalStateException(
                     "Supplied extraction manifest does not match the published manifest for extractionId="
-                            + manifest.extractionId());
+                            + suppliedManifest.extractionId());
         }
-        manifest = publishedManifest;
+        ExtractionManifest manifest = publishedManifest;
 
         Path dataFile = baseDir.resolve(manifest.extractionId() + ".jsonl.gz");
         return readDataFile(dataFile, manifest);

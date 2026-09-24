@@ -48,7 +48,6 @@ class ResultScopeIsolationTest {
     Path dataDir;
 
     private AnnotationConfigApplicationContext context;
-    private JdbcTemplate jdbc;
     private ResultRepository resultRepository;
     private EvidenceRepository evidenceRepository;
     private String resultIdMunicipalityA;
@@ -62,7 +61,7 @@ class ResultScopeIsolationTest {
                 .addFirst(new MapPropertySource("test", Map.of("observatorio.data.directory", dataDir.toString())));
         context.refresh();
 
-        jdbc = context.getBean(JdbcTemplate.class);
+        JdbcTemplate jdbc = context.getBean(JdbcTemplate.class);
         TransactionTemplate tx = new TransactionTemplate(context.getBean(DataSourceTransactionManager.class));
         Path extractsDir = dataDir.resolve("extracts");
 

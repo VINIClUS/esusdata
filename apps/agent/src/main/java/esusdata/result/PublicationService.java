@@ -90,7 +90,7 @@ public final class PublicationService {
                 reproducibilityCheck.verify(request.extractionManifest().extractionId());
         String reproducibilityLevel = fileCheck.reproducible() ? "REPRODUCIBLE" : "NOT_REPRODUCIBLE";
 
-        PublicationOutcome outcome = transactionTemplate.execute(status -> {
+        return transactionTemplate.execute(status -> {
             StagingSnapshot staging = requireOwnedSealedStaging(request);
 
             // §1.9.4 L365: revalidated against CURRENT grants, not the session that made the
@@ -173,7 +173,6 @@ public final class PublicationService {
 
             return new PublicationOutcome(resultId, reproducibilityLevel);
         });
-        return outcome;
     }
 
     /**

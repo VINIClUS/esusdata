@@ -58,7 +58,7 @@ import org.sqlite.SQLiteDataSource;
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Import(ReadinessGateTest.RecoveryProbeConfiguration.class)
-public class ReadinessGateTest extends SecuritySliceTestSupport {
+class ReadinessGateTest extends SecuritySliceTestSupport {
 
     @Autowired
     JdbcTemplate jdbc;
@@ -171,30 +171,31 @@ public class ReadinessGateTest extends SecuritySliceTestSupport {
     }
 
     private static void probeReadinessWhileRecoveryIsBlocked() {
-        HttpClient client =
-                HttpClient.newBuilder().connectTimeout(Duration.ofMillis(100)).build();
-        HttpRequest request = HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
-                .GET()
-                .build();
-        long deadline = System.nanoTime() + READINESS_PROBE_WINDOW.toNanos();
-        try {
-            while (System.nanoTime() < deadline) {
-                try {
-                    HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-                    EARLY_READY_STATUS.set(response.statusCode());
-                    return;
-                } catch (java.io.IOException ignored) {
-                    // A closed port is expected while synchronous recovery holds context refresh.
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    return;
+        try (HttpClient client =
+                HttpClient.newBuilder().connectTimeout(Duration.ofMillis(100)).build()) {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                    .GET()
+                    .build();
+            long deadline = System.nanoTime() + READINESS_PROBE_WINDOW.toNanos();
+            try {
+                while (System.nanoTime() < deadline) {
+                    try {
+                        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                        EARLY_READY_STATUS.set(response.statusCode());
+                        return;
+                    } catch (java.io.IOException ignored) {
+                        // A closed port is expected while synchronous recovery holds context refresh.
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    Thread.sleep(25);
                 }
-                Thread.sleep(25);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } finally {
+                READINESS_PROBE_FINISHED.countDown();
             }
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-        } finally {
-            READINESS_PROBE_FINISHED.countDown();
         }
     }
 }

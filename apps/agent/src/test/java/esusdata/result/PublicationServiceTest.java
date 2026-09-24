@@ -48,13 +48,12 @@ class PublicationServiceTest {
 
     private AnnotationConfigApplicationContext context;
     private JdbcTemplate jdbc;
-    private TransactionTemplate transactionTemplate;
-    private JobRepository jobRepository;
     private ResultStagingArea stagingArea;
-    private ExtractionManifestRepository extractionManifestRepository;
     private ResultRepository resultRepository;
     private Path extractsDir;
     private PublicationService publicationService;
+
+    private String jobId;
 
     @BeforeEach
     void setUp() {
@@ -66,10 +65,11 @@ class PublicationServiceTest {
         context.refresh();
 
         jdbc = context.getBean(JdbcTemplate.class);
-        transactionTemplate = new TransactionTemplate(context.getBean(DataSourceTransactionManager.class));
-        jobRepository = new JdbcJobRepository(jdbc, transactionTemplate);
+        TransactionTemplate transactionTemplate =
+                new TransactionTemplate(context.getBean(DataSourceTransactionManager.class));
+        JobRepository jobRepository = new JdbcJobRepository(jdbc, transactionTemplate);
         stagingArea = new JdbcResultStagingArea(jdbc);
-        extractionManifestRepository = new JdbcExtractionManifestRepository(jdbc);
+        ExtractionManifestRepository extractionManifestRepository = new JdbcExtractionManifestRepository(jdbc);
         resultRepository = new JdbcResultRepository(jdbc);
         extractsDir = dataDir.resolve("extracts");
 
@@ -108,8 +108,6 @@ class PublicationServiceTest {
     private ExtractionManifest fixtureExtract(String extractionId) throws Exception {
         return ExtractFixtures.write(extractsDir, extractionId, "src-1", "3541307", "2026-03", 7, 3, 0);
     }
-
-    private String jobId;
 
     private void insertJob(String state, long generation, String processInstanceId) {
         jobId = "job-" + UUID.randomUUID();

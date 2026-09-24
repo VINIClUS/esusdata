@@ -19,7 +19,7 @@ import org.springframework.test.annotation.DirtiesContext;
 
 /** ENG-03: {@code auth_audit} records login/grant/denial events without secrets or clinical data. */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class AuthAuditTest extends ApiFixtureSupport {
+class AuthAuditTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 

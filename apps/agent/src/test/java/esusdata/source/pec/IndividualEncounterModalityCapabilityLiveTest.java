@@ -66,7 +66,7 @@ class IndividualEncounterModalityCapabilityLiveTest {
                 .filter(r -> r.modality() == EncounterModality.UNMAPPED)
                 .count();
 
-        assertThat(records).hasSize(10029);
+        assertThat(records).hasSize(10_029);
         assertThat(programados).isEqualTo(7100);
         assertThat(espontaneos).isEqualTo(2929);
         assertThat(unmapped).isZero();
@@ -77,7 +77,7 @@ class IndividualEncounterModalityCapabilityLiveTest {
                 .map(r -> r.uuidFicha() + "|" + r.nuAtendimento())
                 .distinct()
                 .count();
-        assertThat(distinctPairs).isEqualTo(10029);
+        assertThat(distinctPairs).isEqualTo(10_029);
     }
 
     private static Map<String, String> readEnvFile() throws IOException {

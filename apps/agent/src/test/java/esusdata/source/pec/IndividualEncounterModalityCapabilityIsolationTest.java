@@ -59,6 +59,8 @@ class IndividualEncounterModalityCapabilityIsolationTest {
             List<RawEncounterRecord> municipalityA = new ArrayList<>();
             var sourceA = new PecConnectionProperties(
                     "fixture-a", "127.0.0.1", 5432, "esus_fixture", "fixture_user", "unused", "1100015");
+            // wraps the shared connection c, closed by the enclosing try
+            @SuppressWarnings("PMD.CloseResource")
             PecSourceConnection sourceConnectionA = PecSourceConnectionTestSupport.bind(c, sourceA, CT133_IDENTITY_A);
             IndividualEncounterModalityCapability.stream(
                     sourceConnectionA.acquire(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1)),
@@ -68,6 +70,8 @@ class IndividualEncounterModalityCapabilityIsolationTest {
             List<RawEncounterRecord> municipalityB = new ArrayList<>();
             var sourceB = new PecConnectionProperties(
                     "fixture-b", "127.0.0.1", 5432, "esus_fixture", "fixture_user", "unused", "3550308");
+            // wraps the shared connection c, closed by the enclosing try
+            @SuppressWarnings("PMD.CloseResource")
             PecSourceConnection sourceConnectionB = PecSourceConnectionTestSupport.bind(c, sourceB, CT133_IDENTITY_B);
             IndividualEncounterModalityCapability.stream(
                     sourceConnectionB.acquire(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1)),

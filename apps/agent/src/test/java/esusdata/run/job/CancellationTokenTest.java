@@ -52,7 +52,7 @@ class CancellationTokenTest {
     void aFailingInterruptIsSwallowedBestEffort() {
         CancellationToken token = new CancellationToken();
         token.bindInterrupt(() -> {
-            throw new RuntimeException("driver does not support cancel");
+            throw new IllegalStateException("driver does not support cancel");
         });
 
         assertThatCode(token::requestCancel).doesNotThrowAnyException();

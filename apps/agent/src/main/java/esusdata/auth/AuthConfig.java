@@ -3,6 +3,7 @@ package esusdata.auth;
 import esusdata.auth.model.AuthAuditWriter;
 import esusdata.auth.model.GrantRepository;
 import esusdata.auth.model.UserRepository;
+import esusdata.config.SqliteConfig;
 import esusdata.config.SqliteProperties;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -27,19 +28,19 @@ public class AuthConfig {
     private static final Logger log = LoggerFactory.getLogger(AuthConfig.class);
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public UserRepository userRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcUserRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public GrantRepository grantRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcGrantRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public ScopeResolver scopeResolver(JdbcTemplate sqliteJdbcTemplate) {
         return new ScopeResolver(sqliteJdbcTemplate);
     }
@@ -60,7 +61,7 @@ public class AuthConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public SessionService sessionService(
             JdbcTemplate sqliteJdbcTemplate, UserRepository userRepository, SecurityProperties properties) {
         return new SessionService(sqliteJdbcTemplate, userRepository, properties);
@@ -72,7 +73,7 @@ public class AuthConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public AuthenticationService authenticationService(
             UserRepository userRepository,
             Argon2Profile argon2Profile,
@@ -83,13 +84,13 @@ public class AuthConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public AuthAuditWriter authAuditWriter(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcAuthAuditWriter(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public AuthorizationVersionGuard authorizationVersionGuard(
             JdbcTemplate sqliteJdbcTemplate,
             TransactionTemplate sqliteTransactionTemplate,
@@ -101,13 +102,13 @@ public class AuthConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public LoginThrottle loginThrottle(JdbcTemplate sqliteJdbcTemplate, SecurityProperties properties) {
         return new LoginThrottle(sqliteJdbcTemplate, properties);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public UserProvisioning userProvisioning(
             UserRepository userRepository,
             JdbcTemplate sqliteJdbcTemplate,
@@ -118,7 +119,7 @@ public class AuthConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public AccessAdministrationService accessAdministrationService(
             UserRepository userRepository,
             GrantRepository grantRepository,
@@ -130,7 +131,7 @@ public class AuthConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public BootstrapActivation bootstrapActivation(
             UserRepository userRepository,
             GrantRepository grantRepository,
@@ -160,7 +161,7 @@ public class AuthConfig {
      * exists. Logs only the activation token's file path — never its contents.
      */
     @Bean
-    @DependsOn({"flywayMigration", "userRepository"})
+    @DependsOn({SqliteConfig.FLYWAY_MIGRATION, "userRepository"})
     public Optional<Path> bootstrapActivationResult(BootstrapActivation bootstrapActivation)
             throws java.io.IOException {
         Optional<Path> tokenFile = bootstrapActivation.ensureBootstrapAdmin();

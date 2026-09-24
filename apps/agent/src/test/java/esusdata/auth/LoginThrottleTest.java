@@ -30,7 +30,6 @@ class LoginThrottleTest {
     Path dataDir;
 
     private AnnotationConfigApplicationContext context;
-    private JdbcTemplate jdbc;
     private SecurityProperties properties;
     private LoginThrottle throttle;
     private Instant now;
@@ -49,7 +48,7 @@ class LoginThrottleTest {
                                 dataDir.resolve("db").toString())));
         context.refresh();
 
-        jdbc = context.getBean(JdbcTemplate.class);
+        JdbcTemplate jdbc = context.getBean(JdbcTemplate.class);
         // maxLoginAttempts=5, throttleWindowMinutes=15, throttleCeilingMinutes=15 — the spec's
         // own baseline, not a shortened test value.
         properties = new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 8, 1, 1, 16, 32, "v1", 30, 24);

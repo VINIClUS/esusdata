@@ -54,7 +54,8 @@ public final class GrantRevalidator implements PublicationAuthorization {
             requireCurrentlyAuthorized(principal, municipalityIbge, Permission.RUN_INDICATOR);
         } catch (GrantRevalidationException revoked) {
             throw new PublicationAuthorizationRefusedException(
-                    "publication refused — authorization no longer current (§1.9.4 L365): " + revoked.getMessage());
+                    "publication refused — authorization no longer current (§1.9.4 L365): " + revoked.getMessage(),
+                    revoked);
         }
     }
 }

@@ -90,7 +90,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         try {
             return CompatibilityFingerprint.compute(probe);
         } catch (CompatibilityFingerprint.VerificationException e) {
-            throw new SQLException(e.getMessage(), e.getCause());
+            throw new SQLException(e.getMessage(), e);
         }
     }
 
@@ -116,7 +116,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         try {
             expectedColumns = CompatibilityFingerprint.parseUniqueKeyColumns(marker);
         } catch (CompatibilityFingerprint.VerificationException e) {
-            throw new SQLException(e.getMessage(), e.getCause());
+            throw new SQLException(e.getMessage(), e);
         }
 
         Map<String, String> constraintTypes = new LinkedHashMap<>();
@@ -156,7 +156,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         boolean violation;
         try (PreparedStatement statement = connection.prepareStatement(uniquenessQuery);
                 ResultSet result = statement.executeQuery()) {
-            violation = result.next();
+            violation = result.next(); // NOPMD - CheckResultSet: the row's existence is the answer
         }
         return new ProbeItem.UniqueKeyItem(marker, null, violation);
     }
@@ -188,7 +188,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         try {
             expected = CompatibilityFingerprint.parseLeafSemanticsIds(marker);
         } catch (CompatibilityFingerprint.VerificationException e) {
-            throw new SQLException(e.getMessage(), e.getCause());
+            throw new SQLException(e.getMessage(), e);
         }
         String placeholders = "?,".repeat(expected.size());
         placeholders = placeholders.substring(0, placeholders.length() - 1);
@@ -220,7 +220,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         try {
             expected = CompatibilityFingerprint.parseLeafIdsSet(marker);
         } catch (CompatibilityFingerprint.VerificationException e) {
-            throw new SQLException(e.getMessage(), e.getCause());
+            throw new SQLException(e.getMessage(), e);
         }
         String placeholders = "?,".repeat(expected.size());
         placeholders = placeholders.substring(0, placeholders.length() - 1);

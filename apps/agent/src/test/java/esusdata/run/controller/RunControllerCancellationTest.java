@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
-public class RunControllerCancellationTest {
+class RunControllerCancellationTest {
 
     private static final Instant NOW = Instant.parse("2026-09-20T12:00:00Z");
     private static final String MUNICIPALITY = "3541307";

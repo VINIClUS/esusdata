@@ -50,7 +50,7 @@ public class SpaWebConfig implements WebMvcConfigurer {
 
         /** Unknown API paths and missing files (anything with an extension) stay 404. */
         private static boolean isClientRoute(String resourcePath) {
-            if (resourcePath.equals("api") || resourcePath.startsWith("api/")) {
+            if ("api".equals(resourcePath) || resourcePath.startsWith("api/")) {
                 return false;
             }
             String lastSegment = resourcePath.substring(resourcePath.lastIndexOf('/') + 1);

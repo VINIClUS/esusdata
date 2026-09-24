@@ -71,6 +71,8 @@ public final class DelegatedExtractPublication implements AutoCloseable {
         this.acquisitionScope = Objects.requireNonNull(acquisitionScope, "acquisitionScope is required");
         ExtractValidation.validateExtractionId(baseDir, extractionId);
         Files.createDirectories(baseDir);
+        // owned by this publication from here on; released by close() or on a failed constructor
+        @SuppressWarnings("PMD.CloseResource")
         ExtractRecovery.WriterLock lock = ExtractRecovery.acquireWriterLock(baseDir, extractionId);
         try {
             // Reconciles any abandoned publication left by a previous attempt at this same
@@ -86,7 +88,7 @@ public final class DelegatedExtractPublication implements AutoCloseable {
             // existed, so it is never "uncertain" in the ENG-51 sense.
             ExtractPublication.ensureTempSpace(baseDir, maxTempFileBytes);
             this.writerLock = lock;
-        } catch (IOException | RuntimeException failure) {
+        } catch (IOException | RuntimeException failure) { // NOPMD - release the lock on any failure, then rethrow
             lock.close();
             throw failure;
         }

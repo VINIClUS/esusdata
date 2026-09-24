@@ -26,7 +26,7 @@ public record PecConnectionProperties(
         if (host == null || host.isBlank()) {
             throw new IllegalArgumentException("host is required");
         }
-        if (port <= 0 || port > 65535) {
+        if (port <= 0 || port > 65_535) {
             throw new IllegalArgumentException("port out of range: " + port);
         }
         if (database == null || database.isBlank()) {

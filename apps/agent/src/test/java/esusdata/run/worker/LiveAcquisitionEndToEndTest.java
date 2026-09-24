@@ -73,7 +73,8 @@ class LiveAcquisitionEndToEndTest {
 
     private JobRunnerTestFixture fixture;
     private Clock clock;
-    private CompatibilityCatalog fixtureCatalog;
+
+    private static boolean fixtureLoaded;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -97,7 +98,7 @@ class LiveAcquisitionEndToEndTest {
                         "0.1.0",
                         new PecSourceIdentity("fixture-a", "5.4.37", "PEC_DW", "PRONTUARIO"),
                         "9.6.13");
-        fixtureCatalog = new CompatibilityCatalog() {
+        CompatibilityCatalog fixtureCatalog = new CompatibilityCatalog() {
             @Override
             public String postgresVersion(Connection connection) {
                 return "9.6.13";
@@ -138,8 +139,6 @@ class LiveAcquisitionEndToEndTest {
     void tearDown() {
         fixture.close();
     }
-
-    private static boolean fixtureLoaded = false;
 
     private static void loadFixtureOnce() throws Exception {
         if (fixtureLoaded) {

@@ -21,7 +21,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * missing row by granting themselves a clinical role.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class TechnicalAdminCannotGrantClinicalTest extends ApiFixtureSupport {
+class TechnicalAdminCannotGrantClinicalTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 

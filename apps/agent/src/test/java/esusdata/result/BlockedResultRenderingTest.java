@@ -23,7 +23,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * dropping the result. This slice does not unblock any gate.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class BlockedResultRenderingTest extends ApiFixtureSupport {
+class BlockedResultRenderingTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 
@@ -76,12 +76,13 @@ public class BlockedResultRenderingTest extends ApiFixtureSupport {
     private HttpResponse<String> getResults(String userId) throws Exception {
         URI uri = URI.create(BASE_URL + "/api/v1/results?municipalityIbge=" + MUNICIPALITY
                 + "&indicatorPack=c1-mais-acesso&referencePeriod=2026-03");
-        HttpClient client = HttpClient.newHttpClient();
-        return client.send(
-                HttpRequest.newBuilder(uri)
-                        .header("Cookie", sessionCookie(userId))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            return client.send(
+                    HttpRequest.newBuilder(uri)
+                            .header("Cookie", sessionCookie(userId))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+        }
     }
 }

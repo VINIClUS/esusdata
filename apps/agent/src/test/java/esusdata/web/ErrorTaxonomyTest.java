@@ -20,7 +20,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * {@code failureCode}, never collapsed into a generic error and never a fabricated success.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class ErrorTaxonomyTest extends ApiFixtureSupport {
+class ErrorTaxonomyTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 

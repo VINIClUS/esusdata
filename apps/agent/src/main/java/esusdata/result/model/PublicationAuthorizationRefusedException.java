@@ -16,4 +16,8 @@ public final class PublicationAuthorizationRefusedException extends RuntimeExcep
     public PublicationAuthorizationRefusedException(String message) {
         super(message);
     }
+
+    public PublicationAuthorizationRefusedException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

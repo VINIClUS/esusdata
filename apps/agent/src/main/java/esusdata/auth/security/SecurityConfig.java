@@ -11,6 +11,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.CacheControlConfig;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -65,7 +68,7 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http, SessionService sessionService, Clock clock, WebSecurityProperties webProperties)
-            throws Exception {
+            throws Exception { // NOPMD - SignatureDeclareThrowsException: HttpSecurity#build() declares it
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         // CsrfConfigurer unconditionally calls SessionManagementConfigurer.addSessionAuthentication
         // Strategy(new CsrfAuthenticationStrategy(...)) — confirmed by decompiling CsrfConfigurer
@@ -90,7 +93,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .headers(headers -> headers.frameOptions(frame -> frame.deny())
+                .headers(headers -> headers.frameOptions(FrameOptionsConfig::deny)
                         .contentTypeOptions(contentTypeOptions -> {})
                         .contentSecurityPolicy(csp ->
                                 csp.policyDirectives("default-src 'self'; frame-ancestors 'none'; base-uri 'none'")))
@@ -102,9 +105,9 @@ public class SecurityConfig {
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(new JsonAuthenticationEntryPoint())
                         .accessDeniedHandler(new JsonAccessDeniedHandler()))
-                .httpBasic(basic -> basic.disable())
-                .formLogin(form -> form.disable())
-                .logout(logout -> logout.disable())
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
                 .addFilterBefore(new CsrfCookieFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(
                         new SessionAuthenticationFilter(
@@ -128,22 +131,23 @@ public class SecurityConfig {
      */
     @Bean
     @Order(2)
-    public SecurityFilterChain webClientFilterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.disable())
+    public SecurityFilterChain webClientFilterChain(HttpSecurity http)
+            throws Exception { // NOPMD - SignatureDeclareThrowsException: HttpSecurity#build() declares it
+        http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> headers
                         // SpaWebConfig sets Cache-Control per path (immutable assets, revalidated
                         // index.html); Security's no-store default would defeat both.
-                        .cacheControl(cache -> cache.disable())
-                        .frameOptions(frame -> frame.deny())
+                        .cacheControl(CacheControlConfig::disable)
+                        .frameOptions(FrameOptionsConfig::deny)
                         .contentTypeOptions(contentTypeOptions -> {})
                         .contentSecurityPolicy(csp -> csp.policyDirectives(
                                 "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
                                         + "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")))
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
-                .httpBasic(basic -> basic.disable())
-                .formLogin(form -> form.disable())
-                .logout(logout -> logout.disable());
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable);
 
         return http.build();
     }

@@ -38,7 +38,7 @@ public record ExtractionScope(String sourceId, String municipalityIbge, String p
     private static LocalDate parseDate(String value, String field) {
         try {
             return LocalDate.parse(value);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e) { // NOPMD - parse failure or null, converted with its cause
             throw new IllegalArgumentException("acquisition scope " + field + " must be an ISO date", e);
         }
     }

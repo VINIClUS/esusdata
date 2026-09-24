@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
-public class RunEventsControllerTest {
+class RunEventsControllerTest {
 
     @Test
     void unknownJobIsAuditedBeforeSseNotFound() {

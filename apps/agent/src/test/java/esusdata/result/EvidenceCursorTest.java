@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
  * §1.10.1 L405: cursor opaco, vinculado ao resultado/ordenação/escopo, e que não concede acesso
  * por si só. Pure unit test — no Spring context, no database.
  */
-public class EvidenceCursorTest {
+class EvidenceCursorTest {
 
     @Test
     void roundTripsTheSeqUnderTheSameResultOrderingAndScope() {

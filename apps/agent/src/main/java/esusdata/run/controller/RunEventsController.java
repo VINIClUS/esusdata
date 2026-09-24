@@ -195,38 +195,21 @@ public class RunEventsController {
             boolean terminal = TERMINAL.contains(current.state());
             if (!terminal) {
                 terminalAttemptFirstObservedAt.set(null);
-            }
-            if (!terminal && snapshot.equals(lastSent.get())) {
-                return;
-            }
-            RunResponse response = responseFactory.toResponse(current);
-            boolean finalAttemptVisible = current.attempt() == 0
-                    || response.attempts().stream().anyMatch(attempt -> attempt.attempt() == current.attempt());
-            boolean terminalAttemptWaitExpired = false;
-            if (terminal && !finalAttemptVisible) {
-                Instant now = clock.instant();
-                Instant firstObservedAt = terminalAttemptFirstObservedAt.get();
-                if (firstObservedAt == null && terminalAttemptFirstObservedAt.compareAndSet(null, now)) {
-                    firstObservedAt = now;
-                } else if (firstObservedAt == null) {
-                    firstObservedAt = terminalAttemptFirstObservedAt.get();
-                }
-                terminalAttemptWaitExpired = !now.isBefore(firstObservedAt.plusMillis(TERMINAL_ATTEMPT_WAIT_MS));
-            }
-            if (terminal && !finalAttemptVisible && !terminalAttemptWaitExpired) {
-                return;
-            }
-            synchronized (emitterLock) {
-                if (stopped.get()) {
+                if (snapshot.equals(lastSent.get())) {
                     return;
                 }
-                if (!snapshot.equals(lastSent.get())) {
-                    if (terminalAttemptWaitExpired) {
-                        log.warn("closing terminal SSE stream for job {} without final attempt history", jobId);
-                    }
-                    emitter.send(SseEmitter.event().name("run").data(response, MediaType.APPLICATION_JSON));
-                    lastSent.set(snapshot);
+            }
+            RunResponse response = responseFactory.toResponse(current);
+            boolean terminalAttemptWaitExpired = false;
+            if (terminal && !finalAttemptVisible(current, response)) {
+                if (!terminalAttemptWaitExpired(terminalAttemptFirstObservedAt)) {
+                    return;
                 }
+                terminalAttemptWaitExpired = true;
+            }
+            if (!sendIfChanged(
+                    jobId, snapshot, response, terminalAttemptWaitExpired, lastSent, emitter, emitterLock, stopped)) {
+                return;
             }
             if (terminal) {
                 onDone.run();
@@ -235,10 +218,56 @@ public class RunEventsController {
         } catch (java.io.IOException e) {
             onDone.run();
             completeWithError(emitter, emitterLock, e);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e) { // NOPMD - an SSE poll must always release and complete the emitter
             onDone.run();
             completeWithError(emitter, emitterLock, e);
         }
+    }
+
+    private static boolean finalAttemptVisible(Job current, RunResponse response) {
+        return current.attempt() == 0
+                || response.attempts().stream().anyMatch(attempt -> attempt.attempt() == current.attempt());
+    }
+
+    /**
+     * Starts the grace period on the first terminal poll that lacks the final attempt, and reports
+     * whether it has run out.
+     */
+    private boolean terminalAttemptWaitExpired(AtomicReference<Instant> terminalAttemptFirstObservedAt) {
+        Instant now = clock.instant();
+        Instant firstObservedAt = terminalAttemptFirstObservedAt.get();
+        if (firstObservedAt == null && terminalAttemptFirstObservedAt.compareAndSet(null, now)) {
+            firstObservedAt = now;
+        } else if (firstObservedAt == null) {
+            firstObservedAt = terminalAttemptFirstObservedAt.get();
+        }
+        return !now.isBefore(firstObservedAt.plusMillis(TERMINAL_ATTEMPT_WAIT_MS));
+    }
+
+    /** Sends the snapshot unless it was already sent; false if the stream stopped meanwhile. */
+    private static boolean sendIfChanged(
+            String jobId,
+            JobSnapshot snapshot,
+            RunResponse response,
+            boolean terminalAttemptWaitExpired,
+            AtomicReference<JobSnapshot> lastSent,
+            SseEmitter emitter,
+            Object emitterLock,
+            AtomicBoolean stopped)
+            throws java.io.IOException {
+        synchronized (emitterLock) {
+            if (stopped.get()) {
+                return false;
+            }
+            if (!snapshot.equals(lastSent.get())) {
+                if (terminalAttemptWaitExpired) {
+                    log.warn("closing terminal SSE stream for job {} without final attempt history", jobId);
+                }
+                emitter.send(SseEmitter.event().name("run").data(response, MediaType.APPLICATION_JSON));
+                lastSent.set(snapshot);
+            }
+        }
+        return true;
     }
 
     private void reauthorize(
@@ -283,7 +312,7 @@ public class RunEventsController {
         } catch (java.io.IOException e) {
             onDone.run();
             completeWithError(emitter, emitterLock, e);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e) { // NOPMD - an SSE poll must always release and complete the emitter
             onDone.run();
             completeWithError(emitter, emitterLock, e);
         }

@@ -18,7 +18,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * explicitly NOT exercised by this class; only the refusal paths are.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class SourceApiTest extends ApiFixtureSupport {
+class SourceApiTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
     private static final String MUNICIPALITY_B = "3304557";

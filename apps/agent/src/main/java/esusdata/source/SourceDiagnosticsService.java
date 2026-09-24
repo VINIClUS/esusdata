@@ -30,6 +30,10 @@ import java.util.Optional;
  */
 public final class SourceDiagnosticsService {
 
+    private final SourceRepository sourceRepository;
+    private final AllowedDestinations allowedDestinations;
+    private final PecDataSourceFactory pecDataSourceFactory;
+
     public enum Outcome {
         DESTINATION_NOT_ALLOWED,
         SOURCE_BUSY,
@@ -77,10 +81,6 @@ public final class SourceDiagnosticsService {
             return budget.statementTimeoutMs();
         }
     }
-
-    private final SourceRepository sourceRepository;
-    private final AllowedDestinations allowedDestinations;
-    private final PecDataSourceFactory pecDataSourceFactory;
 
     public SourceDiagnosticsService(
             SourceRepository sourceRepository,

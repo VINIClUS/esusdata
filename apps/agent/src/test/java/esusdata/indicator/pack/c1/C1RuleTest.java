@@ -71,13 +71,13 @@ class C1RuleTest {
     @Test
     void eng25_bandBoundariesAreExact() {
         assertThat(C1Rule.classify(ExactRatio.of(10, 1))).isEqualTo(Classification.REGULAR); // x<=10
-        assertThat(C1Rule.classify(ExactRatio.of(100001, 10000))).isEqualTo(Classification.SUFICIENTE); // 10.0001
+        assertThat(C1Rule.classify(ExactRatio.of(100_001, 10_000))).isEqualTo(Classification.SUFICIENTE); // 10.0001
         assertThat(C1Rule.classify(ExactRatio.of(30, 1))).isEqualTo(Classification.SUFICIENTE); // 10<x<=30
-        assertThat(C1Rule.classify(ExactRatio.of(300001, 10000))).isEqualTo(Classification.BOM); // 30.0001
+        assertThat(C1Rule.classify(ExactRatio.of(300_001, 10_000))).isEqualTo(Classification.BOM); // 30.0001
         assertThat(C1Rule.classify(ExactRatio.of(50, 1))).isEqualTo(Classification.BOM); // 30<x<=50
-        assertThat(C1Rule.classify(ExactRatio.of(500001, 10000))).isEqualTo(Classification.OTIMO); // 50.0001
+        assertThat(C1Rule.classify(ExactRatio.of(500_001, 10_000))).isEqualTo(Classification.OTIMO); // 50.0001
         assertThat(C1Rule.classify(ExactRatio.of(70, 1))).isEqualTo(Classification.OTIMO); // 50<x<=70
-        assertThat(C1Rule.classify(ExactRatio.of(700001, 10000))).isEqualTo(Classification.REGULAR); // 70.0001
+        assertThat(C1Rule.classify(ExactRatio.of(700_001, 10_000))).isEqualTo(Classification.REGULAR); // 70.0001
     }
 
     // ---- mutual exclusivity: an UNMAPPED encounter is excluded from both arms, not dropped silently ----
@@ -99,7 +99,7 @@ class C1RuleTest {
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.COMPUTED);
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(7100));
-        assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(10029));
+        assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(10_029));
         assertThat(result.valueText()).isEqualTo("70.7947");
         assertThat(result.classification()).isEqualTo(Classification.REGULAR);
     }
@@ -153,7 +153,7 @@ class C1RuleTest {
     @Test
     void quadrimestralAverageKeepsAValueJustAboveTheFiftyBoundary() {
         Classification result = C1Rule.classifyQuadrimestral(
-                ExactRatio.of(500001, 10000), ExactRatio.of(50, 1), ExactRatio.of(50, 1), ExactRatio.of(50, 1));
+                ExactRatio.of(500_001, 10_000), ExactRatio.of(50, 1), ExactRatio.of(50, 1), ExactRatio.of(50, 1));
 
         assertThat(result).isEqualTo(Classification.OTIMO);
     }

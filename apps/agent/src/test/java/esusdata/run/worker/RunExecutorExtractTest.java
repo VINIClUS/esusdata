@@ -128,15 +128,15 @@ class RunExecutorExtractTest {
                 evidenceRepository.page(outcome.resultId(), "3541307", null, EvidenceRepository.DEFAULT_PAGE_SIZE);
         assertThat(page.items()).hasSize(12);
         assertThat(page.items().stream()
-                        .filter(e -> e.decision().equals("IN_NUMERATOR"))
+                        .filter(e -> "IN_NUMERATOR".equals(e.decision()))
                         .count())
                 .isEqualTo(7);
         assertThat(page.items().stream()
-                        .filter(e -> e.decision().equals("DENOMINATOR_ONLY"))
+                        .filter(e -> "DENOMINATOR_ONLY".equals(e.decision()))
                         .count())
                 .isEqualTo(3);
         assertThat(page.items().stream()
-                        .filter(e -> e.decision().equals("EXCLUDED_UNMAPPED"))
+                        .filter(e -> "EXCLUDED_UNMAPPED".equals(e.decision()))
                         .count())
                 .isEqualTo(2);
     }

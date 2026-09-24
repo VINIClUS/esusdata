@@ -104,7 +104,7 @@ class IndividualEncounterModalityCapabilityTest {
         IndividualEncounterModalityCapability.stream(acquisition(connection, guard), ignored -> {}, catalog);
 
         for (int i = 0; i < events.size(); i++) {
-            if (events.get(i).equals("version") || events.get(i).equals("fingerprint")) {
+            if ("version".equals(events.get(i)) || "fingerprint".equals(events.get(i))) {
                 assertThat(events.get(i + 1)).isEqualTo("budget");
             }
         }
@@ -262,21 +262,21 @@ class IndividualEncounterModalityCapabilityTest {
     @Test
     void streamRequiresTheConfiguredPecMunicipalityInsteadOfAnArbitraryQueryScope() {
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
-                        .filter(method -> method.getName().equals("stream"))
+                        .filter(method -> "stream".equals(method.getName()))
                         .allMatch(method -> method.getParameterTypes()[0].equals(PecAcquisition.class)))
                 .isTrue();
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
-                        .filter(method -> method.getName().equals("stream"))
-                        .noneMatch(method -> Arrays.asList(method.getParameterTypes())
-                                .contains(esusdata.source.pec.PecConnectionProperties.class)))
+                        .filter(method -> "stream".equals(method.getName()))
+                        .noneMatch(method ->
+                                Arrays.asList(method.getParameterTypes()).contains(PecConnectionProperties.class)))
                 .isTrue();
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
-                        .filter(method -> method.getName().equals("stream"))
+                        .filter(method -> "stream".equals(method.getName()))
                         .noneMatch(method ->
                                 Arrays.asList(method.getParameterTypes()).contains(PecSourceIdentity.class)))
                 .isTrue();
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
-                        .filter(method -> method.getName().equals("stream"))
+                        .filter(method -> "stream".equals(method.getName()))
                         .noneMatch(method ->
                                 Arrays.asList(method.getParameterTypes()).contains(BudgetGuard.class)))
                 .isTrue();

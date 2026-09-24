@@ -25,7 +25,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * the CAS and the registry flag, not a terminal state.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class RunCancelHttpTest extends ApiFixtureSupport {
+class RunCancelHttpTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
     private static final String OTHER_MUNICIPALITY = "3550308";

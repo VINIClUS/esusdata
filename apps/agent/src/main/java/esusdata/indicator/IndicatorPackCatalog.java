@@ -12,15 +12,6 @@ import java.util.Optional;
  */
 public final class IndicatorPackCatalog {
 
-    public record PackEntry(
-            String id,
-            String ruleVersion,
-            String family,
-            String unit,
-            List<String> dependsOn,
-            boolean executionEnabled,
-            List<String> blockedGates) {}
-
     private static final List<PackEntry> PACKS = List.of(new PackEntry(
             C1Rule.INDICATOR_PACK,
             C1Rule.RULE_VERSION,
@@ -29,6 +20,15 @@ public final class IndicatorPackCatalog {
             List.of(),
             false,
             C1Rule.ReleaseGates.knownIncomplete().incompleteReasons()));
+
+    public record PackEntry(
+            String id,
+            String ruleVersion,
+            String family,
+            String unit,
+            List<String> dependsOn,
+            boolean executionEnabled,
+            List<String> blockedGates) {}
 
     private IndicatorPackCatalog() {}
 

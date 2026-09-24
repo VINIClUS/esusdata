@@ -24,18 +24,24 @@ import org.junit.jupiter.api.io.TempDir;
 
 class ExtractWriterReaderTest {
 
+    @TempDir
+    Path dir;
+
+    private final ExtractReader reader = new ExtractReader();
+    private static final String TEST_QUERY_CHECKSUM = "sha256:" + "0".repeat(64);
+
     @Test
     void publicWriterApiRequiresAnAcquisitionBoundScope() {
         assertThat(Arrays.stream(ExtractWriter.class.getConstructors())
                         .anyMatch(constructor -> Arrays.stream(constructor.getParameterTypes())
-                                .anyMatch(type -> type.getName().equals("esusdata.source.pec.PecAcquisition"))))
+                                .anyMatch(type -> "esusdata.source.pec.PecAcquisition".equals(type.getName()))))
                 .isTrue();
         assertThat(Arrays.stream(ExtractWriter.class.getConstructors())
                         .noneMatch(constructor ->
                                 Arrays.asList(constructor.getParameterTypes()).contains(ExtractionScope.class)))
                 .isTrue();
         assertThat(Arrays.stream(ExtractWriter.class.getMethods())
-                        .filter(method -> method.getName().equals("finalizeExtract"))
+                        .filter(method -> "finalizeExtract".equals(method.getName()))
                         .noneMatch(method -> method.getParameterTypes().length > 0
                                 && method.getParameterTypes()[0].equals(String.class)))
                 .isTrue();
@@ -55,7 +61,7 @@ class ExtractWriterReaderTest {
         assertThat(Arrays.stream(DelegatedExtractPublication.class.getConstructors())
                         .anyMatch(constructor -> Arrays.stream(constructor.getParameterTypes())
                                 .anyMatch(
-                                        type -> type.getName().equals("esusdata.run.acquisition.AcquisitionCommand"))))
+                                        type -> "esusdata.run.acquisition.AcquisitionCommand".equals(type.getName()))))
                 .isTrue();
         assertThat(Arrays.stream(DelegatedExtractPublication.class.getConstructors())
                         .noneMatch(constructor ->
@@ -67,6 +73,8 @@ class ExtractWriterReaderTest {
     void acquisitionBoundWriterDerivesItsManifestScopeFromTheSession() throws Exception {
         var properties = new PecConnectionProperties(
                 "writer-source", "127.0.0.1", 5432, "fixture", "reader", "unused", "3541307");
+        // binds a Mockito mock connection: nothing to release
+        @SuppressWarnings("PMD.CloseResource")
         var sourceConnection = PecSourceConnectionTestSupport.bind(
                 org.mockito.Mockito.mock(java.sql.Connection.class),
                 properties,
@@ -98,12 +106,6 @@ class ExtractWriterReaderTest {
         assertThat(manifest.periodStart()).isEqualTo("2026-03-01");
         assertThat(manifest.periodEndExclusive()).isEqualTo("2026-04-01");
     }
-
-    @TempDir
-    Path dir;
-
-    private final ExtractReader reader = new ExtractReader();
-    private static final String TEST_QUERY_CHECKSUM = "sha256:" + "0".repeat(64);
 
     @Test
     void emptyExtractMustMatchItsBoundAcquisitionScope() throws Exception {
@@ -361,6 +363,8 @@ class ExtractWriterReaderTest {
     @Test
     void aCrashBeforeFinalizeLeavesNoValidExtract() throws IOException {
         String extractionId = "ext-crashed";
+        // closed explicitly without finalizeExtract(): the crash this test simulates
+        @SuppressWarnings("PMD.CloseResource")
         ExtractWriter writer = new ExtractWriter(dir, extractionId);
         writer.write(encounter("1", CanonicalModality.PROGRAMADO));
         writer.close(); // simulates a crash: close() without finalizeExtract()
@@ -373,6 +377,8 @@ class ExtractWriterReaderTest {
     @Test
     void retryAfterAnAbandonedDataTempCanPublishTheSameExtractionId() throws Exception {
         String extractionId = "ext-retry-after-crash";
+        // closed explicitly without finalizeExtract(): the crash this test simulates
+        @SuppressWarnings("PMD.CloseResource")
         ExtractWriter abandoned = new ExtractWriter(dir, extractionId);
         abandoned.write(encounter("abandoned", CanonicalModality.PROGRAMADO));
         abandoned.close();
@@ -832,7 +838,7 @@ class ExtractWriterReaderTest {
 
     private static String randomPayload() {
         byte[] bytes = new byte[4096];
-        new java.util.Random(20260920L).nextBytes(bytes);
+        new java.util.Random(20_260_920L).nextBytes(bytes);
         return java.util.HexFormat.of().formatHex(bytes);
     }
 }

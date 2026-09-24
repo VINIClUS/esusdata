@@ -21,7 +21,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * tests from being needlessly slow without changing what they prove.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class RunApiTest extends ApiFixtureSupport {
+class RunApiTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 

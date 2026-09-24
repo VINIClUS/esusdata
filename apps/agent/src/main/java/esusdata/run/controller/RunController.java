@@ -165,22 +165,7 @@ public class RunController {
                     return responseFactory.toResponse(job);
                 }
             }
-            Instant now = clock.instant();
-            boolean cancelled = switch (job.state()) {
-                case QUEUED -> jobRepository.cancelQueued(id, now);
-                case RUNNING, STAGED -> {
-                    boolean requested =
-                            jobRepository.requestCancel(id, job.processInstanceId(), job.executionGeneration(), now);
-                    if (requested) {
-                        // Best-effort interrupt of an in-flight statement — the CAS above is what
-                        // actually matters; this only shortens how long it takes to notice.
-                        cancellationRegistry.requestCancel(id);
-                    }
-                    yield requested;
-                }
-                default -> false;
-            };
-            if (cancelled) {
+            if (tryCancel(id, job, clock.instant())) {
                 return responseFactory.toResponse(jobRepository.findById(id).orElseThrow());
             }
             // A worker may win more than one ownership CAS while this request is in flight.
@@ -194,6 +179,24 @@ public class RunController {
         }
         throw new JobNotCancellableException(
                 "job " + id + " cannot be cancelled from its current state (" + job.state() + ")");
+    }
+
+    /** One ownership CAS against the job's current state; true if this call cancelled or requested it. */
+    private boolean tryCancel(String id, Job job, Instant now) {
+        return switch (job.state()) {
+            case QUEUED -> jobRepository.cancelQueued(id, now);
+            case RUNNING, STAGED -> {
+                boolean requested =
+                        jobRepository.requestCancel(id, job.processInstanceId(), job.executionGeneration(), now);
+                if (requested) {
+                    // Best-effort interrupt of an in-flight statement — the CAS above is what
+                    // actually matters; this only shortens how long it takes to notice.
+                    cancellationRegistry.requestCancel(id);
+                }
+                yield requested;
+            }
+            default -> false;
+        };
     }
 
     private static boolean isCancellable(JobState state) {

@@ -179,8 +179,7 @@ class JobRecoveryTest {
     }
 
     private void assertThatCodeDoesNotBlock() {
-        org.assertj.core.api.Assertions.assertThatCode(
-                        () -> fixture.acquisitionGuard().requireUnblocked("src-1"))
+        assertThatCode(() -> fixture.acquisitionGuard().requireUnblocked("src-1"))
                 .doesNotThrowAnyException();
     }
 

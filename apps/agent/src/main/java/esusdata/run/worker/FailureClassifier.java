@@ -1,7 +1,6 @@
 package esusdata.run.worker;
 
 import esusdata.auth.model.GrantRevalidationException;
-import esusdata.indicator.model.Classification;
 import esusdata.result.model.PublicationAuthorizationRefusedException;
 import esusdata.run.job.JobCancelledException;
 import esusdata.run.job.SourceAcquisitionBlockedException;
@@ -72,19 +71,21 @@ public final class FailureClassifier {
 
         SQLException sql = findSqlException(failure);
         if (sql != null) {
-            String state = sql.getSQLState();
-            if (state != null && state.startsWith("28")) {
-                return new Classification(Category.DEFINITIVE, "SOURCE_AUTHENTICATION_FAILED", sql.getMessage());
-            }
-            if (sql instanceof SQLTransientException
-                    || (state != null && state.startsWith("08"))
-                    || isSqliteBusy(sql)) {
-                return new Classification(Category.TRANSIENT, "TRANSIENT_SQL_ERROR", sql.getMessage());
-            }
-            return new Classification(Category.DEFINITIVE, "SQL_ERROR", sql.getMessage());
+            return classifySql(sql);
         }
 
         return new Classification(Category.DEFINITIVE, "UNCLASSIFIED_ERROR", failure.getMessage());
+    }
+
+    private static Classification classifySql(SQLException sql) {
+        String state = sql.getSQLState();
+        if (state != null && state.startsWith("28")) {
+            return new Classification(Category.DEFINITIVE, "SOURCE_AUTHENTICATION_FAILED", sql.getMessage());
+        }
+        if (sql instanceof SQLTransientException || (state != null && state.startsWith("08")) || isSqliteBusy(sql)) {
+            return new Classification(Category.TRANSIENT, "TRANSIENT_SQL_ERROR", sql.getMessage());
+        }
+        return new Classification(Category.DEFINITIVE, "SQL_ERROR", sql.getMessage());
     }
 
     private static SQLException findSqlException(Throwable failure) {

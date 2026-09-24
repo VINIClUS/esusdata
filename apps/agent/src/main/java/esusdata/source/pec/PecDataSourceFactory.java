@@ -73,6 +73,9 @@ public final class PecDataSourceFactory {
      * properties used to construct its pool, so adapters cannot accidentally combine this JDBC
      * connection with another source's municipality configuration.
      */
+    // Ownership of the permit and pool moves to the returned connection; finally only cleans up
+    // when that hand-off never happened, which try-with-resources cannot express.
+    @SuppressWarnings("PMD.UseTryWithResources")
     public PecSourceConnection open(
             PecConnectionProperties properties, PecSourceIdentity sourceIdentity, ReadBudget budget)
             throws SQLException {
@@ -85,6 +88,8 @@ public final class PecDataSourceFactory {
                     "PecSourceIdentity sourceId does not match source connection properties");
         }
         Objects.requireNonNull(budget, "read budget is required");
+        // ownership moves to the returned PecSourceConnection, or is released in finally
+        @SuppressWarnings("PMD.CloseResource")
         SourceAcquisitionLimiter.Permit permit = SourceAcquisitionLimiter.acquireOrFail(properties.sourceId());
         HikariDataSource dataSource = null;
         boolean ownershipTransferred = false;

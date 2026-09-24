@@ -27,7 +27,8 @@ public final class PecCompatibilityMatrix {
         }
         try (resource) {
             return new PecCompatibilityMatrix(new ObjectMapper().readTree(resource));
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException
+                | RuntimeException e) { // NOPMD - any read failure of the packaged matrix is fatal, with its cause
             throw new IllegalStateException("Could not read packaged compatibility matrix", e);
         }
     }
@@ -35,7 +36,7 @@ public final class PecCompatibilityMatrix {
     public static PecCompatibilityMatrix fromJson(String json) {
         try {
             return new PecCompatibilityMatrix(new ObjectMapper().readTree(json));
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e) { // NOPMD - any parse or shape failure, converted with its cause
             throw new IllegalArgumentException("Invalid compatibility matrix JSON", e);
         }
     }

@@ -148,7 +148,7 @@ class PecCompatibilityMatrixTest {
 
             @Override
             public String fingerprint(Connection connection, String object, java.util.List<String> columnsUsed) {
-                return object.equals("tb_dim_tempo")
+                return "tb_dim_tempo".equals(object)
                         ? "sha256:changed"
                         : expected.objectFingerprints().get(object);
             }
@@ -185,7 +185,7 @@ class PecCompatibilityMatrixTest {
     @Test
     void compatibilityAwareStreamRequiresAConnectionBoundSourceIdentity() {
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
-                        .filter(method -> method.getName().equals("stream"))
+                        .filter(method -> "stream".equals(method.getName()))
                         .allMatch(method -> method.getParameterTypes()[0].equals(PecAcquisition.class)))
                 .isTrue();
     }
@@ -193,7 +193,7 @@ class PecCompatibilityMatrixTest {
     @Test
     void rawCompatibilityValidationIsNotAPublicUnboundAcquisitionApi() {
         assertThat(Arrays.stream(IndividualEncounterModalityCapability.class.getDeclaredMethods())
-                        .filter(method -> method.getName().equals("validateAdapterCompatibility"))
+                        .filter(method -> "validateAdapterCompatibility".equals(method.getName()))
                         .noneMatch(method -> Modifier.isPublic(method.getModifiers())
                                 && method.getParameterTypes().length > 1
                                 && method.getParameterTypes()[0].equals(Connection.class)

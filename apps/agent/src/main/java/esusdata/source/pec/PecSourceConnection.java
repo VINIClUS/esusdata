@@ -95,6 +95,8 @@ public final class PecSourceConnection implements AutoCloseable {
      * acquisition scope.
      */
     @Override
+    // This is the close() itself: it releases each owned resource in turn and keeps the first failure.
+    @SuppressWarnings("PMD.UseTryWithResources")
     public void close() throws SQLException {
         if (!closed.compareAndSet(false, true)) {
             return;

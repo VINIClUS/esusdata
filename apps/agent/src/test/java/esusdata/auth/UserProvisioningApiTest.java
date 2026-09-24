@@ -19,7 +19,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * inspecting the source.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class UserProvisioningApiTest extends ApiFixtureSupport {
+class UserProvisioningApiTest extends ApiFixtureSupport {
 
     @Test
     void anAdminCanProvisionAUserAndTheReturnedTokenActivatesItThroughTheRealRoute() throws Exception {

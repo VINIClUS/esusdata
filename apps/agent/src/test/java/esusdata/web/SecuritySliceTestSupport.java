@@ -15,12 +15,16 @@ import org.springframework.test.context.DynamicPropertySource;
  * checked against.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
+// Abstract so JUnit never runs the shared context setup as a test class of its own.
+@SuppressWarnings("PMD.AbstractClassWithoutAbstractMethod")
 public abstract class SecuritySliceTestSupport {
 
-    public static final int PORT = 18443;
+    public static final int PORT = 18_443;
     public static final String BASE_URL = "http://127.0.0.1:" + PORT;
 
     @TempDir
+    // JUnit injects a static @TempDir once for the whole class.
+    @SuppressWarnings("PMD.MutableStaticState")
     public static Path dataDir;
 
     @DynamicPropertySource

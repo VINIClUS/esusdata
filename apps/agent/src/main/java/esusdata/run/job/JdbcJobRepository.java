@@ -49,13 +49,13 @@ public final class JdbcJobRepository implements JobRepository {
             rs.getString("staging_id"),
             instantOrNull(rs, "cancel_requested_at"));
 
+    private final JdbcTemplate jdbc;
+    private final TransactionTemplate transactionTemplate;
+
     private static Instant instantOrNull(ResultSet rs, String column) throws SQLException {
         String value = rs.getString(column);
         return value == null ? null : Instant.parse(value);
     }
-
-    private final JdbcTemplate jdbc;
-    private final TransactionTemplate transactionTemplate;
 
     public JdbcJobRepository(JdbcTemplate jdbc, TransactionTemplate transactionTemplate) {
         this.jdbc = jdbc;

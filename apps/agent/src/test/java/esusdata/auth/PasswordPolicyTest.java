@@ -1,6 +1,7 @@
 package esusdata.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
@@ -13,20 +14,20 @@ import org.junit.jupiter.api.Test;
 class PasswordPolicyTest {
 
     private final SecurityProperties properties =
-            new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19456, 2, 1, 16, 32, "v1", 30, 24);
+            new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19_456, 2, 1, 16, 32, "v1", 30, 24);
     private final PasswordPolicy policy = new PasswordPolicy(properties);
 
     @Test
     void acceptsExactlyTheMinimumLength() {
         String password = "a".repeat(15);
         assertThat(password.codePointCount(0, password.length())).isEqualTo(15);
-        policy.validate(password); // does not throw
+        assertThatCode(() -> policy.validate(password)).doesNotThrowAnyException();
     }
 
     @Test
     void acceptsExactlyTheMaximumLength() {
         String password = "a".repeat(128);
-        policy.validate(password); // does not throw
+        assertThatCode(() -> policy.validate(password)).doesNotThrowAnyException();
     }
 
     @Test

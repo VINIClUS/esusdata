@@ -2,8 +2,9 @@ package esusdata.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
@@ -37,7 +38,7 @@ import org.yaml.snakeyaml.Yaml;
  * schema is not caught here and remains a documentation-only claim.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class OpenApiContractTest extends SecuritySliceTestSupport {
+class OpenApiContractTest extends SecuritySliceTestSupport {
 
     /**
      * Boot's own default error-handling route — never part of THIS application's documented
@@ -51,6 +52,8 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
 
     @Autowired
     RequestMappingHandlerMapping handlerMapping;
+
+    private static final ParameterNameDiscoverer PARAMETER_NAMES = new DefaultParameterNameDiscoverer();
 
     @Test
     void everyRegisteredRouteIsDocumentedAndEveryDocumentedRouteIsRegistered() {
@@ -84,7 +87,7 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
     @SuppressWarnings("unchecked")
     void runCreationDeclaresIdempotencyKeyAsRequired() throws Exception {
         Map<String, Object> document;
-        try (InputStream in = new FileInputStream(CONTRACT_PATH.toFile())) {
+        try (InputStream in = Files.newInputStream(CONTRACT_PATH)) {
             document = new Yaml().load(in);
         }
         Map<String, Object> paths = (Map<String, Object>) document.get("paths");
@@ -98,8 +101,6 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
 
         assertThat(idempotencyKey.get("required")).isEqualTo(true);
     }
-
-    private static final ParameterNameDiscoverer PARAMETER_NAMES = new DefaultParameterNameDiscoverer();
 
     private static Set<ParamRef> handlerParams(HandlerMethod handlerMethod) {
         Set<ParamRef> params = new TreeSet<>();
@@ -139,7 +140,7 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
             Set<String> patterns = new LinkedHashSet<>();
             info.getPathPatternsCondition().getPatternValues().forEach(patterns::add);
             for (String pattern : patterns) {
-                if (pattern.equals(EXCLUDED_PATH)) {
+                if (EXCLUDED_PATH.equals(pattern)) {
                     continue;
                 }
                 for (org.springframework.web.bind.annotation.RequestMethod method :
@@ -157,7 +158,7 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
                 .as("expected an OpenAPI contract at %s", CONTRACT_PATH.toAbsolutePath())
                 .isTrue();
         Map<String, Set<ParamRef>> routes = new TreeMap<>();
-        try (InputStream in = new FileInputStream(CONTRACT_PATH.toFile())) {
+        try (InputStream in = Files.newInputStream(CONTRACT_PATH)) {
             Map<String, Object> document = new Yaml().load(in);
             Map<String, Object> components = (Map<String, Object>) document.getOrDefault("components", Map.of());
             Map<String, Object> componentParams = (Map<String, Object>) components.getOrDefault("parameters", Map.of());
@@ -170,8 +171,8 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
                     routes.put(route, operationParams(operation, componentParams));
                 }
             }
-        } catch (Exception e) {
-            throw new RuntimeException("failed to parse " + CONTRACT_PATH, e);
+        } catch (IOException e) {
+            throw new UncheckedIOException("failed to read " + CONTRACT_PATH, e);
         }
         return routes;
     }
@@ -200,7 +201,7 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
         @Override
         public int compareTo(ParamRef other) {
             int byIn = in.compareTo(other.in);
-            return byIn != 0 ? byIn : name.compareTo(other.name);
+            return byIn == 0 ? name.compareTo(other.name) : byIn;
         }
     }
 }

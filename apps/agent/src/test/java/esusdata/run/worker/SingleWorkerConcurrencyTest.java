@@ -71,6 +71,8 @@ class SingleWorkerConcurrencyTest {
 
         int attempts = 4;
         AtomicInteger claims = new AtomicInteger(0);
+        // shut down with shutdownNow() in finally: close() would wait on the blocked tasks
+        @SuppressWarnings("PMD.CloseResource")
         ExecutorService pool = Executors.newFixedThreadPool(attempts);
         try {
             List<Callable<Void>> tasks = new ArrayList<>();
@@ -105,7 +107,7 @@ class SingleWorkerConcurrencyTest {
         for (int i = 0; i < 20; i++) {
             try {
                 return fixture.jobRepository.acquireNext(processInstanceId, clock.instant());
-            } catch (RuntimeException busy) {
+            } catch (RuntimeException busy) { // NOPMD - SQLITE_BUSY surfaces unchecked; retried
                 lastFailure = busy;
                 Thread.sleep(10);
             }

@@ -76,7 +76,7 @@ public final class AllowedDestinations {
             if (host == null || host.isBlank()) {
                 throw new IllegalArgumentException("allowlist host is required");
             }
-            if (port <= 0 || port > 65535) {
+            if (port <= 0 || port > 65_535) {
                 throw new IllegalArgumentException("allowlist port out of range: " + port);
             }
             host = normalizeHost(host);

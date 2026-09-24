@@ -176,7 +176,7 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 "PEC_POSTGRESQL",
                 "PRONTUARIO",
                 "PRIMARY",
-                "127.0.0.1",
+                "127.0.0.1", // NOPMD - AvoidUsingHardCodedIP: loopback test server
                 5432,
                 "esus",
                 "esus_leitura",
@@ -222,7 +222,7 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
             String referencePeriod,
             IndicatorResult result,
             List<EvidenceEntry> evidence)
-            throws Exception {
+            throws IOException {
         String sourceId = "src-" + UUID.randomUUID();
         registerSource(sourceId, municipalityIbge);
 
@@ -294,41 +294,46 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
      * {@code XSRF-TOKEN}/{@code X-XSRF-TOKEN} pair fetched from the running app itself, exactly as
      * {@code CsrfAndOriginTest} proves the filter chain requires.
      */
-    public HttpResponse<String> authenticatedPost(String sessionCookie, URI uri, String jsonBody) throws Exception {
+    public HttpResponse<String> authenticatedPost(String sessionCookie, URI uri, String jsonBody)
+            throws IOException, InterruptedException {
         return authenticatedRequest(sessionCookie, uri, "POST", jsonBody, null);
     }
 
     public HttpResponse<String> authenticatedPostWithIdempotency(
-            String sessionCookie, String idempotencyKey, String jsonBody) throws Exception {
+            String sessionCookie, String idempotencyKey, String jsonBody) throws IOException, InterruptedException {
         return authenticatedRequest(
                 sessionCookie, URI.create(BASE_URL + "/api/v1/runs"), "POST", jsonBody, idempotencyKey);
     }
 
-    public HttpResponse<String> authenticatedDelete(String sessionCookie, URI uri) throws Exception {
+    public HttpResponse<String> authenticatedDelete(String sessionCookie, URI uri)
+            throws IOException, InterruptedException {
         return authenticatedRequest(sessionCookie, uri, "DELETE", null, null);
     }
 
     private static HttpResponse<String> authenticatedRequest(
-            String sessionCookie, URI uri, String method, String jsonBody, String idempotencyKey) throws Exception {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpResponse<String> ready = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        String csrfToken = csrfTokenFrom(ready);
+            String sessionCookie, URI uri, String method, String jsonBody, String idempotencyKey)
+            throws IOException, InterruptedException {
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            HttpResponse<String> ready = client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+            String csrfToken = csrfTokenFrom(ready);
 
-        HttpRequest.BodyPublisher body =
-                jsonBody == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(jsonBody);
-        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
-                .header("Content-Type", "application/json")
-                .header("Cookie", sessionCookie + "; XSRF-TOKEN=" + csrfToken)
-                .header("X-XSRF-TOKEN", csrfToken)
-                .method(method, body);
-        if (idempotencyKey != null) {
-            builder.header("Idempotency-Key", idempotencyKey);
+            HttpRequest.BodyPublisher body = jsonBody == null
+                    ? HttpRequest.BodyPublishers.noBody()
+                    : HttpRequest.BodyPublishers.ofString(jsonBody);
+            HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
+                    .header("Content-Type", "application/json")
+                    .header("Cookie", sessionCookie + "; XSRF-TOKEN=" + csrfToken)
+                    .header("X-XSRF-TOKEN", csrfToken)
+                    .method(method, body);
+            if (idempotencyKey != null) {
+                builder.header("Idempotency-Key", idempotencyKey);
+            }
+            return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
         }
-        return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
     private static String csrfTokenFrom(HttpResponse<String> response) {

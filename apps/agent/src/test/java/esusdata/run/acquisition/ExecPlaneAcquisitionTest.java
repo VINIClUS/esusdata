@@ -52,6 +52,12 @@ class ExecPlaneAcquisitionTest {
             java.util.Map.of("col_a", new ColumnMetadata("text", "text", "NO", 1)),
             List.of(new ProbeItem.ColumnItem("col_a"))));
 
+    private static final AllowedDestinations ALLOWED =
+            new AllowedDestinations(java.util.Set.of(new AllowedDestinations.HostPort("127.0.0.1", 5432)));
+
+    @TempDir
+    Path extractsDir;
+
     private static class RecordingListener implements AcquisitionListener {
         final AtomicInteger progressCount = new AtomicInteger();
         final List<String> uncertainReasons = new CopyOnWriteArrayList<>();
@@ -66,12 +72,6 @@ class ExecPlaneAcquisitionTest {
             uncertainReasons.add(reason);
         }
     }
-
-    private static final AllowedDestinations ALLOWED =
-            new AllowedDestinations(java.util.Set.of(new AllowedDestinations.HostPort("127.0.0.1", 5432)));
-
-    @TempDir
-    Path extractsDir;
 
     private ExecPlaneAcquisition adapter(String scenario) {
         return adapter(scenario, ALLOWED);
@@ -369,7 +369,7 @@ class ExecPlaneAcquisitionTest {
     private Throwable catchFailure(String scenario, RecordingListener listener) {
         try {
             adapter(scenario).acquire(command(), new CancellationToken(), listener);
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException failure) { // NOPMD - captures whatever the adapter throws for the assertion
             return failure;
         }
         throw new AssertionError("scenario " + scenario + " unexpectedly succeeded");

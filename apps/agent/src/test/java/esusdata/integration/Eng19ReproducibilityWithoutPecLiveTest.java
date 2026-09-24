@@ -22,6 +22,7 @@ import esusdata.source.pec.PecSourceIdentity;
 import esusdata.source.pec.RawEncounterRecord;
 import esusdata.source.pec.ReadBudget;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -65,7 +66,7 @@ class Eng19ReproducibilityWithoutPecLiveTest {
         String extractionId = "eng19-2026-03";
         ExtractionManifest manifest = acquireAndWriteExtract(extractionId);
 
-        assertThat(manifest.rowCount()).isEqualTo(10029);
+        assertThat(manifest.rowCount()).isEqualTo(10_029);
         assertThat(manifest.completenessStatus()).isEqualTo("COMPLETE");
 
         // --- Phase B: disconnected. No PEC DataSource, no Connection, nothing PostgreSQL-shaped
@@ -79,7 +80,7 @@ class Eng19ReproducibilityWithoutPecLiveTest {
 
         // --- Assert: identical to the independently-measured psql/pgJDBC baseline. ---
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(7100));
-        assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(10029));
+        assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(10_029));
         assertThat(result.valueText()).isEqualTo("70.7947");
         assertThat(result.classification()).isEqualTo(Classification.REGULAR);
     }
@@ -134,7 +135,7 @@ class Eng19ReproducibilityWithoutPecLiveTest {
         try {
             writer.write(canonical);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         }
     }
 

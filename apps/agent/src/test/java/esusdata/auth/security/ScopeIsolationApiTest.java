@@ -24,7 +24,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * grant refused on the municipal aggregate.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class ScopeIsolationApiTest extends ApiFixtureSupport {
+class ScopeIsolationApiTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY_A = "3541307";
     private static final String MUNICIPALITY_B = "3550308";
@@ -188,12 +188,13 @@ public class ScopeIsolationApiTest extends ApiFixtureSupport {
     }
 
     private HttpResponse<String> get(String userId, URI uri) throws Exception {
-        HttpClient client = HttpClient.newHttpClient();
-        return client.send(
-                HttpRequest.newBuilder(uri)
-                        .header("Cookie", sessionCookie(userId))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            return client.send(
+                    HttpRequest.newBuilder(uri)
+                            .header("Cookie", sessionCookie(userId))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+        }
     }
 }

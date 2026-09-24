@@ -18,7 +18,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** §1.12.7 L541: access mutations and session invalidation must be one atomic operation. */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class AccessAdministrationTransactionTest extends ApiFixtureSupport {
+class AccessAdministrationTransactionTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
     private static final String ACTOR = "access-admin";

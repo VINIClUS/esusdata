@@ -65,7 +65,7 @@ public final class JdbcEvidenceRepository implements EvidenceRepository {
                 .orElseThrow(() -> new EvidenceNotFoundException("result not found in scope: " + resultId));
 
         long cursor = afterSeq == null ? -1L : afterSeq;
-        StringBuilder sql = new StringBuilder("select * from evidence where staging_id = ? and seq > ?");
+        StringBuilder sql = new StringBuilder(256).append("select * from evidence where staging_id = ? and seq > ?");
         List<Object> params = new ArrayList<>(List.of(stagingId, cursor));
         if (cnes != null) {
             sql.append(" and cnes = ?");

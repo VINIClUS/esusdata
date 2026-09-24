@@ -31,6 +31,8 @@
     <spotless.version>3.10.2</spotless.version>
     <palantir-java-format.version>2.99.0</palantir-java-format.version>
     <error-prone.version>2.50.0</error-prone.version>
+    <pmd-plugin.version>3.28.0</pmd-plugin.version>
+    <pmd.version>7.27.0</pmd.version>
   </properties>
 
   <dependencies>
@@ -217,6 +219,44 @@
             </path>
           </annotationProcessorPaths>
         </configuration>
+      </plugin>
+      <!-- Static-analysis gate (ADR 0018): PMD with the project ruleset over main and test
+           sources; any violation fails verify. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <version>${pmd-plugin.version}</version>
+        <configuration>
+          <rulesets>
+            <ruleset>${project.basedir}/config/pmd/ruleset.xml</ruleset>
+          </rulesets>
+          <targetJdk>${java.version}</targetJdk>
+          <includeTests>true</includeTests>
+          <printFailingErrors>true</printFailingErrors>
+          <failOnViolation>true</failOnViolation>
+          <failurePriority>5</failurePriority>
+          <linkXRef>false</linkXRef>
+          <analysisCache>true</analysisCache>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+        <dependencies>
+          <dependency>
+            <groupId>net.sourceforge.pmd</groupId>
+            <artifactId>pmd-java</artifactId>
+            <version>${pmd.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>net.sourceforge.pmd</groupId>
+            <artifactId>pmd-core</artifactId>
+            <version>${pmd.version}</version>
+          </dependency>
+        </dependencies>
       </plugin>
       <!-- Static-analysis gate (ADR 0018): formatting is checked at verify, never applied silently;
            `mvn spotless:apply` rewrites the tree. palantir-java-format also orders and prunes

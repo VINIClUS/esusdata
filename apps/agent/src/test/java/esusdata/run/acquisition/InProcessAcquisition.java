@@ -13,6 +13,7 @@ import esusdata.source.pec.PecDataSourceFactory;
 import esusdata.source.pec.PecSourceConnection;
 import esusdata.source.pec.RawEncounterRecord;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -74,7 +75,7 @@ public final class InProcessAcquisition implements Acquisition {
                                 catalog,
                                 statement -> cancellation.bindInterrupt(cancelInterrupt(statement)),
                                 cancellation::checkCancelled);
-                    } catch (RuntimeException uncertainFailure) {
+                    } catch (RuntimeException uncertainFailure) { // NOPMD - rethrown unchanged; see comment below
                         // Rethrown unchanged (not wrapped): JobWorker/FailureClassifier dispatch on
                         // the concrete type (JobCancelledException, SourceBudgetExceededException,
                         // IllegalStateException...) — only the uncertain-outcome side effect is new.
@@ -137,7 +138,7 @@ public final class InProcessAcquisition implements Acquisition {
         try {
             writer.write(canonical);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         }
     }
 }

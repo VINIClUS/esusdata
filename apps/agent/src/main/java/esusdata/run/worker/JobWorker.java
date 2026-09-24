@@ -140,7 +140,7 @@ public final class JobWorker implements SmartLifecycle {
         Job job = maybeJob.get();
         try {
             processJob(job);
-        } catch (RuntimeException unexpected) {
+        } catch (RuntimeException unexpected) { // NOPMD - the only worker thread must survive; see comment below
             // processJob's own catch blocks (handleFailure, finalizeCancellationIfOwned) make
             // their own unguarded DB calls — findById, neutralize, requeueForRetry/markFailed,
             // recordAttempt — to resolve the job's outcome. If any of those hits transient
@@ -191,13 +191,12 @@ public final class JobWorker implements SmartLifecycle {
                         job,
                         "UNSUPPORTED_ACQUISITION_MODE",
                         "job has neither extraction_id (IMMUTABLE_EXTRACT) nor source_id (LIVE_READ_ONLY).");
-                return;
             }
             // PublicationService records the successful attempt in the same transaction that
             // makes the result and SUCCEEDED job visible.
         } catch (JobCancelledException | PublicationRefusedException cancelledOrRaced) {
             finalizeCancellationIfOwned(job);
-        } catch (Exception failure) {
+        } catch (Exception failure) { // NOPMD - every job failure is classified by handleFailure
             handleFailure(job, failure);
         } finally {
             cancellationRegistry.unregister(job.jobId());

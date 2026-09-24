@@ -141,12 +141,10 @@ public final class SessionService {
 
     /** §1.12.7: "Reautenticação realizada nos últimos cinco minutos" — for sensitive actions. */
     public boolean reauthenticatedRecently(AuthenticatedSession session, Instant now) {
-        if (session.reauthAt() == null) {
-            return false;
-        }
-        return session.reauthAt()
-                .plus(Duration.ofMinutes(properties.reauthWindowMinutes()))
-                .isAfter(now);
+        return session.reauthAt() != null
+                && session.reauthAt()
+                        .plus(Duration.ofMinutes(properties.reauthWindowMinutes()))
+                        .isAfter(now);
     }
 
     public void revoke(String sessionId, Instant now, String reason) {

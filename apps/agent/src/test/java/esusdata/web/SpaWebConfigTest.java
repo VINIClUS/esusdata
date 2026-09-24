@@ -15,7 +15,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * the pages carry the web-client chain's headers without disturbing the API chain.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class SpaWebConfigTest extends SecuritySliceTestSupport {
+class SpaWebConfigTest extends SecuritySliceTestSupport {
 
     private static final String INDEX_MARKER = "SpaWebConfigTest fixture";
 

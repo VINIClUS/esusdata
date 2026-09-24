@@ -53,9 +53,9 @@ public final class ExtractWriter implements AutoCloseable {
     private final DigestOutputStream digestOut;
     private final GZIPOutputStream gzipOut;
 
-    private long rowCount = 0;
-    private long exclusionCount = 0;
-    private boolean closed = false;
+    private long rowCount;
+    private long exclusionCount;
+    private boolean closed;
     private String writtenSourceId;
     private String writtenMunicipalityIbge;
     private LocalDate earliestCareDate;
@@ -103,6 +103,9 @@ public final class ExtractWriter implements AutoCloseable {
                 scopeFor(acquisitionCommand));
     }
 
+    // The lock and the stream chain opened here are owned by this writer: close() releases them,
+    // and a failed constructor releases them before rethrowing.
+    @SuppressWarnings("PMD.CloseResource")
     ExtractWriter(Path baseDir, String extractionId, long maxTempFileBytes, ExtractionScope acquisitionScope)
             throws IOException {
         this.baseDir = baseDir;
@@ -136,7 +139,7 @@ public final class ExtractWriter implements AutoCloseable {
             GZIPOutputStream gzipStream;
             try {
                 gzipStream = new GZIPOutputStream(digestStream);
-            } catch (IOException | RuntimeException failure) {
+            } catch (IOException | RuntimeException failure) { // NOPMD - close the channel on any failure, then rethrow
                 try {
                     dataChannel.close();
                 } catch (IOException closeFailure) {
@@ -148,7 +151,7 @@ public final class ExtractWriter implements AutoCloseable {
             this.digestOut = digestStream;
             this.gzipOut = gzipStream;
             this.writerLock = lock;
-        } catch (IOException | RuntimeException failure) {
+        } catch (IOException | RuntimeException failure) { // NOPMD - release the lock on any failure, then rethrow
             lock.close();
             throw failure;
         }
@@ -285,7 +288,7 @@ public final class ExtractWriter implements AutoCloseable {
 
     @Override
     public void close() throws IOException {
-        try {
+        try (writerLock) {
             if (!closed) {
                 gzipOut.close();
                 closed = true;
@@ -294,21 +297,37 @@ public final class ExtractWriter implements AutoCloseable {
                 // The writer lock prevents reconciliation in this process from touching an active
                 // temporary file owned by another writer.
             }
-        } finally {
-            writerLock.close();
         }
     }
 
     private void validateRecordForWrite(CanonicalEncounter encounter) {
+        validateRecordFields(encounter);
+        LocalDate careDate;
+        try {
+            careDate = LocalDate.parse(encounter.careDate());
+        } catch (RuntimeException e) { // NOPMD - parse failure or null, converted with its cause
+            throw new IllegalArgumentException("encounter careDate must be an ISO local date", e);
+        }
+        if (acquisitionScope != null
+                && !acquisitionScope.contains(
+                        encounter.sourceRef().sourceId(), encounter.municipalityIbge(), careDate)) {
+            throw new IllegalArgumentException("record does not match the bound acquisition scope");
+        }
+        if (isBlankWhenPresent(encounter.cnes())
+                || isBlankWhenPresent(encounter.ine())
+                || isBlankWhenPresent(encounter.cbo())) {
+            throw new IllegalArgumentException("encounter optional fields cannot be blank");
+        }
+        trackWrittenScope(encounter, careDate);
+    }
+
+    private static void validateRecordFields(CanonicalEncounter encounter) {
         if (encounter == null || encounter.sourceRef() == null) {
             throw new IllegalArgumentException("encounter and sourceRef are required");
         }
-        if (encounter.sourceRef().sourceId() == null
-                || encounter.sourceRef().sourceId().isBlank()
-                || encounter.sourceRef().entityType() == null
-                || encounter.sourceRef().entityType().isBlank()
-                || encounter.sourceRef().recordId() == null
-                || encounter.sourceRef().recordId().isBlank()) {
+        if (isBlank(encounter.sourceRef().sourceId())
+                || isBlank(encounter.sourceRef().entityType())
+                || isBlank(encounter.sourceRef().recordId())) {
             throw new IllegalArgumentException("encounter source reference is incomplete");
         }
         if (encounter.municipalityIbge() == null
@@ -318,38 +337,33 @@ public final class ExtractWriter implements AutoCloseable {
         if (encounter.modality() == null) {
             throw new IllegalArgumentException("encounter modality is required");
         }
-        LocalDate careDate;
-        try {
-            careDate = LocalDate.parse(encounter.careDate());
-        } catch (RuntimeException e) {
-            throw new IllegalArgumentException("encounter careDate must be an ISO local date", e);
-        }
-        if (acquisitionScope != null
-                && !acquisitionScope.contains(
-                        encounter.sourceRef().sourceId(), encounter.municipalityIbge(), careDate)) {
-            throw new IllegalArgumentException("record does not match the bound acquisition scope");
-        }
-        if ((encounter.cnes() != null && encounter.cnes().isBlank())
-                || (encounter.ine() != null && encounter.ine().isBlank())
-                || (encounter.cbo() != null && encounter.cbo().isBlank())) {
-            throw new IllegalArgumentException("encounter optional fields cannot be blank");
-        }
+    }
 
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static boolean isBlankWhenPresent(String value) {
+        return value != null && value.isBlank();
+    }
+
+    /** Every record of one extract shares one source and municipality; widens the written period. */
+    private void trackWrittenScope(CanonicalEncounter encounter, LocalDate careDate) {
         if (writtenSourceId == null) {
             writtenSourceId = encounter.sourceRef().sourceId();
             writtenMunicipalityIbge = encounter.municipalityIbge();
             earliestCareDate = careDate;
             latestCareDate = careDate;
-        } else {
-            if (!writtenSourceId.equals(encounter.sourceRef().sourceId())) {
-                throw new IllegalArgumentException("all records in an extract must use one sourceId");
-            }
-            if (!writtenMunicipalityIbge.equals(encounter.municipalityIbge())) {
-                throw new IllegalArgumentException("all records in an extract must use one municipality");
-            }
-            earliestCareDate = earliestCareDate.isAfter(careDate) ? careDate : earliestCareDate;
-            latestCareDate = latestCareDate.isBefore(careDate) ? careDate : latestCareDate;
+            return;
         }
+        if (!writtenSourceId.equals(encounter.sourceRef().sourceId())) {
+            throw new IllegalArgumentException("all records in an extract must use one sourceId");
+        }
+        if (!writtenMunicipalityIbge.equals(encounter.municipalityIbge())) {
+            throw new IllegalArgumentException("all records in an extract must use one municipality");
+        }
+        earliestCareDate = earliestCareDate.isAfter(careDate) ? careDate : earliestCareDate;
+        latestCareDate = latestCareDate.isBefore(careDate) ? careDate : latestCareDate;
     }
 
     private void ensureWrittenScopeMatches(
@@ -402,9 +416,7 @@ public final class ExtractWriter implements AutoCloseable {
 
         @Override
         public void write(byte[] bytes, int offset, int length) throws IOException {
-            if (bytes == null) {
-                throw new NullPointerException("bytes");
-            }
+            Objects.requireNonNull(bytes, "bytes");
             if (offset < 0 || length < 0 || length > bytes.length - offset) {
                 throw new IndexOutOfBoundsException();
             }

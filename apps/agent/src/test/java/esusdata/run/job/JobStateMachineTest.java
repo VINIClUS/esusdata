@@ -1,6 +1,7 @@
 package esusdata.run.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
@@ -63,7 +64,7 @@ class JobStateMachineTest {
         for (JobState state : JobState.values()) {
             for (JobState target : JobState.values()) {
                 // Calling isAllowed must never throw for any (from, to) pair.
-                JobStateMachine.isAllowed(state, target);
+                assertThatCode(() -> JobStateMachine.isAllowed(state, target)).doesNotThrowAnyException();
             }
         }
     }
