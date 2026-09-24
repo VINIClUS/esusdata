@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -43,6 +44,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * <p><b>Gate:</b> skipped without {@code -Dobservatorio.execution-plane.binary}, like {@link
  * ExecPlaneDifferentialLiveTest}.
  */
+@Tag("docker")
 @Testcontainers
 class SourceDiagnosticsDifferentialLiveTest {
 
