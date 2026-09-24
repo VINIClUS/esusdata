@@ -35,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * {@link Acquisition} that delegates the live PEC read to a spawned child process, talking
@@ -81,7 +80,6 @@ public final class ExecPlaneAcquisition implements Acquisition {
     private final Path extractsBaseDir;
     private final Clock clock;
     private final Duration exitGrace;
-    private final ObjectMapper mapper = new ObjectMapper();
 
     public ExecPlaneAcquisition(
             List<String> command,
@@ -182,7 +180,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             // sense, same as a JDBC connection-open failure.
             throw new PecAcquisitionException("could not start execution plane process: " + e.getMessage(), e);
         }
-        drainStderr(process);
+        ExecPlaneProcess.drainStderr(process);
 
         try {
             writeAcquireEnvelope(process.getOutputStream(), acquisitionCommand, validatedHost, publication.tempFile());
@@ -191,7 +189,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
 
             JsonNode probe;
             try {
-                probe = readMessage(reader);
+                probe = ExecPlaneProcess.readMessage(reader);
             } catch (IOException malformed) {
                 return abnormalTermination(
                         process,
@@ -203,17 +201,17 @@ public final class ExecPlaneAcquisition implements Acquisition {
             // child never got a live connection (e.g. a rejected password), so a failed login
             // doesn't put the source on the ENG-51 cooldown — same as a JDBC connection-open
             // failure. Anything else short of a probe is still a protocol violation.
-            if (probe != null && "error".equals(text(probe, TYPE))) {
+            if (probe != null && "error".equals(ExecPlaneProcess.text(probe, TYPE))) {
                 return failFromErrorMessage(process, cancellation, listener, probe);
             }
-            if (probe == null || !"probe".equals(text(probe, TYPE))) {
+            if (probe == null || !"probe".equals(ExecPlaneProcess.text(probe, TYPE))) {
                 return abnormalTermination(
                         process, cancellation, listener, "expected a 'probe' message, got: " + probe);
             }
 
             String mismatch = compareFingerprints(acquisitionCommand, probe);
             if (mismatch != null) {
-                writeLine(
+                ExecPlaneProcess.writeLine(
                         process.getOutputStream(),
                         Map.of(TYPE, "abort", "code", "COMPATIBILITY_MISMATCH", "detail", mismatch));
                 waitForExit(process);
@@ -221,11 +219,11 @@ public final class ExecPlaneAcquisition implements Acquisition {
                 throw new IllegalStateException("execution plane compatibility mismatch (ENG-43): " + mismatch);
             }
 
-            writeLine(process.getOutputStream(), Map.of(TYPE, "proceed"));
+            ExecPlaneProcess.writeLine(process.getOutputStream(), Map.of(TYPE, "proceed"));
 
             cancellation.bindInterrupt(() -> {
                 try {
-                    writeLine(process.getOutputStream(), Map.of(TYPE, "cancel"));
+                    ExecPlaneProcess.writeLine(process.getOutputStream(), Map.of(TYPE, "cancel"));
                 } catch (RuntimeException ignored) { // NOPMD - best-effort cancel write to a child that may be gone
                     // Best-effort only — the child may already have exited.
                 }
@@ -239,7 +237,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             // so closer to its source — this catch exists only to guarantee the child is never
             // orphaned still holding a live PEC read while SourceAcquisitionLimiter's permit is
             // released (§1.9.2).
-            killProcess(process);
+            ExecPlaneProcess.killProcess(process);
             throw e;
         } finally {
             cancellation.unbindInterrupt();
@@ -265,7 +263,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
         while (true) {
             JsonNode message;
             try {
-                message = readMessage(reader);
+                message = ExecPlaneProcess.readMessage(reader);
             } catch (IOException malformed) {
                 return abnormalTermination(
                         process, cancellation, listener, "malformed message: " + malformed.getMessage());
@@ -273,7 +271,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             if (message == null) {
                 break;
             }
-            String type = text(message, TYPE);
+            String type = ExecPlaneProcess.text(message, TYPE);
             if ("progress".equals(type)) {
                 listener.onProgress();
             } else if ("complete".equals(type)) {
@@ -310,7 +308,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
 
         long rowCount = complete.path("row_count").asLong(-1);
         long exclusionCount = complete.path("exclusion_count").asLong(-1);
-        String checksum = text(complete, "checksum");
+        String checksum = ExecPlaneProcess.text(complete, "checksum");
         long compressedBytes = complete.path("compressed_bytes").asLong(-1);
 
         try {
@@ -340,7 +338,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
     private ExtractionManifest failFromErrorMessage(
             Process process, CancellationSignal cancellation, AcquisitionListener listener, JsonNode message) {
         boolean uncertain = message.path("uncertain").asBoolean(true);
-        String detail = text(message, "detail");
+        String detail = ExecPlaneProcess.text(message, "detail");
         waitForExit(process);
         if (uncertain) {
             listener.onUncertainOutcome("execution plane reported an uncertain outcome: " + detail);
@@ -350,12 +348,12 @@ public final class ExecPlaneAcquisition implements Acquisition {
         // throws JobCancelledException itself when the concrete CancellationSignal is a cancelled
         // CancellationToken, without this class ever naming that type.
         cancellation.checkCancelled();
-        throw translate(text(message, "code"), text(message, "sqlstate"), detail);
+        throw translate(ExecPlaneProcess.text(message, "code"), ExecPlaneProcess.text(message, "sqlstate"), detail);
     }
 
     private static ExtractionManifest abnormalTermination(
             Process process, CancellationSignal cancellation, AcquisitionListener listener, String detail) {
-        killProcess(process);
+        ExecPlaneProcess.killProcess(process);
         listener.onUncertainOutcome("execution plane protocol violation: " + detail);
         cancellation.checkCancelled();
         throw new PecAcquisitionException("execution plane protocol violation: " + detail, null);
@@ -393,7 +391,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
     }
 
     private String compareFingerprints(AcquisitionCommand acquisitionCommand, JsonNode probe) {
-        String postgresVersion = text(probe, "postgres_version");
+        String postgresVersion = ExecPlaneProcess.text(probe, "postgres_version");
         PecCompatibilityMatrix.Entry entry;
         try {
             entry = matrix.findExact(
@@ -407,7 +405,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
         if (!IndividualEncounterModalityCapability.QUERY_CHECKSUM.equals(entry.queryChecksum())) {
             return "query checksum mismatch: matrix has " + entry.queryChecksum();
         }
-        String probeQueryChecksum = text(probe, "query_checksum");
+        String probeQueryChecksum = ExecPlaneProcess.text(probe, "query_checksum");
         if (!entry.queryChecksum().equals(probeQueryChecksum)) {
             // The one place the child's own query text is checked against the frozen contract
             // (plan §2.3) — without this, a child running a different query would still pass.
@@ -466,11 +464,11 @@ public final class ExecPlaneAcquisition implements Acquisition {
         if (columnsNode != null) {
             for (JsonNode column : columnsNode) {
                 columns.put(
-                        text(column, "name"),
+                        ExecPlaneProcess.text(column, "name"),
                         new ColumnMetadata(
-                                text(column, "data_type"),
-                                text(column, "udt_name"),
-                                text(column, "is_nullable"),
+                                ExecPlaneProcess.text(column, "data_type"),
+                                ExecPlaneProcess.text(column, "udt_name"),
+                                ExecPlaneProcess.text(column, "is_nullable"),
                                 column.path("ordinal_position").asInt(0)));
             }
         }
@@ -480,7 +478,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
     private static ProbeItem probeItem(String object, JsonNode objectNode, String requested) {
         if (requested.startsWith("UNIQUE_KEY=")) {
             JsonNode uniqueKey = objectNode.get("unique_key");
-            String matchedType = uniqueKey == null ? null : text(uniqueKey, "matched_constraint_type");
+            String matchedType = uniqueKey == null ? null : ExecPlaneProcess.text(uniqueKey, "matched_constraint_type");
             boolean violation = uniqueKey != null
                     && uniqueKey.path("uniqueness_violation_found").asBoolean(false);
             return new ProbeItem.UniqueKeyItem(requested, matchedType, violation);
@@ -519,7 +517,8 @@ public final class ExecPlaneAcquisition implements Acquisition {
             for (JsonNode row : rowsNode) {
                 JsonNode parentNode = row.get("parent_id");
                 Integer parent = (parentNode == null || parentNode.isNull()) ? null : parentNode.asInt();
-                rows.add(new ProbeItem.LeafRow(row.path("id").asInt(0), text(row, "description"), parent));
+                rows.add(new ProbeItem.LeafRow(
+                        row.path("id").asInt(0), ExecPlaneProcess.text(row, "description"), parent));
             }
         }
         return new ProbeItem.LeafSemanticsItem(requested, rows);
@@ -585,7 +584,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             envelope.put("query_checksum", IndividualEncounterModalityCapability.QUERY_CHECKSUM);
             envelope.put("adapter_version", IndividualEncounterModalityCapability.ADAPTER_VERSION);
             envelope.put("budget", budgetFields);
-            writeLine(stdin, envelope);
+            ExecPlaneProcess.writeLine(stdin, envelope);
         } finally {
             // Mirrors PecDataSourceFactory.create()'s finally — the parent's copy is zeroed the
             // moment it has been handed to the child, whether or not the write succeeded.
@@ -593,66 +592,16 @@ public final class ExecPlaneAcquisition implements Acquisition {
         }
     }
 
-    private JsonNode readMessage(BufferedReader reader) throws IOException {
-        String line = reader.readLine();
-        if (line == null) {
-            return null;
-        }
-        if (line.isBlank()) {
-            return readMessage(reader);
-        }
-        try {
-            return mapper.readTree(line);
-        } catch (RuntimeException malformed) { // NOPMD - Jackson 3 throws unchecked; converted with its cause
-            throw new IOException("invalid JSON line from execution plane: " + line, malformed);
-        }
-    }
-
-    private void writeLine(OutputStream stdin, Object payload) {
-        String json;
-        try {
-            json = mapper.writeValueAsString(payload);
-        } catch (RuntimeException e) { // NOPMD - Jackson 3 throws unchecked; converted with its cause
-            throw new PecAcquisitionException("could not serialize message to execution plane: " + e.getMessage(), e);
-        }
-        synchronized (stdin) {
-            try {
-                stdin.write((json + "\n").getBytes(StandardCharsets.UTF_8));
-                stdin.flush();
-            } catch (IOException e) {
-                throw new PecAcquisitionException("could not write to execution plane stdin: " + e.getMessage(), e);
-            }
-        }
-    }
-
-    private static void drainStderr(Process process) {
-        Thread stderrThread = new Thread(
-                () -> {
-                    try (BufferedReader err = new BufferedReader(
-                            new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
-                        String line;
-                        while ((line = err.readLine()) != null) {
-                            log.info("execution plane: {}", line);
-                        }
-                    } catch (IOException ignored) {
-                        // The process ended; nothing left to drain.
-                    }
-                },
-                "execplane-stderr");
-        stderrThread.setDaemon(true);
-        stderrThread.start();
-    }
-
     /** Waits for the child to exit (killing it if it overruns the grace period) and returns its exit code. */
     private int waitForExit(Process process) {
         try {
             if (!process.waitFor(exitGrace.toMillis(), TimeUnit.MILLISECONDS)) {
-                killProcess(process);
+                ExecPlaneProcess.killProcess(process);
                 process.waitFor();
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            killProcess(process);
+            ExecPlaneProcess.killProcess(process);
             awaitTermination(process);
         }
         return process.exitValue();
@@ -671,25 +620,5 @@ public final class ExecPlaneAcquisition implements Acquisition {
                 // Already recorded on the caller's thread via Thread.currentThread().interrupt().
             }
         }
-    }
-
-    private static void killProcess(Process process) {
-        if (!process.isAlive()) {
-            return;
-        }
-        process.destroy();
-        try {
-            if (!process.waitFor(1, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            process.destroyForcibly();
-        }
-    }
-
-    private static String text(JsonNode node, String field) {
-        JsonNode value = node == null ? null : node.get(field);
-        return value == null || value.isNull() ? null : value.asString();
     }
 }

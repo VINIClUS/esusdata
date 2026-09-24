@@ -15,6 +15,7 @@ import esusdata.result.model.ResultRepository;
 import esusdata.result.model.ResultStagingArea;
 import esusdata.run.acquisition.Acquisition;
 import esusdata.run.acquisition.ExecPlaneAcquisition;
+import esusdata.run.acquisition.ExecPlaneConnectivityCheck;
 import esusdata.run.extract.ExtractStore;
 import esusdata.run.extract.FileExtractStore;
 import esusdata.run.job.AcquisitionGuardStore;
@@ -30,6 +31,7 @@ import esusdata.run.worker.JobWorker;
 import esusdata.run.worker.RunExecutor;
 import esusdata.source.JdbcSourceRepository;
 import esusdata.source.SourceConnectionProperties;
+import esusdata.source.SourceConnectivityCheck;
 import esusdata.source.SourceDiagnosticsService;
 import esusdata.source.SourceRepository;
 import esusdata.source.pec.AllowedDestinations;
@@ -151,8 +153,8 @@ public class RunConfig {
     public SourceDiagnosticsService sourceDiagnosticsService(
             SourceRepository sourceRepository,
             AllowedDestinations allowedDestinations,
-            PecDataSourceFactory pecDataSourceFactory) {
-        return new SourceDiagnosticsService(sourceRepository, allowedDestinations, pecDataSourceFactory);
+            SourceConnectivityCheck sourceConnectivityCheck) {
+        return new SourceDiagnosticsService(sourceRepository, allowedDestinations, sourceConnectivityCheck);
     }
 
     // --- jobrunner -------------------------------------------------------------------------
@@ -362,6 +364,14 @@ public class RunConfig {
                 properties.extractsDirectory(),
                 clock,
                 executionPlaneProperties.exitGrace());
+    }
+
+    /** ADR 0017: the source diagnostic runs through the same binary as every acquisition. */
+    @Bean
+    public SourceConnectivityCheck sourceConnectivityCheck(
+            ExecPlaneProperties executionPlaneProperties, PecSecretResolver pecSecretResolver) {
+        return new ExecPlaneConnectivityCheck(
+                List.of(executionPlaneProperties.binary()), pecSecretResolver, executionPlaneProperties.exitGrace());
     }
 
     private static List<String> orEmpty(List<String> list) {
