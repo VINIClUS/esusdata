@@ -126,7 +126,7 @@ class ExecPlaneDifferentialLiveTest {
 
     private static boolean fixtureLoaded = false;
 
-    private void loadFixtureOnce() throws Exception {
+    private static void loadFixtureOnce() throws Exception {
         if (fixtureLoaded) {
             return;
         }
@@ -177,7 +177,9 @@ class ExecPlaneDifferentialLiveTest {
             public String fingerprint(Connection connection, String object, List<String> columnsUsed)
                     throws SQLException {
                 String fingerprint = packagedEntry.objectFingerprints().get(object);
-                if (fingerprint == null) throw new SQLException("No packaged fingerprint for " + object);
+                if (fingerprint == null) {
+                    throw new SQLException("No packaged fingerprint for " + object);
+                }
                 return fingerprint;
             }
         };
@@ -191,7 +193,7 @@ class ExecPlaneDifferentialLiveTest {
      * rather than a hand-duplicated list, so this test can never silently drift from what the real
      * matrix actually names.
      */
-    private PecCompatibilityMatrix syntheticMatrixWithRealFingerprints() throws Exception {
+    private static PecCompatibilityMatrix syntheticMatrixWithRealFingerprints() throws Exception {
         String packagedJson = Files.readString(PACKAGED_MATRIX_FILE);
         @SuppressWarnings("unchecked")
         Map<String, Object> root = MAPPER.readValue(packagedJson, Map.class);
@@ -474,7 +476,7 @@ class ExecPlaneDifferentialLiveTest {
     private static final int BULK_ROWS = 1_000_000;
     private static boolean bulkRowsInserted = false;
 
-    private void insertBulkRowsOnce() throws Exception {
+    private static void insertBulkRowsOnce() throws Exception {
         if (bulkRowsInserted) {
             return;
         }
@@ -490,7 +492,7 @@ class ExecPlaneDifferentialLiveTest {
         bulkRowsInserted = true;
     }
 
-    private long activeObservatorioQueriesAfterSettling() throws Exception {
+    private static long activeObservatorioQueriesAfterSettling() throws Exception {
         long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
         try (Connection c = DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword());
                 Statement st = c.createStatement()) {

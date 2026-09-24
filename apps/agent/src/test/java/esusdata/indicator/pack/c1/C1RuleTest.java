@@ -165,11 +165,12 @@ class C1RuleTest {
                 .hasMessageContaining("at least one");
     }
 
-    private List<CanonicalEncounter> encounters(int programados, int espontaneos, int unmapped) {
+    private static List<CanonicalEncounter> encounters(int programados, int espontaneos, int unmapped) {
         return encounters(programados, espontaneos, unmapped, "2026-03-15");
     }
 
-    private List<CanonicalEncounter> encounters(int programados, int espontaneos, int unmapped, String careDate) {
+    private static List<CanonicalEncounter> encounters(
+            int programados, int espontaneos, int unmapped, String careDate) {
         List<CanonicalEncounter> list = new ArrayList<>();
         for (int i = 0; i < programados; i++) {
             list.add(encounter("p" + i, CanonicalModality.PROGRAMADO, careDate));
@@ -183,11 +184,7 @@ class C1RuleTest {
         return list;
     }
 
-    private CanonicalEncounter encounter(String recordId, CanonicalModality modality) {
-        return encounter(recordId, modality, "2026-03-15");
-    }
-
-    private CanonicalEncounter encounter(String recordId, CanonicalModality modality, String careDate) {
+    private static CanonicalEncounter encounter(String recordId, CanonicalModality modality, String careDate) {
         return new CanonicalEncounter(
                 new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", recordId),
                 "3541307",

@@ -70,7 +70,7 @@ public final class SessionAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private String readCookie(HttpServletRequest request) {
+    private static String readCookie(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return null;

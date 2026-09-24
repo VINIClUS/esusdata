@@ -145,7 +145,7 @@ class RunExecutorExtractTest {
     void rejectsAJobRequestingAnIndicatorPackThisExecutorDoesNotCompute() throws Exception {
         ExtractionManifest manifest =
                 ExtractFixtures.write(fixture.extractsDir, "ext-c1-wrong-pack", "src-1", "3541307", "2026-03", 7, 3, 2);
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+        fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-1",
                 "run-1",
                 "3541307",
@@ -190,7 +190,7 @@ class RunExecutorExtractTest {
         ExtractionManifest manifest = ExtractFixtures.write(
                 fixture.extractsDir, "ext-c1-wrong-source", "src-2", "3541307", "2026-03", 7, 3, 2);
 
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+        fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-1",
                 "run-1",
                 "3541307",
@@ -231,7 +231,7 @@ class RunExecutorExtractTest {
         ExtractionManifest manifest = ExtractFixtures.write(
                 fixture.extractsDir, "ext-c1-wrong-municipality", "src-1", "3541001", "2026-03", 7, 3, 2);
 
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+        fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-1",
                 "run-1",
                 "3541307",
@@ -272,7 +272,7 @@ class RunExecutorExtractTest {
         ExtractionManifest manifest = ExtractFixtures.write(
                 fixture.extractsDir, "ext-c1-wrong-period", "src-1", "3541307", "2026-01", 7, 3, 2);
 
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+        fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-1",
                 "run-1",
                 "3541307",
@@ -315,7 +315,7 @@ class RunExecutorExtractTest {
         ExtractionManifest manifest =
                 ExtractFixtures.write(fixture.extractsDir, "ext-c1-no-grant", "src-1", "3541307", "2026-03", 7, 3, 2);
 
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+        fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-1",
                 "run-1",
                 "3541307",

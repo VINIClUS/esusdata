@@ -134,7 +134,7 @@ class SessionAbsoluteDurationTest {
         }
     }
 
-    private String sha256Hex(String rawTokenValue) {
+    private static String sha256Hex(String rawTokenValue) {
         try {
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
             return java.util.HexFormat.of()

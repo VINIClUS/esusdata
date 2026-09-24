@@ -62,6 +62,7 @@ public final class JdbcJobRepository implements JobRepository {
         this.transactionTemplate = transactionTemplate;
     }
 
+    @Override
     public Job enqueue(EnqueueRequest request) {
         jdbc.update(
                 """
@@ -91,11 +92,13 @@ public final class JdbcJobRepository implements JobRepository {
         return findById(request.jobId()).orElseThrow();
     }
 
+    @Override
     public Optional<Job> findById(String jobId) {
         return jdbc.query("select * from jobs where job_id = ?", MAPPER, jobId).stream()
                 .findFirst();
     }
 
+    @Override
     public List<Job> findRecent(String municipalityIbge, int limit) {
         return jdbc.query("""
                 select * from jobs where municipality_ibge = ?
@@ -103,8 +106,11 @@ public final class JdbcJobRepository implements JobRepository {
                 """, MAPPER, municipalityIbge, limit);
     }
 
+    @Override
     public Optional<Job> findByIdempotency(String principal, String idempotencyKey) {
-        if (principal == null || idempotencyKey == null) return Optional.empty();
+        if (principal == null || idempotencyKey == null) {
+            return Optional.empty();
+        }
         return jdbc
                 .query(
                         "select * from jobs where idempotency_principal = ? and idempotency_key = ?",
@@ -122,6 +128,7 @@ public final class JdbcJobRepository implements JobRepository {
      * the old association explicitly instead of relying on the constraint to allow the insert.
      * The job row itself, and its history, are untouched; only the idempotency linkage is dropped.
      */
+    @Override
     public void clearIdempotencyKey(String jobId) {
         jdbc.update("update jobs set idempotency_key = NULL where job_id = ?", jobId);
     }
@@ -131,6 +138,7 @@ public final class JdbcJobRepository implements JobRepository {
      * generation inside a short transaction (§1.9.4: "a aquisição do job incrementa a geração em
      * transação curta"). Returns empty if there is nothing runnable right now.
      */
+    @Override
     public Optional<Job> acquireNext(String processInstanceId, Instant now) {
         return Optional.ofNullable(transactionTemplate.execute(status -> {
             List<String> candidates = jdbc.queryForList("""
@@ -156,6 +164,7 @@ public final class JdbcJobRepository implements JobRepository {
         }));
     }
 
+    @Override
     public void markProgress(String jobId, String processInstanceId, long executionGeneration, Instant now) {
         jdbc.update("""
                 UPDATE jobs SET last_progress_at = ?
@@ -164,6 +173,7 @@ public final class JdbcJobRepository implements JobRepository {
                 """, now.toString(), jobId, processInstanceId, executionGeneration);
     }
 
+    @Override
     public boolean markStaged(String jobId, String processInstanceId, long executionGeneration, String stagingId) {
         return jdbc.update("""
                 UPDATE jobs SET state = 'STAGED', staging_id = ?
@@ -173,6 +183,7 @@ public final class JdbcJobRepository implements JobRepository {
     }
 
     /** Definitive failure — no more attempts. Terminal; never retried automatically. */
+    @Override
     public boolean markFailed(
             String jobId,
             String processInstanceId,
@@ -201,6 +212,7 @@ public final class JdbcJobRepository implements JobRepository {
      * {@code FAILED} while attempts remain (§1.9.4). Callers clear any staged evidence themselves
      * before calling this (a retry always recomputes from scratch, never resumes a partial stage).
      */
+    @Override
     public boolean requeueForRetry(
             String jobId,
             String processInstanceId,
@@ -227,6 +239,7 @@ public final class JdbcJobRepository implements JobRepository {
     }
 
     /** A pending cancel request against one observed running/staged attempt. */
+    @Override
     public boolean requestCancel(String jobId, String processInstanceId, long executionGeneration, Instant now) {
         return jdbc.update("""
                 UPDATE jobs SET state = 'CANCEL_REQUESTED', cancel_requested_at = ?
@@ -236,6 +249,7 @@ public final class JdbcJobRepository implements JobRepository {
     }
 
     /** Cancelling a job that never started — no attempt, no staging to neutralize. */
+    @Override
     public boolean cancelQueued(String jobId, Instant now) {
         return jdbc.update("""
                 UPDATE jobs SET state = 'CANCELLED', finished_at = ?,
@@ -244,6 +258,7 @@ public final class JdbcJobRepository implements JobRepository {
                 """, now.toString(), jobId) == 1;
     }
 
+    @Override
     public boolean markCancelled(String jobId, String processInstanceId, long executionGeneration, Instant now) {
         return jdbc.update("""
                 UPDATE jobs SET state = 'CANCELLED', finished_at = ?,
@@ -258,6 +273,7 @@ public final class JdbcJobRepository implements JobRepository {
      * The publication transaction calls this method while it is already open, so the result,
      * staging row, job state, and attempt row commit or roll back together.
      */
+    @Override
     public boolean markSucceededAndRecordAttempt(
             String jobId, String processInstanceId, long executionGeneration, String stagingId, Instant finishedAt) {
         return transitionAndRecordAttempt(
@@ -279,6 +295,7 @@ public final class JdbcJobRepository implements JobRepository {
     }
 
     /** Failed terminal transition plus its attempt history, atomically. */
+    @Override
     public boolean markFailedAndRecordAttempt(
             String jobId,
             String processInstanceId,
@@ -313,6 +330,7 @@ public final class JdbcJobRepository implements JobRepository {
     }
 
     /** Cancellation terminal transition plus its attempt history, atomically. */
+    @Override
     public boolean markCancelledAndRecordAttempt(
             String jobId, String processInstanceId, long executionGeneration, Instant finishedAt) {
         return transitionAndRecordAttempt(
@@ -333,6 +351,7 @@ public final class JdbcJobRepository implements JobRepository {
     }
 
     /** Retry transition plus its attempt history, atomically. */
+    @Override
     public boolean requeueForRetryAndRecordAttempt(
             String jobId,
             String processInstanceId,
@@ -411,6 +430,7 @@ public final class JdbcJobRepository implements JobRepository {
     // --- recovery-only CAS transitions (JobRecovery is the only caller) -----------------------
 
     /** Jobs left {@code RUNNING}/{@code STAGED} by a process instance other than the current one. */
+    @Override
     public List<Job> findAbandoned(JobState state, String currentProcessInstanceId) {
         return jdbc.query(
                 "select * from jobs where state = ? and (process_instance_id is null or process_instance_id <> ?)",
@@ -419,6 +439,7 @@ public final class JdbcJobRepository implements JobRepository {
                 currentProcessInstanceId);
     }
 
+    @Override
     public boolean requeueAbandoned(String jobId, JobState fromState, Instant nextAttemptAt) {
         return jdbc.update("""
                 UPDATE jobs SET state = 'QUEUED', execution_generation = execution_generation + 1,
@@ -427,6 +448,7 @@ public final class JdbcJobRepository implements JobRepository {
                 """, nextAttemptAt.toString(), jobId, fromState.name()) == 1;
     }
 
+    @Override
     public boolean failAbandoned(
             String jobId, JobState fromState, String failureCode, String failureDetail, Instant now) {
         return jdbc.update("""
@@ -437,6 +459,7 @@ public final class JdbcJobRepository implements JobRepository {
                 """, now.toString(), failureCode, failureDetail, jobId, fromState.name()) == 1;
     }
 
+    @Override
     public boolean cancelAbandoned(String jobId, Instant now) {
         return jdbc.update("""
                 UPDATE jobs SET state = 'CANCELLED', process_instance_id = NULL, finished_at = ?,
@@ -447,6 +470,7 @@ public final class JdbcJobRepository implements JobRepository {
 
     // --- attempt history -------------------------------------------------------------------
 
+    @Override
     public void recordAttempt(
             String jobId,
             int attempt,
@@ -474,6 +498,7 @@ public final class JdbcJobRepository implements JobRepository {
                 failureDetail);
     }
 
+    @Override
     public List<AttemptRecord> findAttempts(String jobId) {
         return jdbc.query(
                 "select * from job_attempts where job_id = ? order by attempt",

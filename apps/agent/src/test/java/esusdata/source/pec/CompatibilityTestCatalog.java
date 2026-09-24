@@ -34,7 +34,9 @@ final class CompatibilityTestCatalog implements CompatibilityCatalog {
     public String fingerprint(Connection connection, String object, java.util.List<String> columnsUsed)
             throws SQLException {
         String fingerprint = fingerprints.get(object);
-        if (fingerprint == null) throw new SQLException("No synthetic fingerprint for " + object);
+        if (fingerprint == null) {
+            throw new SQLException("No synthetic fingerprint for " + object);
+        }
         return fingerprint;
     }
 }

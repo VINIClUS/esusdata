@@ -6,7 +6,6 @@ import esusdata.auth.model.AuthenticationFailedException;
 import esusdata.auth.model.UserAccount;
 import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
-import java.time.Clock;
 import java.time.Instant;
 
 /**
@@ -21,21 +20,18 @@ public final class AuthenticationService {
     private final SessionService sessionService;
     private final LoginThrottle loginThrottle;
     private final AuthAuditWriter auditWriter;
-    private final Clock clock;
 
     public AuthenticationService(
             UserRepository userRepository,
             Argon2Profile argon2Profile,
             SessionService sessionService,
             LoginThrottle loginThrottle,
-            AuthAuditWriter auditWriter,
-            Clock clock) {
+            AuthAuditWriter auditWriter) {
         this.userRepository = userRepository;
         this.argon2Profile = argon2Profile;
         this.sessionService = sessionService;
         this.loginThrottle = loginThrottle;
         this.auditWriter = auditWriter;
-        this.clock = clock;
     }
 
     public record LoginResult(String rawToken, String userId, String displayName) {}

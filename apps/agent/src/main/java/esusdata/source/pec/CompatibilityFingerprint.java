@@ -1,5 +1,6 @@
 package esusdata.source.pec;
 
+import java.io.Serial;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -23,6 +24,9 @@ public final class CompatibilityFingerprint {
 
     /** A verdict this algorithm reached from raw probe data — never a JDBC/connection failure. */
     public static final class VerificationException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public VerificationException(String message) {
             super(message);
         }
@@ -173,7 +177,7 @@ public final class CompatibilityFingerprint {
             throw new VerificationException("Invalid leaf semantic marker: " + marker);
         }
         Set<Integer> expected = new HashSet<>();
-        for (String value : marker.substring(prefix.length()).split(",")) {
+        for (String value : marker.substring(prefix.length()).split(",", -1)) {
             try {
                 if (!expected.add(Integer.valueOf(value))) {
                     throw new VerificationException("Duplicate frozen leaf id in marker: " + marker);
@@ -194,7 +198,7 @@ public final class CompatibilityFingerprint {
             throw new VerificationException("Invalid leaf-id marker: " + marker);
         }
         Set<Integer> expected = new HashSet<>();
-        for (String value : marker.substring(prefix.length()).split(",")) {
+        for (String value : marker.substring(prefix.length()).split(",", -1)) {
             try {
                 expected.add(Integer.valueOf(value));
             } catch (NumberFormatException e) {

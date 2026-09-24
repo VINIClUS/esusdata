@@ -55,6 +55,8 @@ public final class EvidenceCursor {
     }
 
     /**
+     * Decodes and verifies a token produced by {@link #encode}.
+     *
      * @throws InvalidCursorException if the token is malformed, tampered with, or bound to a
      *     different result/ordering/scope than the caller is currently requesting under.
      */
@@ -70,7 +72,7 @@ public final class EvidenceCursor {
             payload = Base64.getUrlDecoder().decode(parts[0]);
             presentedMac = Base64.getUrlDecoder().decode(parts[1]);
         } catch (IllegalArgumentException e) {
-            throw new InvalidCursorException("malformed evidence cursor");
+            throw new InvalidCursorException("malformed evidence cursor", e);
         }
         if (!MessageDigest.isEqual(presentedMac, hmac(payload))) {
             throw new InvalidCursorException("evidence cursor failed integrity check");
@@ -83,7 +85,7 @@ public final class EvidenceCursor {
         try {
             seq = Long.parseLong(fields[3]);
         } catch (NumberFormatException e) {
-            throw new InvalidCursorException("malformed evidence cursor payload");
+            throw new InvalidCursorException("malformed evidence cursor payload", e);
         }
         // A cursor minted for a different result/ordering/scope must never be honored here — the
         // "não concede acesso" half of §1.10.1 L405, enforced structurally rather than by convention.

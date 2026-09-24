@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 
 /** Reauthentication must use the same account/origin progressive throttle as login. */
@@ -20,9 +19,6 @@ public class ReauthThrottleApiTest extends ApiFixtureSupport {
 
     @Autowired
     Argon2Profile argon2Profile;
-
-    @Autowired
-    JdbcTemplate jdbc;
 
     @Test
     void wrongReauthenticationIsThrottledByAccountAndOrigin() throws Exception {

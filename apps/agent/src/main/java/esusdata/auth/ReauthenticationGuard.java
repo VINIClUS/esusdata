@@ -1,6 +1,7 @@
 package esusdata.auth;
 
 import esusdata.auth.model.AuthenticatedSession;
+import java.io.Serial;
 import java.time.Instant;
 
 /**
@@ -24,6 +25,9 @@ public final class ReauthenticationGuard {
     }
 
     public static final class ReauthenticationRequiredException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public ReauthenticationRequiredException(String message) {
             super(message);
         }

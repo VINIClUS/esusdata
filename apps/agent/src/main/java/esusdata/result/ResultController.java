@@ -96,7 +96,7 @@ public class ResultController {
         EvidencePage page = evidenceRepository.page(id, municipalityIbge, filter.cnes(), filter.ine(), afterSeq, limit);
 
         List<EvidenceEntryResponse> items =
-                page.items().stream().map(this::toResponse).toList();
+                page.items().stream().map(ResultController::toResponse).toList();
         String nextCursor = page.nextCursor() == null
                 ? null
                 : EvidenceCursor.of(id, EVIDENCE_ORDERING, scopeKey, page.nextCursor())
@@ -155,7 +155,7 @@ public class ResultController {
         return List.of(mapper.readValue(limitationsJson, String[].class));
     }
 
-    private EvidenceEntryResponse toResponse(EvidenceRecord record) {
+    private static EvidenceEntryResponse toResponse(EvidenceRecord record) {
         return new EvidenceEntryResponse(
                 record.sourceEntityType(),
                 record.sourceRecordId(),

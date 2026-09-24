@@ -50,7 +50,7 @@ public final class SessionService {
         this.properties = properties;
     }
 
-    /** @return the raw opaque token — set as the session cookie value, never stored. */
+    /** Creates a session and returns its raw opaque token — set as the session cookie value, never stored. */
     public String create(String userId, long authorizationVersionAtLogin, Instant now) {
         String rawToken = newOpaqueToken();
         String sessionId = hash(rawToken);

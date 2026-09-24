@@ -14,6 +14,8 @@ package esusdata.result.model;
 public interface PublicationAuthorization {
 
     /**
+     * Re-checks, right before publishing, that {@code principal} may still publish.
+     *
      * @throws PublicationAuthorizationRefusedException if {@code principal} no longer holds a
      *         current grant sufficient to publish for {@code municipalityIbge}.
      */

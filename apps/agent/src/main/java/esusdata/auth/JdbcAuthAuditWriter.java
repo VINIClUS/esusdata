@@ -20,6 +20,7 @@ public final class JdbcAuthAuditWriter implements AuthAuditWriter {
         this.jdbc = jdbc;
     }
 
+    @Override
     public void record(
             Instant at, String actorUserId, String eventType, String target, String outcome, String detailJson) {
         jdbc.update(

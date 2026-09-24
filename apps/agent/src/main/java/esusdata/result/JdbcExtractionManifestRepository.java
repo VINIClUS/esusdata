@@ -41,12 +41,14 @@ public final class JdbcExtractionManifestRepository implements ExtractionManifes
         this.jdbc = jdbc;
     }
 
+    @Override
     public boolean existsById(String extractionId) {
         Integer count = jdbc.queryForObject(
                 "select count(*) from extraction_manifests where extraction_id = ?", Integer.class, extractionId);
         return count != null && count > 0;
     }
 
+    @Override
     public void save(ExtractionManifest manifest, Path filePath) {
         jdbc.update(
                 """
@@ -76,6 +78,7 @@ public final class JdbcExtractionManifestRepository implements ExtractionManifes
                 manifest.adapterVersion());
     }
 
+    @Override
     public Optional<StoredManifest> findById(String extractionId) {
         return jdbc.query("select * from extraction_manifests where extraction_id = ?", MAPPER, extractionId).stream()
                 .findFirst();

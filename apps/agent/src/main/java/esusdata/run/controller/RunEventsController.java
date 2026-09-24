@@ -289,13 +289,13 @@ public class RunEventsController {
         }
     }
 
-    private void complete(SseEmitter emitter, Object emitterLock) {
+    private static void complete(SseEmitter emitter, Object emitterLock) {
         synchronized (emitterLock) {
             emitter.complete();
         }
     }
 
-    private void completeWithError(SseEmitter emitter, Object emitterLock, Throwable error) {
+    private static void completeWithError(SseEmitter emitter, Object emitterLock, Throwable error) {
         synchronized (emitterLock) {
             emitter.completeWithError(error);
         }

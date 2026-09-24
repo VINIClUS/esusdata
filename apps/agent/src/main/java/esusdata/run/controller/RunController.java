@@ -97,7 +97,7 @@ public class RunController {
             YearMonth.parse(request.referencePeriod());
         } catch (java.time.format.DateTimeParseException e) {
             throw new IllegalArgumentException(
-                    "referencePeriod must be an ISO YearMonth (yyyy-MM): " + request.referencePeriod());
+                    "referencePeriod must be an ISO YearMonth (yyyy-MM): " + request.referencePeriod(), e);
         }
         authorization.requireObjectScope(session, Permission.RUN_INDICATOR, request.municipalityIbge());
         requireIdempotencyKey(idempotencyKey);
@@ -196,7 +196,7 @@ public class RunController {
                 "job " + id + " cannot be cancelled from its current state (" + job.state() + ")");
     }
 
-    private boolean isCancellable(JobState state) {
+    private static boolean isCancellable(JobState state) {
         return state == JobState.QUEUED || state == JobState.RUNNING || state == JobState.STAGED;
     }
 
@@ -218,7 +218,7 @@ public class RunController {
      * {@code extractionId}, when present, only SELECTS IMMUTABLE_EXTRACT replay over a fresh
      * LIVE_READ_ONLY acquisition — it is not an alternative to {@code sourceId}.
      */
-    private void requireFieldsPresent(CreateRunRequest request) {
+    private static void requireFieldsPresent(CreateRunRequest request) {
         if (request.municipalityIbge() == null
                 || request.municipalityIbge().isBlank()
                 || request.indicatorPack() == null
@@ -237,7 +237,7 @@ public class RunController {
         }
     }
 
-    private void requireIdempotencyKey(String idempotencyKey) {
+    private static void requireIdempotencyKey(String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new IllegalArgumentException("Idempotency-Key is required");
         }
@@ -268,7 +268,7 @@ public class RunController {
         }
     }
 
-    private String requestedScopeJson(String municipalityIbge) {
+    private static String requestedScopeJson(String municipalityIbge) {
         return "{\"municipalityIbge\":\"" + municipalityIbge + "\"}";
     }
 
@@ -277,7 +277,7 @@ public class RunController {
      * differing only in {@code referencePeriod} (the field most likely to be dropped by accident)
      * must still conflict under a reused key, never silently adopt the first job.
      */
-    private String computeRequestHash(CreateRunRequest request) {
+    private static String computeRequestHash(CreateRunRequest request) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             updateCanonicalField(digest, request.municipalityIbge());
@@ -293,7 +293,7 @@ public class RunController {
     }
 
     /** Length-prefixed UTF-8 fields make delimiters data, not structure, and preserve null vs empty. */
-    private void updateCanonicalField(MessageDigest digest, String value) {
+    private static void updateCanonicalField(MessageDigest digest, String value) {
         if (value == null) {
             digest.update((byte) 0);
             return;

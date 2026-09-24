@@ -46,9 +46,13 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         requireConnection(connection);
         try (PreparedStatement statement = connection.prepareStatement(VERSION_QUERY);
                 ResultSet result = statement.executeQuery()) {
-            if (!result.next()) throw new SQLException("PostgreSQL version probe returned no row");
+            if (!result.next()) {
+                throw new SQLException("PostgreSQL version probe returned no row");
+            }
             String version = result.getString(1);
-            if (version == null || version.isBlank()) throw new SQLException("PostgreSQL version probe was blank");
+            if (version == null || version.isBlank()) {
+                throw new SQLException("PostgreSQL version probe was blank");
+            }
             return version.trim();
         }
     }
@@ -195,7 +199,9 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         List<ProbeItem.LeafRow> rows = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(query)) {
             int index = 1;
-            for (Integer value : expected) statement.setInt(index++, value);
+            for (Integer value : expected) {
+                statement.setInt(index++, value);
+            }
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
                     int id = result.getInt(1);
@@ -224,15 +230,21 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         Set<Integer> found = new java.util.HashSet<>();
         try (PreparedStatement statement = connection.prepareStatement(query)) {
             int index = 1;
-            for (Integer value : expected) statement.setInt(index++, value);
+            for (Integer value : expected) {
+                statement.setInt(index++, value);
+            }
             try (ResultSet result = statement.executeQuery()) {
-                while (result.next()) found.add(result.getInt(1));
+                while (result.next()) {
+                    found.add(result.getInt(1));
+                }
             }
         }
         return new ProbeItem.LeafIdsItem(marker, found);
     }
 
     private static void requireConnection(Connection connection) throws SQLException {
-        if (connection == null) throw new SQLException("A connected PostgreSQL session is required");
+        if (connection == null) {
+            throw new SQLException("A connected PostgreSQL session is required");
+        }
     }
 }

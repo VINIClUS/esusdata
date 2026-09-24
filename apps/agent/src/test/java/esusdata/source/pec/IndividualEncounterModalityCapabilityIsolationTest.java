@@ -104,7 +104,7 @@ class IndividualEncounterModalityCapabilityIsolationTest {
         }
     }
 
-    private void loadFixture() throws Exception {
+    private static void loadFixture() throws Exception {
         // A single execute() with the whole (multi-statement, comment-containing) file: pgJDBC's
         // simple query protocol parses statement boundaries and comments correctly. Splitting the
         // text on ";" ourselves is not equivalent -- this fixture's own prose comments contain a
@@ -122,7 +122,9 @@ class IndividualEncounterModalityCapabilityIsolationTest {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] buf = new byte[8192];
             int n;
-            while ((n = in.read(buf)) != -1) digest.update(buf, 0, n);
+            while ((n = in.read(buf)) != -1) {
+                digest.update(buf, 0, n);
+            }
             return "sha256:" + HexFormat.of().formatHex(digest.digest());
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);

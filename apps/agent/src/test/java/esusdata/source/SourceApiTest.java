@@ -95,11 +95,11 @@ public class SourceApiTest extends ApiFixtureSupport {
         assertThat(response.statusCode()).isEqualTo(404);
     }
 
-    private String createSourceJson(String sourceId) {
+    private static String createSourceJson(String sourceId) {
         return createSourceJson(sourceId, MUNICIPALITY);
     }
 
-    private String createSourceJson(String sourceId, String municipalityIbge) {
+    private static String createSourceJson(String sourceId, String municipalityIbge) {
         return "{\"id\":\"" + sourceId + "\",\"sourceFamily\":\"PEC_POSTGRESQL\","
                 + "\"pecInstallationRole\":\"PRONTUARIO\",\"sourceLocationKind\":\"PRIMARY\","
                 + "\"host\":\"127.0.0.1\",\"port\":5432,\"databaseName\":\"esus\","

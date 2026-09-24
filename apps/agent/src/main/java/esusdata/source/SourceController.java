@@ -92,7 +92,7 @@ public class SourceController {
                 diagnostics.statementTimeoutMs());
     }
 
-    private SourceResponse toResponse(SourceRecord record) {
+    private static SourceResponse toResponse(SourceRecord record) {
         return new SourceResponse(
                 record.id(),
                 record.sourceConfigurationVersion(),

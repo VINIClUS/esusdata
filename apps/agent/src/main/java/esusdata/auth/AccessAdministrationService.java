@@ -6,6 +6,7 @@ import esusdata.auth.model.Role;
 import esusdata.auth.model.ScopeKind;
 import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
+import java.io.Serial;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
@@ -131,11 +132,13 @@ public final class AccessAdministrationService {
     }
 
     private void requireExists(String userId) {
-        userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException("unknown user: " + userId));
+        if (userRepository.findById(userId).isEmpty()) {
+            throw new UserNotFoundException("unknown user: " + userId);
+        }
     }
 
     /** Mirrors the {@code user_grants} CHECK constraint in V3 — fail before the INSERT, not via SQLite's error. */
-    private void validateScopeShape(ScopeKind scopeKind, String municipalityIbge, String cnes, String ine) {
+    private static void validateScopeShape(ScopeKind scopeKind, String municipalityIbge, String cnes, String ine) {
         if (scopeKind == ScopeKind.INSTALLATION) {
             if (municipalityIbge != null || cnes != null || ine != null) {
                 throw new IllegalArgumentException("INSTALLATION scope must not carry municipality_ibge/cnes/ine");
@@ -148,24 +151,36 @@ public final class AccessAdministrationService {
     }
 
     public static final class SelfGrantForbiddenException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public SelfGrantForbiddenException(String message) {
             super(message);
         }
     }
 
     public static final class SelfBlockForbiddenException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public SelfBlockForbiddenException(String message) {
             super(message);
         }
     }
 
     public static final class GrantNotFoundException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public GrantNotFoundException(String message) {
             super(message);
         }
     }
 
     public static final class UserNotFoundException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public UserNotFoundException(String message) {
             super(message);
         }

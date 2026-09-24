@@ -80,11 +80,13 @@ class IndividualEncounterModalityCapabilityLiveTest {
         assertThat(distinctPairs).isEqualTo(10029);
     }
 
-    private Map<String, String> readEnvFile() throws IOException {
+    private static Map<String, String> readEnvFile() throws IOException {
         Map<String, String> values = new HashMap<>();
         for (String line : Files.readAllLines(ENV_FILE)) {
             int i = line.indexOf('=');
-            if (i > 0) values.put(line.substring(0, i), line.substring(i + 1));
+            if (i > 0) {
+                values.put(line.substring(0, i), line.substring(i + 1));
+            }
         }
         return values;
     }

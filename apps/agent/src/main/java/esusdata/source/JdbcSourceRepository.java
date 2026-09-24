@@ -33,6 +33,7 @@ public final class JdbcSourceRepository implements SourceRepository {
         this.jdbc = jdbc;
     }
 
+    @Override
     public void upsert(SourceRecord source) {
         jdbc.update(
                 """
@@ -66,6 +67,7 @@ public final class JdbcSourceRepository implements SourceRepository {
                 source.createdAt());
     }
 
+    @Override
     public Optional<SourceRecord> findById(String id) {
         return jdbc.query("select * from sources where id = ?", MAPPER, id).stream()
                 .findFirst();

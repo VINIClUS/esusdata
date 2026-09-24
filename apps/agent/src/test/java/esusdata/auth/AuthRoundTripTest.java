@@ -120,7 +120,8 @@ public class AuthRoundTripTest extends SecuritySliceTestSupport {
         assertThat(meAfterLogout.statusCode()).isEqualTo(401);
     }
 
-    private HttpResponse<String> post(HttpClient client, String path, String csrfToken, String body) throws Exception {
+    private static HttpResponse<String> post(HttpClient client, String path, String csrfToken, String body)
+            throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(BASE_URL + path))
                 .header("Content-Type", "application/json")
                 .header("X-XSRF-TOKEN", csrfToken);
@@ -130,7 +131,7 @@ public class AuthRoundTripTest extends SecuritySliceTestSupport {
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    private String csrfTokenFrom(CookieManager cookieManager) {
+    private static String csrfTokenFrom(CookieManager cookieManager) {
         CookieStore store = cookieManager.getCookieStore();
         for (HttpCookie cookie : store.getCookies()) {
             if ("XSRF-TOKEN".equals(cookie.getName())) {
@@ -140,13 +141,13 @@ public class AuthRoundTripTest extends SecuritySliceTestSupport {
         throw new IllegalStateException("no XSRF-TOKEN cookie was issued");
     }
 
-    private String readActivationToken() throws Exception {
+    private static String readActivationToken() throws Exception {
         Path tokenFile = dataDir.resolve("bootstrap-activation.token");
         String firstLine = Files.readAllLines(tokenFile).get(0);
         return firstLine.trim();
     }
 
-    private String extractField(String json, String field) {
+    private static String extractField(String json, String field) {
         String marker = "\"" + field + "\":\"";
         int start = json.indexOf(marker) + marker.length();
         int end = json.indexOf('"', start);

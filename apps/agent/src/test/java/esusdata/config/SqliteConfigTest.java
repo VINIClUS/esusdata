@@ -41,7 +41,9 @@ class SqliteConfigTest {
 
     @AfterEach
     void tearDown() {
-        if (context != null) context.close();
+        if (context != null) {
+            context.close();
+        }
     }
 
     @Test
@@ -57,7 +59,9 @@ class SqliteConfigTest {
                 ResultSet rs = st.executeQuery(
                         "select version from flyway_schema_history where success = 1 order by version")) {
             java.util.List<String> appliedVersions = new java.util.ArrayList<>();
-            while (rs.next()) appliedVersions.add(rs.getString(1));
+            while (rs.next()) {
+                appliedVersions.add(rs.getString(1));
+            }
             assertThat(appliedVersions).containsExactly("1", "2", "3");
         }
         assertThat(migration.migrationsExecuted()).isEqualTo(3);
@@ -114,6 +118,8 @@ class SqliteConfigTest {
     }
 
     @Test
+    // javac's try lint: the resource is held for the block's scope, never read.
+    @SuppressWarnings("try")
     void secondProcessAgainstSameDataDirectoryIsRefused(@TempDir Path independentDir) {
         // Uses its own directory, independent of the Spring context's already-held lock from
         // @BeforeEach, so this test isolates exactly the "second acquire on the same file" case.

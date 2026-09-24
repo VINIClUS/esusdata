@@ -118,7 +118,7 @@ public class SqliteConfig {
         return new SqliteRuntimeAssertion();
     }
 
-    private void assertPragma(Statement st, String pragma, String expected) throws SQLException {
+    private static void assertPragma(Statement st, String pragma, String expected) throws SQLException {
         try (ResultSet rs = st.executeQuery("PRAGMA " + pragma)) {
             if (!rs.next()) {
                 throw new IllegalStateException("PRAGMA " + pragma + " returned no row");
@@ -131,7 +131,7 @@ public class SqliteConfig {
         }
     }
 
-    private void assertMinimumVersion(Statement st) throws SQLException {
+    private static void assertMinimumVersion(Statement st) throws SQLException {
         try (ResultSet rs = st.executeQuery("select sqlite_version()")) {
             rs.next();
             String version = rs.getString(1);
@@ -145,7 +145,7 @@ public class SqliteConfig {
     }
 
     static int[] parseVersion(String version) {
-        String[] segments = version.split("\\.");
+        String[] segments = version.split("\\.", -1);
         int[] result = new int[3];
         for (int i = 0; i < 3 && i < segments.length; i++) {
             result[i] = Integer.parseInt(segments[i].replaceAll("[^0-9].*", ""));
@@ -156,7 +156,9 @@ public class SqliteConfig {
     static int compareVersions(int[] a, int[] b) {
         for (int i = 0; i < 3; i++) {
             int cmp = Integer.compare(a[i], b[i]);
-            if (cmp != 0) return cmp;
+            if (cmp != 0) {
+                return cmp;
+            }
         }
         return 0;
     }

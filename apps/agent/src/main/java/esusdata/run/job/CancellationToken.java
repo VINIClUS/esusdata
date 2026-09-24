@@ -45,7 +45,7 @@ public final class CancellationToken implements CancellationSignal {
         }
     }
 
-    private void runInterrupt(Runnable interrupt) {
+    private static void runInterrupt(Runnable interrupt) {
         if (interrupt == null) {
             return;
         }

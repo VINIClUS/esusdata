@@ -72,7 +72,7 @@ public class SessionInactivityTest extends ApiFixtureSupport {
         return Instant.parse(value);
     }
 
-    private HttpResponse<String> get(String cookie, String path) throws Exception {
+    private static HttpResponse<String> get(String cookie, String path) throws Exception {
         return HttpClient.newHttpClient()
                 .send(
                         HttpRequest.newBuilder(URI.create(BASE_URL + path))

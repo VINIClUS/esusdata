@@ -146,7 +146,7 @@ public class ScopeIsolationApiTest extends ApiFixtureSupport {
                 .isInstanceOf(ScopeDeniedException.class);
     }
 
-    private IndicatorResult computedResult(String municipalityIbge) {
+    private static IndicatorResult computedResult(String municipalityIbge) {
         return new IndicatorResult(
                 IndicatorResult.IndicatorStatus.COMPUTED,
                 "60.0000",
@@ -162,7 +162,7 @@ public class ScopeIsolationApiTest extends ApiFixtureSupport {
                 "c1-exact-ratio@1");
     }
 
-    private EvidenceEntry entry(String recordId, String ine) {
+    private static EvidenceEntry entry(String recordId, String ine) {
         return new EvidenceEntry(
                 "tb_fat_atendimento_individual",
                 recordId,

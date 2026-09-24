@@ -112,7 +112,7 @@ public final class JobWorker implements SmartLifecycle {
         }
     }
 
-    private void sleep(Duration duration) {
+    private static void sleep(Duration duration) {
         try {
             Thread.sleep(duration.toMillis());
         } catch (InterruptedException e) {

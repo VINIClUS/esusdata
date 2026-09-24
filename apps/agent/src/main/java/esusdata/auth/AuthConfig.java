@@ -78,10 +78,8 @@ public class AuthConfig {
             Argon2Profile argon2Profile,
             SessionService sessionService,
             LoginThrottle loginThrottle,
-            AuthAuditWriter authAuditWriter,
-            Clock clock) {
-        return new AuthenticationService(
-                userRepository, argon2Profile, sessionService, loginThrottle, authAuditWriter, clock);
+            AuthAuditWriter authAuditWriter) {
+        return new AuthenticationService(userRepository, argon2Profile, sessionService, loginThrottle, authAuditWriter);
     }
 
     @Bean

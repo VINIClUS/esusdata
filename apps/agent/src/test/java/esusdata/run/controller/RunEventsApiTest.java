@@ -373,7 +373,7 @@ public class RunEventsApiTest extends ApiFixtureSupport {
         return jobId;
     }
 
-    private Stream<String> openEventStream(String cookie, String jobId) throws Exception {
+    private static Stream<String> openEventStream(String cookie, String jobId) throws Exception {
         HttpResponse<Stream<String>> response = HttpClient.newHttpClient()
                 .send(
                         HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/events"))
@@ -386,15 +386,15 @@ public class RunEventsApiTest extends ApiFixtureSupport {
         return response.body();
     }
 
-    private String readNextDataLine(Iterator<String> lines) throws Exception {
+    private static String readNextDataLine(Iterator<String> lines) throws Exception {
         return readNextLineWithPrefix(lines, "data:");
     }
 
-    private String readNextCommentLine(Iterator<String> lines) throws Exception {
+    private static String readNextCommentLine(Iterator<String> lines) throws Exception {
         return readNextLineWithPrefix(lines, ":");
     }
 
-    private String readNextLineWithPrefix(Iterator<String> lines, String prefix) throws Exception {
+    private static String readNextLineWithPrefix(Iterator<String> lines, String prefix) throws Exception {
         return withTimeout(
                 () -> {
                     while (lines.hasNext()) {
@@ -414,7 +414,7 @@ public class RunEventsApiTest extends ApiFixtureSupport {
      *     mid-read, which the JDK HTTP client surfaces to the reader as an {@code IOException},
      *     not a clean EOF).
      */
-    private boolean drainWithin(Iterator<String> lines, Duration timeout) throws Exception {
+    private static boolean drainWithin(Iterator<String> lines, Duration timeout) throws Exception {
         try {
             return withTimeout(
                     () -> {
@@ -433,7 +433,7 @@ public class RunEventsApiTest extends ApiFixtureSupport {
         }
     }
 
-    private <T> T withTimeout(Callable<T> task, Duration timeout) throws Exception {
+    private static <T> T withTimeout(Callable<T> task, Duration timeout) throws Exception {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             return executor.submit(task).get(timeout.toMillis(), TimeUnit.MILLISECONDS);

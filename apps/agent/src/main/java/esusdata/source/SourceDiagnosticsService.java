@@ -95,7 +95,11 @@ public final class SourceDiagnosticsService {
         return sourceRepository.findById(sourceId);
     }
 
-    /** @throws SourceNotFoundException if {@code sourceId} does not resolve. */
+    /**
+     * Runs the connectivity check against a registered source.
+     *
+     * @throws SourceNotFoundException if {@code sourceId} does not resolve.
+     */
     public Diagnostics test(String sourceId) {
         SourceRecord source = sourceRepository
                 .findById(sourceId)

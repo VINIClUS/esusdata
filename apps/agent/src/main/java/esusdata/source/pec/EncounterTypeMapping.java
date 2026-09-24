@@ -23,8 +23,12 @@ public final class EncounterTypeMapping {
     private EncounterTypeMapping() {}
 
     public static EncounterModality classify(int tipoAtendimentoId) {
-        if (PROGRAMADO_IDS.contains(tipoAtendimentoId)) return EncounterModality.PROGRAMADO;
-        if (ESPONTANEO_IDS.contains(tipoAtendimentoId)) return EncounterModality.ESPONTANEO;
+        if (PROGRAMADO_IDS.contains(tipoAtendimentoId)) {
+            return EncounterModality.PROGRAMADO;
+        }
+        if (ESPONTANEO_IDS.contains(tipoAtendimentoId)) {
+            return EncounterModality.ESPONTANEO;
+        }
         return EncounterModality.UNMAPPED;
     }
 }

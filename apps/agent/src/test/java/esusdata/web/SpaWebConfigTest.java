@@ -75,7 +75,7 @@ public class SpaWebConfigTest extends SecuritySliceTestSupport {
         assertThat(unknown.body()).doesNotContain(INDEX_MARKER);
     }
 
-    private HttpResponse<String> get(String path) throws Exception {
+    private static HttpResponse<String> get(String path) throws Exception {
         return HttpClient.newHttpClient()
                 .send(
                         HttpRequest.newBuilder(URI.create(BASE_URL + path))

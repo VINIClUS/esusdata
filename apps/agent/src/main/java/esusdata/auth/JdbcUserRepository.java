@@ -36,6 +36,7 @@ public final class JdbcUserRepository implements UserRepository {
         this.jdbc = jdbc;
     }
 
+    @Override
     public void insert(UserAccount user) {
         jdbc.update(
                 """
@@ -58,16 +59,19 @@ public final class JdbcUserRepository implements UserRepository {
                 user.lastLoginAt() == null ? null : user.lastLoginAt().toString());
     }
 
+    @Override
     public Optional<UserAccount> findById(String userId) {
         return jdbc.query("select * from users where user_id = ?", MAPPER, userId).stream()
                 .findFirst();
     }
 
+    @Override
     public Optional<UserAccount> findByUsername(String username) {
         return jdbc.query("select * from users where username = ?", MAPPER, username).stream()
                 .findFirst();
     }
 
+    @Override
     public boolean anyExistsWithRole(Role role) {
         Integer count = jdbc.queryForObject("""
                 select count(*) from users u
@@ -77,10 +81,12 @@ public final class JdbcUserRepository implements UserRepository {
         return count != null && count > 0;
     }
 
+    @Override
     public void recordLogin(String userId, Instant at) {
         jdbc.update("update users set last_login_at = ? where user_id = ?", at.toString(), userId);
     }
 
+    @Override
     public void setPassword(
             String userId,
             String passwordHash,
@@ -94,11 +100,13 @@ public final class JdbcUserRepository implements UserRepository {
                 """, passwordHash, passwordAlgo, passwordParamsJson, securityPolicyVersion, userId);
     }
 
+    @Override
     public void setState(String userId, UserState state) {
         jdbc.update("update users set state = ? where user_id = ?", state.name(), userId);
     }
 
     /** @return the new {@code authorization_version} */
+    @Override
     public long bumpAuthorizationVersion(String userId) {
         jdbc.update("update users set authorization_version = authorization_version + 1 where user_id = ?", userId);
         Long version =

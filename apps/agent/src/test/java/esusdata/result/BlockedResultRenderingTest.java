@@ -62,7 +62,7 @@ public class BlockedResultRenderingTest extends ApiFixtureSupport {
         assertThat(body).contains("Portão A");
     }
 
-    private CanonicalEncounter encounter(int seq, CanonicalModality modality) {
+    private static CanonicalEncounter encounter(int seq, CanonicalModality modality) {
         return new CanonicalEncounter(
                 new SourceRef("src-blocked", "tb_fat_atendimento_individual", "rec-" + seq),
                 MUNICIPALITY,

@@ -37,6 +37,8 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The execution plane against a real PEC, through the production constructor — the packaged
@@ -57,6 +59,8 @@ import org.junit.jupiter.api.io.TempDir;
  * patient data and are deleted with it.
  */
 class ExecPlaneLivePecTest {
+
+    private static final Logger log = LoggerFactory.getLogger(ExecPlaneLivePecTest.class);
 
     private static final String BINARY_PROPERTY = "observatorio.execution-plane.binary";
     private static final String OPT_IN_PROPERTY = "observatorio.execution-plane.live-pec";
@@ -102,6 +106,8 @@ class ExecPlaneLivePecTest {
         Assumptions.assumeTrue(canLogIn(), "Skipping: tunnel is up but the PEC's PostgreSQL is not answering");
     }
 
+    // javac's try lint: the resource is held for the block's scope, never read.
+    @SuppressWarnings("try")
     private boolean canLogIn() {
         try (Connection ignored = openCheckConnection()) {
             return true;
@@ -214,13 +220,13 @@ class ExecPlaneLivePecTest {
                             IndividualEncounterModalityCapability.ADAPTER_VERSION,
                             identity(),
                             postgresVersion);
-            System.out.println("fingerprints: source=" + identity().sourceId() + " PEC="
+            log.info("fingerprints: source=" + identity().sourceId() + " PEC="
                     + identity().pecVersion() + " PostgreSQL=" + postgresVersion);
             for (Map.Entry<String, String> expected : entry.objectFingerprints().entrySet()) {
                 String object = expected.getKey();
                 String observed =
                         catalog.fingerprint(c, object, entry.objectColumns().get(object));
-                System.out.println("fingerprint " + object + " matrix=" + expected.getValue() + " jdbc=" + observed);
+                log.info("fingerprint " + object + " matrix=" + expected.getValue() + " jdbc=" + observed);
                 assertThat(observed).as(object).isEqualTo(expected.getValue());
             }
         }
@@ -243,8 +249,8 @@ class ExecPlaneLivePecTest {
                                 LocalDate.of(2026, 4, 1)),
                         new CancellationToken(),
                         listener);
-        System.out.println("live month: rows=" + manifest.rowCount() + " exclusions=" + manifest.exclusionCount()
-                + " checksum=" + manifest.checksum());
+        log.info("live month: rows=" + manifest.rowCount() + " exclusions=" + manifest.exclusionCount() + " checksum="
+                + manifest.checksum());
 
         assertThat(manifest.sourceId()).isEqualTo(identity().sourceId());
         assertThat(manifest.municipalityIbge()).isEqualTo(env.get("PEC_MUNICIPALITY_IBGE"));
@@ -285,7 +291,7 @@ class ExecPlaneLivePecTest {
         Throwable failure = catchThrowable(() -> adapter(new EnvFileSecretResolver(envFile))
                 .acquire(wholeHistoryCommand("live-cancel"), cancellation, listener));
         long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
-        System.out.println("live cancel: elapsedMs=" + elapsedMs + " progressMessages=" + listener.progressCount.get());
+        log.info("live cancel: elapsedMs=" + elapsedMs + " progressMessages=" + listener.progressCount.get());
 
         assertThat(failure)
                 .as("the period streamed in full before the cancel landed (or had < 1000 rows)")

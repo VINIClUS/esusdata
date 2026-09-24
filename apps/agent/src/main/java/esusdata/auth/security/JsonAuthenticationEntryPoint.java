@@ -1,7 +1,6 @@
 package esusdata.auth.security;
 
 import esusdata.web.ApiError;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -17,7 +16,7 @@ public final class JsonAuthenticationEntryPoint implements AuthenticationEntryPo
     @Override
     public void commence(
             HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
-            throws IOException, ServletException {
+            throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json");
         response.setHeader("Cache-Control", "no-store");

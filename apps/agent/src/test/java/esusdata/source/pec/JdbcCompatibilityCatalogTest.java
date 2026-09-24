@@ -33,7 +33,11 @@ class JdbcCompatibilityCatalogTest {
         String fingerprint =
                 new JdbcCompatibilityCatalog().fingerprint(connection, "tb_test", List.of("id", "care_date"));
 
-        assertThat(fingerprint).isEqualTo(sha256("tb_test\n" + "id|bigint|int8|1|NO\n" + "care_date|date|date|2|YES"));
+        assertThat(fingerprint).isEqualTo(sha256("""
+                                                 tb_test
+                                                 id|bigint|int8|1|NO
+                                                 care_date|date|date|2|YES\
+                                                 """));
     }
 
     @Test
@@ -69,14 +73,15 @@ class JdbcCompatibilityCatalogTest {
                                 "co_seq_dim_tipo_atendimento", "ds_tipo_atendimento",
                                 "co_dim_tipo_atendimento_pai", "LEAF_SEMANTICS=2,3"));
 
-        assertThat(fingerprint)
-                .isEqualTo(sha256("tb_dim_tipo_atendimento\n"
-                        + "co_seq_dim_tipo_atendimento|bigint|int8|1|NO\n"
-                        + "ds_tipo_atendimento|character varying|varchar|2|NO\n"
-                        + "co_dim_tipo_atendimento_pai|bigint|int8|3|YES\n"
-                        + "LEAF_SEMANTICS=2,3\n"
-                        + "2|17:Consulta agendada|1\n"
-                        + "3|15:Consulta no dia|4"));
+        assertThat(fingerprint).isEqualTo(sha256("""
+                                  tb_dim_tipo_atendimento
+                                  co_seq_dim_tipo_atendimento|bigint|int8|1|NO
+                                  ds_tipo_atendimento|character varying|varchar|2|NO
+                                  co_dim_tipo_atendimento_pai|bigint|int8|3|YES
+                                  LEAF_SEMANTICS=2,3
+                                  2|17:Consulta agendada|1
+                                  3|15:Consulta no dia|4\
+                                  """));
     }
 
     @Test
@@ -109,12 +114,13 @@ class JdbcCompatibilityCatalogTest {
                         "tb_dim_unidade_saude",
                         List.of("co_seq_dim_unidade_saude", "nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude"));
 
-        assertThat(fingerprint)
-                .isEqualTo(sha256("tb_dim_unidade_saude\n"
-                        + "co_seq_dim_unidade_saude|bigint|int8|1|NO\n"
-                        + "nu_cnes|character varying|varchar|2|YES\n"
-                        + "UNIQUE_KEY=co_seq_dim_unidade_saude\n"
-                        + "PRIMARY KEY|co_seq_dim_unidade_saude"));
+        assertThat(fingerprint).isEqualTo(sha256("""
+                                  tb_dim_unidade_saude
+                                  co_seq_dim_unidade_saude|bigint|int8|1|NO
+                                  nu_cnes|character varying|varchar|2|YES
+                                  UNIQUE_KEY=co_seq_dim_unidade_saude
+                                  PRIMARY KEY|co_seq_dim_unidade_saude\
+                                  """));
     }
 
     @Test

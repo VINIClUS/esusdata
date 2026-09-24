@@ -29,13 +29,13 @@ public class SseConfig {
         return scheduler(50, "sse-reauth-");
     }
 
-    private ScheduledExecutorService scheduler(int poolSize, String threadPrefix) {
+    private static ScheduledExecutorService scheduler(int poolSize, String threadPrefix) {
         ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(poolSize, threadFactory(threadPrefix));
         scheduler.setRemoveOnCancelPolicy(true);
         return scheduler;
     }
 
-    private ThreadFactory threadFactory(String prefix) {
+    private static ThreadFactory threadFactory(String prefix) {
         AtomicInteger counter = new AtomicInteger();
         return runnable -> {
             Thread thread = new Thread(runnable, prefix + counter.incrementAndGet());

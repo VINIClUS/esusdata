@@ -8,8 +8,8 @@ package esusdata.source.pec;
  *
  * @param sourceId          persistent identity of the source (§1.4.1), independent of host changes
  * @param host              validated against {@link AllowedDestinations} before any connection attempt
- * @param port
- * @param database
+ * @param port              PostgreSQL port of the PEC database
+ * @param database          PEC database name
  * @param user              the PEC role used for reads — never {@code postgres} (§1.12.7)
  * @param secretRef         opaque reference to where the password is stored; never the password itself
  * @param municipalityIbge  7-digit IBGE code this source is authorized for (§1.4.2)

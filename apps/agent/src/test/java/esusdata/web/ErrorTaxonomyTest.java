@@ -78,7 +78,7 @@ public class ErrorTaxonomyTest extends ApiFixtureSupport {
         assertThat(finalBody).contains("\"resultId\":null");
     }
 
-    private String pollUntilTerminal(String cookie, String jobId) throws Exception {
+    private static String pollUntilTerminal(String cookie, String jobId) throws Exception {
         Instant deadline = Instant.now().plus(Duration.ofSeconds(10));
         String body = null;
         while (Instant.now().isBefore(deadline)) {
@@ -100,7 +100,7 @@ public class ErrorTaxonomyTest extends ApiFixtureSupport {
         throw new AssertionError("job " + jobId + " did not reach a terminal state in time; last body: " + body);
     }
 
-    private String extractField(String json, String field) {
+    private static String extractField(String json, String field) {
         String marker = "\"" + field + "\":\"";
         int start = json.indexOf(marker) + marker.length();
         int end = json.indexOf('"', start);

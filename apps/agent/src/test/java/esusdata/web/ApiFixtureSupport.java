@@ -125,19 +125,19 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
     }
 
     /**
-     * @return an {@code OBS_SESSION=...} cookie header value ready to attach to an HttpRequest.
-     *     Reads the user's CURRENT {@code authorizationVersion} rather than assuming 1 — a session
-     *     minted with a stale version would fail authentication after any grant/revoke/block
-     *     mutation bumps it, which would look like an authorization bug rather than a fixture one.
+     * Returns an {@code OBS_SESSION=...} cookie header value ready to attach to an HttpRequest.
+     * Reads the user's CURRENT {@code authorizationVersion} rather than assuming 1 — a session
+     * minted with a stale version would fail authentication after any grant/revoke/block mutation
+     * bumps it, which would look like an authorization bug rather than a fixture one.
      */
     public String sessionCookie(String userId) {
         return SessionCookie.NAME + "=" + rawSessionToken(userId);
     }
 
     /**
-     * @return the raw opaque session token (not the {@code OBS_SESSION=...} cookie header) — for
-     *     tests that need to look up the underlying {@code sessions} row directly, via {@link
-     *     #sha256Hex}.
+     * Returns the raw opaque session token (not the {@code OBS_SESSION=...} cookie header) — for
+     * tests that need to look up the underlying {@code sessions} row directly, via {@link
+     * #sha256Hex}.
      */
     public String rawSessionToken(String userId) {
         long authorizationVersion =
@@ -308,7 +308,7 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
         return authenticatedRequest(sessionCookie, uri, "DELETE", null, null);
     }
 
-    private HttpResponse<String> authenticatedRequest(
+    private static HttpResponse<String> authenticatedRequest(
             String sessionCookie, URI uri, String method, String jsonBody, String idempotencyKey) throws Exception {
         HttpClient client = HttpClient.newHttpClient();
         HttpResponse<String> ready = client.send(
@@ -331,7 +331,7 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    private String csrfTokenFrom(HttpResponse<String> response) {
+    private static String csrfTokenFrom(HttpResponse<String> response) {
         for (String setCookie : response.headers().allValues("Set-Cookie")) {
             if (setCookie.startsWith("XSRF-TOKEN=")) {
                 String rest = setCookie.substring("XSRF-TOKEN=".length());

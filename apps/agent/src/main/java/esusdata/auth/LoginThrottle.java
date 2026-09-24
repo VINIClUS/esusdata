@@ -1,5 +1,6 @@
 package esusdata.auth;
 
+import java.io.Serial;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -31,13 +32,12 @@ public final class LoginThrottle {
         Duration window = Duration.ofMinutes(properties.throttleWindowMinutes());
         Instant windowStart = now.minus(window);
 
-        Optional<Instant> accountDelay =
-                delayUntil("username", username, windowStart, now, properties.maxLoginAttempts());
+        Optional<Instant> accountDelay = delayUntil("username", username, windowStart, properties.maxLoginAttempts());
         if (accountDelay.isPresent() && accountDelay.get().isAfter(now)) {
             throw new LoginThrottledException(accountDelay.get());
         }
-        Optional<Instant> originDelay = delayUntil(
-                "origin", origin, windowStart, now, properties.maxLoginAttempts() * ORIGIN_FAILURE_MULTIPLIER);
+        Optional<Instant> originDelay =
+                delayUntil("origin", origin, windowStart, properties.maxLoginAttempts() * ORIGIN_FAILURE_MULTIPLIER);
         if (originDelay.isPresent() && originDelay.get().isAfter(now)) {
             throw new LoginThrottledException(originDelay.get());
         }
@@ -58,7 +58,7 @@ public final class LoginThrottle {
                 """, "attempt-" + java.util.UUID.randomUUID(), username, origin, now.toString(), outcome);
     }
 
-    private Optional<Instant> delayUntil(String column, String value, Instant windowStart, Instant now, int threshold) {
+    private Optional<Instant> delayUntil(String column, String value, Instant windowStart, int threshold) {
         if (value == null) {
             return Optional.empty();
         }
@@ -78,12 +78,15 @@ public final class LoginThrottle {
         if (lastFailureAt == null) {
             return Optional.empty();
         }
-        long excess = count - threshold + 1;
+        long excess = (long) count - threshold + 1;
         long delayMinutes = Math.min(properties.throttleCeilingMinutes(), excess);
         return Optional.of(Instant.parse(lastFailureAt).plus(Duration.ofMinutes(delayMinutes)));
     }
 
     public static final class LoginThrottledException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         private final Instant retryAfter;
 
         public LoginThrottledException(Instant retryAfter) {

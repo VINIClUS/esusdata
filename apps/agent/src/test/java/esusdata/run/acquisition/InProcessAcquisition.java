@@ -120,7 +120,7 @@ public final class InProcessAcquisition implements Acquisition {
         };
     }
 
-    private void writeCanonical(ExtractWriter writer, PecAcquisition acquisition, RawEncounterRecord raw) {
+    private static void writeCanonical(ExtractWriter writer, PecAcquisition acquisition, RawEncounterRecord raw) {
         CanonicalModality modality = switch (raw.modality()) {
             case PROGRAMADO -> CanonicalModality.PROGRAMADO;
             case ESPONTANEO -> CanonicalModality.ESPONTANEO;

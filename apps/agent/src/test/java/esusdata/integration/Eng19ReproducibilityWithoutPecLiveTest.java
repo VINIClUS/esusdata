@@ -117,7 +117,7 @@ class Eng19ReproducibilityWithoutPecLiveTest {
         }
     }
 
-    private void writeCanonical(ExtractWriter writer, PecAcquisition acquisition, RawEncounterRecord raw) {
+    private static void writeCanonical(ExtractWriter writer, PecAcquisition acquisition, RawEncounterRecord raw) {
         CanonicalModality modality = switch (raw.modality()) {
             case PROGRAMADO -> CanonicalModality.PROGRAMADO;
             case ESPONTANEO -> CanonicalModality.ESPONTANEO;
@@ -138,11 +138,13 @@ class Eng19ReproducibilityWithoutPecLiveTest {
         }
     }
 
-    private Map<String, String> readEnvFile() throws IOException {
+    private static Map<String, String> readEnvFile() throws IOException {
         Map<String, String> values = new HashMap<>();
         for (String line : Files.readAllLines(ENV_FILE)) {
             int i = line.indexOf('=');
-            if (i > 0) values.put(line.substring(0, i), line.substring(i + 1));
+            if (i > 0) {
+                values.put(line.substring(0, i), line.substring(i + 1));
+            }
         }
         return values;
     }

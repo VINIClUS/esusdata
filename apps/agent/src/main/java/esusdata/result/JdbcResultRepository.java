@@ -50,6 +50,7 @@ public final class JdbcResultRepository implements ResultRepository {
         this.jdbc = jdbc;
     }
 
+    @Override
     public List<PublishedResult> findPublished(String municipalityIbge, String indicatorPack, String referencePeriod) {
         requireScope(municipalityIbge);
         return jdbc.query("""
@@ -59,6 +60,7 @@ public final class JdbcResultRepository implements ResultRepository {
                 """, MAPPER, municipalityIbge, indicatorPack, referencePeriod);
     }
 
+    @Override
     public List<String> findPublishedPeriods(String municipalityIbge) {
         requireScope(municipalityIbge);
         return jdbc.queryForList("""
@@ -73,6 +75,7 @@ public final class JdbcResultRepository implements ResultRepository {
      * scope returns empty — identical to "not found" from the caller's perspective (§1.10.1:
      * "objeto inexistente e objeto fora do escopo têm a mesma resposta externa 404").
      */
+    @Override
     public Optional<PublishedResult> findByIdInScope(String resultId, String municipalityIbge) {
         requireScope(municipalityIbge);
         return jdbc
@@ -86,6 +89,7 @@ public final class JdbcResultRepository implements ResultRepository {
     }
 
     /** Lets {@code GET /runs/{id}} surface where a SUCCEEDED job's result landed. */
+    @Override
     public Optional<String> findResultIdByJobId(String jobId, String municipalityIbge) {
         requireScope(municipalityIbge);
         return jdbc
@@ -98,7 +102,7 @@ public final class JdbcResultRepository implements ResultRepository {
                 .findFirst();
     }
 
-    private void requireScope(String municipalityIbge) {
+    private static void requireScope(String municipalityIbge) {
         if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
             throw new IllegalArgumentException("a 7-digit municipality scope is required to read results");
         }

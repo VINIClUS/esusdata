@@ -144,16 +144,26 @@ public final class ExtractRecovery {
         boolean manifestTempExists = Files.exists(manifestTemp, LinkOption.NOFOLLOW_LINKS);
 
         if (manifestExists && dataExists) {
-            if (manifestTempExists) delete(manifestTemp);
-            if (dataTempExists) delete(dataTemp);
-            if (manifestTempExists || dataTempExists) forceDirectory(baseDir);
+            if (manifestTempExists) {
+                delete(manifestTemp);
+            }
+            if (dataTempExists) {
+                delete(dataTemp);
+            }
+            if (manifestTempExists || dataTempExists) {
+                forceDirectory(baseDir);
+            }
             return;
         }
 
         if (manifestExists) {
             delete(manifestFile);
-            if (manifestTempExists) delete(manifestTemp);
-            if (dataTempExists) delete(dataTemp);
+            if (manifestTempExists) {
+                delete(manifestTemp);
+            }
+            if (dataTempExists) {
+                delete(dataTemp);
+            }
             forceDirectory(baseDir);
             return;
         }
@@ -167,7 +177,9 @@ public final class ExtractRecovery {
                 }
                 new ExtractReader().readDataFile(dataFile, manifest);
                 publishNewFile(manifestTemp, manifestFile);
-                if (dataTempExists) delete(dataTemp);
+                if (dataTempExists) {
+                    delete(dataTemp);
+                }
                 forceDirectory(baseDir);
             } catch (IOException | RuntimeException failure) {
                 removePartialPublication(dataFile, dataTemp, manifestTemp, baseDir, failure);
@@ -175,10 +187,18 @@ public final class ExtractRecovery {
             return;
         }
 
-        if (dataExists) delete(dataFile);
-        if (manifestTempExists) delete(manifestTemp);
-        if (dataTempExists) delete(dataTemp);
-        if (dataExists || manifestTempExists || dataTempExists) forceDirectory(baseDir);
+        if (dataExists) {
+            delete(dataFile);
+        }
+        if (manifestTempExists) {
+            delete(manifestTemp);
+        }
+        if (dataTempExists) {
+            delete(dataTemp);
+        }
+        if (dataExists || manifestTempExists || dataTempExists) {
+            forceDirectory(baseDir);
+        }
     }
 
     private static ExtractionManifest readStagedManifest(Path manifestTemp, String extractionId) throws IOException {
@@ -220,7 +240,9 @@ public final class ExtractRecovery {
     }
 
     private static void rejectLinks(Path... paths) {
-        for (Path path : paths) ExtractValidation.rejectSymbolicLink(path, "extract recovery path");
+        for (Path path : paths) {
+            ExtractValidation.rejectSymbolicLink(path, "extract recovery path");
+        }
     }
 
     private static void delete(Path path) throws IOException {
@@ -252,6 +274,7 @@ public final class ExtractRecovery {
             try {
                 channel.close();
             } catch (IOException ignored) {
+                // Best-effort cleanup: callers are already returning or failing on their own terms.
             }
         }
     }
@@ -271,6 +294,7 @@ public final class ExtractRecovery {
             try {
                 lock.release();
             } catch (IOException ignored) {
+                // Closing the channel below releases the lock anyway.
             }
             closeQuietly(channel);
         }

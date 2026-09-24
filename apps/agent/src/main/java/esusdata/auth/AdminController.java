@@ -97,7 +97,7 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
-    private GrantResponse toResponse(Grant grant) {
+    private static GrantResponse toResponse(Grant grant) {
         return new GrantResponse(
                 grant.grantId(),
                 grant.userId(),

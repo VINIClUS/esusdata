@@ -71,11 +71,21 @@ public final class C1Rule {
 
         public List<String> incompleteReasons() {
             List<String> reasons = new ArrayList<>();
-            if (!sourceAndValidity) reasons.add("Portão A (fonte e vigência) incompleto");
-            if (!calculationModel) reasons.add("Portão B (modelo de cálculo) incompleto");
-            if (!adapter) reasons.add("Portão C (adaptador) incompleto");
-            if (!reconciliation) reasons.add("Portão D (reconciliação) incompleto");
-            if (!pilotAndOperations) reasons.add("Portão E (piloto e operação) incompleto");
+            if (!sourceAndValidity) {
+                reasons.add("Portão A (fonte e vigência) incompleto");
+            }
+            if (!calculationModel) {
+                reasons.add("Portão B (modelo de cálculo) incompleto");
+            }
+            if (!adapter) {
+                reasons.add("Portão C (adaptador) incompleto");
+            }
+            if (!reconciliation) {
+                reasons.add("Portão D (reconciliação) incompleto");
+            }
+            if (!pilotAndOperations) {
+                reasons.add("Portão E (piloto e operação) incompleto");
+            }
             return List.copyOf(reasons);
         }
     }
@@ -248,10 +258,18 @@ public final class C1Rule {
      * never by converting {@code ratio} to a decimal first.
      */
     public static Classification classify(ExactRatio percentageRatio) {
-        if (percentageRatio.compareToFraction(70, 1) > 0) return Classification.REGULAR;
-        if (percentageRatio.compareToFraction(50, 1) > 0) return Classification.OTIMO;
-        if (percentageRatio.compareToFraction(30, 1) > 0) return Classification.BOM;
-        if (percentageRatio.compareToFraction(10, 1) > 0) return Classification.SUFICIENTE;
+        if (percentageRatio.compareToFraction(70, 1) > 0) {
+            return Classification.REGULAR;
+        }
+        if (percentageRatio.compareToFraction(50, 1) > 0) {
+            return Classification.OTIMO;
+        }
+        if (percentageRatio.compareToFraction(30, 1) > 0) {
+            return Classification.BOM;
+        }
+        if (percentageRatio.compareToFraction(10, 1) > 0) {
+            return Classification.SUFICIENTE;
+        }
         return Classification.REGULAR;
     }
 

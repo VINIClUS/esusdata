@@ -98,7 +98,7 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-    private ResponseCookie newSessionCookie(String rawToken, HttpServletRequest httpRequest) {
+    private static ResponseCookie newSessionCookie(String rawToken, HttpServletRequest httpRequest) {
         return ResponseCookie.from(SessionCookie.NAME, rawToken)
                 .httpOnly(true)
                 .secure(httpRequest.isSecure())
@@ -107,7 +107,7 @@ public class AuthController {
                 .build();
     }
 
-    private ResponseCookie clearedSessionCookie(HttpServletRequest httpRequest) {
+    private static ResponseCookie clearedSessionCookie(HttpServletRequest httpRequest) {
         return ResponseCookie.from(SessionCookie.NAME, "")
                 .httpOnly(true)
                 .secure(httpRequest.isSecure())

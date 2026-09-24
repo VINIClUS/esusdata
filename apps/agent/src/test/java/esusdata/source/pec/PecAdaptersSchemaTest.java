@@ -33,7 +33,7 @@ class PecAdaptersSchemaTest {
                 .isNotEmpty();
     }
 
-    private InputStream resource(String name) {
+    private static InputStream resource(String name) {
         InputStream stream = PecAdaptersSchemaTest.class.getResourceAsStream(name);
         assertThat(stream).as("missing classpath resource %s", name).isNotNull();
         return stream;

@@ -1,7 +1,6 @@
 package esusdata.auth.security;
 
 import esusdata.web.ApiError;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -16,7 +15,7 @@ public final class JsonAccessDeniedHandler implements AccessDeniedHandler {
     @Override
     public void handle(
             HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException)
-            throws IOException, ServletException {
+            throws IOException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType("application/json");
         response.setHeader("Cache-Control", "no-store");

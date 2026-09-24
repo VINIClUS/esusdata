@@ -104,7 +104,9 @@ public final class PecCompatibilityMatrix {
                 throw new IllegalStateException("Compatibility object fingerprint entry is incomplete");
             }
             List<String> requestedColumns = new ArrayList<>();
-            for (JsonNode column : columnsNode) requestedColumns.add(column.asString());
+            for (JsonNode column : columnsNode) {
+                requestedColumns.add(column.asString());
+            }
             if (fingerprints.put(name, fingerprint) != null) {
                 throw new IllegalStateException("Compatibility matrix contains duplicate object: " + name);
             }
@@ -125,7 +127,9 @@ public final class PecCompatibilityMatrix {
             return List.of();
         }
         List<String> listed = new ArrayList<>();
-        for (JsonNode version : versions) listed.add(version.asString());
+        for (JsonNode version : versions) {
+            listed.add(version.asString());
+        }
         return List.copyOf(listed);
     }
 

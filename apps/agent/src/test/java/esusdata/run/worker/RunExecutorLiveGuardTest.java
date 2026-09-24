@@ -50,7 +50,7 @@ class RunExecutorLiveGuardTest {
     void runLiveRefusesWhileTheSourceIsOnCooldown() {
         fixture.acquisitionGuard().block("src-1", clock.instant().plusSeconds(60), "test cooldown");
 
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+        fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-live",
                 "run-1",
                 "3541307",
@@ -96,7 +96,7 @@ class RunExecutorLiveGuardTest {
 
         ExtractionManifest manifest = ExtractFixtures.write(
                 fixture.extractsDir, "ext-under-cooldown", "src-1", "3541307", "2026-03", 7, 3, 0);
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+        fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-extract",
                 "run-1",
                 "3541307",

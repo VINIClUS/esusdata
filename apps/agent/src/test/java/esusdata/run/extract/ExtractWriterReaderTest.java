@@ -819,7 +819,7 @@ class ExtractWriterReaderTest {
                 new tools.jackson.databind.ObjectMapper().writeValueAsBytes(manifest));
     }
 
-    private CanonicalEncounter encounter(String recordId, CanonicalModality modality) {
+    private static CanonicalEncounter encounter(String recordId, CanonicalModality modality) {
         return new CanonicalEncounter(
                 new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", recordId),
                 "3541307",
@@ -830,7 +830,7 @@ class ExtractWriterReaderTest {
                 "225142");
     }
 
-    private String randomPayload() {
+    private static String randomPayload() {
         byte[] bytes = new byte[4096];
         new java.util.Random(20260920L).nextBytes(bytes);
         return java.util.HexFormat.of().formatHex(bytes);

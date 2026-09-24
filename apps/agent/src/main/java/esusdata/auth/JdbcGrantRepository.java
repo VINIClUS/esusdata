@@ -35,6 +35,7 @@ public final class JdbcGrantRepository implements GrantRepository {
         this.jdbc = jdbc;
     }
 
+    @Override
     public void insert(Grant grant) {
         jdbc.update(
                 """
@@ -55,11 +56,13 @@ public final class JdbcGrantRepository implements GrantRepository {
                 grant.revokedBy());
     }
 
+    @Override
     public List<Grant> activeGrantsForUser(String userId) {
         return jdbc.query("select * from user_grants where user_id = ? and revoked_at is null", MAPPER, userId);
     }
 
     /** @return {@code true} if a grant with this id was active and is now revoked by this call. */
+    @Override
     public boolean revoke(String grantId, Instant at, String revokedBy) {
         int updated = jdbc.update(
                 "update user_grants set revoked_at = ?, revoked_by = ? where grant_id = ? and revoked_at is null",
@@ -69,6 +72,7 @@ public final class JdbcGrantRepository implements GrantRepository {
         return updated == 1;
     }
 
+    @Override
     public void revokeAllForUser(String userId, Instant at, String revokedBy) {
         jdbc.update(
                 "update user_grants set revoked_at = ?, revoked_by = ? where user_id = ? and revoked_at is null",

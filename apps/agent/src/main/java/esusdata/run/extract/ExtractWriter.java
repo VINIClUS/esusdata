@@ -171,7 +171,9 @@ public final class ExtractWriter implements AutoCloseable {
     }
 
     public void write(CanonicalEncounter encounter) throws IOException {
-        if (closed) throw new IllegalStateException("writer already finalized/closed");
+        if (closed) {
+            throw new IllegalStateException("writer already finalized/closed");
+        }
         validateRecordForWrite(encounter);
         ExtractPublication.ensureTempSpace(baseDir, maxTempFileBytes - boundedOut.written());
         byte[] line = (mapper.writeValueAsString(encounter) + "\n").getBytes(StandardCharsets.UTF_8);
@@ -185,9 +187,9 @@ public final class ExtractWriter implements AutoCloseable {
     /**
      * Closes the stream, computes the checksum, validates and stages the manifest, then publishes
      * the data and manifest files. The manifest (the thing {@link ExtractReader} looks for) is
-     * never published before the data file it describes is complete and named correctly.
+     * never published before the data file it describes is complete and named correctly. Uses only
+     * the immutable scope captured by the acquisition session.
      */
-    /** Finalizes using only the immutable scope captured by the acquisition session. */
     public ExtractionManifest finalizeExtract(
             Instant startedAt,
             String sourceZoneId,
@@ -327,9 +329,9 @@ public final class ExtractWriter implements AutoCloseable {
                         encounter.sourceRef().sourceId(), encounter.municipalityIbge(), careDate)) {
             throw new IllegalArgumentException("record does not match the bound acquisition scope");
         }
-        if (encounter.cnes() != null && encounter.cnes().isBlank()
-                || encounter.ine() != null && encounter.ine().isBlank()
-                || encounter.cbo() != null && encounter.cbo().isBlank()) {
+        if ((encounter.cnes() != null && encounter.cnes().isBlank())
+                || (encounter.ine() != null && encounter.ine().isBlank())
+                || (encounter.cbo() != null && encounter.cbo().isBlank())) {
             throw new IllegalArgumentException("encounter optional fields cannot be blank");
         }
 
@@ -400,7 +402,9 @@ public final class ExtractWriter implements AutoCloseable {
 
         @Override
         public void write(byte[] bytes, int offset, int length) throws IOException {
-            if (bytes == null) throw new NullPointerException("bytes");
+            if (bytes == null) {
+                throw new NullPointerException("bytes");
+            }
             if (offset < 0 || length < 0 || length > bytes.length - offset) {
                 throw new IndexOutOfBoundsException();
             }
@@ -432,7 +436,9 @@ public final class ExtractWriter implements AutoCloseable {
         }
 
         private static long saturatingAdd(long left, long right) {
-            if (right > Long.MAX_VALUE - left) return Long.MAX_VALUE;
+            if (right > Long.MAX_VALUE - left) {
+                return Long.MAX_VALUE;
+            }
             return left + right;
         }
     }

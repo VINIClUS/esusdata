@@ -75,7 +75,7 @@ class GrantRevocationDuringRunTest {
 
         ExtractionManifest manifest =
                 ExtractFixtures.write(fixture.extractsDir, "ext-logout", "src-1", "3541307", "2026-03", 7, 3, 0);
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+        fixture.jobRepository.enqueue(new EnqueueRequest(
                 "job-1",
                 "run-1",
                 "3541307",

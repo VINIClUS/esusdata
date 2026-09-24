@@ -274,7 +274,7 @@ public class RunApiTest extends ApiFixtureSupport {
         assertThat(response.statusCode()).isEqualTo(404);
     }
 
-    private String pollUntilTerminal(String cookie, String jobId) throws Exception {
+    private static String pollUntilTerminal(String cookie, String jobId) throws Exception {
         Instant deadline = Instant.now().plus(Duration.ofSeconds(10));
         String body = null;
         while (Instant.now().isBefore(deadline)) {
@@ -296,11 +296,11 @@ public class RunApiTest extends ApiFixtureSupport {
         throw new AssertionError("job " + jobId + " did not reach a terminal state in time; last body: " + body);
     }
 
-    private String createRunJson(String sourceId, String extractionId, String referencePeriod) {
+    private static String createRunJson(String sourceId, String extractionId, String referencePeriod) {
         return createRunJson(sourceId, extractionId, referencePeriod, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION);
     }
 
-    private String createRunJson(
+    private static String createRunJson(
             String sourceId, String extractionId, String referencePeriod, String indicatorPack, String ruleVersion) {
         String extractionField = extractionId == null ? "" : ",\"extractionId\":\"" + extractionId + "\"";
         return "{\"municipalityIbge\":\"" + MUNICIPALITY + "\",\"indicatorPack\":\"" + indicatorPack
@@ -308,7 +308,7 @@ public class RunApiTest extends ApiFixtureSupport {
                 + "\",\"sourceId\":\"" + sourceId + "\"" + extractionField + "}";
     }
 
-    private String extractField(String json, String field) {
+    private static String extractField(String json, String field) {
         String marker = "\"" + field + "\":\"";
         int start = json.indexOf(marker) + marker.length();
         int end = json.indexOf('"', start);

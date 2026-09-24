@@ -72,7 +72,8 @@ public class AuthErrorResponsesTest extends SecuritySliceTestSupport {
         assertThat(Long.parseLong(retryAfter)).isGreaterThan(0);
     }
 
-    private HttpResponse<String> post(HttpClient client, String path, String csrfToken, String body) throws Exception {
+    private static HttpResponse<String> post(HttpClient client, String path, String csrfToken, String body)
+            throws Exception {
         return client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + path))
                         .header("Content-Type", "application/json")
@@ -82,7 +83,7 @@ public class AuthErrorResponsesTest extends SecuritySliceTestSupport {
                 HttpResponse.BodyHandlers.ofString());
     }
 
-    private String csrfTokenFrom(CookieManager cookieManager) {
+    private static String csrfTokenFrom(CookieManager cookieManager) {
         CookieStore store = cookieManager.getCookieStore();
         for (HttpCookie cookie : store.getCookies()) {
             if ("XSRF-TOKEN".equals(cookie.getName())) {
@@ -92,7 +93,7 @@ public class AuthErrorResponsesTest extends SecuritySliceTestSupport {
         throw new IllegalStateException("no XSRF-TOKEN cookie was issued");
     }
 
-    private String readActivationToken() throws Exception {
+    private static String readActivationToken() throws Exception {
         Path tokenFile = dataDir.resolve("bootstrap-activation.token");
         String firstLine = Files.readAllLines(tokenFile).get(0);
         return firstLine.trim();

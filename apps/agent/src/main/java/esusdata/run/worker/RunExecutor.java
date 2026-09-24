@@ -219,7 +219,7 @@ public final class RunExecutor {
         return computeStageAndPublish(context, manifest, encounters, cancellation);
     }
 
-    private void requireC1(RunContext context) {
+    private static void requireC1(RunContext context) {
         // This executor only ever computes C1 — reject anything else before doing any I/O rather
         // than silently publishing a C1 result under a different pack/version's name.
         if (!C1Rule.INDICATOR_PACK.equals(context.indicatorPack())
@@ -286,7 +286,7 @@ public final class RunExecutor {
         return new RunOutcome(stagingId, outcome.resultId(), result);
     }
 
-    private String computeInputFingerprint(ExtractionManifest manifest, IndicatorResult result) {
+    private static String computeInputFingerprint(ExtractionManifest manifest, IndicatorResult result) {
         SortedMap<String, String> fields = new TreeMap<>();
         fields.put("source_id", manifest.sourceId());
         fields.put("municipality_ibge", manifest.municipalityIbge());
@@ -304,7 +304,7 @@ public final class RunExecutor {
         return InputFingerprint.compute(fields);
     }
 
-    private List<EvidenceEntry> toEvidence(List<CanonicalEncounter> encounters, IndicatorResult result) {
+    private static List<EvidenceEntry> toEvidence(List<CanonicalEncounter> encounters, IndicatorResult result) {
         List<EvidenceEntry> entries = new ArrayList<>(encounters.size());
         for (CanonicalEncounter e : encounters) {
             String decision = switch (e.modality()) {

@@ -2,6 +2,7 @@ package esusdata.config;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.io.Serial;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
@@ -64,12 +65,14 @@ public final class ProcessLock implements AutoCloseable {
             try {
                 channel.close();
             } catch (IOException ignored) {
+                // Cleanup on a path already failing with its own exception; nothing to add.
             }
         }
         if (raf != null) {
             try {
                 raf.close();
             } catch (IOException ignored) {
+                // Cleanup on a path already failing with its own exception; nothing to add.
             }
         }
     }
@@ -90,6 +93,9 @@ public final class ProcessLock implements AutoCloseable {
     }
 
     public static final class ProcessLockUnavailableException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public ProcessLockUnavailableException(String message) {
             super(message);
         }

@@ -159,7 +159,7 @@ class LoginThrottleTest {
         }
     }
 
-    private LoginThrottle.LoginThrottledException catchThrottled(Runnable action) {
+    private static LoginThrottle.LoginThrottledException catchThrottled(Runnable action) {
         try {
             action.run();
         } catch (LoginThrottle.LoginThrottledException e) {

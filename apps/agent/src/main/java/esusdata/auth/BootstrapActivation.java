@@ -9,6 +9,7 @@ import esusdata.auth.model.UserAccount;
 import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
 import java.io.IOException;
+import java.io.Serial;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -200,6 +201,9 @@ public final class BootstrapActivation {
     private record TokenRow(String tokenHash, String userId, Instant expiresAt, Instant consumedAt) {}
 
     public static final class ActivationFailedException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public ActivationFailedException(String message) {
             super(message);
         }

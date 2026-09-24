@@ -107,7 +107,9 @@ class LiveAcquisitionEndToEndTest {
             public String fingerprint(Connection connection, String object, List<String> columnsUsed)
                     throws SQLException {
                 String fingerprint = entry.objectFingerprints().get(object);
-                if (fingerprint == null) throw new SQLException("No fixture fingerprint for " + object);
+                if (fingerprint == null) {
+                    throw new SQLException("No fixture fingerprint for " + object);
+                }
                 return fingerprint;
             }
         };
@@ -139,7 +141,7 @@ class LiveAcquisitionEndToEndTest {
 
     private static boolean fixtureLoaded = false;
 
-    private void loadFixtureOnce() throws Exception {
+    private static void loadFixtureOnce() throws Exception {
         if (fixtureLoaded) {
             return;
         }
@@ -151,7 +153,7 @@ class LiveAcquisitionEndToEndTest {
     }
 
     private RunExecutor.RunContext liveContext(String jobId, String municipalityIbge) {
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
+        fixture.jobRepository.enqueue(new EnqueueRequest(
                 jobId,
                 "run-" + jobId,
                 municipalityIbge,

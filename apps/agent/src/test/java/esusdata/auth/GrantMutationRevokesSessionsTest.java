@@ -81,7 +81,7 @@ public class GrantMutationRevokesSessionsTest extends ApiFixtureSupport {
         assertThat(meStatus(targetCookie)).isEqualTo(401);
     }
 
-    private int meStatus(String cookie) throws Exception {
+    private static int meStatus(String cookie) throws Exception {
         HttpResponse<String> response = HttpClient.newHttpClient()
                 .send(
                         HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/me"))
@@ -92,7 +92,7 @@ public class GrantMutationRevokesSessionsTest extends ApiFixtureSupport {
         return response.statusCode();
     }
 
-    private String extractField(String json, String field) {
+    private static String extractField(String json, String field) {
         String marker = "\"" + field + "\":\"";
         int start = json.indexOf(marker) + marker.length();
         int end = json.indexOf('"', start);

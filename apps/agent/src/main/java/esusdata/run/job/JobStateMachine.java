@@ -15,8 +15,8 @@ import java.util.Set;
  * CANCEL_REQUESTED after restart         -&gt; CANCELLED
  * </pre>
  *
- * <p>The "abandoned after restart" row adds no new edges beyond {@code RUNNING -&gt; QUEUED} and
- * {@code STAGED -&gt; QUEUED} — both already needed for a <em>live</em> transient-failure retry
+ * <p>The "abandoned after restart" row adds no new edges beyond {@code RUNNING -> QUEUED} and
+ * {@code STAGED -> QUEUED} — both already needed for a <em>live</em> transient-failure retry
  * (§1.9.4: "retries automáticos... com atraso crescente"), which never visits {@code FAILED} at
  * all while attempts remain. Recovery and live retry are the same edge; only the caller differs.
  *

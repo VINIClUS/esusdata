@@ -124,7 +124,9 @@ public final class PecDataSourceFactory {
             throw new IllegalArgumentException(setting + " must be positive");
         }
         long seconds = millis / 1000;
-        if (millis % 1000 != 0) seconds++;
+        if (millis % 1000 != 0) {
+            seconds++;
+        }
         seconds = Math.max(1, seconds);
         if (seconds > Integer.MAX_VALUE) {
             throw new IllegalArgumentException(setting + " is too large for pgJDBC timeout properties");

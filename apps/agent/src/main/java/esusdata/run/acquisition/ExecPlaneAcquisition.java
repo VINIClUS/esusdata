@@ -116,6 +116,8 @@ public final class ExecPlaneAcquisition implements Acquisition {
     }
 
     @Override
+    // javac's try lint: the permit is held for the block's scope and released on close, never read.
+    @SuppressWarnings("try")
     public ExtractionManifest acquire(
             AcquisitionCommand acquisitionCommand, CancellationSignal cancellation, AcquisitionListener listener) {
         // §1.12.6/ENG-46: the allowlist is deployment-administered and never crosses the process
@@ -228,9 +230,6 @@ public final class ExecPlaneAcquisition implements Acquisition {
 
             return consumeUntilComplete(
                     process, reader, publication, cancellation, listener, startedAt, acquisitionCommand.sourceZoneId());
-        } catch (IOException e) {
-            killProcess(process);
-            throw new PecAcquisitionException("execution plane I/O failure: " + e.getMessage(), e);
         } catch (RuntimeException e) {
             // A bad AcquisitionCommand or a stdin write racing the child's exit can throw
             // unchecked after spawn. Every path that should flag ENG-51 uncertainty already does
@@ -245,7 +244,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
     }
 
     /**
-     * Reads {@code progress}/{@code complete}/{@code error} messages until the child closes its
+     * Reads {@code "progress"}/{@code "complete"}/{@code "error"} messages until the child closes its
      * stdout, then requires both an exit code of {@code 0} <em>and</em> a {@code complete} message
      * — either alone is a protocol violation, not a success. Only once both hold does this call
      * {@link DelegatedExtractPublication#publish} to verify the child's report against the file it
@@ -258,8 +257,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             CancellationSignal cancellation,
             AcquisitionListener listener,
             Instant startedAt,
-            String sourceZoneId)
-            throws IOException {
+            String sourceZoneId) {
         JsonNode complete = null;
         while (true) {
             JsonNode message;
@@ -347,7 +345,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
         throw translate(text(message, "code"), text(message, "sqlstate"), detail);
     }
 
-    private ExtractionManifest abnormalTermination(
+    private static ExtractionManifest abnormalTermination(
             Process process, CancellationSignal cancellation, AcquisitionListener listener, String detail) {
         killProcess(process);
         listener.onUncertainOutcome("execution plane protocol violation: " + detail);
@@ -357,14 +355,14 @@ public final class ExecPlaneAcquisition implements Acquisition {
 
     /**
      * Plan §2.7.1's translation table, mapped onto exception types {@code FailureClassifier}
-     * already has a branch for. An error carrying a {@code sqlstate} becomes a {@code
+     * already has a branch for. An error carrying a {@code "sqlstate"} field becomes a {@code
      * PecAcquisitionException} caused by a {@link SQLException} with that same state — exactly the
      * shape the JDBC path throws — so the classifier's existing SQLSTATE dispatch ({@code 28*} →
      * {@code SOURCE_AUTHENTICATION_FAILED}, {@code 08*} → transient) applies unchanged, rather
      * than the plan's original new constructor plus a second, parallel classifier branch. Any
      * other unrecognized {@code code} falls through to the generic {@code UNCLASSIFIED_ERROR}.
      */
-    private RuntimeException translate(String code, String sqlState, String detail) {
+    private static RuntimeException translate(String code, String sqlState, String detail) {
         if ("COMPATIBILITY_MISMATCH".equals(code)) {
             return new IllegalStateException("execution plane compatibility mismatch (ENG-43): " + detail);
         }
@@ -445,7 +443,8 @@ public final class ExecPlaneAcquisition implements Acquisition {
      * {@code JdbcCompatibilityCatalog} uses (plan §1.3/§2.2) — there is no second implementation
      * of the ENG-43 signature algorithm for a child to drift from.
      */
-    private CompatibilityProbeResult buildProbeResult(String object, JsonNode objectNode, List<String> columnsUsed) {
+    private static CompatibilityProbeResult buildProbeResult(
+            String object, JsonNode objectNode, List<String> columnsUsed) {
         Map<String, ColumnMetadata> columns = new LinkedHashMap<>();
         JsonNode columnsNode = objectNode.get("columns");
         if (columnsNode != null) {
@@ -604,7 +603,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
         }
     }
 
-    private void drainStderr(Process process) {
+    private static void drainStderr(Process process) {
         Thread stderrThread = new Thread(
                 () -> {
                     try (BufferedReader err = new BufferedReader(
@@ -652,7 +651,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
         }
     }
 
-    private void killProcess(Process process) {
+    private static void killProcess(Process process) {
         if (!process.isAlive()) {
             return;
         }

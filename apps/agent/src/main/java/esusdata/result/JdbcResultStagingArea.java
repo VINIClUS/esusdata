@@ -28,6 +28,7 @@ public final class JdbcResultStagingArea implements ResultStagingArea {
     }
 
     /** Opens a new staging row in state {@code OPEN}. */
+    @Override
     public String open(StagingRequest request) {
         IndicatorResult result = request.result();
         jdbc.update(
@@ -70,6 +71,7 @@ public final class JdbcResultStagingArea implements ResultStagingArea {
      * staging") — assigns a deterministic {@code seq} in list order, starting at 0, so pagination
      * over the eventual published result is reproducible.
      */
+    @Override
     public void writeEvidence(String stagingId, List<EvidenceEntry> entries) {
         for (int offset = 0; offset < entries.size(); offset += EVIDENCE_BATCH_SIZE) {
             List<EvidenceEntry> batch = entries.subList(offset, Math.min(offset + EVIDENCE_BATCH_SIZE, entries.size()));
@@ -104,6 +106,7 @@ public final class JdbcResultStagingArea implements ResultStagingArea {
     }
 
     /** Seals a staging row — the last step before it can be published. */
+    @Override
     public void seal(String stagingId) {
         int updated = jdbc.update(
                 "update result_staging set state = 'SEALED' where staging_id = ? and state = 'OPEN'", stagingId);
@@ -117,6 +120,7 @@ public final class JdbcResultStagingArea implements ResultStagingArea {
      * abandoned job (§1.9.4: "estágio parcial neutralizado"). A {@code PUBLISHED} row is never
      * neutralized; the CAS below only matches {@code OPEN}/{@code SEALED}.
      */
+    @Override
     public void neutralize(String stagingId) {
         jdbc.update("delete from evidence where staging_id = ?", stagingId);
         jdbc.update(

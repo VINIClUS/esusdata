@@ -35,6 +35,7 @@ public final class JdbcEvidenceRepository implements EvidenceRepository {
         this.jdbc = jdbc;
     }
 
+    @Override
     public EvidencePage page(String resultId, String municipalityIbge, Long afterSeq, int limit) {
         return page(resultId, municipalityIbge, null, null, afterSeq, limit);
     }
@@ -45,6 +46,7 @@ public final class JdbcEvidenceRepository implements EvidenceRepository {
      * {@code hasMore}/{@code nextCursor} (a page could come back short of {@code limit} while more
      * matching rows exist further down the {@code seq} order).
      */
+    @Override
     public EvidencePage page(
             String resultId, String municipalityIbge, String cnes, String ine, Long afterSeq, int limit) {
         if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {

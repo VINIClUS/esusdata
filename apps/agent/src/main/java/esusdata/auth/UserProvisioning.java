@@ -4,6 +4,7 @@ import esusdata.auth.model.ActivationTokens;
 import esusdata.auth.model.UserAccount;
 import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
+import java.io.Serial;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -79,6 +80,9 @@ public final class UserProvisioning {
     }
 
     public static final class UsernameAlreadyExistsException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public UsernameAlreadyExistsException(String message) {
             super(message);
         }

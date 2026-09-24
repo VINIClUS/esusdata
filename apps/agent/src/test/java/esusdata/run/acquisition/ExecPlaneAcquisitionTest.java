@@ -118,7 +118,7 @@ class ExecPlaneAcquisitionTest {
         return System.getProperty("java.home") + java.io.File.separator + "bin" + java.io.File.separator + "java";
     }
 
-    private AcquisitionCommand command() {
+    private static AcquisitionCommand command() {
         return new AcquisitionCommand(
                 new PecConnectionProperties(
                         "src-1", "127.0.0.1", 5432, "esus", "esus_leitura", "PEC_DB_PASSWORD", "3541307"),

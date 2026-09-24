@@ -28,6 +28,8 @@ import tools.jackson.databind.ObjectMapper;
  * exit {@code 0}) the real binary must satisfy, so {@link DelegatedExtractPublication}'s
  * verification logic is genuinely exercised, not simulated.
  */
+// Stdout/stderr are the execution-plane protocol this stub stands in for, not logging.
+@SuppressWarnings("SystemOut")
 public final class StubExecPlaneMain {
 
     // Raw column data for "test_object.col_a" — ExecPlaneAcquisitionTest's synthetic
@@ -40,7 +42,7 @@ public final class StubExecPlaneMain {
             "sha256:d3056dab5cb643fa03eb8a7b3b963e69532e12d1e23b3f5c3010d3a965b90246";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    public static void main(String[] args) throws IOException, InterruptedException {
+    public static void main(String[] args) throws IOException {
         String scenario = args.length > 0 ? args[0] : "happy";
         PrintStream out = new PrintStream(System.out, true, StandardCharsets.UTF_8);
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
@@ -245,4 +247,6 @@ public final class StubExecPlaneMain {
         String checksum = HexFormat.of().formatHex(digest.digest(compressed));
         return new Completion(jsonLines.size(), exclusionCount, checksum, compressed.length);
     }
+
+    private StubExecPlaneMain() {}
 }

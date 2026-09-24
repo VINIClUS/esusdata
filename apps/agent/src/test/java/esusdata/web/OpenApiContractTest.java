@@ -101,7 +101,7 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
 
     private static final ParameterNameDiscoverer PARAMETER_NAMES = new DefaultParameterNameDiscoverer();
 
-    private Set<ParamRef> handlerParams(HandlerMethod handlerMethod) {
+    private static Set<ParamRef> handlerParams(HandlerMethod handlerMethod) {
         Set<ParamRef> params = new TreeSet<>();
         for (MethodParameter parameter : handlerMethod.getMethodParameters()) {
             parameter.initParameterNameDiscovery(PARAMETER_NAMES);
@@ -118,7 +118,7 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
         return params;
     }
 
-    private String resolveName(String value, String name, MethodParameter parameter) {
+    private static String resolveName(String value, String name, MethodParameter parameter) {
         if (!value.isBlank()) {
             return value;
         }
@@ -152,7 +152,7 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Set<ParamRef>> documentedRoutes() {
+    private static Map<String, Set<ParamRef>> documentedRoutes() {
         assertThat(Files.exists(CONTRACT_PATH))
                 .as("expected an OpenAPI contract at %s", CONTRACT_PATH.toAbsolutePath())
                 .isTrue();
@@ -177,7 +177,7 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
     }
 
     @SuppressWarnings("unchecked")
-    private Set<ParamRef> operationParams(Map<String, Object> operation, Map<String, Object> componentParams) {
+    private static Set<ParamRef> operationParams(Map<String, Object> operation, Map<String, Object> componentParams) {
         Set<ParamRef> params = new TreeSet<>();
         List<Object> declared = (List<Object>) operation.getOrDefault("parameters", List.of());
         for (Object entry : declared) {

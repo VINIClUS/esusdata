@@ -1,5 +1,6 @@
 package esusdata.source.pec;
 
+import java.io.Serial;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Locale;
@@ -91,6 +92,9 @@ public final class AllowedDestinations {
     }
 
     public static final class DestinationNotAllowedException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public DestinationNotAllowedException(String message) {
             super(message);
         }

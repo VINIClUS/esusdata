@@ -47,7 +47,9 @@ public class RunControllerCancellationTest {
         Job running = job(JobState.RUNNING);
         Job requested = job(JobState.CANCEL_REQUESTED);
         when(jobRepository.findById("job-1"))
-                .thenReturn(Optional.of(queued), Optional.of(running), Optional.of(requested));
+                .thenReturn(Optional.of(queued))
+                .thenReturn(Optional.of(running))
+                .thenReturn(Optional.of(requested));
         when(jobRepository.cancelQueued(eq("job-1"), any(Instant.class))).thenReturn(false);
         when(jobRepository.requestCancel(eq("job-1"), eq("proc-1"), eq(1L), any(Instant.class)))
                 .thenReturn(true);
@@ -79,10 +81,9 @@ public class RunControllerCancellationTest {
         doNothing().when(authorization).requireObjectScope(session, Permission.RUN_INDICATOR, MUNICIPALITY);
 
         when(jobRepository.findById("job-1"))
-                .thenReturn(
-                        Optional.of(job(JobState.CANCEL_REQUESTED)),
-                        Optional.of(job(JobState.SUCCEEDED)),
-                        Optional.of(job(JobState.SUCCEEDED)));
+                .thenReturn(Optional.of(job(JobState.CANCEL_REQUESTED)))
+                .thenReturn(Optional.of(job(JobState.SUCCEEDED)))
+                .thenReturn(Optional.of(job(JobState.SUCCEEDED)));
 
         RunController controller = new RunController(
                 jobRepository,
@@ -105,11 +106,10 @@ public class RunControllerCancellationTest {
         doNothing().when(authorization).requireObjectScope(session, Permission.RUN_INDICATOR, MUNICIPALITY);
 
         when(jobRepository.findById("job-1"))
-                .thenReturn(
-                        Optional.of(job(JobState.RUNNING, "proc-1", 1)),
-                        Optional.of(job(JobState.QUEUED, null, 2)),
-                        Optional.of(job(JobState.RUNNING, "proc-2", 3)),
-                        Optional.of(job(JobState.CANCEL_REQUESTED, "proc-2", 3)));
+                .thenReturn(Optional.of(job(JobState.RUNNING, "proc-1", 1)))
+                .thenReturn(Optional.of(job(JobState.QUEUED, null, 2)))
+                .thenReturn(Optional.of(job(JobState.RUNNING, "proc-2", 3)))
+                .thenReturn(Optional.of(job(JobState.CANCEL_REQUESTED, "proc-2", 3)));
         when(jobRepository.requestCancel(eq("job-1"), eq("proc-1"), eq(1L), any(Instant.class)))
                 .thenReturn(false);
         when(jobRepository.cancelQueued(eq("job-1"), any(Instant.class))).thenReturn(false);
@@ -154,15 +154,15 @@ public class RunControllerCancellationTest {
         verify(authorization).auditDenied(session, Permission.RUN_INDICATOR, "unknown");
     }
 
-    private AuthenticatedSession session() {
+    private static AuthenticatedSession session() {
         return new AuthenticatedSession("session-1", "user-1", NOW, NOW, NOW.plusSeconds(3600), 1, null);
     }
 
-    private Job job(JobState state) {
+    private static Job job(JobState state) {
         return job(state, "proc-1", 1);
     }
 
-    private Job job(JobState state, String processInstanceId, long executionGeneration) {
+    private static Job job(JobState state, String processInstanceId, long executionGeneration) {
         return new Job(
                 "job-1",
                 "run-1",

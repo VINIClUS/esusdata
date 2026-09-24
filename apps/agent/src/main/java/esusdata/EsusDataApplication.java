@@ -12,8 +12,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * DataSource") provable rather than incidental.
  */
 @SpringBootApplication
-public class EsusDataApplication {
+public final class EsusDataApplication {
     public static void main(String[] args) {
         SpringApplication.run(EsusDataApplication.class, args);
     }
+
+    private EsusDataApplication() {}
 }

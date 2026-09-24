@@ -260,7 +260,7 @@ class JobWorkerTest {
         JobRepository jobRepository = mock(JobRepository.class);
         when(jobRepository.acquireNext(anyString(), any(Instant.class))).thenReturn(Optional.of(acquired));
         when(jobRepository.findById("job-1"))
-                .thenReturn(Optional.of(persistedCancellation), Optional.of(persistedCancellation));
+                .thenReturn(Optional.of(persistedCancellation)); // Mockito keeps returning the last stub
         when(jobRepository.markCancelledAndRecordAttempt("job-1", "proc-1", 1, now))
                 .thenReturn(true);
 

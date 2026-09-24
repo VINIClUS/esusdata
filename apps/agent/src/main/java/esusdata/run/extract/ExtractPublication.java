@@ -40,7 +40,9 @@ final class ExtractPublication {
             String adapterVersion,
             String completenessStatus,
             String consistencyLevel) {
-        if (sourceId == null || sourceId.isBlank()) throw new IllegalArgumentException("sourceId is required");
+        if (sourceId == null || sourceId.isBlank()) {
+            throw new IllegalArgumentException("sourceId is required");
+        }
         if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
             throw new IllegalArgumentException("municipalityIbge must be a 7-digit IBGE code");
         }
@@ -52,15 +54,21 @@ final class ExtractPublication {
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("period must use ISO local dates", e);
         }
-        if (!end.isAfter(start)) throw new IllegalArgumentException("period end must be after period start");
-        if (startedAt == null) throw new IllegalArgumentException("startedAt is required");
-        if (sourceZoneId == null || sourceZoneId.isBlank())
+        if (!end.isAfter(start)) {
+            throw new IllegalArgumentException("period end must be after period start");
+        }
+        if (startedAt == null) {
+            throw new IllegalArgumentException("startedAt is required");
+        }
+        if (sourceZoneId == null || sourceZoneId.isBlank()) {
             throw new IllegalArgumentException("sourceZoneId is required");
+        }
         if (!ExtractValidation.isSha256Digest(queryChecksum)) {
             throw new IllegalArgumentException("queryChecksum must be a SHA-256 digest");
         }
-        if (adapterVersion == null || adapterVersion.isBlank())
+        if (adapterVersion == null || adapterVersion.isBlank()) {
             throw new IllegalArgumentException("adapterVersion is required");
+        }
         if (!"COMPLETE".equals(completenessStatus)) {
             throw new IllegalArgumentException("only COMPLETE extracts may be published");
         }
@@ -78,7 +86,9 @@ final class ExtractPublication {
         createOwnerOnlyFile(path);
         try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE)) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
-            while (buffer.hasRemaining()) channel.write(buffer);
+            while (buffer.hasRemaining()) {
+                channel.write(buffer);
+            }
             channel.force(true);
         }
     }

@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.net.CookieManager;
 import java.net.CookieStore;
 import java.net.HttpCookie;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -109,10 +110,14 @@ public class CsrfAndOriginTest extends SecuritySliceTestSupport {
     @Test
     void aRequestWithAnUnrecognizedHostHeaderIsRejected() throws Exception {
         String rawResponse;
-        try (Socket socket = new Socket("127.0.0.1", PORT)) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), PORT)) {
             OutputStream out = socket.getOutputStream();
-            String request =
-                    "GET /api/v1/ready HTTP/1.1\r\n" + "Host: attacker.example.com\r\n" + "Connection: close\r\n\r\n";
+            String request = """
+                    GET /api/v1/ready HTTP/1.1\r
+                    Host: attacker.example.com\r
+                    Connection: close\r
+                    \r
+                    """;
             out.write(request.getBytes(StandardCharsets.US_ASCII));
             out.flush();
             StringBuilder sb = new StringBuilder();
@@ -130,7 +135,7 @@ public class CsrfAndOriginTest extends SecuritySliceTestSupport {
         assertThat(rawResponse).contains("ORIGIN_NOT_ALLOWED");
     }
 
-    private String csrfTokenFrom(CookieManager cookieManager) {
+    private static String csrfTokenFrom(CookieManager cookieManager) {
         CookieStore store = cookieManager.getCookieStore();
         for (HttpCookie cookie : store.getCookies()) {
             if ("XSRF-TOKEN".equals(cookie.getName())) {

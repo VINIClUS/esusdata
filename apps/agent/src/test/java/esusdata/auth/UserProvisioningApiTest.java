@@ -58,14 +58,14 @@ public class UserProvisioningApiTest extends ApiFixtureSupport {
         assertThat(activate.statusCode()).isEqualTo(204);
     }
 
-    private String extractField(String json, String field) {
+    private static String extractField(String json, String field) {
         String marker = "\"" + field + "\":\"";
         int start = json.indexOf(marker) + marker.length();
         int end = json.indexOf('"', start);
         return json.substring(start, end);
     }
 
-    private String csrfTokenViaReady() throws Exception {
+    private static String csrfTokenViaReady() throws Exception {
         HttpResponse<String> ready = HttpClient.newHttpClient()
                 .send(
                         HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))

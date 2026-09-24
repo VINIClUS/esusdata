@@ -282,11 +282,11 @@ class IndividualEncounterModalityCapabilityTest {
                 .isTrue();
     }
 
-    private PecConnectionProperties sourceProperties() {
+    private static PecConnectionProperties sourceProperties() {
         return new PecConnectionProperties("test-source", "127.0.0.1", 5432, "fixture", "reader", "unused", "3541307");
     }
 
-    private void assertPostgresBudgetCancellation(String sqlState, String message) throws Exception {
+    private static void assertPostgresBudgetCancellation(String sqlState, String message) throws Exception {
         Connection connection = mock(Connection.class);
         PreparedStatement statement = mock(PreparedStatement.class);
         when(connection.prepareStatement(anyString(), eq(ResultSet.TYPE_FORWARD_ONLY), eq(ResultSet.CONCUR_READ_ONLY)))
@@ -302,11 +302,11 @@ class IndividualEncounterModalityCapabilityTest {
                 .hasCauseInstanceOf(java.sql.SQLException.class);
     }
 
-    private PecAcquisition acquisition(Connection connection, BudgetGuard guard) {
+    private static PecAcquisition acquisition(Connection connection, BudgetGuard guard) {
         return acquisition(connection, CT133_IDENTITY, guard);
     }
 
-    private PecAcquisition acquisition(Connection connection, PecSourceIdentity identity, BudgetGuard guard) {
+    private static PecAcquisition acquisition(Connection connection, PecSourceIdentity identity, BudgetGuard guard) {
         return PecAcquisitionTestSupport.bind(
                 PecSourceConnectionTestSupport.bind(connection, sourceProperties(), identity),
                 LocalDate.of(2026, 3, 1),
@@ -314,7 +314,7 @@ class IndividualEncounterModalityCapabilityTest {
                 guard);
     }
 
-    private PecAcquisition acquisition(Connection connection, ReadBudget budget, BudgetGuard guard) {
+    private static PecAcquisition acquisition(Connection connection, ReadBudget budget, BudgetGuard guard) {
         return PecAcquisitionTestSupport.bind(
                 PecSourceConnectionTestSupport.bind(connection, sourceProperties(), CT133_IDENTITY, budget),
                 LocalDate.of(2026, 3, 1),

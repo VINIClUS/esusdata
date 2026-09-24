@@ -61,7 +61,9 @@ public record ReadBudget(
     }
 
     public ReadBudget {
-        if (poolMaxSize <= 0) throw new IllegalArgumentException("poolMaxSize must be positive");
+        if (poolMaxSize <= 0) {
+            throw new IllegalArgumentException("poolMaxSize must be positive");
+        }
         if (connectionTimeout == null || connectionTimeout.isNegative() || connectionTimeout.isZero()) {
             throw new IllegalArgumentException("connectionTimeout must be positive");
         }
