@@ -38,6 +38,10 @@ A matriz exigia `pec_version` exato. A 5.5.28, com o mesmo schema observado, nã
 
 - Uma instalação sem o binário não sobe. Os pacotes (ADR 0014) sempre trazem o binário, e a opção
   de desligá-lo foi retirada dos `application.yml`. Rodar o backend local exige `cargo build` antes.
+- **Atualização de instalações que seguiram o opt-out do ADR 0014.** O `postinst` e o instalador
+  Windows só criam o `application.yml` de config quando ele não existe. Uma instalação com
+  `observatorio.execution-plane.binary: ""` nesse arquivo deixa de iniciar depois da atualização.
+  Remova essa linha antes de atualizar.
 - Os testes com contexto Spring apontam `binary` para qualquer executável (o próprio `java`). Nenhum
   deles adquire.
 - O `include_str!` do Rust embute a matriz. Mudar a matriz exige recompilar o binário, e o
