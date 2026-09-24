@@ -1,21 +1,21 @@
 package esusdata.run.worker;
 
-import esusdata.run.extract.ExtractFixtures;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import esusdata.indicator.pack.c1.C1Rule;
+import esusdata.run.extract.ExtractFixtures;
+import esusdata.run.job.EnqueueRequest;
+import esusdata.run.job.Job;
+import esusdata.run.job.JobState;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Path;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.run.job.EnqueueRequest;
-import esusdata.run.job.Job;
-import esusdata.run.job.JobState;
 /** §1.13 invariant: "reiniciar job não duplica resultado." */
 class RestartDoesNotDuplicateResultTest {
 
@@ -40,11 +40,24 @@ class RestartDoesNotDuplicateResultTest {
 
     @Test
     void restartAfterSuccessNeverReRunsOrDuplicatesTheResult() throws Exception {
-        var manifest = ExtractFixtures.write(
-                fixture.extractsDir, "ext-restart", "src-1", "3541307", "2026-03", 4, 4, 0);
-        fixture.jobRepository.enqueue(new EnqueueRequest("job-1", "run-1", "3541307",
-                C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION, "2026-03", 3, "src-1",
-                manifest.extractionId(), "test-principal", null, null, null, null, clock.instant()));
+        var manifest =
+                ExtractFixtures.write(fixture.extractsDir, "ext-restart", "src-1", "3541307", "2026-03", 4, 4, 0);
+        fixture.jobRepository.enqueue(new EnqueueRequest(
+                "job-1",
+                "run-1",
+                "3541307",
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                3,
+                "src-1",
+                manifest.extractionId(),
+                "test-principal",
+                null,
+                null,
+                null,
+                null,
+                clock.instant()));
 
         JobWorker worker = fixture.worker("proc-1");
         assertThat(worker.runOnce()).isTrue(); // runs job-1 to completion (SUCCEEDED)

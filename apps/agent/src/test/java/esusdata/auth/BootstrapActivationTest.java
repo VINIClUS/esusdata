@@ -1,6 +1,21 @@
 package esusdata.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import esusdata.auth.model.GrantRepository;
+import esusdata.auth.model.Role;
+import esusdata.auth.model.UserAccount;
+import esusdata.auth.model.UserRepository;
+import esusdata.auth.model.UserState;
 import esusdata.config.SqliteConfig;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,22 +25,6 @@ import org.springframework.core.env.MapPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import esusdata.auth.model.Role;
-import esusdata.auth.model.UserAccount;
-import esusdata.auth.model.UserState;
-import esusdata.auth.model.GrantRepository;
-import esusdata.auth.model.UserRepository;
 
 /**
  * Proves two fixes found in PR review: a token-file write failure never leaves a
@@ -53,8 +52,13 @@ class BootstrapActivationTest {
         clock = Clock.fixed(Instant.parse("2026-09-20T12:00:00Z"), ZoneOffset.UTC);
         context = new AnnotationConfigApplicationContext();
         context.register(SqliteConfig.class);
-        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("test",
-                Map.of("observatorio.data.directory", dataDir.resolve("db").toString())));
+        context.getEnvironment()
+                .getPropertySources()
+                .addFirst(new MapPropertySource(
+                        "test",
+                        Map.of(
+                                "observatorio.data.directory",
+                                dataDir.resolve("db").toString())));
         context.refresh();
 
         jdbc = context.getBean(JdbcTemplate.class);
@@ -72,8 +76,16 @@ class BootstrapActivationTest {
     }
 
     private BootstrapActivation activationOver(Path tokenDirectory) {
-        return new BootstrapActivation(userRepository, grantRepository, jdbc, transactionTemplate,
-                clock, properties, passwordPolicy, argon2Profile, tokenDirectory);
+        return new BootstrapActivation(
+                userRepository,
+                grantRepository,
+                jdbc,
+                transactionTemplate,
+                clock,
+                properties,
+                passwordPolicy,
+                argon2Profile,
+                tokenDirectory);
     }
 
     @Test
@@ -86,7 +98,8 @@ class BootstrapActivationTest {
         assertThatThrownBy(activation::ensureBootstrapAdmin).isInstanceOf(IOException.class);
 
         assertThat(userRepository.anyExistsWithRole(Role.TECHNICAL_ADMIN)).isFalse();
-        assertThat(jdbc.queryForObject("select count(*) from activation_tokens", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from activation_tokens", Integer.class))
+                .isZero();
     }
 
     @Test
@@ -112,8 +125,7 @@ class BootstrapActivationTest {
 
         UserAccount firstActivation = activation.activate(rawToken, "a-strong-enough-passphrase-1", clock.instant());
 
-        assertThatThrownBy(() ->
-                activation.activate(rawToken, "a-different-strong-passphrase-2", clock.instant()))
+        assertThatThrownBy(() -> activation.activate(rawToken, "a-different-strong-passphrase-2", clock.instant()))
                 .isInstanceOf(BootstrapActivation.ActivationFailedException.class)
                 .hasMessageContaining("already used");
 
@@ -123,7 +135,7 @@ class BootstrapActivationTest {
         assertThat(current.passwordHash()).isEqualTo(firstActivation.passwordHash());
         assertThat(current.state()).isEqualTo(UserState.ACTIVE);
         assertThat(jdbc.queryForObject(
-                "select count(*) from activation_tokens where consumed_at is not null", Integer.class))
+                        "select count(*) from activation_tokens where consumed_at is not null", Integer.class))
                 .isEqualTo(1);
     }
 }

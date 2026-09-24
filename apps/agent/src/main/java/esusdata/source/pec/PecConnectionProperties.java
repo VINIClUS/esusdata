@@ -21,8 +21,7 @@ public record PecConnectionProperties(
         String database,
         String user,
         String secretRef,
-        String municipalityIbge
-) {
+        String municipalityIbge) {
     public PecConnectionProperties {
         if (host == null || host.isBlank()) {
             throw new IllegalArgumentException("host is required");
@@ -34,9 +33,8 @@ public record PecConnectionProperties(
             throw new IllegalArgumentException("database is required");
         }
         if (!isValidPostgresIdentifier(database)) {
-            throw new IllegalArgumentException(
-                    "database name is not a valid PostgreSQL identifier: " + database
-                            + " — must be alphanumeric or underscore, no JDBC URL parameter injection allowed");
+            throw new IllegalArgumentException("database name is not a valid PostgreSQL identifier: " + database
+                    + " — must be alphanumeric or underscore, no JDBC URL parameter injection allowed");
         }
         if (user == null || user.isBlank()) {
             throw new IllegalArgumentException("user is required");
@@ -46,8 +44,7 @@ public record PecConnectionProperties(
                     "Refusing to configure a source with the 'postgres' superuser (Tech Spec §1.12.7)");
         }
         if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
-            throw new IllegalArgumentException(
-                    "municipality_ibge must be a 7-digit code, got: " + municipalityIbge);
+            throw new IllegalArgumentException("municipality_ibge must be a 7-digit code, got: " + municipalityIbge);
         }
     }
 

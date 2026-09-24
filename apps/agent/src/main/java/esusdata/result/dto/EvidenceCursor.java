@@ -1,15 +1,15 @@
 package esusdata.result.dto;
 
-import esusdata.result.model.EvidenceRepository;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
+import esusdata.result.model.InvalidCursorException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
-import esusdata.result.model.InvalidCursorException;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
 /**
  * §1.10.1 L405: "cursor opaco vinculado ao resultado publicado/filtros/ordenação [...] o cursor
  * não concede acesso." A base64url envelope over {@code resultId|ordering|scope|seq}, authenticated
@@ -75,8 +75,7 @@ public final class EvidenceCursor {
         if (!MessageDigest.isEqual(presentedMac, hmac(payload))) {
             throw new InvalidCursorException("evidence cursor failed integrity check");
         }
-        String[] fields = new String(payload, StandardCharsets.UTF_8)
-                .split(String.valueOf(FIELD_SEPARATOR), -1);
+        String[] fields = new String(payload, StandardCharsets.UTF_8).split(String.valueOf(FIELD_SEPARATOR), -1);
         if (fields.length != 4) {
             throw new InvalidCursorException("malformed evidence cursor payload");
         }
@@ -88,10 +87,10 @@ public final class EvidenceCursor {
         }
         // A cursor minted for a different result/ordering/scope must never be honored here — the
         // "não concede acesso" half of §1.10.1 L405, enforced structurally rather than by convention.
-        if (!fields[0].equals(expectedResultId) || !fields[1].equals(expectedOrdering)
+        if (!fields[0].equals(expectedResultId)
+                || !fields[1].equals(expectedOrdering)
                 || !fields[2].equals(expectedScope)) {
-            throw new InvalidCursorException(
-                    "evidence cursor does not match the requested result/ordering/scope");
+            throw new InvalidCursorException("evidence cursor does not match the requested result/ordering/scope");
         }
         return new EvidenceCursor(fields[0], fields[1], fields[2], seq);
     }

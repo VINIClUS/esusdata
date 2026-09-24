@@ -21,6 +21,6 @@ public interface PublicationAuthorization {
 
     /** A permissive default for call sites (mostly tests) that do not exercise authorization. */
     static PublicationAuthorization allowAll() {
-        return (principal, municipalityIbge) -> { };
+        return (principal, municipalityIbge) -> {};
     }
 }

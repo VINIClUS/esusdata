@@ -1,16 +1,16 @@
 package esusdata.auth;
 
-import esusdata.auth.model.Role;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.auth.model.Role;
+import esusdata.web.ApiFixtureSupport;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.ApiFixtureSupport;
 /**
  * §1.12.7 L541: granting, revoking, or blocking a user immediately bumps their
  * {@code authorization_version} and revokes their existing sessions — proven here through the
@@ -32,10 +32,10 @@ public class GrantMutationRevokesSessionsTest extends ApiFixtureSupport {
         String targetCookie = sessionCookie(target);
         assertThat(meStatus(targetCookie)).isEqualTo(200);
 
-        HttpResponse<String> grant = authenticatedPost(adminCookie,
+        HttpResponse<String> grant = authenticatedPost(
+                adminCookie,
                 URI.create(BASE_URL + "/api/v1/users/" + target + "/grants"),
-                "{\"role\":\"MANAGER\",\"scopeKind\":\"MUNICIPALITY\",\"municipalityIbge\":\""
-                        + MUNICIPALITY + "\"}");
+                "{\"role\":\"MANAGER\",\"scopeKind\":\"MUNICIPALITY\",\"municipalityIbge\":\"" + MUNICIPALITY + "\"}");
         assertThat(grant.statusCode()).isEqualTo(201);
 
         assertThat(meStatus(targetCookie)).isEqualTo(401);
@@ -47,17 +47,18 @@ public class GrantMutationRevokesSessionsTest extends ApiFixtureSupport {
         grantInstallation(admin, Role.TECHNICAL_ADMIN);
 
         String target = createUser("target-" + System.nanoTime());
-        HttpResponse<String> grant = authenticatedPost(reauthenticatedSessionCookie(admin),
+        HttpResponse<String> grant = authenticatedPost(
+                reauthenticatedSessionCookie(admin),
                 URI.create(BASE_URL + "/api/v1/users/" + target + "/grants"),
-                "{\"role\":\"MANAGER\",\"scopeKind\":\"MUNICIPALITY\",\"municipalityIbge\":\""
-                        + MUNICIPALITY + "\"}");
+                "{\"role\":\"MANAGER\",\"scopeKind\":\"MUNICIPALITY\",\"municipalityIbge\":\"" + MUNICIPALITY + "\"}");
         assertThat(grant.statusCode()).isEqualTo(201);
         String grantId = extractField(grant.body(), "grantId");
 
         String targetCookie = sessionCookie(target);
         assertThat(meStatus(targetCookie)).isEqualTo(200);
 
-        HttpResponse<String> revoke = authenticatedDelete(reauthenticatedSessionCookie(admin),
+        HttpResponse<String> revoke = authenticatedDelete(
+                reauthenticatedSessionCookie(admin),
                 URI.create(BASE_URL + "/api/v1/users/" + target + "/grants/" + grantId));
         assertThat(revoke.statusCode()).isEqualTo(204);
 
@@ -73,18 +74,21 @@ public class GrantMutationRevokesSessionsTest extends ApiFixtureSupport {
         String targetCookie = sessionCookie(target);
         assertThat(meStatus(targetCookie)).isEqualTo(200);
 
-        HttpResponse<String> block = authenticatedPost(reauthenticatedSessionCookie(admin),
-                URI.create(BASE_URL + "/api/v1/users/" + target + "/block"), null);
+        HttpResponse<String> block = authenticatedPost(
+                reauthenticatedSessionCookie(admin), URI.create(BASE_URL + "/api/v1/users/" + target + "/block"), null);
         assertThat(block.statusCode()).isEqualTo(204);
 
         assertThat(meStatus(targetCookie)).isEqualTo(401);
     }
 
     private int meStatus(String cookie) throws Exception {
-        HttpResponse<String> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/me"))
-                        .header("Cookie", cookie).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/me"))
+                                .header("Cookie", cookie)
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
         return response.statusCode();
     }
 

@@ -1,23 +1,5 @@
 package esusdata.run.controller;
 
-import esusdata.auth.model.AuthenticatedSession;
-import esusdata.auth.model.Permission;
-import esusdata.run.worker.CancellationRegistry;
-import esusdata.run.worker.IdempotencyResolver;
-import esusdata.run.job.Job;
-import esusdata.run.job.JobRepository;
-import esusdata.run.job.JobState;
-import esusdata.result.model.ExtractionManifestRepository;
-import esusdata.result.model.ResultRepository;
-import esusdata.source.SourceRepository;
-import org.junit.jupiter.api.Test;
-
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.List;
-import java.util.Optional;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,9 +8,27 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import esusdata.web.ApiNotFoundException;
-import esusdata.run.job.JobNotCancellableException;
+
 import esusdata.auth.ApiAuthorization;
+import esusdata.auth.model.AuthenticatedSession;
+import esusdata.auth.model.Permission;
+import esusdata.result.model.ExtractionManifestRepository;
+import esusdata.result.model.ResultRepository;
+import esusdata.run.job.Job;
+import esusdata.run.job.JobNotCancellableException;
+import esusdata.run.job.JobRepository;
+import esusdata.run.job.JobState;
+import esusdata.run.worker.CancellationRegistry;
+import esusdata.run.worker.IdempotencyResolver;
+import esusdata.source.SourceRepository;
+import esusdata.web.ApiNotFoundException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+
 public class RunControllerCancellationTest {
 
     private static final Instant NOW = Instant.parse("2026-09-20T12:00:00Z");
@@ -54,16 +54,21 @@ public class RunControllerCancellationTest {
         when(jobRepository.findAttempts("job-1")).thenReturn(List.of());
 
         RunController controller = new RunController(
-                jobRepository, mock(IdempotencyResolver.class), cancellationRegistry,
-                new RunResponseFactory(jobRepository, mock(ResultRepository.class)), mock(SourceRepository.class),
-                mock(ExtractionManifestRepository.class), authorization,
+                jobRepository,
+                mock(IdempotencyResolver.class),
+                cancellationRegistry,
+                new RunResponseFactory(jobRepository, mock(ResultRepository.class)),
+                mock(SourceRepository.class),
+                mock(ExtractionManifestRepository.class),
+                authorization,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         RunResponse response = controller.cancel(session, "job-1");
 
         verify(jobRepository).requestCancel("job-1", "proc-1", 1L, NOW);
         assertThat(response.state()).isEqualTo(JobState.CANCEL_REQUESTED.name());
-        assertThat(cancellationRegistry.find("job-1").orElseThrow().isCancelRequested()).isTrue();
+        assertThat(cancellationRegistry.find("job-1").orElseThrow().isCancelRequested())
+                .isTrue();
     }
 
     @Test
@@ -74,17 +79,22 @@ public class RunControllerCancellationTest {
         doNothing().when(authorization).requireObjectScope(session, Permission.RUN_INDICATOR, MUNICIPALITY);
 
         when(jobRepository.findById("job-1"))
-                .thenReturn(Optional.of(job(JobState.CANCEL_REQUESTED)),
-                        Optional.of(job(JobState.SUCCEEDED)), Optional.of(job(JobState.SUCCEEDED)));
+                .thenReturn(
+                        Optional.of(job(JobState.CANCEL_REQUESTED)),
+                        Optional.of(job(JobState.SUCCEEDED)),
+                        Optional.of(job(JobState.SUCCEEDED)));
 
         RunController controller = new RunController(
-                jobRepository, mock(IdempotencyResolver.class), new CancellationRegistry(),
-                new RunResponseFactory(jobRepository, mock(ResultRepository.class)), mock(SourceRepository.class),
-                mock(ExtractionManifestRepository.class), authorization,
+                jobRepository,
+                mock(IdempotencyResolver.class),
+                new CancellationRegistry(),
+                new RunResponseFactory(jobRepository, mock(ResultRepository.class)),
+                mock(SourceRepository.class),
+                mock(ExtractionManifestRepository.class),
+                authorization,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
-        assertThatThrownBy(() -> controller.cancel(session, "job-1"))
-                .isInstanceOf(JobNotCancellableException.class);
+        assertThatThrownBy(() -> controller.cancel(session, "job-1")).isInstanceOf(JobNotCancellableException.class);
     }
 
     @Test
@@ -95,7 +105,8 @@ public class RunControllerCancellationTest {
         doNothing().when(authorization).requireObjectScope(session, Permission.RUN_INDICATOR, MUNICIPALITY);
 
         when(jobRepository.findById("job-1"))
-                .thenReturn(Optional.of(job(JobState.RUNNING, "proc-1", 1)),
+                .thenReturn(
+                        Optional.of(job(JobState.RUNNING, "proc-1", 1)),
                         Optional.of(job(JobState.QUEUED, null, 2)),
                         Optional.of(job(JobState.RUNNING, "proc-2", 3)),
                         Optional.of(job(JobState.CANCEL_REQUESTED, "proc-2", 3)));
@@ -107,9 +118,13 @@ public class RunControllerCancellationTest {
         when(jobRepository.findAttempts("job-1")).thenReturn(List.of());
 
         RunController controller = new RunController(
-                jobRepository, mock(IdempotencyResolver.class), new CancellationRegistry(),
-                new RunResponseFactory(jobRepository, mock(ResultRepository.class)), mock(SourceRepository.class),
-                mock(ExtractionManifestRepository.class), authorization,
+                jobRepository,
+                mock(IdempotencyResolver.class),
+                new CancellationRegistry(),
+                new RunResponseFactory(jobRepository, mock(ResultRepository.class)),
+                mock(SourceRepository.class),
+                mock(ExtractionManifestRepository.class),
+                authorization,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         RunResponse response = controller.cancel(session, "job-1");
@@ -126,19 +141,21 @@ public class RunControllerCancellationTest {
         when(jobRepository.findById("missing")).thenReturn(Optional.empty());
 
         RunController controller = new RunController(
-                jobRepository, mock(IdempotencyResolver.class), new CancellationRegistry(),
-                new RunResponseFactory(jobRepository, mock(ResultRepository.class)), mock(SourceRepository.class),
-                mock(ExtractionManifestRepository.class), authorization,
+                jobRepository,
+                mock(IdempotencyResolver.class),
+                new CancellationRegistry(),
+                new RunResponseFactory(jobRepository, mock(ResultRepository.class)),
+                mock(SourceRepository.class),
+                mock(ExtractionManifestRepository.class),
+                authorization,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
-        assertThatThrownBy(() -> controller.get(session, "missing"))
-                .isInstanceOf(ApiNotFoundException.class);
+        assertThatThrownBy(() -> controller.get(session, "missing")).isInstanceOf(ApiNotFoundException.class);
         verify(authorization).auditDenied(session, Permission.RUN_INDICATOR, "unknown");
     }
 
     private AuthenticatedSession session() {
-        return new AuthenticatedSession(
-                "session-1", "user-1", NOW, NOW, NOW.plusSeconds(3600), 1, null);
+        return new AuthenticatedSession("session-1", "user-1", NOW, NOW, NOW.plusSeconds(3600), 1, null);
     }
 
     private Job job(JobState state) {
@@ -147,10 +164,32 @@ public class RunControllerCancellationTest {
 
     private Job job(JobState state, String processInstanceId, long executionGeneration) {
         return new Job(
-                "job-1", "run-1", MUNICIPALITY, "c1-mais-acesso", "c1-mais-acesso@0.1.0",
-                "2026-03", state, state == JobState.QUEUED ? 0 : 1, 3, processInstanceId,
+                "job-1",
+                "run-1",
+                MUNICIPALITY,
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                state,
+                state == JobState.QUEUED ? 0 : 1,
+                3,
+                processInstanceId,
                 executionGeneration,
-                null, null, NOW, state == JobState.QUEUED ? null : NOW, null,
-                null, null, null, null, "src-1", null, "user-1", "hash-1", null, null, null);
+                null,
+                null,
+                NOW,
+                state == JobState.QUEUED ? null : NOW,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "src-1",
+                null,
+                "user-1",
+                "hash-1",
+                null,
+                null,
+                null);
     }
 }

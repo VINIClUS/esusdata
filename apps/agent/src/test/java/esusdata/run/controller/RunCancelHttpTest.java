@@ -1,18 +1,18 @@
 package esusdata.run.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import esusdata.auth.model.Role;
 import esusdata.indicator.pack.c1.C1Rule;
 import esusdata.run.worker.CancellationRegistry;
+import esusdata.web.ApiFixtureSupport;
+import java.net.URI;
+import java.net.http.HttpResponse;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.annotation.DirtiesContext;
 
-import java.net.URI;
-import java.net.http.HttpResponse;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.ApiFixtureSupport;
 /**
  * ENG-07/ENG-23 "pela rota HTTP": {@code CancellationTokenTest} proves the token itself;
  * {@code LiveAcquisitionEndToEndTest} proves a pre-set token aborts a real PostgreSQL acquisition
@@ -42,23 +42,32 @@ public class RunCancelHttpTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
         String jobId = "job-" + UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, process_instance_id,
                     execution_generation, created_at, source_id)
                 VALUES (?,?,?,?,?,?, 'RUNNING', 1, 3, 'proc-test-owns-nothing', 1, ?, ?)
-                """, jobId, "run-" + jobId, MUNICIPALITY, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
-                "2026-03", clock.instant().toString(), sourceId);
+                """,
+                jobId,
+                "run-" + jobId,
+                MUNICIPALITY,
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                clock.instant().toString(),
+                sourceId);
         cancellationRegistry.register(jobId);
 
-        HttpResponse<String> response = authenticatedPost(cookie,
-                URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/cancel"), null);
+        HttpResponse<String> response =
+                authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/cancel"), null);
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("\"state\":\"CANCEL_REQUESTED\"");
         assertThat(jdbc.queryForObject("select state from jobs where job_id = ?", String.class, jobId))
                 .isEqualTo("CANCEL_REQUESTED");
-        assertThat(cancellationRegistry.find(jobId).orElseThrow().isCancelRequested()).isTrue();
+        assertThat(cancellationRegistry.find(jobId).orElseThrow().isCancelRequested())
+                .isTrue();
     }
 
     @Test
@@ -69,16 +78,25 @@ public class RunCancelHttpTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
         String jobId = "job-" + UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, process_instance_id,
                     execution_generation, created_at, source_id, cancel_requested_at)
                 VALUES (?,?,?,?,?,?, 'CANCEL_REQUESTED', 1, 3, 'proc-test-owns-nothing', 1, ?, ?, ?)
-                """, jobId, "run-" + jobId, MUNICIPALITY, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
-                "2026-03", clock.instant().toString(), sourceId, clock.instant().toString());
+                """,
+                jobId,
+                "run-" + jobId,
+                MUNICIPALITY,
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                clock.instant().toString(),
+                sourceId,
+                clock.instant().toString());
 
-        HttpResponse<String> response = authenticatedPost(cookie,
-                URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/cancel"), null);
+        HttpResponse<String> response =
+                authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/cancel"), null);
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("\"state\":\"CANCEL_REQUESTED\"");
@@ -92,16 +110,25 @@ public class RunCancelHttpTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
         String jobId = "job-" + UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, process_instance_id,
                     execution_generation, created_at, source_id, finished_at)
                 VALUES (?,?,?,?,?,?, 'SUCCEEDED', 1, 3, 'proc-test-owns-nothing', 1, ?, ?, ?)
-                """, jobId, "run-" + jobId, MUNICIPALITY, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
-                "2026-03", clock.instant().toString(), sourceId, clock.instant().toString());
+                """,
+                jobId,
+                "run-" + jobId,
+                MUNICIPALITY,
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                clock.instant().toString(),
+                sourceId,
+                clock.instant().toString());
 
-        HttpResponse<String> response = authenticatedPost(cookie,
-                URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/cancel"), null);
+        HttpResponse<String> response =
+                authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/cancel"), null);
 
         assertThat(response.statusCode()).isEqualTo(409);
         assertThat(response.body()).contains("JOB_NOT_CANCELLABLE");
@@ -122,23 +149,34 @@ public class RunCancelHttpTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, OTHER_MUNICIPALITY);
         String jobId = "job-" + UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, process_instance_id,
                     execution_generation, created_at, source_id)
                 VALUES (?,?,?,?,?,?, 'RUNNING', 1, 3, 'proc-test-owns-nothing', 1, ?, ?)
-                """, jobId, "run-" + jobId, OTHER_MUNICIPALITY, C1Rule.INDICATOR_PACK,
-                C1Rule.RULE_VERSION, "2026-03", clock.instant().toString(), sourceId);
+                """,
+                jobId,
+                "run-" + jobId,
+                OTHER_MUNICIPALITY,
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                clock.instant().toString(),
+                sourceId);
 
-        HttpResponse<String> read = java.net.http.HttpClient.newHttpClient().send(
-                java.net.http.HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs/" + jobId))
-                        .header("Cookie", cookie).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> read = java.net.http.HttpClient.newHttpClient()
+                .send(
+                        java.net.http.HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs/" + jobId))
+                                .header("Cookie", cookie)
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
         assertThat(read.statusCode()).isEqualTo(404);
         assertThat(read.body()).contains("NOT_FOUND");
 
-        HttpResponse<String> cancel = authenticatedPost(cookie,
-                URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/cancel"), null);
+        HttpResponse<String> cancel =
+                authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/cancel"), null);
         assertThat(cancel.statusCode()).isEqualTo(404);
         assertThat(jdbc.queryForObject("select state from jobs where job_id = ?", String.class, jobId))
                 .isEqualTo("RUNNING");

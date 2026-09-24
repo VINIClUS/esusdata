@@ -1,21 +1,20 @@
 package esusdata.auth;
 
-import esusdata.auth.model.Role;
-import esusdata.indicator.pack.c1.C1Rule;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.auth.model.Role;
+import esusdata.auth.security.SessionCookie;
+import esusdata.indicator.pack.c1.C1Rule;
+import esusdata.web.ApiFixtureSupport;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.ApiFixtureSupport;
-import esusdata.auth.security.SessionAuthenticationFilter;
-import esusdata.auth.security.SessionCookie;
 /**
  * ENG-44 (§1.12.7 L537): "polling... não conta" toward session inactivity. Proves BOTH directions
  * against the same session — not just that polling fails to advance it (a predicate that matched
@@ -34,13 +33,21 @@ public class SessionInactivityTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
         String jobId = "job-" + UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, process_instance_id,
                     execution_generation, created_at, source_id)
                 VALUES (?,?,?,?,?,?, 'QUEUED', 0, 3, NULL, 0, ?, ?)
-                """, jobId, "run-" + jobId, MUNICIPALITY, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
-                "2026-03", clock.instant().toString(), sourceId);
+                """,
+                jobId,
+                "run-" + jobId,
+                MUNICIPALITY,
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                clock.instant().toString(),
+                sourceId);
 
         String rawToken = rawSessionToken(manager);
         String cookie = SessionCookie.NAME + "=" + rawToken;
@@ -66,8 +73,12 @@ public class SessionInactivityTest extends ApiFixtureSupport {
     }
 
     private HttpResponse<String> get(String cookie, String path) throws Exception {
-        return HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + path)).header("Cookie", cookie).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
+        return HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create(BASE_URL + path))
+                                .header("Cookie", cookie)
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
     }
 }

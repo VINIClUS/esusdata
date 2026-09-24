@@ -1,8 +1,5 @@
 package esusdata.run.acquisition;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -16,6 +13,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Stands in for the real Rust execution plane in {@link ExecPlaneAcquisitionTest} —
@@ -63,12 +62,11 @@ public final class StubExecPlaneMain {
         // Failures the real binary reports before (or instead of) the probe message — a
         // connection that never opened is "uncertain":false, anything after it is true.
         switch (scenario) {
-            case "auth-failure" -> preProbeError("28P01",
-                    "password authentication failed for user \\\"esus_leitura\\\"", false);
+            case "auth-failure" ->
+                preProbeError("28P01", "password authentication failed for user \\\"esus_leitura\\\"", false);
             case "connect-refused" -> preProbeError("08001", "Connection refused (os error 111)", false);
             case "probe-sql-error" -> preProbeError("42501", "permission denied for relation tb_fat", true);
-            default -> {
-            }
+            default -> {}
         }
 
         String dataType = "mismatch".equals(scenario) ? "varchar" : CORRECT_DATA_TYPE;
@@ -87,9 +85,11 @@ public final class StubExecPlaneMain {
         switch (scenario) {
             case "happy" -> {
                 out.println("{\"type\":\"progress\"}");
-                Completion completion = writeExtract(extractTempPath, List.of(
-                        row("1", "PROGRAMADO", "2026-03-05", "3541307"),
-                        row("2", "ESPONTANEO", "2026-03-10", "3541307")));
+                Completion completion = writeExtract(
+                        extractTempPath,
+                        List.of(
+                                row("1", "PROGRAMADO", "2026-03-05", "3541307"),
+                                row("2", "ESPONTANEO", "2026-03-10", "3541307")));
                 out.println(completeMessage(completion));
                 System.exit(0);
             }
@@ -100,30 +100,30 @@ public final class StubExecPlaneMain {
                 // ExtractReader/ExtractValidation.validateRecord — not DelegatedExtractPublication
                 // — is what ultimately catches it: publication succeeds (the manifest is derived
                 // from the bound scope, never from file contents), but a later read fails closed.
-                Completion completion = writeExtract(extractTempPath, List.of(
-                        row("1", "PROGRAMADO", "2026-03-05", "9999999")));
+                Completion completion =
+                        writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "9999999")));
                 out.println(completeMessage(completion));
                 System.exit(0);
             }
             case "wrong-checksum" -> {
-                Completion actual = writeExtract(extractTempPath, List.of(
-                        row("1", "PROGRAMADO", "2026-03-05", "3541307")));
+                Completion actual =
+                        writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
                 out.println(completeMessage(new Completion(
                         actual.rowCount, actual.exclusionCount, "0".repeat(64), actual.compressedBytes)));
                 System.exit(0);
             }
             case "wrong-size" -> {
-                Completion actual = writeExtract(extractTempPath, List.of(
-                        row("1", "PROGRAMADO", "2026-03-05", "3541307")));
+                Completion actual =
+                        writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
                 out.println(completeMessage(new Completion(
                         actual.rowCount, actual.exclusionCount, actual.checksum, actual.compressedBytes + 1)));
                 System.exit(0);
             }
             case "exclusion-gt-rows" -> {
-                Completion actual = writeExtract(extractTempPath, List.of(
-                        row("1", "PROGRAMADO", "2026-03-05", "3541307")));
-                out.println(completeMessage(new Completion(
-                        actual.rowCount, actual.rowCount + 1, actual.checksum, actual.compressedBytes)));
+                Completion actual =
+                        writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
+                out.println(completeMessage(
+                        new Completion(actual.rowCount, actual.rowCount + 1, actual.checksum, actual.compressedBytes)));
                 System.exit(0);
             }
             case "missing-file" -> {
@@ -138,8 +138,8 @@ public final class StubExecPlaneMain {
                 System.exit(0);
             }
             case "complete-then-nonzero" -> {
-                Completion completion = writeExtract(extractTempPath, List.of(
-                        row("1", "PROGRAMADO", "2026-03-05", "3541307")));
+                Completion completion =
+                        writeExtract(extractTempPath, List.of(row("1", "PROGRAMADO", "2026-03-05", "3541307")));
                 out.println(completeMessage(completion));
                 System.exit(1);
             }
@@ -188,14 +188,13 @@ public final class StubExecPlaneMain {
     }
 
     private static void preProbeError(String sqlState, String detail, boolean uncertain) {
-        System.out.println("{\"type\":\"error\",\"code\":\"SQL_ERROR\",\"sqlstate\":\"" + sqlState
-                + "\",\"detail\":\"" + detail + "\",\"uncertain\":" + uncertain + "}");
+        System.out.println("{\"type\":\"error\",\"code\":\"SQL_ERROR\",\"sqlstate\":\"" + sqlState + "\",\"detail\":\""
+                + detail + "\",\"uncertain\":" + uncertain + "}");
         System.out.flush();
         System.exit(1);
     }
 
-    private record Completion(long rowCount, long exclusionCount, String checksum, long compressedBytes) {
-    }
+    private record Completion(long rowCount, long exclusionCount, String checksum, long compressedBytes) {}
 
     private static String completeMessage(Completion completion) {
         return "{\"type\":\"complete\",\"row_count\":" + completion.rowCount()
@@ -225,7 +224,9 @@ public final class StubExecPlaneMain {
      * {@link DelegatedExtractPublication}'s verification for real, not a simulation of it.
      */
     private static Completion writeExtract(String tempPath, List<String> jsonLines) throws IOException {
-        long exclusionCount = jsonLines.stream().filter(line -> line.contains("\"modality\":\"UNMAPPED\"")).count();
+        long exclusionCount = jsonLines.stream()
+                .filter(line -> line.contains("\"modality\":\"UNMAPPED\""))
+                .count();
         ByteArrayOutputStream raw = new ByteArrayOutputStream();
         try (GZIPOutputStream gzip = new GZIPOutputStream(raw)) {
             for (String line : jsonLines) {

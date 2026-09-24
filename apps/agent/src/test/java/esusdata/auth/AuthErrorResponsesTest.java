@@ -1,8 +1,8 @@
 package esusdata.auth;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.web.SecuritySliceTestSupport;
 import java.net.CookieManager;
 import java.net.CookieStore;
 import java.net.HttpCookie;
@@ -12,9 +12,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.SecuritySliceTestSupport;
 /**
  * PR-review regressions: a validation-rejected activation password must come back as a 4xx
  * client error, not an unhandled {@code WeakPasswordException} escaping as a 500; and a
@@ -28,12 +28,18 @@ public class AuthErrorResponsesTest extends SecuritySliceTestSupport {
     void activatingWithAWeakPasswordReturns400NotAServerError() throws Exception {
         CookieManager cookieManager = new CookieManager();
         HttpClient client = HttpClient.newBuilder().cookieHandler(cookieManager).build();
-        client.send(HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
+        client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
         String csrfToken = csrfTokenFrom(cookieManager);
         String activationToken = readActivationToken();
 
-        HttpResponse<String> response = post(client, "/api/v1/auth/activate", csrfToken,
+        HttpResponse<String> response = post(
+                client,
+                "/api/v1/auth/activate",
+                csrfToken,
                 "{\"token\":\"" + activationToken + "\",\"password\":\"too-short\"}");
 
         assertThat(response.statusCode()).isEqualTo(400);
@@ -44,7 +50,10 @@ public class AuthErrorResponsesTest extends SecuritySliceTestSupport {
     void aThrottledLoginReturnsRetryAfterAsDeltaSeconds() throws Exception {
         CookieManager cookieManager = new CookieManager();
         HttpClient client = HttpClient.newBuilder().cookieHandler(cookieManager).build();
-        client.send(HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
+        client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
         String csrfToken = csrfTokenFrom(cookieManager);
         String body = "{\"username\":\"no-such-user\",\"password\":\"wrong-password\"}";
@@ -63,8 +72,7 @@ public class AuthErrorResponsesTest extends SecuritySliceTestSupport {
         assertThat(Long.parseLong(retryAfter)).isGreaterThan(0);
     }
 
-    private HttpResponse<String> post(HttpClient client, String path, String csrfToken, String body)
-            throws Exception {
+    private HttpResponse<String> post(HttpClient client, String path, String csrfToken, String body) throws Exception {
         return client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + path))
                         .header("Content-Type", "application/json")

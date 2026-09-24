@@ -14,10 +14,15 @@ import java.util.Optional;
  */
 public interface JobRepository {
     record AttemptRecord(
-            String jobId, int attempt, String processInstanceId, long executionGeneration,
-            Instant startedAt, Instant finishedAt, String outcome, String failureCode,
-            String failureDetail) {
-    }
+            String jobId,
+            int attempt,
+            String processInstanceId,
+            long executionGeneration,
+            Instant startedAt,
+            Instant finishedAt,
+            String outcome,
+            String failureCode,
+            String failureDetail) {}
 
     Job enqueue(EnqueueRequest request);
 
@@ -50,8 +55,13 @@ public interface JobRepository {
 
     /** Definitive failure — no more attempts. Terminal; never retried automatically. */
     boolean markFailed(
-            String jobId, String processInstanceId, long executionGeneration, JobState fromState,
-            String failureCode, String failureDetail, Instant now);
+            String jobId,
+            String processInstanceId,
+            long executionGeneration,
+            JobState fromState,
+            String failureCode,
+            String failureDetail,
+            Instant now);
 
     /**
      * Live transient-failure retry: {@code RUNNING|STAGED -> QUEUED} with backoff — never visits
@@ -59,12 +69,16 @@ public interface JobRepository {
      * before calling this (a retry always recomputes from scratch, never resumes a partial stage).
      */
     boolean requeueForRetry(
-            String jobId, String processInstanceId, long executionGeneration, JobState fromState,
-            Instant nextAttemptAt, String failureCode, String failureDetail);
+            String jobId,
+            String processInstanceId,
+            long executionGeneration,
+            JobState fromState,
+            Instant nextAttemptAt,
+            String failureCode,
+            String failureDetail);
 
     /** A pending cancel request against one observed running/staged attempt. */
-    boolean requestCancel(
-            String jobId, String processInstanceId, long executionGeneration, Instant now);
+    boolean requestCancel(String jobId, String processInstanceId, long executionGeneration, Instant now);
 
     /** Cancelling a job that never started — no attempt, no staging to neutralize. */
     boolean cancelQueued(String jobId, Instant now);
@@ -77,13 +91,17 @@ public interface JobRepository {
      * staging row, job state, and attempt row commit or roll back together.
      */
     boolean markSucceededAndRecordAttempt(
-            String jobId, String processInstanceId, long executionGeneration,
-            String stagingId, Instant finishedAt);
+            String jobId, String processInstanceId, long executionGeneration, String stagingId, Instant finishedAt);
 
     /** Failed terminal transition plus its attempt history, atomically. */
     boolean markFailedAndRecordAttempt(
-            String jobId, String processInstanceId, long executionGeneration, JobState fromState,
-            String failureCode, String failureDetail, Instant finishedAt);
+            String jobId,
+            String processInstanceId,
+            long executionGeneration,
+            JobState fromState,
+            String failureCode,
+            String failureDetail,
+            Instant finishedAt);
 
     /** Cancellation terminal transition plus its attempt history, atomically. */
     boolean markCancelledAndRecordAttempt(
@@ -91,8 +109,14 @@ public interface JobRepository {
 
     /** Retry transition plus its attempt history, atomically. */
     boolean requeueForRetryAndRecordAttempt(
-            String jobId, String processInstanceId, long executionGeneration, JobState fromState,
-            Instant nextAttemptAt, String failureCode, String failureDetail, Instant finishedAt);
+            String jobId,
+            String processInstanceId,
+            long executionGeneration,
+            JobState fromState,
+            Instant nextAttemptAt,
+            String failureCode,
+            String failureDetail,
+            Instant finishedAt);
 
     // --- recovery-only CAS transitions (JobRecovery is the only caller) -----------------------
 
@@ -101,14 +125,20 @@ public interface JobRepository {
 
     boolean requeueAbandoned(String jobId, JobState fromState, Instant nextAttemptAt);
 
-    boolean failAbandoned(
-            String jobId, JobState fromState, String failureCode, String failureDetail, Instant now);
+    boolean failAbandoned(String jobId, JobState fromState, String failureCode, String failureDetail, Instant now);
 
     boolean cancelAbandoned(String jobId, Instant now);
 
     void recordAttempt(
-            String jobId, int attempt, String processInstanceId, long executionGeneration,
-            Instant startedAt, Instant finishedAt, String outcome, String failureCode, String failureDetail);
+            String jobId,
+            int attempt,
+            String processInstanceId,
+            long executionGeneration,
+            Instant startedAt,
+            Instant finishedAt,
+            String outcome,
+            String failureCode,
+            String failureDetail);
 
     List<AttemptRecord> findAttempts(String jobId);
 }

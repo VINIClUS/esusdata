@@ -10,6 +10,4 @@ public record AuthenticatedSession(
         Instant lastInteractiveAt,
         Instant absoluteExpiresAt,
         long authorizationVersionAtLogin,
-        Instant reauthAt
-) {
-}
+        Instant reauthAt) {}

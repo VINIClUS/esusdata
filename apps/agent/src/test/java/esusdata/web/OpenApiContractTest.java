@@ -1,5 +1,18 @@
 package esusdata.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.DefaultParameterNameDiscoverer;
@@ -12,21 +25,6 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.yaml.snakeyaml.Yaml;
-
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * §1.10.1 "documentar contratos em OpenAPI na implementação". Compares
@@ -132,7 +130,8 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
 
     private Map<String, HandlerMethod> registeredRoutes() {
         Map<String, HandlerMethod> routes = new TreeMap<>();
-        for (Map.Entry<RequestMappingInfo, HandlerMethod> entry : handlerMapping.getHandlerMethods().entrySet()) {
+        for (Map.Entry<RequestMappingInfo, HandlerMethod> entry :
+                handlerMapping.getHandlerMethods().entrySet()) {
             RequestMappingInfo info = entry.getKey();
             if (info.getPathPatternsCondition() == null) {
                 continue;
@@ -143,7 +142,8 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
                 if (pattern.equals(EXCLUDED_PATH)) {
                     continue;
                 }
-                for (org.springframework.web.bind.annotation.RequestMethod method : info.getMethodsCondition().getMethods()) {
+                for (org.springframework.web.bind.annotation.RequestMethod method :
+                        info.getMethodsCondition().getMethods()) {
                     routes.put(method.name() + " " + pattern, entry.getValue());
                 }
             }
@@ -160,8 +160,7 @@ public class OpenApiContractTest extends SecuritySliceTestSupport {
         try (InputStream in = new FileInputStream(CONTRACT_PATH.toFile())) {
             Map<String, Object> document = new Yaml().load(in);
             Map<String, Object> components = (Map<String, Object>) document.getOrDefault("components", Map.of());
-            Map<String, Object> componentParams =
-                    (Map<String, Object>) components.getOrDefault("parameters", Map.of());
+            Map<String, Object> componentParams = (Map<String, Object>) components.getOrDefault("parameters", Map.of());
             Map<String, Object> paths = (Map<String, Object>) document.get("paths");
             for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
                 Map<String, Object> operations = (Map<String, Object>) pathEntry.getValue();

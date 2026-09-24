@@ -1,12 +1,32 @@
 package esusdata.result;
 
-import esusdata.source.JdbcSourceRepository;
-import esusdata.run.job.JdbcJobRepository;
-import esusdata.run.extract.ExtractFixtures;
-import esusdata.run.extract.ExtractionManifest;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.result.model.ExtractionManifestRepository;
+import esusdata.result.model.PublicationAuthorization;
+import esusdata.result.model.PublicationOutcome;
+import esusdata.result.model.PublicationRefusedException;
+import esusdata.result.model.PublicationRequest;
+import esusdata.result.model.PublishedResult;
+import esusdata.result.model.ResultRepository;
+import esusdata.result.model.ResultStagingArea;
+import esusdata.result.model.StagingRequest;
+import esusdata.run.extract.ExtractFixtures;
+import esusdata.run.extract.ExtractionManifest;
+import esusdata.run.job.JdbcJobRepository;
 import esusdata.run.job.JobRepository;
+import esusdata.source.JdbcSourceRepository;
+import esusdata.source.model.SourceRecord;
+import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,27 +37,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.math.BigInteger;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import esusdata.source.model.SourceRecord;
-import esusdata.source.SourceRepository;
-import esusdata.result.model.PublicationAuthorization;
-import esusdata.result.model.PublicationOutcome;
-import esusdata.result.model.PublicationRefusedException;
-import esusdata.result.model.PublicationRequest;
-import esusdata.result.model.PublishedResult;
-import esusdata.result.model.StagingRequest;
-import esusdata.result.model.ExtractionManifestRepository;
-import esusdata.result.model.ResultRepository;
-import esusdata.result.model.ResultStagingArea;
 /**
  * ENG-30/ENG-23: the final short transaction publishes only under an exact process/generation/
  * state match; any mismatch rolls back the whole transaction, leaving nothing visible.
@@ -61,8 +60,9 @@ class PublicationServiceTest {
     void setUp() {
         context = new AnnotationConfigApplicationContext();
         context.register(esusdata.config.SqliteConfig.class);
-        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("test",
-                Map.of("observatorio.data.directory", dataDir.toString())));
+        context.getEnvironment()
+                .getPropertySources()
+                .addFirst(new MapPropertySource("test", Map.of("observatorio.data.directory", dataDir.toString())));
         context.refresh();
 
         jdbc = context.getBean(JdbcTemplate.class);
@@ -73,13 +73,30 @@ class PublicationServiceTest {
         resultRepository = new JdbcResultRepository(jdbc);
         extractsDir = dataDir.resolve("extracts");
 
-        new JdbcSourceRepository(jdbc).upsert(new SourceRecord(
-                "src-1", 1, "PEC_POSTGRESQL", "PRONTUARIO", "PRIMARY", "127.0.0.1", 5432,
-                "esus", "esus_leitura", "PEC_DB_PASSWORD", "3541307", "5.4.37", "PEC_DW",
-                Instant.EPOCH.toString()));
+        new JdbcSourceRepository(jdbc)
+                .upsert(new SourceRecord(
+                        "src-1",
+                        1,
+                        "PEC_POSTGRESQL",
+                        "PRONTUARIO",
+                        "PRIMARY",
+                        "127.0.0.1",
+                        5432,
+                        "esus",
+                        "esus_leitura",
+                        "PEC_DB_PASSWORD",
+                        "3541307",
+                        "5.4.37",
+                        "PEC_DW",
+                        Instant.EPOCH.toString()));
 
-        publicationService = new PublicationService(jdbc, transactionTemplate, jobRepository,
-                extractionManifestRepository, new ReproducibilityCheck(extractsDir), extractsDir,
+        publicationService = new PublicationService(
+                jdbc,
+                transactionTemplate,
+                jobRepository,
+                extractionManifestRepository,
+                new ReproducibilityCheck(extractsDir),
+                extractsDir,
                 PublicationAuthorization.allowAll());
     }
 
@@ -96,30 +113,58 @@ class PublicationServiceTest {
 
     private void insertJob(String state, long generation, String processInstanceId) {
         jobId = "job-" + UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, process_instance_id,
                     execution_generation, created_at, source_id)
                 VALUES (?,?,?,?,?,?,?,1,3,?,?,?,?)
-                """, jobId, "run-" + jobId, "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
-                "2026-03", state, processInstanceId, generation, Instant.EPOCH.toString(), "src-1");
+                """,
+                jobId,
+                "run-" + jobId,
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                state,
+                processInstanceId,
+                generation,
+                Instant.EPOCH.toString(),
+                "src-1");
     }
 
     private String stageResult(ExtractionManifest manifest, long generation, String processInstanceId) {
         return stageResult(manifest, generation, processInstanceId, List.of());
     }
 
-    private String stageResult(ExtractionManifest manifest, long generation, String processInstanceId,
-            List<String> limitations) {
+    private String stageResult(
+            ExtractionManifest manifest, long generation, String processInstanceId, List<String> limitations) {
         IndicatorResult result = new IndicatorResult(
-                IndicatorResult.IndicatorStatus.COMPUTED, "70.0000",
-                BigInteger.valueOf(7), BigInteger.valueOf(10), "PROGRAMADOS_MAIS_ESPONTANEOS",
-                Classification.OTIMO, "2026-03", "c1-mais-acesso@0.1.0", "2026-03-31",
-                "3541307", limitations, "c1-exact-ratio@1");
+                IndicatorResult.IndicatorStatus.COMPUTED,
+                "70.0000",
+                BigInteger.valueOf(7),
+                BigInteger.valueOf(10),
+                "PROGRAMADOS_MAIS_ESPONTANEOS",
+                Classification.OTIMO,
+                "2026-03",
+                "c1-mais-acesso@0.1.0",
+                "2026-03-31",
+                "3541307",
+                limitations,
+                "c1-exact-ratio@1");
         String stagingId = "stg-" + UUID.randomUUID();
-        stagingArea.open(new StagingRequest(stagingId, jobId, generation, processInstanceId,
-                Instant.now(), "c1-mais-acesso", result, manifest.extractionId(),
-                manifest.adapterVersion(), "SOURCE_EVENT", "sha256:" + "0".repeat(64)));
+        stagingArea.open(new StagingRequest(
+                stagingId,
+                jobId,
+                generation,
+                processInstanceId,
+                Instant.now(),
+                "c1-mais-acesso",
+                result,
+                manifest.extractionId(),
+                manifest.adapterVersion(),
+                "SOURCE_EVENT",
+                "sha256:" + "0".repeat(64)));
         stagingArea.seal(stagingId);
         return stagingId;
     }
@@ -131,16 +176,27 @@ class PublicationServiceTest {
         String stagingId = stageResult(manifest, 1, "proc-1");
 
         PublicationOutcome outcome = publicationService.publish(new PublicationRequest(
-                jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307"));
+                jobId,
+                "run-1",
+                stagingId,
+                "src-1",
+                1,
+                "proc-1",
+                manifest,
+                "OBSERVED",
+                "NOT_VALIDATED",
+                "test-build",
+                Instant.now(),
+                "test-principal",
+                "3541307"));
 
         assertThat(outcome.reproducibilityLevel()).isEqualTo("REPRODUCIBLE");
-        assertThat(resultRepository.findByIdInScope(outcome.resultId(), "3541307")).isPresent();
-        assertThat(jdbc.queryForObject(
-                "select state from jobs where job_id = ?", String.class, jobId))
+        assertThat(resultRepository.findByIdInScope(outcome.resultId(), "3541307"))
+                .isPresent();
+        assertThat(jdbc.queryForObject("select state from jobs where job_id = ?", String.class, jobId))
                 .isEqualTo("SUCCEEDED");
         assertThat(jdbc.queryForObject(
-                "select state from result_staging where staging_id = ?", String.class, stagingId))
+                        "select state from result_staging where staging_id = ?", String.class, stagingId))
                 .isEqualTo("PUBLISHED");
     }
 
@@ -148,19 +204,33 @@ class PublicationServiceTest {
     void successfulPublicationClearsFailureDiagnosticsFromAPriorTransientAttempt() throws Exception {
         ExtractionManifest manifest = fixtureExtract("ext-retry-success");
         insertJob("STAGED", 2, "proc-1");
-        jdbc.update("update jobs set failure_code = ?, failure_detail = ? where job_id = ?",
-                "TRANSIENT_SQL_ERROR", "temporary source failure", jobId);
+        jdbc.update(
+                "update jobs set failure_code = ?, failure_detail = ? where job_id = ?",
+                "TRANSIENT_SQL_ERROR",
+                "temporary source failure",
+                jobId);
         String stagingId = stageResult(manifest, 2, "proc-1");
 
         PublicationOutcome outcome = publicationService.publish(new PublicationRequest(
-                jobId, "run-1", stagingId, "src-1", 2, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307"));
+                jobId,
+                "run-1",
+                stagingId,
+                "src-1",
+                2,
+                "proc-1",
+                manifest,
+                "OBSERVED",
+                "NOT_VALIDATED",
+                "test-build",
+                Instant.now(),
+                "test-principal",
+                "3541307"));
 
         assertThat(outcome).isNotNull();
-        assertThat(jdbc.queryForObject(
-                "select failure_code from jobs where job_id = ?", String.class, jobId)).isNull();
-        assertThat(jdbc.queryForObject(
-                "select failure_detail from jobs where job_id = ?", String.class, jobId)).isNull();
+        assertThat(jdbc.queryForObject("select failure_code from jobs where job_id = ?", String.class, jobId))
+                .isNull();
+        assertThat(jdbc.queryForObject("select failure_detail from jobs where job_id = ?", String.class, jobId))
+                .isNull();
     }
 
     @Test
@@ -168,23 +238,44 @@ class PublicationServiceTest {
         ExtractionManifest manifest = fixtureExtract("ext-attempt-history-conflict");
         insertJob("STAGED", 1, "proc-1");
         String stagingId = stageResult(manifest, 1, "proc-1");
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO job_attempts (job_id, attempt, process_instance_id, execution_generation,
                     started_at, finished_at, outcome, failure_code, failure_detail)
                 VALUES (?,?,?,?,?,?,?,?,?)
-                """, jobId, 1, "proc-1", 1, Instant.EPOCH.toString(), Instant.EPOCH.toString(),
-                "FAILED_TRANSIENT", "SOURCE_TIMEOUT", "already recorded");
+                """,
+                jobId,
+                1,
+                "proc-1",
+                1,
+                Instant.EPOCH.toString(),
+                Instant.EPOCH.toString(),
+                "FAILED_TRANSIENT",
+                "SOURCE_TIMEOUT",
+                "already recorded");
 
         assertThatThrownBy(() -> publicationService.publish(new PublicationRequest(
-                jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307")))
+                        jobId,
+                        "run-1",
+                        stagingId,
+                        "src-1",
+                        1,
+                        "proc-1",
+                        manifest,
+                        "OBSERVED",
+                        "NOT_VALIDATED",
+                        "test-build",
+                        Instant.now(),
+                        "test-principal",
+                        "3541307")))
                 .isInstanceOf(org.springframework.dao.DataAccessException.class);
 
-        assertThat(resultRepository.findPublished("3541307", "c1-mais-acesso", "2026-03")).isEmpty();
+        assertThat(resultRepository.findPublished("3541307", "c1-mais-acesso", "2026-03"))
+                .isEmpty();
+        assertThat(jdbc.queryForObject("select state from jobs where job_id = ?", String.class, jobId))
+                .isEqualTo("STAGED");
         assertThat(jdbc.queryForObject(
-                "select state from jobs where job_id = ?", String.class, jobId)).isEqualTo("STAGED");
-        assertThat(jdbc.queryForObject(
-                "select state from result_staging where staging_id = ?", String.class, stagingId))
+                        "select state from result_staging where staging_id = ?", String.class, stagingId))
                 .isEqualTo("SEALED");
     }
 
@@ -198,13 +289,25 @@ class PublicationServiceTest {
         jdbc.update("update jobs set execution_generation = 2 where job_id = ?", jobId);
 
         assertThatThrownBy(() -> publicationService.publish(new PublicationRequest(
-                jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307")))
+                        jobId,
+                        "run-1",
+                        stagingId,
+                        "src-1",
+                        1,
+                        "proc-1",
+                        manifest,
+                        "OBSERVED",
+                        "NOT_VALIDATED",
+                        "test-build",
+                        Instant.now(),
+                        "test-principal",
+                        "3541307")))
                 .isInstanceOf(PublicationRefusedException.class);
 
-        assertThat(resultRepository.findPublished("3541307", "c1-mais-acesso", "2026-03")).isEmpty();
+        assertThat(resultRepository.findPublished("3541307", "c1-mais-acesso", "2026-03"))
+                .isEmpty();
         assertThat(jdbc.queryForObject(
-                "select state from result_staging where staging_id = ?", String.class, stagingId))
+                        "select state from result_staging where staging_id = ?", String.class, stagingId))
                 .isEqualTo("SEALED");
     }
 
@@ -213,18 +316,47 @@ class PublicationServiceTest {
         ExtractionManifest manifest = fixtureExtract("ext-open");
         insertJob("RUNNING", 1, "proc-1");
         IndicatorResult result = new IndicatorResult(
-                IndicatorResult.IndicatorStatus.BLOCKED, null, BigInteger.valueOf(7),
-                BigInteger.valueOf(10), "PROGRAMADOS_MAIS_ESPONTANEOS", null, "2026-03",
-                "c1-mais-acesso@0.1.0", "2026-03-31", "3541307", List.of(), "c1-exact-ratio@1");
+                IndicatorResult.IndicatorStatus.BLOCKED,
+                null,
+                BigInteger.valueOf(7),
+                BigInteger.valueOf(10),
+                "PROGRAMADOS_MAIS_ESPONTANEOS",
+                null,
+                "2026-03",
+                "c1-mais-acesso@0.1.0",
+                "2026-03-31",
+                "3541307",
+                List.of(),
+                "c1-exact-ratio@1");
         String stagingId = "stg-" + UUID.randomUUID();
-        stagingArea.open(new StagingRequest(stagingId, jobId, 1, "proc-1", Instant.now(),
-                "c1-mais-acesso", result, manifest.extractionId(), manifest.adapterVersion(),
-                "SOURCE_EVENT", "sha256:" + "0".repeat(64)));
+        stagingArea.open(new StagingRequest(
+                stagingId,
+                jobId,
+                1,
+                "proc-1",
+                Instant.now(),
+                "c1-mais-acesso",
+                result,
+                manifest.extractionId(),
+                manifest.adapterVersion(),
+                "SOURCE_EVENT",
+                "sha256:" + "0".repeat(64)));
         // Never sealed.
 
         assertThatThrownBy(() -> publicationService.publish(new PublicationRequest(
-                jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307")))
+                        jobId,
+                        "run-1",
+                        stagingId,
+                        "src-1",
+                        1,
+                        "proc-1",
+                        manifest,
+                        "OBSERVED",
+                        "NOT_VALIDATED",
+                        "test-build",
+                        Instant.now(),
+                        "test-principal",
+                        "3541307")))
                 .isInstanceOf(PublicationRefusedException.class);
     }
 
@@ -238,13 +370,23 @@ class PublicationServiceTest {
         jdbc.update("update jobs set state = 'CANCEL_REQUESTED' where job_id = ?", jobId);
 
         assertThatThrownBy(() -> publicationService.publish(new PublicationRequest(
-                jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307")))
+                        jobId,
+                        "run-1",
+                        stagingId,
+                        "src-1",
+                        1,
+                        "proc-1",
+                        manifest,
+                        "OBSERVED",
+                        "NOT_VALIDATED",
+                        "test-build",
+                        Instant.now(),
+                        "test-principal",
+                        "3541307")))
                 .isInstanceOf(PublicationRefusedException.class);
 
         // The cancel request is preserved, not silently overwritten by a successful publish.
-        assertThat(jdbc.queryForObject(
-                "select state from jobs where job_id = ?", String.class, jobId))
+        assertThat(jdbc.queryForObject("select state from jobs where job_id = ?", String.class, jobId))
                 .isEqualTo("CANCEL_REQUESTED");
     }
 
@@ -257,8 +399,19 @@ class PublicationServiceTest {
         String stagingId = stageResult(manifest, 1, "proc-1", List.of("person_attribution_unavailable"));
 
         PublicationOutcome outcome = publicationService.publish(new PublicationRequest(
-                jobId, "run-1", stagingId, "src-1", 1, "proc-1", manifest,
-                "OBSERVED", "NOT_VALIDATED", "test-build", Instant.now(), "test-principal", "3541307"));
+                jobId,
+                "run-1",
+                stagingId,
+                "src-1",
+                1,
+                "proc-1",
+                manifest,
+                "OBSERVED",
+                "NOT_VALIDATED",
+                "test-build",
+                Instant.now(),
+                "test-principal",
+                "3541307"));
 
         assertThat(outcome.reproducibilityLevel()).isEqualTo("NOT_REPRODUCIBLE");
         // §1.9.5: "resultado apontando para arquivo perdido fica indisponível/limitado, nunca
@@ -268,8 +421,8 @@ class PublicationServiceTest {
         // limitation C1 always ships (person_attribution_unavailable, design decision #2) — the
         // parse-mutate-reserialize in augmentLimitations is exactly the kind of operation that
         // could silently drop it.
-        PublishedResult published = resultRepository.findByIdInScope(outcome.resultId(), "3541307")
-                .orElseThrow();
+        PublishedResult published =
+                resultRepository.findByIdInScope(outcome.resultId(), "3541307").orElseThrow();
         assertThat(published.limitationsJson())
                 .contains("extraction_source_unavailable")
                 .contains("person_attribution_unavailable");

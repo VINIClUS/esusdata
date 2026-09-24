@@ -13,8 +13,7 @@ import java.nio.file.Path;
  */
 public final class ReproducibilityCheck {
 
-    public record Outcome(boolean reproducible, String reason) {
-    }
+    public record Outcome(boolean reproducible, String reason) {}
 
     private final Path extractsBaseDir;
     private final ExtractReader reader = new ExtractReader();

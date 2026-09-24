@@ -1,16 +1,16 @@
 package esusdata.run.worker;
 
-import esusdata.indicator.model.Classification;
-
 import esusdata.auth.model.GrantRevalidationException;
+import esusdata.indicator.model.Classification;
 import esusdata.result.model.PublicationAuthorizationRefusedException;
-import esusdata.source.pec.SourceBudgetExceededException;
+import esusdata.run.job.JobCancelledException;
+import esusdata.run.job.SourceAcquisitionBlockedException;
 import esusdata.source.pec.AllowedDestinations;
+import esusdata.source.pec.SourceBudgetExceededException;
 import java.sql.SQLException;
 import java.sql.SQLTransientException;
 import java.util.Locale;
-import esusdata.run.job.JobCancelledException;
-import esusdata.run.job.SourceAcquisitionBlockedException;
+
 /**
  * ENG-22: "retry é limitado e auditado apenas para classes permitidas; credencial inválida, regra
  * ambígua e limite da fonte não entram em loop." Unknown failures default to
@@ -18,13 +18,14 @@ import esusdata.run.job.SourceAcquisitionBlockedException;
  */
 public final class FailureClassifier {
 
-    public enum Category { TRANSIENT, DEFINITIVE }
-
-    public record Classification(Category category, String code, String detail) {
+    public enum Category {
+        TRANSIENT,
+        DEFINITIVE
     }
 
-    private FailureClassifier() {
-    }
+    public record Classification(Category category, String code, String detail) {}
+
+    private FailureClassifier() {}
 
     public static Classification classify(Throwable failure) {
         if (failure instanceof SourceBudgetExceededException e) {

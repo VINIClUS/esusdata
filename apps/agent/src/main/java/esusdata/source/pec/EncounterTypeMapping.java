@@ -20,8 +20,7 @@ public final class EncounterTypeMapping {
     public static final Set<Integer> PROGRAMADO_IDS = Set.of(2, 3);
     public static final Set<Integer> ESPONTANEO_IDS = Set.of(5, 6, 7);
 
-    private EncounterTypeMapping() {
-    }
+    private EncounterTypeMapping() {}
 
     public static EncounterModality classify(int tipoAtendimentoId) {
         if (PROGRAMADO_IDS.contains(tipoAtendimentoId)) return EncounterModality.PROGRAMADO;

@@ -1,4 +1,3 @@
 package esusdata.auth.dto;
 
-public record CreateUserRequest(String username, String displayName) {
-}
+public record CreateUserRequest(String username, String displayName) {}

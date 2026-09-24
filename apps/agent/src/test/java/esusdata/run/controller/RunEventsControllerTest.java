@@ -1,14 +1,22 @@
 package esusdata.run.controller;
 
-import esusdata.auth.model.AuthenticatedSession;
-import esusdata.auth.model.Permission;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import esusdata.auth.ApiAuthorization;
 import esusdata.auth.ScopeResolver;
 import esusdata.auth.SessionService;
+import esusdata.auth.model.AuthenticatedSession;
+import esusdata.auth.model.Permission;
 import esusdata.run.job.Job;
 import esusdata.run.job.JobRepository;
 import esusdata.run.job.JobState;
-import org.junit.jupiter.api.Test;
-
+import esusdata.web.ApiNotFoundException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -18,16 +26,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import esusdata.web.ApiNotFoundException;
-import esusdata.auth.ApiAuthorization;
 public class RunEventsControllerTest {
 
     @Test
@@ -37,13 +37,20 @@ public class RunEventsControllerTest {
         when(jobRepository.findById("missing")).thenReturn(Optional.empty());
         ApiAuthorization authorization = mock(ApiAuthorization.class);
         RunEventsController controller = new RunEventsController(
-                jobRepository, mock(RunResponseFactory.class), authorization, mock(ScopeResolver.class),
-                mock(SessionService.class), new SseConnectionLimiter(), mock(ScheduledExecutorService.class),
-                mock(ScheduledExecutorService.class), Clock.fixed(now, ZoneOffset.UTC), 1000, 30);
+                jobRepository,
+                mock(RunResponseFactory.class),
+                authorization,
+                mock(ScopeResolver.class),
+                mock(SessionService.class),
+                new SseConnectionLimiter(),
+                mock(ScheduledExecutorService.class),
+                mock(ScheduledExecutorService.class),
+                Clock.fixed(now, ZoneOffset.UTC),
+                1000,
+                30);
 
         AuthenticatedSession session = sessionAt(now);
-        assertThatThrownBy(() -> controller.events(session, "missing"))
-                .isInstanceOf(ApiNotFoundException.class);
+        assertThatThrownBy(() -> controller.events(session, "missing")).isInstanceOf(ApiNotFoundException.class);
 
         verify(authorization).auditDenied(session, Permission.RUN_INDICATOR, "unknown");
     }
@@ -52,18 +59,58 @@ public class RunEventsControllerTest {
     void terminalPollCancelsItsScheduledTaskEvenIfItRunsBeforeControllerReturns() {
         Instant now = Instant.parse("2026-09-20T12:00:00Z");
         Job job = new Job(
-                "job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0", "2026-03",
-                JobState.SUCCEEDED, 1, 3, "proc-1", 1, now, null, now, now, now,
-                null, null, null, null, "src-1", null, null, null, null, null, null);
+                "job-1",
+                "run-1",
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                JobState.SUCCEEDED,
+                1,
+                3,
+                "proc-1",
+                1,
+                now,
+                null,
+                now,
+                now,
+                now,
+                null,
+                null,
+                null,
+                null,
+                "src-1",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
 
         JobRepository jobRepository = mock(JobRepository.class);
         when(jobRepository.findById("job-1")).thenReturn(Optional.of(job));
         RunResponseFactory responseFactory = mock(RunResponseFactory.class);
-        when(responseFactory.toResponse(job)).thenReturn(new RunResponse(
-                "job-1", "run-1", "SUCCEEDED", 1, 3, "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
-                "2026-03", "src-1", null, now.toString(), now.toString(), now.toString(), now.toString(),
-                null, null, null,
-                List.of(new AttemptResponse(1, now.toString(), now.toString(), "SUCCEEDED", null, null))));
+        when(responseFactory.toResponse(job))
+                .thenReturn(new RunResponse(
+                        "job-1",
+                        "run-1",
+                        "SUCCEEDED",
+                        1,
+                        3,
+                        "3541307",
+                        "c1-mais-acesso",
+                        "c1-mais-acesso@0.1.0",
+                        "2026-03",
+                        "src-1",
+                        null,
+                        now.toString(),
+                        now.toString(),
+                        now.toString(),
+                        now.toString(),
+                        null,
+                        null,
+                        null,
+                        List.of(new AttemptResponse(1, now.toString(), now.toString(), "SUCCEEDED", null, null))));
 
         ScheduledFuture<?> future = mock(ScheduledFuture.class);
         ScheduledExecutorService reauthScheduler = mock(ScheduledExecutorService.class);
@@ -74,17 +121,27 @@ public class RunEventsControllerTest {
                     invocation.<Runnable>getArgument(0).run();
                     return future;
                 });
-        when(reauthScheduler.scheduleWithFixedDelay(any(Runnable.class), eq(1_000_000L), eq(1_000_000L),
-                eq(TimeUnit.MILLISECONDS))).thenAnswer(invocation -> reauthFuture);
-        when(reauthScheduler.scheduleAtFixedRate(any(Runnable.class), eq(30_000L), eq(30_000L),
-                eq(TimeUnit.MILLISECONDS))).thenAnswer(invocation -> reauthFuture);
+        when(reauthScheduler.scheduleWithFixedDelay(
+                        any(Runnable.class), eq(1_000_000L), eq(1_000_000L), eq(TimeUnit.MILLISECONDS)))
+                .thenAnswer(invocation -> reauthFuture);
+        when(reauthScheduler.scheduleAtFixedRate(
+                        any(Runnable.class), eq(30_000L), eq(30_000L), eq(TimeUnit.MILLISECONDS)))
+                .thenAnswer(invocation -> reauthFuture);
 
-        AuthenticatedSession session = new AuthenticatedSession(
-                "session-1", "user-1", now, now, now.plusSeconds(3600), 1, null);
+        AuthenticatedSession session =
+                new AuthenticatedSession("session-1", "user-1", now, now, now.plusSeconds(3600), 1, null);
         RunEventsController controller = new RunEventsController(
-                jobRepository, responseFactory, mock(ApiAuthorization.class), mock(ScopeResolver.class),
-                mock(SessionService.class), new SseConnectionLimiter(), scheduler, reauthScheduler,
-                Clock.fixed(now, ZoneOffset.UTC), 1000, 1000);
+                jobRepository,
+                responseFactory,
+                mock(ApiAuthorization.class),
+                mock(ScopeResolver.class),
+                mock(SessionService.class),
+                new SseConnectionLimiter(),
+                scheduler,
+                reauthScheduler,
+                Clock.fixed(now, ZoneOffset.UTC),
+                1000,
+                1000);
 
         controller.events(session, "job-1");
 
@@ -95,9 +152,33 @@ public class RunEventsControllerTest {
     void reauthorizationIsScheduledOnItsOwnCadence() {
         Instant now = Instant.parse("2026-09-20T12:00:00Z");
         Job job = new Job(
-                "job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0", "2026-03",
-                JobState.RUNNING, 1, 3, "proc-1", 1, now, null, now, null, now,
-                null, null, null, null, "src-1", null, null, null, null, null, null);
+                "job-1",
+                "run-1",
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                JobState.RUNNING,
+                1,
+                3,
+                "proc-1",
+                1,
+                now,
+                null,
+                now,
+                null,
+                now,
+                null,
+                null,
+                null,
+                null,
+                "src-1",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
 
         JobRepository jobRepository = mock(JobRepository.class);
         when(jobRepository.findById("job-1")).thenReturn(Optional.of(job));
@@ -107,23 +188,33 @@ public class RunEventsControllerTest {
         ScheduledFuture<?> reauthFuture = mock(ScheduledFuture.class);
         when(pollScheduler.scheduleWithFixedDelay(any(Runnable.class), eq(0L), eq(1000L), eq(TimeUnit.MILLISECONDS)))
                 .thenAnswer(invocation -> pollFuture);
-        when(reauthScheduler.scheduleWithFixedDelay(any(Runnable.class), eq(30_000L), eq(30_000L),
-                eq(TimeUnit.MILLISECONDS))).thenAnswer(invocation -> reauthFuture);
-        when(reauthScheduler.scheduleAtFixedRate(any(Runnable.class), eq(30_000L), eq(30_000L),
-                eq(TimeUnit.MILLISECONDS))).thenAnswer(invocation -> reauthFuture);
+        when(reauthScheduler.scheduleWithFixedDelay(
+                        any(Runnable.class), eq(30_000L), eq(30_000L), eq(TimeUnit.MILLISECONDS)))
+                .thenAnswer(invocation -> reauthFuture);
+        when(reauthScheduler.scheduleAtFixedRate(
+                        any(Runnable.class), eq(30_000L), eq(30_000L), eq(TimeUnit.MILLISECONDS)))
+                .thenAnswer(invocation -> reauthFuture);
 
         Instant sessionNow = now;
         AuthenticatedSession session = new AuthenticatedSession(
                 "session-1", "user-1", sessionNow, sessionNow, sessionNow.plusSeconds(3600), 1, null);
         RunEventsController controller = new RunEventsController(
-                jobRepository, mock(RunResponseFactory.class), mock(ApiAuthorization.class), mock(ScopeResolver.class),
-                mock(SessionService.class), new SseConnectionLimiter(), pollScheduler, reauthScheduler,
-                Clock.fixed(now, ZoneOffset.UTC), 1000, 30);
+                jobRepository,
+                mock(RunResponseFactory.class),
+                mock(ApiAuthorization.class),
+                mock(ScopeResolver.class),
+                mock(SessionService.class),
+                new SseConnectionLimiter(),
+                pollScheduler,
+                reauthScheduler,
+                Clock.fixed(now, ZoneOffset.UTC),
+                1000,
+                30);
 
         controller.events(session, "job-1");
 
-        verify(reauthScheduler).scheduleAtFixedRate(any(Runnable.class), eq(30_000L), eq(30_000L),
-                eq(TimeUnit.MILLISECONDS));
+        verify(reauthScheduler)
+                .scheduleAtFixedRate(any(Runnable.class), eq(30_000L), eq(30_000L), eq(TimeUnit.MILLISECONDS));
     }
 
     @Test
@@ -138,18 +229,27 @@ public class RunEventsControllerTest {
         ScheduledFuture<?> reauthFuture = mock(ScheduledFuture.class);
         when(pollScheduler.scheduleWithFixedDelay(any(Runnable.class), eq(0L), eq(1000L), eq(TimeUnit.MILLISECONDS)))
                 .thenAnswer(invocation -> pollFuture);
-        when(reauthScheduler.scheduleAtFixedRate(any(Runnable.class), eq(30_000L), eq(30_000L),
-                eq(TimeUnit.MILLISECONDS))).thenAnswer(invocation -> reauthFuture);
+        when(reauthScheduler.scheduleAtFixedRate(
+                        any(Runnable.class), eq(30_000L), eq(30_000L), eq(TimeUnit.MILLISECONDS)))
+                .thenAnswer(invocation -> reauthFuture);
 
         RunEventsController controller = new RunEventsController(
-                jobRepository, mock(RunResponseFactory.class), mock(ApiAuthorization.class), mock(ScopeResolver.class),
-                mock(SessionService.class), new SseConnectionLimiter(), pollScheduler, reauthScheduler,
-                Clock.fixed(now, ZoneOffset.UTC), 1000, 60);
+                jobRepository,
+                mock(RunResponseFactory.class),
+                mock(ApiAuthorization.class),
+                mock(ScopeResolver.class),
+                mock(SessionService.class),
+                new SseConnectionLimiter(),
+                pollScheduler,
+                reauthScheduler,
+                Clock.fixed(now, ZoneOffset.UTC),
+                1000,
+                60);
 
         controller.events(sessionAt(now), "job-1");
 
-        verify(reauthScheduler).scheduleAtFixedRate(any(Runnable.class), eq(30_000L), eq(30_000L),
-                eq(TimeUnit.MILLISECONDS));
+        verify(reauthScheduler)
+                .scheduleAtFixedRate(any(Runnable.class), eq(30_000L), eq(30_000L), eq(TimeUnit.MILLISECONDS));
     }
 
     @Test
@@ -165,8 +265,9 @@ public class RunEventsControllerTest {
         when(pollScheduler.scheduleWithFixedDelay(any(Runnable.class), eq(0L), eq(1000L), eq(TimeUnit.MILLISECONDS)))
                 .thenAnswer(invocation -> pollFuture);
         AtomicReference<Runnable> reauthTask = new AtomicReference<>();
-        when(reauthScheduler.scheduleAtFixedRate(any(Runnable.class), eq(30_000L), eq(30_000L),
-                eq(TimeUnit.MILLISECONDS))).thenAnswer(invocation -> {
+        when(reauthScheduler.scheduleAtFixedRate(
+                        any(Runnable.class), eq(30_000L), eq(30_000L), eq(TimeUnit.MILLISECONDS)))
+                .thenAnswer(invocation -> {
                     reauthTask.set(invocation.getArgument(0));
                     return reauthFuture;
                 });
@@ -178,28 +279,75 @@ public class RunEventsControllerTest {
                 .thenReturn(false);
 
         RunEventsController controller = new RunEventsController(
-                jobRepository, mock(RunResponseFactory.class), authorization, scopeResolver, sessionService,
-                new SseConnectionLimiter(), pollScheduler, reauthScheduler, Clock.fixed(now, ZoneOffset.UTC),
-                1000, 30);
+                jobRepository,
+                mock(RunResponseFactory.class),
+                authorization,
+                scopeResolver,
+                sessionService,
+                new SseConnectionLimiter(),
+                pollScheduler,
+                reauthScheduler,
+                Clock.fixed(now, ZoneOffset.UTC),
+                1000,
+                30);
 
         controller.events(sessionAt(now), "job-1");
         reauthTask.get().run();
 
-        verify(authorization).auditDenied(any(AuthenticatedSession.class), eq(Permission.RUN_INDICATOR),
-                eq("3541307"));
+        verify(authorization).auditDenied(any(AuthenticatedSession.class), eq(Permission.RUN_INDICATOR), eq("3541307"));
     }
 
     @Test
     void terminalAttemptGraceStartsAtFirstObservationEvenWithLongPollInterval() {
         Instant firstObservation = Instant.parse("2026-09-20T12:00:00Z");
         Job job = new Job(
-                "job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0", "2026-03",
-                JobState.SUCCEEDED, 1, 3, "proc-1", 1, firstObservation, null, firstObservation,
-                firstObservation, firstObservation, null, null, null, null, "src-1", null, null, null, null, null, null);
+                "job-1",
+                "run-1",
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                JobState.SUCCEEDED,
+                1,
+                3,
+                "proc-1",
+                1,
+                firstObservation,
+                null,
+                firstObservation,
+                firstObservation,
+                firstObservation,
+                null,
+                null,
+                null,
+                null,
+                "src-1",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
         RunResponse response = new RunResponse(
-                "job-1", "run-1", "SUCCEEDED", 1, 3, "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
-                "2026-03", "src-1", null, firstObservation.toString(), firstObservation.toString(),
-                firstObservation.toString(), firstObservation.toString(), null, null, null, List.of());
+                "job-1",
+                "run-1",
+                "SUCCEEDED",
+                1,
+                3,
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                "src-1",
+                null,
+                firstObservation.toString(),
+                firstObservation.toString(),
+                firstObservation.toString(),
+                firstObservation.toString(),
+                null,
+                null,
+                null,
+                List.of());
         JobRepository jobRepository = mock(JobRepository.class);
         when(jobRepository.findById("job-1")).thenReturn(Optional.of(job));
         RunResponseFactory responseFactory = mock(RunResponseFactory.class);
@@ -214,15 +362,24 @@ public class RunEventsControllerTest {
                     pollTask.set(invocation.getArgument(0));
                     return pollFuture;
                 });
-        when(reauthScheduler.scheduleAtFixedRate(any(Runnable.class), eq(30_000L), eq(30_000L),
-                eq(TimeUnit.MILLISECONDS))).thenAnswer(invocation -> reauthFuture);
+        when(reauthScheduler.scheduleAtFixedRate(
+                        any(Runnable.class), eq(30_000L), eq(30_000L), eq(TimeUnit.MILLISECONDS)))
+                .thenAnswer(invocation -> reauthFuture);
         Clock clock = mock(Clock.class);
         when(clock.instant()).thenReturn(firstObservation, firstObservation.plusSeconds(5));
 
         RunEventsController controller = new RunEventsController(
-                jobRepository, responseFactory, mock(ApiAuthorization.class), mock(ScopeResolver.class),
-                mock(SessionService.class), new SseConnectionLimiter(), pollScheduler, reauthScheduler,
-                clock, 5000, 30);
+                jobRepository,
+                responseFactory,
+                mock(ApiAuthorization.class),
+                mock(ScopeResolver.class),
+                mock(SessionService.class),
+                new SseConnectionLimiter(),
+                pollScheduler,
+                reauthScheduler,
+                clock,
+                5000,
+                30);
 
         controller.events(sessionAt(firstObservation), "job-1");
         pollTask.get().run();
@@ -233,14 +390,37 @@ public class RunEventsControllerTest {
     }
 
     private static AuthenticatedSession sessionAt(Instant now) {
-        return new AuthenticatedSession(
-                "session-1", "user-1", now, now, now.plusSeconds(3600), 1, null);
+        return new AuthenticatedSession("session-1", "user-1", now, now, now.plusSeconds(3600), 1, null);
     }
 
     private static Job runningJob(Instant now) {
         return new Job(
-                "job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0", "2026-03",
-                JobState.RUNNING, 1, 3, "proc-1", 1, now, null, now, null, now,
-                null, null, null, null, "src-1", null, null, null, null, null, null);
+                "job-1",
+                "run-1",
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                JobState.RUNNING,
+                1,
+                3,
+                "proc-1",
+                1,
+                now,
+                null,
+                now,
+                null,
+                now,
+                null,
+                null,
+                null,
+                null,
+                "src-1",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 }

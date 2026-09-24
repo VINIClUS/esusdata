@@ -1,13 +1,16 @@
 package esusdata.run.extract;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import esusdata.indicator.model.CanonicalEncounter;
+import esusdata.indicator.model.CanonicalModality;
+import esusdata.indicator.model.SourceRef;
 import esusdata.source.pec.PecAcquisition;
-import esusdata.source.pec.PecSourceConnectionTestSupport;
 import esusdata.source.pec.PecConnectionProperties;
+import esusdata.source.pec.PecSourceConnectionTestSupport;
 import esusdata.source.pec.PecSourceIdentity;
 import esusdata.source.pec.SourceBudgetExceededException;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,30 +19,25 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import esusdata.indicator.model.CanonicalEncounter;
-import esusdata.indicator.model.CanonicalModality;
-
-import esusdata.indicator.model.SourceRef;
 class ExtractWriterReaderTest {
 
     @Test
     void publicWriterApiRequiresAnAcquisitionBoundScope() {
         assertThat(Arrays.stream(ExtractWriter.class.getConstructors())
-                .anyMatch(constructor -> Arrays.stream(constructor.getParameterTypes())
-                        .anyMatch(type -> type.getName().equals(
-                                "esusdata.source.pec.PecAcquisition"))))
+                        .anyMatch(constructor -> Arrays.stream(constructor.getParameterTypes())
+                                .anyMatch(type -> type.getName().equals("esusdata.source.pec.PecAcquisition"))))
                 .isTrue();
         assertThat(Arrays.stream(ExtractWriter.class.getConstructors())
-                .noneMatch(constructor -> Arrays.asList(constructor.getParameterTypes())
-                        .contains(ExtractionScope.class)))
+                        .noneMatch(constructor ->
+                                Arrays.asList(constructor.getParameterTypes()).contains(ExtractionScope.class)))
                 .isTrue();
         assertThat(Arrays.stream(ExtractWriter.class.getMethods())
-                .filter(method -> method.getName().equals("finalizeExtract"))
-                .noneMatch(method -> method.getParameterTypes().length > 0
-                        && method.getParameterTypes()[0].equals(String.class)))
+                        .filter(method -> method.getName().equals("finalizeExtract"))
+                        .noneMatch(method -> method.getParameterTypes().length > 0
+                                && method.getParameterTypes()[0].equals(String.class)))
                 .isTrue();
     }
 
@@ -55,36 +53,44 @@ class ExtractWriterReaderTest {
     @Test
     void publicDelegatedExtractPublicationApiAlsoRequiresAnAcquisitionBoundScope() {
         assertThat(Arrays.stream(DelegatedExtractPublication.class.getConstructors())
-                .anyMatch(constructor -> Arrays.stream(constructor.getParameterTypes())
-                        .anyMatch(type -> type.getName().equals(
-                                "esusdata.run.acquisition.AcquisitionCommand"))))
+                        .anyMatch(constructor -> Arrays.stream(constructor.getParameterTypes())
+                                .anyMatch(
+                                        type -> type.getName().equals("esusdata.run.acquisition.AcquisitionCommand"))))
                 .isTrue();
         assertThat(Arrays.stream(DelegatedExtractPublication.class.getConstructors())
-                .noneMatch(constructor -> Arrays.asList(constructor.getParameterTypes())
-                        .contains(ExtractionScope.class)))
+                        .noneMatch(constructor ->
+                                Arrays.asList(constructor.getParameterTypes()).contains(ExtractionScope.class)))
                 .isTrue();
     }
 
     @Test
     void acquisitionBoundWriterDerivesItsManifestScopeFromTheSession() throws Exception {
         var properties = new PecConnectionProperties(
-                "writer-source", "127.0.0.1", 5432,
-                "fixture", "reader", "unused", "3541307");
+                "writer-source", "127.0.0.1", 5432, "fixture", "reader", "unused", "3541307");
         var sourceConnection = PecSourceConnectionTestSupport.bind(
-                org.mockito.Mockito.mock(java.sql.Connection.class), properties,
+                org.mockito.Mockito.mock(java.sql.Connection.class),
+                properties,
                 new PecSourceIdentity("writer-source", "5.4.37", "PEC_DW", "PRONTUARIO"));
-        PecAcquisition acquisition = sourceConnection.acquire(
-                java.time.LocalDate.of(2026, 3, 1), java.time.LocalDate.of(2026, 4, 1));
+        PecAcquisition acquisition =
+                sourceConnection.acquire(java.time.LocalDate.of(2026, 3, 1), java.time.LocalDate.of(2026, 4, 1));
 
         ExtractionManifest manifest;
         try (ExtractWriter writer = new ExtractWriter(dir, "ext-session-scope", acquisition)) {
             writer.write(new CanonicalEncounter(
                     new SourceRef("writer-source", "tb_fat_atendimento_individual", "1"),
-                    "3541307", "2026-03-15", CanonicalModality.PROGRAMADO,
-                    "2750325", "0000346268", "225142"));
+                    "3541307",
+                    "2026-03-15",
+                    CanonicalModality.PROGRAMADO,
+                    "2750325",
+                    "0000346268",
+                    "225142"));
             manifest = writer.finalizeExtract(
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         assertThat(manifest.sourceId()).isEqualTo("writer-source");
@@ -101,31 +107,44 @@ class ExtractWriterReaderTest {
 
     @Test
     void emptyExtractMustMatchItsBoundAcquisitionScope() throws Exception {
-        ExtractionScope scope = new ExtractionScope(
-                "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01");
+        ExtractionScope scope = new ExtractionScope("pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01");
 
         assertThatThrownBy(() -> {
-            try (ExtractWriter writer = new ExtractWriter(dir, "ext-empty-scope", scope)) {
-                writer.finalizeExtract(
-                        "other-source", "3550308", "2026-04-01", "2026-05-01",
-                        Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                        TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
-            }
-        }).isInstanceOf(IllegalArgumentException.class)
+                    try (ExtractWriter writer = new ExtractWriter(dir, "ext-empty-scope", scope)) {
+                        writer.finalizeExtract(
+                                "other-source",
+                                "3550308",
+                                "2026-04-01",
+                                "2026-05-01",
+                                Instant.parse("2026-09-19T20:00:00Z"),
+                                "America/Sao_Paulo",
+                                TEST_QUERY_CHECKSUM,
+                                "0.1.0",
+                                "COMPLETE",
+                                "SNAPSHOT");
+                    }
+                })
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("acquisition scope");
     }
 
     @Test
     void emptyExtractWithTheBoundAcquisitionScopeCanBeFinalized() throws Exception {
-        ExtractionScope scope = new ExtractionScope(
-                "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01");
+        ExtractionScope scope = new ExtractionScope("pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01");
 
         ExtractionManifest manifest;
         try (ExtractWriter writer = new ExtractWriter(dir, "ext-empty-scope-valid", scope)) {
             manifest = writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         assertThat(manifest.rowCount()).isZero();
@@ -137,13 +156,18 @@ class ExtractWriterReaderTest {
         String randomPayload = randomPayload();
 
         assertThatThrownBy(() -> {
-            try (ExtractWriter writer = new ExtractWriter(dir, "ext-payload-ceiling", 64)) {
-                writer.write(new CanonicalEncounter(
-                        new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", "large"),
-                        "3541307", "2026-03-15", CanonicalModality.PROGRAMADO,
-                        randomPayload, null, null));
-            }
-        }).isInstanceOf(SourceBudgetExceededException.class)
+                    try (ExtractWriter writer = new ExtractWriter(dir, "ext-payload-ceiling", 64)) {
+                        writer.write(new CanonicalEncounter(
+                                new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", "large"),
+                                "3541307",
+                                "2026-03-15",
+                                CanonicalModality.PROGRAMADO,
+                                randomPayload,
+                                null,
+                                null));
+                    }
+                })
+                .isInstanceOf(SourceBudgetExceededException.class)
                 .hasMessageContaining("temporary extract byte ceiling");
 
         assertThat(Files.size(dir.resolve("ext-payload-ceiling.jsonl.gz.tmp"))).isLessThanOrEqualTo(64);
@@ -160,9 +184,16 @@ class ExtractWriterReaderTest {
             writer.write(encounter("3", CanonicalModality.UNMAPPED));
 
             manifest = writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         assertThat(manifest.rowCount()).isEqualTo(3);
@@ -186,25 +217,39 @@ class ExtractWriterReaderTest {
         try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
             writer.write(encounter("original", CanonicalModality.PROGRAMADO));
             writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
         byte[] originalData = Files.readAllBytes(dir.resolve(extractionId + ".jsonl.gz"));
         byte[] originalManifest = Files.readAllBytes(dir.resolve(extractionId + ".manifest.json"));
 
         assertThatThrownBy(() -> {
-            try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
-                writer.write(encounter("replacement", CanonicalModality.ESPONTANEO));
-                writer.finalizeExtract(
-                        "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                        Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                        TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
-            }
-        }).isInstanceOf(IOException.class);
+                    try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+                        writer.write(encounter("replacement", CanonicalModality.ESPONTANEO));
+                        writer.finalizeExtract(
+                                "pec-ct133-dev",
+                                "3541307",
+                                "2026-03-01",
+                                "2026-04-01",
+                                Instant.parse("2026-09-19T20:00:00Z"),
+                                "America/Sao_Paulo",
+                                TEST_QUERY_CHECKSUM,
+                                "0.1.0",
+                                "COMPLETE",
+                                "SNAPSHOT");
+                    }
+                })
+                .isInstanceOf(IOException.class);
 
-        assertThat(Files.readAllBytes(dir.resolve(extractionId + ".jsonl.gz")))
-                .isEqualTo(originalData);
+        assertThat(Files.readAllBytes(dir.resolve(extractionId + ".jsonl.gz"))).isEqualTo(originalData);
         assertThat(Files.readAllBytes(dir.resolve(extractionId + ".manifest.json")))
                 .isEqualTo(originalManifest);
     }
@@ -215,16 +260,21 @@ class ExtractWriterReaderTest {
             return;
         }
         Set<PosixFilePermission> originalPermissions = Files.getPosixFilePermissions(dir);
-        Files.setPosixFilePermissions(dir, Set.of(
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE));
+        Files.setPosixFilePermissions(dir, Set.of(PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE));
         try {
             try (ExtractWriter writer = new ExtractWriter(dir, "ext-no-directory-read")) {
                 writer.write(encounter("1", CanonicalModality.PROGRAMADO));
                 writer.finalizeExtract(
-                        "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                        Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                        TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                        "pec-ct133-dev",
+                        "3541307",
+                        "2026-03-01",
+                        "2026-04-01",
+                        Instant.parse("2026-09-19T20:00:00Z"),
+                        "America/Sao_Paulo",
+                        TEST_QUERY_CHECKSUM,
+                        "0.1.0",
+                        "COMPLETE",
+                        "SNAPSHOT");
             }
         } finally {
             Files.setPosixFilePermissions(dir, originalPermissions);
@@ -241,18 +291,35 @@ class ExtractWriterReaderTest {
         try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
             published = writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         ExtractionManifest forged = new ExtractionManifest(
-                published.extractionId(), published.sourceId(), published.municipalityIbge(),
-                published.periodStart(), published.periodEndExclusive(), published.startedAt(),
-                published.finishedAt(), published.canonicalSchemaVersion(),
-                published.completenessStatus(), published.consistencyLevel(), published.sourceZoneId(),
-                published.rowCount(), published.exclusionCount(), published.checksum(),
-                "sha256:forged", published.adapterVersion());
+                published.extractionId(),
+                published.sourceId(),
+                published.municipalityIbge(),
+                published.periodStart(),
+                published.periodEndExclusive(),
+                published.startedAt(),
+                published.finishedAt(),
+                published.canonicalSchemaVersion(),
+                published.completenessStatus(),
+                published.consistencyLevel(),
+                published.sourceZoneId(),
+                published.rowCount(),
+                published.exclusionCount(),
+                published.checksum(),
+                "sha256:forged",
+                published.adapterVersion());
 
         assertThatThrownBy(() -> reader.readEncounters(dir, forged))
                 .isInstanceOf(IllegalStateException.class)
@@ -262,10 +329,22 @@ class ExtractWriterReaderTest {
     @Test
     void queryChecksumMustBeAnActualSha256Digest() {
         ExtractionManifest manifest = new ExtractionManifest(
-                "ext-query-checksum", "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                "2026-09-19T20:00:00Z", "2026-09-19T20:01:00Z", "1", "COMPLETE", "SNAPSHOT",
-                "America/Sao_Paulo", 0, 0, "sha256:" + "0".repeat(64),
-                "sha256:not-a-digest", "0.1.0");
+                "ext-query-checksum",
+                "pec-ct133-dev",
+                "3541307",
+                "2026-03-01",
+                "2026-04-01",
+                "2026-09-19T20:00:00Z",
+                "2026-09-19T20:01:00Z",
+                "1",
+                "COMPLETE",
+                "SNAPSHOT",
+                "America/Sao_Paulo",
+                0,
+                0,
+                "sha256:" + "0".repeat(64),
+                "sha256:not-a-digest",
+                "0.1.0");
 
         assertThatThrownBy(() -> ExtractValidation.validateManifest(manifest))
                 .isInstanceOf(IllegalStateException.class)
@@ -286,8 +365,7 @@ class ExtractWriterReaderTest {
         writer.write(encounter("1", CanonicalModality.PROGRAMADO));
         writer.close(); // simulates a crash: close() without finalizeExtract()
 
-        assertThatThrownBy(() -> reader.readManifest(dir, extractionId))
-                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> reader.readManifest(dir, extractionId)).isInstanceOf(IllegalStateException.class);
         assertThat(Files.exists(dir.resolve(extractionId + ".jsonl.gz"))).isFalse();
         assertThat(Files.exists(dir.resolve(extractionId + ".jsonl.gz.tmp"))).isTrue();
     }
@@ -303,13 +381,21 @@ class ExtractWriterReaderTest {
         try (ExtractWriter retry = new ExtractWriter(dir, extractionId)) {
             retry.write(encounter("replacement", CanonicalModality.ESPONTANEO));
             retry.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         ExtractionManifest manifest = reader.readManifest(dir, extractionId);
-        assertThat(reader.readEncounters(dir, manifest)).extracting(CanonicalEncounter::sourceRef)
+        assertThat(reader.readEncounters(dir, manifest))
+                .extracting(CanonicalEncounter::sourceRef)
                 .extracting(SourceRef::recordId)
                 .containsExactly("replacement");
     }
@@ -321,9 +407,16 @@ class ExtractWriterReaderTest {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
 
             assertThatThrownBy(() -> writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2999-01-01T00:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT"))
+                            "pec-ct133-dev",
+                            "3541307",
+                            "2026-03-01",
+                            "2026-04-01",
+                            Instant.parse("2999-01-01T00:00:00Z"),
+                            "America/Sao_Paulo",
+                            TEST_QUERY_CHECKSUM,
+                            "0.1.0",
+                            "COMPLETE",
+                            "SNAPSHOT"))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("timestamps");
         }
@@ -343,9 +436,16 @@ class ExtractWriterReaderTest {
             Files.writeString(manifestTemp, "stale manifest staging file");
 
             assertThatThrownBy(() -> writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT"))
+                            "pec-ct133-dev",
+                            "3541307",
+                            "2026-03-01",
+                            "2026-04-01",
+                            Instant.parse("2026-09-19T20:00:00Z"),
+                            "America/Sao_Paulo",
+                            TEST_QUERY_CHECKSUM,
+                            "0.1.0",
+                            "COMPLETE",
+                            "SNAPSHOT"))
                     .isInstanceOf(IOException.class);
         }
 
@@ -361,9 +461,16 @@ class ExtractWriterReaderTest {
         try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
             writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         Path publishedManifest = dir.resolve(extractionId + ".manifest.json");
@@ -385,9 +492,16 @@ class ExtractWriterReaderTest {
         try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
             writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
         Files.delete(dir.resolve(extractionId + ".manifest.json"));
 
@@ -403,9 +517,16 @@ class ExtractWriterReaderTest {
         try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
             writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         Path dataFile = dir.resolve(extractionId + ".jsonl.gz");
@@ -432,13 +553,19 @@ class ExtractWriterReaderTest {
         try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
             writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
-        Set<PosixFilePermission> ownerOnly = Set.of(
-                PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
+        Set<PosixFilePermission> ownerOnly = Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
         assertThat(Files.getPosixFilePermissions(dir.resolve(extractionId + ".jsonl.gz")))
                 .containsExactlyInAnyOrderElementsOf(ownerOnly);
         assertThat(Files.getPosixFilePermissions(dir.resolve(extractionId + ".manifest.json")))
@@ -459,8 +586,16 @@ class ExtractWriterReaderTest {
         try (ExtractWriter writer = new ExtractWriter(dir, extractionIdA)) {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
             manifestA = writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.now(), "America/Sao_Paulo", TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.now(),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         String extractionIdB = "ext-b";
@@ -468,13 +603,23 @@ class ExtractWriterReaderTest {
             writer.write(encounter("1", CanonicalModality.ESPONTANEO));
             writer.write(encounter("2", CanonicalModality.ESPONTANEO));
             writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.now(), "America/Sao_Paulo", TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.now(),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         // Overwrite A's finalized data file with B's — valid gzip, wrong content relative to
         // manifestA's recorded checksum.
-        Files.copy(dir.resolve(extractionIdB + ".jsonl.gz"), dir.resolve(extractionIdA + ".jsonl.gz"),
+        Files.copy(
+                dir.resolve(extractionIdB + ".jsonl.gz"),
+                dir.resolve(extractionIdA + ".jsonl.gz"),
                 java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
         assertThatThrownBy(() -> reader.readEncounters(dir, manifestA))
@@ -489,17 +634,34 @@ class ExtractWriterReaderTest {
         try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
             manifest = writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         writeManifest(new ExtractionManifest(
-                manifest.extractionId(), manifest.sourceId(), manifest.municipalityIbge(),
-                manifest.periodStart(), manifest.periodEndExclusive(), manifest.startedAt(),
-                manifest.finishedAt(), manifest.canonicalSchemaVersion(),
-                manifest.completenessStatus(), "LIVE", manifest.sourceZoneId(), manifest.rowCount(),
-                manifest.exclusionCount(), manifest.checksum(), manifest.queryChecksum(),
+                manifest.extractionId(),
+                manifest.sourceId(),
+                manifest.municipalityIbge(),
+                manifest.periodStart(),
+                manifest.periodEndExclusive(),
+                manifest.startedAt(),
+                manifest.finishedAt(),
+                manifest.canonicalSchemaVersion(),
+                manifest.completenessStatus(),
+                "LIVE",
+                manifest.sourceZoneId(),
+                manifest.rowCount(),
+                manifest.exclusionCount(),
+                manifest.checksum(),
+                manifest.queryChecksum(),
                 manifest.adapterVersion()));
 
         assertThatThrownBy(() -> reader.readEncounters(dir, reader.readManifest(dir, extractionId)))
@@ -514,17 +676,34 @@ class ExtractWriterReaderTest {
         try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
             writer.write(encounter("1", CanonicalModality.PROGRAMADO));
             manifest = writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         writeManifest(new ExtractionManifest(
-                manifest.extractionId(), manifest.sourceId(), "3550308", manifest.periodStart(),
-                manifest.periodEndExclusive(), manifest.startedAt(), manifest.finishedAt(),
-                manifest.canonicalSchemaVersion(), manifest.completenessStatus(),
-                manifest.consistencyLevel(), manifest.sourceZoneId(), manifest.rowCount(),
-                manifest.exclusionCount(), manifest.checksum(), manifest.queryChecksum(),
+                manifest.extractionId(),
+                manifest.sourceId(),
+                "3550308",
+                manifest.periodStart(),
+                manifest.periodEndExclusive(),
+                manifest.startedAt(),
+                manifest.finishedAt(),
+                manifest.canonicalSchemaVersion(),
+                manifest.completenessStatus(),
+                manifest.consistencyLevel(),
+                manifest.sourceZoneId(),
+                manifest.rowCount(),
+                manifest.exclusionCount(),
+                manifest.checksum(),
+                manifest.queryChecksum(),
                 manifest.adapterVersion()));
 
         ExtractionManifest mismatchedScope = reader.readManifest(dir, extractionId);
@@ -533,11 +712,21 @@ class ExtractWriterReaderTest {
                 .hasMessageContaining("municipality");
 
         writeManifest(new ExtractionManifest(
-                manifest.extractionId(), manifest.sourceId(), manifest.municipalityIbge(),
-                "2026-04-01", "2026-05-01", manifest.startedAt(), manifest.finishedAt(),
-                manifest.canonicalSchemaVersion(), manifest.completenessStatus(),
-                manifest.consistencyLevel(), manifest.sourceZoneId(), manifest.rowCount(),
-                manifest.exclusionCount(), manifest.checksum(), manifest.queryChecksum(),
+                manifest.extractionId(),
+                manifest.sourceId(),
+                manifest.municipalityIbge(),
+                "2026-04-01",
+                "2026-05-01",
+                manifest.startedAt(),
+                manifest.finishedAt(),
+                manifest.canonicalSchemaVersion(),
+                manifest.completenessStatus(),
+                manifest.consistencyLevel(),
+                manifest.sourceZoneId(),
+                manifest.rowCount(),
+                manifest.exclusionCount(),
+                manifest.checksum(),
+                manifest.queryChecksum(),
                 manifest.adapterVersion()));
 
         ExtractionManifest mismatchedPeriod = reader.readManifest(dir, extractionId);
@@ -553,28 +742,55 @@ class ExtractWriterReaderTest {
         try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
             writer.write(encounter("1", CanonicalModality.UNMAPPED));
             manifest = writer.finalizeExtract(
-                    "pec-ct133-dev", "3541307", "2026-03-01", "2026-04-01",
-                    Instant.parse("2026-09-19T20:00:00Z"), "America/Sao_Paulo",
-                    TEST_QUERY_CHECKSUM, "0.1.0", "COMPLETE", "SNAPSHOT");
+                    "pec-ct133-dev",
+                    "3541307",
+                    "2026-03-01",
+                    "2026-04-01",
+                    Instant.parse("2026-09-19T20:00:00Z"),
+                    "America/Sao_Paulo",
+                    TEST_QUERY_CHECKSUM,
+                    "0.1.0",
+                    "COMPLETE",
+                    "SNAPSHOT");
         }
 
         writeManifest(new ExtractionManifest(
-                manifest.extractionId(), manifest.sourceId(), manifest.municipalityIbge(),
-                manifest.periodStart(), manifest.periodEndExclusive(), "not-an-instant",
-                manifest.finishedAt(), manifest.canonicalSchemaVersion(),
-                manifest.completenessStatus(), manifest.consistencyLevel(), manifest.sourceZoneId(),
-                manifest.rowCount(), manifest.exclusionCount(), manifest.checksum(),
-                manifest.queryChecksum(), manifest.adapterVersion()));
+                manifest.extractionId(),
+                manifest.sourceId(),
+                manifest.municipalityIbge(),
+                manifest.periodStart(),
+                manifest.periodEndExclusive(),
+                "not-an-instant",
+                manifest.finishedAt(),
+                manifest.canonicalSchemaVersion(),
+                manifest.completenessStatus(),
+                manifest.consistencyLevel(),
+                manifest.sourceZoneId(),
+                manifest.rowCount(),
+                manifest.exclusionCount(),
+                manifest.checksum(),
+                manifest.queryChecksum(),
+                manifest.adapterVersion()));
         assertThatThrownBy(() -> reader.readEncounters(dir, reader.readManifest(dir, extractionId)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("timestamp");
 
         writeManifest(new ExtractionManifest(
-                manifest.extractionId(), manifest.sourceId(), manifest.municipalityIbge(),
-                manifest.periodStart(), manifest.periodEndExclusive(), manifest.startedAt(),
-                manifest.finishedAt(), manifest.canonicalSchemaVersion(),
-                manifest.completenessStatus(), manifest.consistencyLevel(), manifest.sourceZoneId(),
-                manifest.rowCount(), 0, manifest.checksum(), manifest.queryChecksum(),
+                manifest.extractionId(),
+                manifest.sourceId(),
+                manifest.municipalityIbge(),
+                manifest.periodStart(),
+                manifest.periodEndExclusive(),
+                manifest.startedAt(),
+                manifest.finishedAt(),
+                manifest.canonicalSchemaVersion(),
+                manifest.completenessStatus(),
+                manifest.consistencyLevel(),
+                manifest.sourceZoneId(),
+                manifest.rowCount(),
+                0,
+                manifest.checksum(),
+                manifest.queryChecksum(),
                 manifest.adapterVersion()));
         assertThatThrownBy(() -> reader.readEncounters(dir, reader.readManifest(dir, extractionId)))
                 .isInstanceOf(IllegalStateException.class)
@@ -583,24 +799,18 @@ class ExtractWriterReaderTest {
 
     @Test
     void traversalAbsoluteAndSymlinkExtractionIdsAreRejectedByBothBoundaries() throws Exception {
-        assertThatThrownBy(() -> new ExtractWriter(dir, "../escape"))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ExtractWriter(dir, "/tmp/escape"))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ExtractWriter(dir, "../escape")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ExtractWriter(dir, "/tmp/escape")).isInstanceOf(IllegalArgumentException.class);
 
         Path target = dir.resolve("target-id");
         Files.writeString(target, "not a manifest");
         Path symlink = dir.resolve("linked-id");
         Files.createSymbolicLink(symlink, target.getFileName());
 
-        assertThatThrownBy(() -> new ExtractWriter(dir, "linked-id"))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> reader.readManifest(dir, "../escape"))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> reader.readManifest(dir, "/tmp/escape"))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> reader.readManifest(dir, "linked-id"))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ExtractWriter(dir, "linked-id")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reader.readManifest(dir, "../escape")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reader.readManifest(dir, "/tmp/escape")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reader.readManifest(dir, "linked-id")).isInstanceOf(IllegalArgumentException.class);
     }
 
     private void writeManifest(ExtractionManifest manifest) throws IOException {
@@ -612,7 +822,12 @@ class ExtractWriterReaderTest {
     private CanonicalEncounter encounter(String recordId, CanonicalModality modality) {
         return new CanonicalEncounter(
                 new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", recordId),
-                "3541307", "2026-03-15", modality, "2750325", "0000346268", "225142");
+                "3541307",
+                "2026-03-15",
+                modality,
+                "2750325",
+                "0000346268",
+                "225142");
     }
 
     private String randomPayload() {

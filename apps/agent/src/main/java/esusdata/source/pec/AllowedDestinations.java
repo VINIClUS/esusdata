@@ -58,9 +58,8 @@ public final class AllowedDestinations {
             String resolvedIp = resolved.getHostAddress();
             HostPort resolvedAddr = new HostPort(resolvedIp, port);
             if (!allowed.contains(resolvedAddr)) {
-                throw new DestinationNotAllowedException(
-                        "Host " + host + " resolved to address " + resolvedIp + ":" + port
-                                + " which is not in the approved allowlist — DNS rebinding protection.");
+                throw new DestinationNotAllowedException("Host " + host + " resolved to address " + resolvedIp + ":"
+                        + port + " which is not in the approved allowlist — DNS rebinding protection.");
             }
         }
         return resolvedAddresses[0];

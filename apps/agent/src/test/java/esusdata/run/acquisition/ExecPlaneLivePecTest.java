@@ -1,10 +1,14 @@
 package esusdata.run.acquisition;
 
-import esusdata.run.worker.FailureClassifier;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
+
+import esusdata.run.extract.ExtractionManifest;
 import esusdata.run.job.CancellationToken;
 import esusdata.run.job.JobCancelledException;
-import esusdata.run.extract.ExtractionManifest;
+import esusdata.run.worker.FailureClassifier;
 import esusdata.source.pec.AllowedDestinations;
+import esusdata.source.pec.EnvFileSecretResolver;
 import esusdata.source.pec.IndividualEncounterModalityCapability;
 import esusdata.source.pec.JdbcCompatibilityCatalog;
 import esusdata.source.pec.PecCompatibilityMatrix;
@@ -12,13 +16,7 @@ import esusdata.source.pec.PecConnectionProperties;
 import esusdata.source.pec.PecSecretResolver;
 import esusdata.source.pec.PecSourceIdentity;
 import esusdata.source.pec.ReadBudget;
-import esusdata.source.pec.EnvFileSecretResolver;
 import esusdata.testsupport.LivePecAssumptions;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,9 +33,10 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.catchThrowable;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * The execution plane against a real PEC, through the production constructor — the packaged
@@ -72,16 +71,18 @@ class ExecPlaneLivePecTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        Assumptions.assumeTrue(Boolean.getBoolean(OPT_IN_PROPERTY),
+        Assumptions.assumeTrue(
+                Boolean.getBoolean(OPT_IN_PROPERTY),
                 "Skipping: touches the production PEC — opt in with -D" + OPT_IN_PROPERTY + "=true");
         realBinary = System.getProperty(BINARY_PROPERTY);
-        Assumptions.assumeTrue(realBinary != null && !realBinary.isBlank(),
-                "Skipping: -D" + BINARY_PROPERTY + " not set");
-        Assumptions.assumeTrue(Files.isExecutable(Path.of(realBinary)),
-                "Skipping: " + realBinary + " is not an executable file");
+        Assumptions.assumeTrue(
+                realBinary != null && !realBinary.isBlank(), "Skipping: -D" + BINARY_PROPERTY + " not set");
+        Assumptions.assumeTrue(
+                Files.isExecutable(Path.of(realBinary)), "Skipping: " + realBinary + " is not an executable file");
         String configuredEnvFile = System.getProperty(ENV_FILE_PROPERTY);
         envFile = configuredEnvFile == null || configuredEnvFile.isBlank()
-                ? LivePecAssumptions.ENV_FILE : Path.of(configuredEnvFile);
+                ? LivePecAssumptions.ENV_FILE
+                : Path.of(configuredEnvFile);
         Assumptions.assumeTrue(Files.exists(envFile), "Skipping: no PEC secret file at " + envFile);
         env = Files.readAllLines(envFile).stream()
                 .filter(line -> line.contains("="))
@@ -89,10 +90,12 @@ class ExecPlaneLivePecTest {
                         line -> line.substring(0, line.indexOf('=')).trim(),
                         line -> line.substring(line.indexOf('=') + 1).trim()));
         for (String key : List.of("PEC_SOURCE_ID", "PEC_VERSION", "PEC_MUNICIPALITY_IBGE")) {
-            Assumptions.assumeTrue(env.get(key) != null && !env.get(key).isBlank(),
+            Assumptions.assumeTrue(
+                    env.get(key) != null && !env.get(key).isBlank(),
                     "Skipping: " + envFile + " has no " + key + " — the source's true identity is required");
         }
-        Assumptions.assumeTrue(LivePecAssumptions.isReachable(env.get("PEC_DB_HOST"), port()),
+        Assumptions.assumeTrue(
+                LivePecAssumptions.isReachable(env.get("PEC_DB_HOST"), port()),
                 "Skipping: " + env.get("PEC_DB_HOST") + ":" + port() + " not reachable — tunnel likely down");
         // The tunnel's local port accepts TCP even when the PEC's PostgreSQL behind it is down —
         // only a real login proves there is a server to test against.
@@ -113,7 +116,8 @@ class ExecPlaneLivePecTest {
             return DriverManager.getConnection(
                     "jdbc:postgresql://" + env.get("PEC_DB_HOST") + ":" + port() + "/" + env.get("PEC_DB_NAME")
                             + "?ApplicationName=observatorio-aps-livetest-check&readOnly=true&loginTimeout=5",
-                    env.get("PEC_DB_USER"), new String(password));
+                    env.get("PEC_DB_USER"),
+                    new String(password));
         } finally {
             java.util.Arrays.fill(password, '\0');
         }
@@ -125,9 +129,12 @@ class ExecPlaneLivePecTest {
 
     private ExecPlaneAcquisition adapter(PecSecretResolver secretResolver) {
         return new ExecPlaneAcquisition(
-                List.of(realBinary), secretResolver,
+                List.of(realBinary),
+                secretResolver,
                 new AllowedDestinations(Set.of(new AllowedDestinations.HostPort(env.get("PEC_DB_HOST"), port()))),
-                extractsDir, Clock.systemUTC(), Duration.ofSeconds(10));
+                extractsDir,
+                Clock.systemUTC(),
+                Duration.ofSeconds(10));
     }
 
     private PecSourceIdentity identity() {
@@ -143,18 +150,36 @@ class ExecPlaneLivePecTest {
      */
     private AcquisitionCommand wholeHistoryCommand(String extractionId) {
         ReadBudget budget = new ReadBudget(
-                2, Duration.ofSeconds(10), Duration.ofSeconds(10), 20_000, 10_000, 20_000,
-                500_000, 20_000, ReadBudget.DEFAULT_MAX_PAYLOAD_BYTES, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES);
+                2,
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(10),
+                20_000,
+                10_000,
+                20_000,
+                500_000,
+                20_000,
+                ReadBudget.DEFAULT_MAX_PAYLOAD_BYTES,
+                ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES);
         return command(extractionId, budget, LocalDate.of(2000, 1, 1), LocalDate.of(2027, 1, 1));
     }
 
     private AcquisitionCommand command(
             String extractionId, ReadBudget budget, LocalDate periodStart, LocalDate periodEndExclusive) {
         return new AcquisitionCommand(
-                new PecConnectionProperties(env.get("PEC_SOURCE_ID"), env.get("PEC_DB_HOST"), port(),
-                        env.get("PEC_DB_NAME"), env.get("PEC_DB_USER"), "PEC_DB_PASSWORD",
+                new PecConnectionProperties(
+                        env.get("PEC_SOURCE_ID"),
+                        env.get("PEC_DB_HOST"),
+                        port(),
+                        env.get("PEC_DB_NAME"),
+                        env.get("PEC_DB_USER"),
+                        "PEC_DB_PASSWORD",
                         env.get("PEC_MUNICIPALITY_IBGE")),
-                identity(), budget, extractionId, periodStart, periodEndExclusive, "America/Sao_Paulo");
+                identity(),
+                budget,
+                extractionId,
+                periodStart,
+                periodEndExclusive,
+                "America/Sao_Paulo");
     }
 
     private static class RecordingListener implements AcquisitionListener {
@@ -183,14 +208,18 @@ class ExecPlaneLivePecTest {
         JdbcCompatibilityCatalog catalog = new JdbcCompatibilityCatalog();
         try (Connection c = openCheckConnection()) {
             String postgresVersion = catalog.postgresVersion(c);
-            PecCompatibilityMatrix.Entry entry = PecCompatibilityMatrix.fromClasspathResource().findExact(
-                    IndividualEncounterModalityCapability.CAPABILITY,
-                    IndividualEncounterModalityCapability.ADAPTER_VERSION, identity(), postgresVersion);
-            System.out.println("fingerprints: source=" + identity().sourceId() + " PEC=" + identity().pecVersion()
-                    + " PostgreSQL=" + postgresVersion);
+            PecCompatibilityMatrix.Entry entry = PecCompatibilityMatrix.fromClasspathResource()
+                    .findExact(
+                            IndividualEncounterModalityCapability.CAPABILITY,
+                            IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                            identity(),
+                            postgresVersion);
+            System.out.println("fingerprints: source=" + identity().sourceId() + " PEC="
+                    + identity().pecVersion() + " PostgreSQL=" + postgresVersion);
             for (Map.Entry<String, String> expected : entry.objectFingerprints().entrySet()) {
                 String object = expected.getKey();
-                String observed = catalog.fingerprint(c, object, entry.objectColumns().get(object));
+                String observed =
+                        catalog.fingerprint(c, object, entry.objectColumns().get(object));
                 System.out.println("fingerprint " + object + " matrix=" + expected.getValue() + " jdbc=" + observed);
                 assertThat(observed).as(object).isEqualTo(expected.getValue());
             }
@@ -205,10 +234,15 @@ class ExecPlaneLivePecTest {
     void acquiresOneMonthEndToEndThroughTheRustChild() {
         RecordingListener listener = new RecordingListener();
 
-        ExtractionManifest manifest = adapter(new EnvFileSecretResolver(envFile)).acquire(
-                command("live-month", ReadBudget.initialEngineeringProposal(),
-                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1)),
-                new CancellationToken(), listener);
+        ExtractionManifest manifest = adapter(new EnvFileSecretResolver(envFile))
+                .acquire(
+                        command(
+                                "live-month",
+                                ReadBudget.initialEngineeringProposal(),
+                                LocalDate.of(2026, 3, 1),
+                                LocalDate.of(2026, 4, 1)),
+                        new CancellationToken(),
+                        listener);
         System.out.println("live month: rows=" + manifest.rowCount() + " exclusions=" + manifest.exclusionCount()
                 + " checksum=" + manifest.checksum());
 
@@ -264,7 +298,8 @@ class ExecPlaneLivePecTest {
     }
 
     private long activeObservatorioQueries() throws Exception {
-        try (Connection c = openCheckConnection(); Statement st = c.createStatement()) {
+        try (Connection c = openCheckConnection();
+                Statement st = c.createStatement()) {
             long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
             while (true) {
                 long active;

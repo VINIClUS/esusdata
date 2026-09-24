@@ -30,8 +30,7 @@ public record Job(
         String requestHash,
         Instant idempotencyExpiresAt,
         String stagingId,
-        Instant cancelRequestedAt
-) {
+        Instant cancelRequestedAt) {
     /** {@code extraction_id} present means the job replays an already-finalized extract. */
     public boolean isImmutableExtract() {
         return extractionId != null;

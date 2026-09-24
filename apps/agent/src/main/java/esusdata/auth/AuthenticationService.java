@@ -1,13 +1,13 @@
 package esusdata.auth;
 
-import java.time.Clock;
-import java.time.Instant;
+import esusdata.auth.model.AuthAuditWriter;
 import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.AuthenticationFailedException;
 import esusdata.auth.model.UserAccount;
-import esusdata.auth.model.UserState;
-import esusdata.auth.model.AuthAuditWriter;
 import esusdata.auth.model.UserRepository;
+import esusdata.auth.model.UserState;
+import java.time.Clock;
+import java.time.Instant;
 
 /**
  * Orchestrates login/logout over the lower-level identity-access pieces. Deliberately framework-
@@ -24,8 +24,12 @@ public final class AuthenticationService {
     private final Clock clock;
 
     public AuthenticationService(
-            UserRepository userRepository, Argon2Profile argon2Profile, SessionService sessionService,
-            LoginThrottle loginThrottle, AuthAuditWriter auditWriter, Clock clock) {
+            UserRepository userRepository,
+            Argon2Profile argon2Profile,
+            SessionService sessionService,
+            LoginThrottle loginThrottle,
+            AuthAuditWriter auditWriter,
+            Clock clock) {
         this.userRepository = userRepository;
         this.argon2Profile = argon2Profile;
         this.sessionService = sessionService;
@@ -34,8 +38,7 @@ public final class AuthenticationService {
         this.clock = clock;
     }
 
-    public record LoginResult(String rawToken, String userId, String displayName) {
-    }
+    public record LoginResult(String rawToken, String userId, String displayName) {}
 
     /**
      * §1.12.7 L538: throttle is checked before any password comparison — a throttled account
@@ -47,7 +50,8 @@ public final class AuthenticationService {
         boolean success = false;
         try {
             UserAccount user = userRepository.findByUsername(username).orElse(null);
-            if (user == null || user.state() != UserState.ACTIVE
+            if (user == null
+                    || user.state() != UserState.ACTIVE
                     || !argon2Profile.matches(password, user.passwordHash())) {
                 throw new AuthenticationFailedException("invalid username or password");
             }
@@ -76,8 +80,7 @@ public final class AuthenticationService {
      * and the effect is visible only on the NEXT request that re-validates the session (the
      * {@link AuthenticatedSession} already materialized for THIS request is not mutated in place).
      */
-    public void reauthenticate(
-            String sessionId, String userId, String password, String origin, Instant now) {
+    public void reauthenticate(String sessionId, String userId, String password, String origin, Instant now) {
         UserAccount user = userRepository.findById(userId).orElse(null);
         String username = user == null ? userId : user.username();
         try {
@@ -89,7 +92,8 @@ public final class AuthenticationService {
         }
         boolean success = false;
         try {
-            if (user == null || user.state() != UserState.ACTIVE
+            if (user == null
+                    || user.state() != UserState.ACTIVE
                     || !argon2Profile.matches(password, user.passwordHash())) {
                 throw new AuthenticationFailedException("invalid password");
             }

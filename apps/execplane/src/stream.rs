@@ -27,7 +27,10 @@ pub enum StreamOutcome {
     Cancelled,
     /// `sqlstate` is forwarded on the wire so Java's `FailureClassifier` classifies it exactly as
     /// it would the same `SQLException` on the JDBC path (see `sqlstate_of`).
-    Failed { detail: String, sqlstate: Option<String> },
+    Failed {
+        detail: String,
+        sqlstate: Option<String>,
+    },
     /// A record failed `ExtractSink::write`'s port of `validateRecordForWrite` (out-of-scope
     /// `care_date`, blank required field, ...) — mirrors Java's `IllegalArgumentException` /
     /// `INVALID_EXTRACT_RECORD` (fatia 3 / ADR 0011).
@@ -64,7 +67,12 @@ pub fn stream_query(
     let cancel_requested = Arc::new(AtomicBool::new(false));
     let duration_exceeded = Arc::new(AtomicBool::new(false));
     spawn_cancel_listener(cancel_token.clone(), Arc::clone(&cancel_requested));
-    spawn_duration_watchdog(cancel_token, start, budget.max_duration_ms, Arc::clone(&duration_exceeded));
+    spawn_duration_watchdog(
+        cancel_token,
+        start,
+        budget.max_duration_ms,
+        Arc::clone(&duration_exceeded),
+    );
 
     let positional_query = to_positional_placeholders(query_text);
     let params: [&(dyn postgres::types::ToSql + Sync); 3] =
@@ -159,11 +167,16 @@ pub fn stream_query(
         };
         if let Err(err) = sink.write(&encounter) {
             return Ok(match err {
-                crate::extract::ExtractError::InvalidRecord(detail) => StreamOutcome::InvalidRecord(detail),
-                crate::extract::ExtractError::BudgetExceeded(detail) => StreamOutcome::BudgetExceeded(detail),
-                crate::extract::ExtractError::Io(detail) => {
-                    StreamOutcome::Failed { detail, sqlstate: None }
+                crate::extract::ExtractError::InvalidRecord(detail) => {
+                    StreamOutcome::InvalidRecord(detail)
                 }
+                crate::extract::ExtractError::BudgetExceeded(detail) => {
+                    StreamOutcome::BudgetExceeded(detail)
+                }
+                crate::extract::ExtractError::Io(detail) => StreamOutcome::Failed {
+                    detail,
+                    sqlstate: None,
+                },
             });
         }
 
@@ -235,7 +248,10 @@ fn classify_failure(
             "duration ceiling exceeded (a stalled read was interrupted)".to_string(),
         );
     }
-    StreamOutcome::Failed { detail: err.to_string(), sqlstate: sqlstate_of(&err) }
+    StreamOutcome::Failed {
+        detail: err.to_string(),
+        sqlstate: sqlstate_of(&err),
+    }
 }
 
 /// The SQLSTATE pgJDBC would have attached to the same failure: the server's own code when there
@@ -342,7 +358,10 @@ mod tests {
 
     #[test]
     fn converts_jdbc_placeholders_to_positional_ones() {
-        assert_eq!(to_positional_placeholders("a = ? AND b = ?"), "a = $1 AND b = $2");
+        assert_eq!(
+            to_positional_placeholders("a = ? AND b = ?"),
+            "a = $1 AND b = $2"
+        );
     }
 
     #[test]

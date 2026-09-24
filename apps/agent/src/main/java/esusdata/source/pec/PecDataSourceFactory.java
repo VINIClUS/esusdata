@@ -2,7 +2,6 @@ package esusdata.source.pec;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-
 import java.net.InetAddress;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -32,8 +31,8 @@ public final class PecDataSourceFactory {
     HikariDataSource create(PecConnectionProperties properties, ReadBudget budget) {
         InetAddress validatedAddress = allowedDestinations.assertAllowed(properties.host(), properties.port());
 
-        String jdbcUrl = "jdbc:postgresql://" + jdbcHostLiteral(validatedAddress) + ":" + properties.port()
-                + "/" + properties.database();
+        String jdbcUrl = "jdbc:postgresql://" + jdbcHostLiteral(validatedAddress) + ":" + properties.port() + "/"
+                + properties.database();
 
         char[] password = secretResolver.resolve(properties.secretRef());
         try {
@@ -51,20 +50,18 @@ public final class PecDataSourceFactory {
             config.setInitializationFailTimeout(-1);
             config.setConnectionTimeout(budget.acquisitionTimeout().toMillis());
             config.addDataSourceProperty("connectTimeout", pgConnectTimeoutSeconds(budget.connectionTimeout()));
-            config.addDataSourceProperty("socketTimeout", pgTimeoutSeconds(
-                    budget.maxDurationMs(), "maxDurationMs"));
-            config.addDataSourceProperty("cancelSignalTimeout", pgTimeoutSeconds(
-                    budget.connectionTimeout().toMillis(), "connectionTimeout"));
-            config.addDataSourceProperty("queryTimeout", pgTimeoutSeconds(
-                    budget.statementTimeoutMs(), "statementTimeoutMs"));
+            config.addDataSourceProperty("socketTimeout", pgTimeoutSeconds(budget.maxDurationMs(), "maxDurationMs"));
+            config.addDataSourceProperty(
+                    "cancelSignalTimeout",
+                    pgTimeoutSeconds(budget.connectionTimeout().toMillis(), "connectionTimeout"));
+            config.addDataSourceProperty(
+                    "queryTimeout", pgTimeoutSeconds(budget.statementTimeoutMs(), "statementTimeoutMs"));
             config.setPoolName("pec-" + properties.sourceId());
-            config.setConnectionInitSql(
-                    "SET application_name = 'observatorio-aps'; "
-                            + "SET default_transaction_read_only = on; "
-                            + "SET statement_timeout = " + budget.statementTimeoutMs() + "; "
-                            + "SET lock_timeout = " + budget.lockTimeoutMs() + "; "
-                            + "SET idle_in_transaction_session_timeout = " + budget.idleInTransactionTimeoutMs() + ";"
-            );
+            config.setConnectionInitSql("SET application_name = 'observatorio-aps'; "
+                    + "SET default_transaction_read_only = on; "
+                    + "SET statement_timeout = " + budget.statementTimeoutMs() + "; "
+                    + "SET lock_timeout = " + budget.lockTimeoutMs() + "; "
+                    + "SET idle_in_transaction_session_timeout = " + budget.idleInTransactionTimeoutMs() + ";");
             return new HikariDataSource(config);
         } finally {
             java.util.Arrays.fill(password, '\0');
@@ -77,9 +74,7 @@ public final class PecDataSourceFactory {
      * connection with another source's municipality configuration.
      */
     public PecSourceConnection open(
-            PecConnectionProperties properties,
-            PecSourceIdentity sourceIdentity,
-            ReadBudget budget)
+            PecConnectionProperties properties, PecSourceIdentity sourceIdentity, ReadBudget budget)
             throws SQLException {
         requireCompleteSourceIdentity(sourceIdentity);
         if (properties == null) {
@@ -90,14 +85,13 @@ public final class PecDataSourceFactory {
                     "PecSourceIdentity sourceId does not match source connection properties");
         }
         Objects.requireNonNull(budget, "read budget is required");
-        SourceAcquisitionLimiter.Permit permit =
-                SourceAcquisitionLimiter.acquireOrFail(properties.sourceId());
+        SourceAcquisitionLimiter.Permit permit = SourceAcquisitionLimiter.acquireOrFail(properties.sourceId());
         HikariDataSource dataSource = null;
         boolean ownershipTransferred = false;
         try {
             dataSource = create(properties, budget);
-            PecSourceConnection sourceConnection = PecSourceConnection.fromPool(
-                    dataSource, properties, sourceIdentity, budget, permit);
+            PecSourceConnection sourceConnection =
+                    PecSourceConnection.fromPool(dataSource, properties, sourceIdentity, budget, permit);
             ownershipTransferred = true;
             return sourceConnection;
         } finally {
@@ -112,8 +106,7 @@ public final class PecDataSourceFactory {
 
     private static void requireCompleteSourceIdentity(PecSourceIdentity sourceIdentity) {
         if (sourceIdentity == null || !sourceIdentity.isComplete()) {
-            throw new IllegalStateException(
-                    "PecSourceIdentity is required before opening a PEC source connection");
+            throw new IllegalStateException("PecSourceIdentity is required before opening a PEC source connection");
         }
     }
 

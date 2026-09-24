@@ -19,6 +19,4 @@ public record SourceRecord(
         String municipalityIbge,
         String pecVersion,
         String readModel,
-        String createdAt
-) {
-}
+        String createdAt) {}

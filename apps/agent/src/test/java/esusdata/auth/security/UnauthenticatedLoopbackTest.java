@@ -1,15 +1,15 @@
 package esusdata.auth.security;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.web.SecuritySliceTestSupport;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.SecuritySliceTestSupport;
 /**
  * ENG-49: "loopback não é exceção para autenticação/autorização" — every protected route on
  * 127.0.0.1 still requires a valid session; there is no bypass for local traffic.
@@ -21,7 +21,9 @@ public class UnauthenticatedLoopbackTest extends SecuritySliceTestSupport {
     void meIsRejectedWithoutASession() throws Exception {
         HttpClient client = HttpClient.newHttpClient();
         HttpResponse<String> response = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/me")).GET().build(),
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/me"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(401);
@@ -33,7 +35,10 @@ public class UnauthenticatedLoopbackTest extends SecuritySliceTestSupport {
     void logoutIsRejectedWithoutASession() throws Exception {
         java.net.CookieManager cookieManager = new java.net.CookieManager();
         HttpClient client = HttpClient.newBuilder().cookieHandler(cookieManager).build();
-        client.send(HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
+        client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
         String csrfToken = null;
         for (java.net.HttpCookie cookie : cookieManager.getCookieStore().getCookies()) {
@@ -45,7 +50,8 @@ public class UnauthenticatedLoopbackTest extends SecuritySliceTestSupport {
         HttpResponse<String> response = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/logout"))
                         .header("X-XSRF-TOKEN", csrfToken)
-                        .POST(HttpRequest.BodyPublishers.noBody()).build(),
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(401);
@@ -55,7 +61,9 @@ public class UnauthenticatedLoopbackTest extends SecuritySliceTestSupport {
     void readyRemainsPublicByDesign() throws Exception {
         HttpClient client = HttpClient.newHttpClient();
         HttpResponse<String> response = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(200);

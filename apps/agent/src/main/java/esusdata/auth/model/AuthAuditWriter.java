@@ -10,6 +10,5 @@ import java.time.Instant;
  * field).
  */
 public interface AuthAuditWriter {
-    void record(Instant at, String actorUserId, String eventType, String target,
-            String outcome, String detailJson);
+    void record(Instant at, String actorUserId, String eventType, String target, String outcome, String detailJson);
 }

@@ -47,7 +47,8 @@ pub fn probe_object(
     Ok(Value::Object(fields))
 }
 
-const COLUMNS_QUERY: &str = "SELECT column_name, data_type, udt_name, is_nullable, ordinal_position \
+const COLUMNS_QUERY: &str =
+    "SELECT column_name, data_type, udt_name, is_nullable, ordinal_position \
      FROM information_schema.columns \
     WHERE table_schema = 'public' AND table_name = $1 \
     ORDER BY ordinal_position";
@@ -73,7 +74,8 @@ fn fetch_columns(txn: &mut Transaction, object: &str) -> Result<Vec<Value>, Box<
         .collect())
 }
 
-const CONSTRAINTS_QUERY: &str = "SELECT tc.constraint_name, tc.constraint_type, kcu.column_name, kcu.ordinal_position \
+const CONSTRAINTS_QUERY: &str =
+    "SELECT tc.constraint_name, tc.constraint_type, kcu.column_name, kcu.ordinal_position \
       FROM information_schema.table_constraints tc \
       JOIN information_schema.key_column_usage kcu \
         ON kcu.constraint_schema = tc.constraint_schema \
@@ -108,7 +110,11 @@ fn probe_unique_key(
     }
 
     for (_, constraint_type, columns) in &constraints {
-        if columns.iter().map(String::as_str).eq(expected.iter().copied()) {
+        if columns
+            .iter()
+            .map(String::as_str)
+            .eq(expected.iter().copied())
+        {
             return Ok((Some(constraint_type.clone()), false));
         }
     }
@@ -149,12 +155,19 @@ fn probe_required_dimensions(txn: &mut Transaction) -> Result<Option<i64>, Box<d
 
 fn parse_ids(csv: &str) -> Result<Vec<i64>, Box<dyn Error>> {
     csv.split(',')
-        .map(|value| value.parse::<i64>().map_err(|e| Box::<dyn Error>::from(e.to_string())))
+        .map(|value| {
+            value
+                .parse::<i64>()
+                .map_err(|e| Box::<dyn Error>::from(e.to_string()))
+        })
         .collect()
 }
 
 /// Mirrors `JdbcCompatibilityCatalog.probeLeafSemantics`.
-fn probe_leaf_semantics(txn: &mut Transaction, ids_csv: &str) -> Result<Vec<Value>, Box<dyn Error>> {
+fn probe_leaf_semantics(
+    txn: &mut Transaction,
+    ids_csv: &str,
+) -> Result<Vec<Value>, Box<dyn Error>> {
     let ids = parse_ids(ids_csv)?;
     let rows = txn.query(
         "SELECT co_seq_dim_tipo_atendimento, ds_tipo_atendimento, co_dim_tipo_atendimento_pai \
@@ -190,7 +203,11 @@ fn probe_leaf_ids(txn: &mut Transaction, ids_csv: &str) -> Result<Vec<i64>, Box<
 /// these names from the same packaged, trusted `pec-adapters.json`, not from the wire, but the
 /// check costs nothing and keeps the two implementations symmetric.
 fn require_safe_identifier(identifier: &str) -> Result<(), Box<dyn Error>> {
-    if !identifier.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') || identifier.is_empty() {
+    if !identifier
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        || identifier.is_empty()
+    {
         return Err(format!("unsafe identifier in compatibility contract: {identifier}").into());
     }
     Ok(())

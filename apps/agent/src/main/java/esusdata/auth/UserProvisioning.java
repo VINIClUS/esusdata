@@ -1,16 +1,15 @@
 package esusdata.auth;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.support.TransactionTemplate;
-
+import esusdata.auth.model.ActivationTokens;
+import esusdata.auth.model.UserAccount;
+import esusdata.auth.model.UserRepository;
+import esusdata.auth.model.UserState;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
-import esusdata.auth.model.ActivationTokens;
-import esusdata.auth.model.UserAccount;
-import esusdata.auth.model.UserState;
-import esusdata.auth.model.UserRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * §1.12.7 L536 applied uniformly, not only to the bootstrap admin: every account starts {@code
@@ -34,8 +33,11 @@ public final class UserProvisioning {
     private final SecurityProperties properties;
 
     public UserProvisioning(
-            UserRepository userRepository, JdbcTemplate jdbc, TransactionTemplate transactionTemplate,
-            Clock clock, SecurityProperties properties) {
+            UserRepository userRepository,
+            JdbcTemplate jdbc,
+            TransactionTemplate transactionTemplate,
+            Clock clock,
+            SecurityProperties properties) {
         this.userRepository = userRepository;
         this.jdbc = jdbc;
         this.transactionTemplate = transactionTemplate;
@@ -43,8 +45,7 @@ public final class UserProvisioning {
         this.properties = properties;
     }
 
-    public record ProvisionedUser(String userId, String activationToken, Instant expiresAt) {
-    }
+    public record ProvisionedUser(String userId, String activationToken, Instant expiresAt) {}
 
     public ProvisionedUser provision(String username, String displayName, String createdBy) {
         if (userRepository.findByUsername(username).isPresent()) {
@@ -57,9 +58,18 @@ public final class UserProvisioning {
 
         transactionTemplate.executeWithoutResult(status -> {
             userRepository.insert(new UserAccount(
-                    userId, username, displayName, "UNSET", "NONE", "{}",
-                    properties.securityPolicyVersion(), 1, UserState.PENDING_ACTIVATION, now,
-                    createdBy, null));
+                    userId,
+                    username,
+                    displayName,
+                    "UNSET",
+                    "NONE",
+                    "{}",
+                    properties.securityPolicyVersion(),
+                    1,
+                    UserState.PENDING_ACTIVATION,
+                    now,
+                    createdBy,
+                    null));
             jdbc.update("""
                     INSERT INTO activation_tokens (token_hash, user_id, expires_at, consumed_at)
                     VALUES (?,?,?,null)

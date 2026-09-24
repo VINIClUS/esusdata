@@ -1,19 +1,17 @@
 package esusdata.run.acquisition;
 
-import esusdata.source.pec.PecAcquisition;
-import esusdata.source.pec.PecDataSourceFactory;
-import esusdata.source.pec.PecSourceConnection;
-
 import esusdata.indicator.model.CanonicalEncounter;
 import esusdata.indicator.model.CanonicalModality;
-import esusdata.run.extract.ExtractionManifest;
 import esusdata.indicator.model.SourceRef;
 import esusdata.run.extract.ExtractWriter;
+import esusdata.run.extract.ExtractionManifest;
 import esusdata.source.pec.CompatibilityCatalog;
 import esusdata.source.pec.IndividualEncounterModalityCapability;
 import esusdata.source.pec.JdbcCompatibilityCatalog;
+import esusdata.source.pec.PecAcquisition;
+import esusdata.source.pec.PecDataSourceFactory;
+import esusdata.source.pec.PecSourceConnection;
 import esusdata.source.pec.RawEncounterRecord;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.PreparedStatement;
@@ -47,7 +45,9 @@ public final class InProcessAcquisition implements Acquisition {
      * JdbcCompatibilityCatalog}).
      */
     public InProcessAcquisition(
-            PecDataSourceFactory pecDataSourceFactory, Path extractsBaseDir, Clock clock,
+            PecDataSourceFactory pecDataSourceFactory,
+            Path extractsBaseDir,
+            Clock clock,
             CompatibilityCatalog catalog) {
         this.pecDataSourceFactory = pecDataSourceFactory;
         this.extractsBaseDir = extractsBaseDir;
@@ -66,8 +66,7 @@ public final class InProcessAcquisition implements Acquisition {
                 listener.onProgress();
                 PecAcquisition acquisition =
                         sourceConnection.acquire(command.periodStart(), command.periodEndExclusive());
-                try (ExtractWriter writer =
-                        new ExtractWriter(extractsBaseDir, command.extractionId(), acquisition)) {
+                try (ExtractWriter writer = new ExtractWriter(extractsBaseDir, command.extractionId(), acquisition)) {
                     try {
                         IndividualEncounterModalityCapability.stream(
                                 acquisition,
@@ -86,8 +85,12 @@ public final class InProcessAcquisition implements Acquisition {
                         throw new PecAcquisitionException(uncertainFailure.getMessage(), uncertainFailure);
                     }
                     manifest = writer.finalizeExtract(
-                            startedAt, command.sourceZoneId(), IndividualEncounterModalityCapability.QUERY_CHECKSUM,
-                            IndividualEncounterModalityCapability.ADAPTER_VERSION, "COMPLETE", "SNAPSHOT");
+                            startedAt,
+                            command.sourceZoneId(),
+                            IndividualEncounterModalityCapability.QUERY_CHECKSUM,
+                            IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                            "COMPLETE",
+                            "SNAPSHOT");
                 }
             }
             listener.onProgress();
@@ -104,8 +107,7 @@ public final class InProcessAcquisition implements Acquisition {
     }
 
     private static String uncertainOutcomeMessage(AcquisitionCommand command, Throwable failure) {
-        return "acquisition " + command.extractionId()
-                + " ended a live PEC read with an uncertain outcome: " + failure;
+        return "acquisition " + command.extractionId() + " ended a live PEC read with an uncertain outcome: " + failure;
     }
 
     private static Runnable cancelInterrupt(PreparedStatement statement) {
@@ -126,8 +128,12 @@ public final class InProcessAcquisition implements Acquisition {
         };
         CanonicalEncounter canonical = new CanonicalEncounter(
                 new SourceRef(acquisition.sourceId(), "tb_fat_atendimento_individual", String.valueOf(raw.pk())),
-                acquisition.municipalityIbge(), raw.careDate().toString(), modality,
-                raw.cnes(), raw.ine(), raw.cbo());
+                acquisition.municipalityIbge(),
+                raw.careDate().toString(),
+                modality,
+                raw.cnes(),
+                raw.ine(),
+                raw.cbo());
         try {
             writer.write(canonical);
         } catch (IOException e) {

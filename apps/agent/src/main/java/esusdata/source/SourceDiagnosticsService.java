@@ -1,7 +1,7 @@
 package esusdata.source;
 
+import esusdata.source.model.SourceNotFoundException;
 import esusdata.source.model.SourceRecord;
-
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.PecConnectionProperties;
 import esusdata.source.pec.PecDataSourceFactory;
@@ -12,7 +12,7 @@ import esusdata.source.pec.SourceBudgetExceededException;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Optional;
-import esusdata.source.model.SourceNotFoundException;
+
 /**
  * §1.10: {@code POST /sources/{id}/test} — "diagnóstico limitado de rede, leitura, capacidades e
  * orçamento; sem revelar segredo." Lives here, not in {@code api}, because {@code api} is
@@ -31,8 +31,12 @@ import esusdata.source.model.SourceNotFoundException;
 public final class SourceDiagnosticsService {
 
     public enum Outcome {
-        DESTINATION_NOT_ALLOWED, SOURCE_BUSY, SOURCE_AUTHENTICATION_FAILED,
-        SOURCE_PERMISSION_DENIED, CONNECTION_FAILED, CONNECTED
+        DESTINATION_NOT_ALLOWED,
+        SOURCE_BUSY,
+        SOURCE_AUTHENTICATION_FAILED,
+        SOURCE_PERMISSION_DENIED,
+        CONNECTION_FAILED,
+        CONNECTED
     }
 
     static Outcome classifySqlState(String sqlState) {
@@ -79,7 +83,8 @@ public final class SourceDiagnosticsService {
     private final PecDataSourceFactory pecDataSourceFactory;
 
     public SourceDiagnosticsService(
-            SourceRepository sourceRepository, AllowedDestinations allowedDestinations,
+            SourceRepository sourceRepository,
+            AllowedDestinations allowedDestinations,
             PecDataSourceFactory pecDataSourceFactory) {
         this.sourceRepository = sourceRepository;
         this.allowedDestinations = allowedDestinations;
@@ -92,7 +97,8 @@ public final class SourceDiagnosticsService {
 
     /** @throws SourceNotFoundException if {@code sourceId} does not resolve. */
     public Diagnostics test(String sourceId) {
-        SourceRecord source = sourceRepository.findById(sourceId)
+        SourceRecord source = sourceRepository
+                .findById(sourceId)
                 .orElseThrow(() -> new SourceNotFoundException("unknown source: " + sourceId));
         ReadBudget budget = ReadBudget.initialEngineeringProposal();
 
@@ -103,8 +109,13 @@ public final class SourceDiagnosticsService {
         }
 
         PecConnectionProperties properties = new PecConnectionProperties(
-                source.id(), source.host(), source.port(), source.databaseName(), source.dbUser(),
-                source.secretRef(), source.municipalityIbge());
+                source.id(),
+                source.host(),
+                source.port(),
+                source.databaseName(),
+                source.dbUser(),
+                source.secretRef(),
+                source.municipalityIbge());
         PecSourceIdentity identity = new PecSourceIdentity(
                 source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole());
 

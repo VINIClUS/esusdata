@@ -1,9 +1,8 @@
 package esusdata.source.pec;
 
-import com.zaxxer.hikari.HikariDataSource;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import com.zaxxer.hikari.HikariDataSource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,8 +12,8 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Live integration test against the real e-SUS PEC on CT 133, reached through the SSH tunnel
@@ -32,8 +31,8 @@ class PecDataSourceFactoryLiveTest {
 
     @Test
     void connectsThroughTheTunnelAndAppliesTheReadBudget() throws Exception {
-        Assumptions.assumeTrue(Files.exists(ENV_FILE),
-                "Skipping: no dev PEC secret file at " + ENV_FILE + " (expected outside CI)");
+        Assumptions.assumeTrue(
+                Files.exists(ENV_FILE), "Skipping: no dev PEC secret file at " + ENV_FILE + " (expected outside CI)");
 
         Map<String, String> env = readEnvFile();
         var properties = new PecConnectionProperties(
@@ -43,31 +42,30 @@ class PecDataSourceFactoryLiveTest {
                 env.get("PEC_DB_NAME"),
                 env.get("PEC_DB_USER"),
                 "PEC_DB_PASSWORD",
-                "3541307"
-        );
+                "3541307");
 
         Assumptions.assumeTrue(
                 esusdata.testsupport.LivePecAssumptions.isReachable(properties.host(), properties.port()),
                 "Skipping: " + properties.host() + ":" + properties.port() + " not reachable "
                         + "— SSH tunnel likely down (see ADR 0003)");
 
-        var allowlist = new AllowedDestinations(
-                Set.of(new AllowedDestinations.HostPort(properties.host(), properties.port())));
+        var allowlist =
+                new AllowedDestinations(Set.of(new AllowedDestinations.HostPort(properties.host(), properties.port())));
         var factory = new PecDataSourceFactory(allowlist, new EnvFileSecretResolver(ENV_FILE));
 
         HikariDataSource ds = factory.create(properties, ReadBudget.initialEngineeringProposal());
         try {
-            try (Connection c = ds.getConnection(); Statement st = c.createStatement()) {
+            try (Connection c = ds.getConnection();
+                    Statement st = c.createStatement()) {
                 try (ResultSet rs = st.executeQuery("select current_user, version()")) {
                     rs.next();
                     assertThat(rs.getString(1)).isEqualTo("esus_leitura");
                     assertThat(rs.getString(2)).contains("PostgreSQL 9.6.13");
                 }
                 // The budget GUCs applied via connectionInitSql must be visible on this connection.
-                try (ResultSet rs = st.executeQuery(
-                        "select current_setting('statement_timeout'), "
-                                + "current_setting('default_transaction_read_only'), "
-                                + "current_setting('application_name')")) {
+                try (ResultSet rs = st.executeQuery("select current_setting('statement_timeout'), "
+                        + "current_setting('default_transaction_read_only'), "
+                        + "current_setting('application_name')")) {
                     rs.next();
                     assertThat(rs.getString(1)).isEqualTo("30s");
                     assertThat(rs.getString(2)).isEqualTo("on");

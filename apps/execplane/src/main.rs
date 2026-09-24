@@ -20,8 +20,9 @@ const CAPABILITY: &str = "individual_encounter_modality";
 /// reported in the probe handshake; `stream::stream_query` converts it to `$1,$2,$3` placeholders
 /// before executing it (the native wire protocol doesn't understand JDBC's `?`), but the checksum
 /// below is always computed from these unconverted bytes.
-const QUERY_TEXT: &str =
-    include_str!("../../../contracts/compatibility/queries/individual_encounter_modality@0.1.0.sql");
+const QUERY_TEXT: &str = include_str!(
+    "../../../contracts/compatibility/queries/individual_encounter_modality@0.1.0.sql"
+);
 
 fn main() {
     match run() {
@@ -131,7 +132,10 @@ fn run() -> Result<i32, Box<dyn Error>> {
         }
     };
 
-    let query_checksum = format!("sha256:{}", hex_encode(Sha256::digest(QUERY_TEXT.as_bytes())));
+    let query_checksum = format!(
+        "sha256:{}",
+        hex_encode(Sha256::digest(QUERY_TEXT.as_bytes()))
+    );
     write_line(&json!({
         "type": "probe",
         "postgres_version": postgres_version,
@@ -139,7 +143,9 @@ fn run() -> Result<i32, Box<dyn Error>> {
         "objects": objects_json,
     }))?;
 
-    let decision = lines.next().ok_or("stdin closed before a decision was received")??;
+    let decision = lines
+        .next()
+        .ok_or("stdin closed before a decision was received")??;
     if decision.contains("\"type\":\"abort\"") {
         txn.rollback()?;
         return Ok(1);
@@ -179,7 +185,9 @@ fn run() -> Result<i32, Box<dyn Error>> {
             // A live connection already exists (the probe ran) — this is uncertain territory,
             // same reasoning as every other post-probe failure.
             let (code, detail) = extract_error_code_and_detail(err);
-            write_line(&json!({ "type": "error", "code": code, "detail": detail, "uncertain": true }))?;
+            write_line(
+                &json!({ "type": "error", "code": code, "detail": detail, "uncertain": true }),
+            )?;
             end_transaction(txn.rollback());
             return Ok(1);
         }
@@ -213,7 +221,9 @@ fn run() -> Result<i32, Box<dyn Error>> {
             }
             Err(err) => {
                 let (code, detail) = extract_error_code_and_detail(err);
-                write_line(&json!({ "type": "error", "code": code, "detail": detail, "uncertain": true }))?;
+                write_line(
+                    &json!({ "type": "error", "code": code, "detail": detail, "uncertain": true }),
+                )?;
                 end_transaction(txn.rollback());
                 1
             }
@@ -350,8 +360,10 @@ fn is_timeout_budget(err: &postgres::Error) -> bool {
         return false;
     };
     let message = db_error.message().to_lowercase();
-    (db_error.code() == &postgres::error::SqlState::QUERY_CANCELED && message.contains("statement timeout"))
-        || (db_error.code() == &postgres::error::SqlState::LOCK_NOT_AVAILABLE && message.contains("lock timeout"))
+    (db_error.code() == &postgres::error::SqlState::QUERY_CANCELED
+        && message.contains("statement timeout"))
+        || (db_error.code() == &postgres::error::SqlState::LOCK_NOT_AVAILABLE
+            && message.contains("lock timeout"))
 }
 
 /// Mirrors `BudgetGuard.checkDuration` on the JDBC path, whose clock also starts before
@@ -370,7 +382,9 @@ impl Error for ProbeBudgetExceeded {}
 
 fn check_probe_duration(start: &Instant, budget: &stream::Budget) -> Result<(), Box<dyn Error>> {
     match stream::check_duration(start, budget) {
-        Some(stream::StreamOutcome::BudgetExceeded(detail)) => Err(Box::new(ProbeBudgetExceeded(detail))),
+        Some(stream::StreamOutcome::BudgetExceeded(detail)) => {
+            Err(Box::new(ProbeBudgetExceeded(detail)))
+        }
         _ => Ok(()),
     }
 }
@@ -388,7 +402,10 @@ mod tests {
             "../../../contracts/compatibility/pec-adapters.json"
         ))
         .unwrap();
-        let checksum = format!("sha256:{}", hex_encode(Sha256::digest(QUERY_TEXT.as_bytes())));
+        let checksum = format!(
+            "sha256:{}",
+            hex_encode(Sha256::digest(QUERY_TEXT.as_bytes()))
+        );
         for entry in matrix["tested_with"].as_array().unwrap() {
             assert_eq!(entry["query_checksum"], checksum.as_str());
         }

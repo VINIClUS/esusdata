@@ -1,30 +1,23 @@
 package esusdata.run.acquisition;
 
-import esusdata.run.extract.ExtractionManifest;
 import esusdata.run.extract.DelegatedExtractPublication;
+import esusdata.run.extract.ExtractionManifest;
+import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.ColumnMetadata;
 import esusdata.source.pec.CompatibilityFingerprint;
 import esusdata.source.pec.CompatibilityProbeResult;
-import esusdata.source.pec.ProbeItem;
-import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.IndividualEncounterModalityCapability;
-
-import esusdata.source.pec.AllowedDestinations;
-
+import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecSecretResolver;
+import esusdata.source.pec.ProbeItem;
 import esusdata.source.pec.ReadBudget;
 import esusdata.source.pec.SourceAcquisitionLimiter;
 import esusdata.source.pec.SourceBudgetExceededException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.SQLException;
@@ -39,6 +32,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
 /**
  * {@link Acquisition} that delegates the live PEC read to a spawned child process, talking
  * NDJSON over its stdin/stdout (plan §2.2). The child never touches SQLite or the job queue, and
@@ -83,16 +81,31 @@ public final class ExecPlaneAcquisition implements Acquisition {
     private final ObjectMapper mapper = new ObjectMapper();
 
     public ExecPlaneAcquisition(
-            List<String> command, PecSecretResolver secretResolver, AllowedDestinations allowedDestinations,
-            Path extractsBaseDir, Clock clock, Duration exitGrace) {
-        this(command, secretResolver, allowedDestinations, PecCompatibilityMatrix.fromClasspathResource(),
-                extractsBaseDir, clock, exitGrace);
+            List<String> command,
+            PecSecretResolver secretResolver,
+            AllowedDestinations allowedDestinations,
+            Path extractsBaseDir,
+            Clock clock,
+            Duration exitGrace) {
+        this(
+                command,
+                secretResolver,
+                allowedDestinations,
+                PecCompatibilityMatrix.fromClasspathResource(),
+                extractsBaseDir,
+                clock,
+                exitGrace);
     }
 
     /** Package-visible seam for tests to inject a synthetic matrix, mirroring the JDBC path's own seam. */
     ExecPlaneAcquisition(
-            List<String> command, PecSecretResolver secretResolver, AllowedDestinations allowedDestinations,
-            PecCompatibilityMatrix matrix, Path extractsBaseDir, Clock clock, Duration exitGrace) {
+            List<String> command,
+            PecSecretResolver secretResolver,
+            AllowedDestinations allowedDestinations,
+            PecCompatibilityMatrix matrix,
+            Path extractsBaseDir,
+            Clock clock,
+            Duration exitGrace) {
         this.command = command;
         this.secretResolver = secretResolver;
         this.allowedDestinations = allowedDestinations;
@@ -112,16 +125,19 @@ public final class ExecPlaneAcquisition implements Acquisition {
         // on its own and connect to whatever that second lookup returns, defeating the check
         // (mirrors PecDataSourceFactory pinning the same InetAddress into its JDBC URL).
         InetAddress validatedAddress = allowedDestinations.assertAllowed(
-                acquisitionCommand.connectionProperties().host(), acquisitionCommand.connectionProperties().port());
-        try (SourceAcquisitionLimiter.Permit permit =
-                SourceAcquisitionLimiter.acquireOrFail(acquisitionCommand.connectionProperties().sourceId())) {
+                acquisitionCommand.connectionProperties().host(),
+                acquisitionCommand.connectionProperties().port());
+        try (SourceAcquisitionLimiter.Permit permit = SourceAcquisitionLimiter.acquireOrFail(
+                acquisitionCommand.connectionProperties().sourceId())) {
             return runChild(acquisitionCommand, validatedAddress.getHostAddress(), cancellation, listener);
         }
     }
 
     private ExtractionManifest runChild(
-            AcquisitionCommand acquisitionCommand, String validatedHost,
-            CancellationSignal cancellation, AcquisitionListener listener) {
+            AcquisitionCommand acquisitionCommand,
+            String validatedHost,
+            CancellationSignal cancellation,
+            AcquisitionListener listener) {
         Instant startedAt = clock.instant();
 
         // Opened before any process is spawned (fatia 3 / ADR 0011 — a deliberate move earlier
@@ -147,8 +163,12 @@ public final class ExecPlaneAcquisition implements Acquisition {
     }
 
     private ExtractionManifest runChild(
-            AcquisitionCommand acquisitionCommand, String validatedHost, CancellationSignal cancellation,
-            AcquisitionListener listener, DelegatedExtractPublication publication, Instant startedAt) {
+            AcquisitionCommand acquisitionCommand,
+            String validatedHost,
+            CancellationSignal cancellation,
+            AcquisitionListener listener,
+            DelegatedExtractPublication publication,
+            Instant startedAt) {
         Process process;
         try {
             process = new ProcessBuilder(command).redirectErrorStream(false).start();
@@ -161,14 +181,17 @@ public final class ExecPlaneAcquisition implements Acquisition {
 
         try {
             writeAcquireEnvelope(process.getOutputStream(), acquisitionCommand, validatedHost, publication.tempFile());
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
+            BufferedReader reader =
+                    new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
 
             JsonNode probe;
             try {
                 probe = readMessage(reader);
             } catch (IOException malformed) {
-                return abnormalTermination(process, cancellation, listener,
+                return abnormalTermination(
+                        process,
+                        cancellation,
+                        listener,
                         "malformed message before handshake: " + malformed.getMessage());
             }
             // An error before the probe carries its own "uncertain" flag: false only when the
@@ -179,18 +202,18 @@ public final class ExecPlaneAcquisition implements Acquisition {
                 return failFromErrorMessage(process, cancellation, listener, probe);
             }
             if (probe == null || !"probe".equals(text(probe, "type"))) {
-                return abnormalTermination(process, cancellation, listener,
-                        "expected a 'probe' message, got: " + probe);
+                return abnormalTermination(
+                        process, cancellation, listener, "expected a 'probe' message, got: " + probe);
             }
 
             String mismatch = compareFingerprints(acquisitionCommand, probe);
             if (mismatch != null) {
-                writeLine(process.getOutputStream(), Map.of(
-                        "type", "abort", "code", "COMPATIBILITY_MISMATCH", "detail", mismatch));
+                writeLine(
+                        process.getOutputStream(),
+                        Map.of("type", "abort", "code", "COMPATIBILITY_MISMATCH", "detail", mismatch));
                 waitForExit(process);
                 listener.onUncertainOutcome("compatibility mismatch: " + mismatch);
-                throw new IllegalStateException(
-                        "execution plane compatibility mismatch (ENG-43): " + mismatch);
+                throw new IllegalStateException("execution plane compatibility mismatch (ENG-43): " + mismatch);
             }
 
             writeLine(process.getOutputStream(), Map.of("type", "proceed"));
@@ -204,8 +227,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             });
 
             return consumeUntilComplete(
-                    process, reader, publication, cancellation, listener,
-                    startedAt, acquisitionCommand.sourceZoneId());
+                    process, reader, publication, cancellation, listener, startedAt, acquisitionCommand.sourceZoneId());
         } catch (IOException e) {
             killProcess(process);
             throw new PecAcquisitionException("execution plane I/O failure: " + e.getMessage(), e);
@@ -230,16 +252,22 @@ public final class ExecPlaneAcquisition implements Acquisition {
      * actually produced and publish it.
      */
     private ExtractionManifest consumeUntilComplete(
-            Process process, BufferedReader reader, DelegatedExtractPublication publication,
-            CancellationSignal cancellation, AcquisitionListener listener,
-            Instant startedAt, String sourceZoneId) throws IOException {
+            Process process,
+            BufferedReader reader,
+            DelegatedExtractPublication publication,
+            CancellationSignal cancellation,
+            AcquisitionListener listener,
+            Instant startedAt,
+            String sourceZoneId)
+            throws IOException {
         JsonNode complete = null;
         while (true) {
             JsonNode message;
             try {
                 message = readMessage(reader);
             } catch (IOException malformed) {
-                return abnormalTermination(process, cancellation, listener, "malformed message: " + malformed.getMessage());
+                return abnormalTermination(
+                        process, cancellation, listener, "malformed message: " + malformed.getMessage());
             }
             if (message == null) {
                 break;
@@ -278,9 +306,16 @@ public final class ExecPlaneAcquisition implements Acquisition {
 
         try {
             return publication.publish(
-                    rowCount, exclusionCount, checksum, compressedBytes, startedAt, sourceZoneId,
+                    rowCount,
+                    exclusionCount,
+                    checksum,
+                    compressedBytes,
+                    startedAt,
+                    sourceZoneId,
                     IndividualEncounterModalityCapability.QUERY_CHECKSUM,
-                    IndividualEncounterModalityCapability.ADAPTER_VERSION, "COMPLETE", "SNAPSHOT");
+                    IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                    "COMPLETE",
+                    "SNAPSHOT");
         } catch (IOException | RuntimeException publishFailure) {
             // The child already reported success and exited 0 — the live read is over. A failure
             // verifying/publishing the local file is not "uncertain" in the ENG-51 sense (mirrors
@@ -331,8 +366,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
      */
     private RuntimeException translate(String code, String sqlState, String detail) {
         if ("COMPATIBILITY_MISMATCH".equals(code)) {
-            return new IllegalStateException(
-                    "execution plane compatibility mismatch (ENG-43): " + detail);
+            return new IllegalStateException("execution plane compatibility mismatch (ENG-43): " + detail);
         }
         if (SourceBudgetExceededException.CODE.equals(code)) {
             return new SourceBudgetExceededException(detail);
@@ -357,8 +391,10 @@ public final class ExecPlaneAcquisition implements Acquisition {
         PecCompatibilityMatrix.Entry entry;
         try {
             entry = matrix.findExact(
-                    CAPABILITY, IndividualEncounterModalityCapability.ADAPTER_VERSION,
-                    acquisitionCommand.sourceIdentity(), postgresVersion);
+                    CAPABILITY,
+                    IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                    acquisitionCommand.sourceIdentity(),
+                    postgresVersion);
         } catch (RuntimeException noEntry) {
             return "no compatibility matrix entry: " + noEntry.getMessage();
         }
@@ -369,8 +405,8 @@ public final class ExecPlaneAcquisition implements Acquisition {
         if (!entry.queryChecksum().equals(probeQueryChecksum)) {
             // The one place the child's own query text is checked against the frozen contract
             // (plan §2.3) — without this, a child running a different query would still pass.
-            return "query checksum mismatch: matrix has " + entry.queryChecksum()
-                    + " but execution plane reported " + probeQueryChecksum;
+            return "query checksum mismatch: matrix has " + entry.queryChecksum() + " but execution plane reported "
+                    + probeQueryChecksum;
         }
         JsonNode objects = probe.get("objects");
         for (Map.Entry<String, String> expected : entry.objectFingerprints().entrySet()) {
@@ -381,20 +417,23 @@ public final class ExecPlaneAcquisition implements Acquisition {
             }
             String actual;
             try {
-                CompatibilityProbeResult probeResult =
-                        buildProbeResult(object, objectNode, entry.objectColumns().get(object));
+                CompatibilityProbeResult probeResult = buildProbeResult(
+                        object, objectNode, entry.objectColumns().get(object));
                 actual = CompatibilityFingerprint.compute(probeResult);
             } catch (RuntimeException invalid) {
                 return "could not compute fingerprint for " + object + ": " + invalid.getMessage();
             }
             if (!expected.getValue().equals(actual)) {
-                return "fingerprint mismatch for " + object + ": expected "
-                        + expected.getValue() + " but computed " + actual;
+                return "fingerprint mismatch for " + object + ": expected " + expected.getValue() + " but computed "
+                        + actual;
             }
             // Evidence trail: the fingerprint computed from what the child measured, per object.
-            log.info("execution plane probe matched {} for source {} (PEC {}): {}",
-                    object, acquisitionCommand.sourceIdentity().sourceId(),
-                    acquisitionCommand.sourceIdentity().pecVersion(), actual);
+            log.info(
+                    "execution plane probe matched {} for source {} (PEC {}): {}",
+                    object,
+                    acquisitionCommand.sourceIdentity().sourceId(),
+                    acquisitionCommand.sourceIdentity().pecVersion(),
+                    actual);
         }
         return null;
     }
@@ -411,9 +450,13 @@ public final class ExecPlaneAcquisition implements Acquisition {
         JsonNode columnsNode = objectNode.get("columns");
         if (columnsNode != null) {
             for (JsonNode column : columnsNode) {
-                columns.put(text(column, "name"), new ColumnMetadata(
-                        text(column, "data_type"), text(column, "udt_name"), text(column, "is_nullable"),
-                        column.path("ordinal_position").asInt(0)));
+                columns.put(
+                        text(column, "name"),
+                        new ColumnMetadata(
+                                text(column, "data_type"),
+                                text(column, "udt_name"),
+                                text(column, "is_nullable"),
+                                column.path("ordinal_position").asInt(0)));
             }
         }
 
@@ -475,12 +518,14 @@ public final class ExecPlaneAcquisition implements Acquisition {
 
     private void writeAcquireEnvelope(
             OutputStream stdin, AcquisitionCommand acquisitionCommand, String validatedHost, Path extractTempPath) {
-        char[] password = secretResolver.resolve(acquisitionCommand.connectionProperties().secretRef());
+        char[] password =
+                secretResolver.resolve(acquisitionCommand.connectionProperties().secretRef());
         try {
             ReadBudget budget = acquisitionCommand.budget();
             Map<String, Object> budgetFields = new LinkedHashMap<>();
             budgetFields.put("connect_timeout_ms", budget.connectionTimeout().toMillis());
-            budgetFields.put("acquisition_timeout_ms", budget.acquisitionTimeout().toMillis());
+            budgetFields.put(
+                    "acquisition_timeout_ms", budget.acquisitionTimeout().toMillis());
             budgetFields.put("statement_timeout_ms", budget.statementTimeoutMs());
             budgetFields.put("lock_timeout_ms", budget.lockTimeoutMs());
             budgetFields.put("idle_in_transaction_timeout_ms", budget.idleInTransactionTimeoutMs());
@@ -499,13 +544,18 @@ public final class ExecPlaneAcquisition implements Acquisition {
             // Password crosses only via this stdin envelope — never argv (/proc/<pid>/cmdline is
             // world-readable) and never an environment variable.
             envelope.put("password", new String(password));
-            envelope.put("municipality_ibge", acquisitionCommand.connectionProperties().municipalityIbge());
+            envelope.put(
+                    "municipality_ibge",
+                    acquisitionCommand.connectionProperties().municipalityIbge());
             envelope.put("pec_version", acquisitionCommand.sourceIdentity().pecVersion());
             envelope.put("read_model", acquisitionCommand.sourceIdentity().readModel());
-            envelope.put("installation_role", acquisitionCommand.sourceIdentity().installationRole());
+            envelope.put(
+                    "installation_role", acquisitionCommand.sourceIdentity().installationRole());
             envelope.put("extraction_id", acquisitionCommand.extractionId());
             envelope.put("period_start", acquisitionCommand.periodStart().toString());
-            envelope.put("period_end_exclusive", acquisitionCommand.periodEndExclusive().toString());
+            envelope.put(
+                    "period_end_exclusive",
+                    acquisitionCommand.periodEndExclusive().toString());
             envelope.put("source_zone_id", acquisitionCommand.sourceZoneId());
             // Fatia 3 / ADR 0011: the child writes the extract's data file itself, at this one
             // reserved path — the same path DelegatedExtractPublication already took the
@@ -555,17 +605,19 @@ public final class ExecPlaneAcquisition implements Acquisition {
     }
 
     private void drainStderr(Process process) {
-        Thread stderrThread = new Thread(() -> {
-            try (BufferedReader err = new BufferedReader(
-                    new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = err.readLine()) != null) {
-                    log.info("execution plane: {}", line);
-                }
-            } catch (IOException ignored) {
-                // The process ended; nothing left to drain.
-            }
-        }, "execplane-stderr");
+        Thread stderrThread = new Thread(
+                () -> {
+                    try (BufferedReader err = new BufferedReader(
+                            new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = err.readLine()) != null) {
+                            log.info("execution plane: {}", line);
+                        }
+                    } catch (IOException ignored) {
+                        // The process ended; nothing left to drain.
+                    }
+                },
+                "execplane-stderr");
         stderrThread.setDaemon(true);
         stderrThread.start();
     }

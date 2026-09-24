@@ -8,8 +8,7 @@ import java.util.Optional;
  * "consultas sempre recebem escopo autorizado." There is no unscoped read path in this class.
  */
 public interface ResultRepository {
-    List<PublishedResult> findPublished(
-            String municipalityIbge, String indicatorPack, String referencePeriod);
+    List<PublishedResult> findPublished(String municipalityIbge, String indicatorPack, String referencePeriod);
 
     /** Reference periods with at least one published result in the municipality, newest first. */
     List<String> findPublishedPeriods(String municipalityIbge);

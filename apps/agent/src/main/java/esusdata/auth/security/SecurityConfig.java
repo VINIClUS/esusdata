@@ -2,6 +2,9 @@ package esusdata.auth.security;
 
 import esusdata.auth.SessionService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Clock;
+import java.util.Set;
+import java.util.function.Predicate;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,18 +12,14 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.util.AntPathMatcher;
-
-import java.time.Clock;
-import java.util.Set;
-import java.util.function.Predicate;
 
 /**
  * The one place the HTTP filter chains are assembled. Under {@code /api/**}, no {@code permitAll}
@@ -86,23 +85,20 @@ public class SecurityConfig {
         RequestAttributeSecurityContextRepository securityContextRepository =
                 new RequestAttributeSecurityContextRepository();
 
-        http
-                .securityMatcher("/api/**")
+        http.securityMatcher("/api/**")
                 .securityContext(sc -> sc.securityContextRepository(securityContextRepository))
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(csrfTokenRepository)
+                .csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .headers(headers -> headers
-                        .frameOptions(frame -> frame.deny())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(headers -> headers.frameOptions(frame -> frame.deny())
                         .contentTypeOptions(contentTypeOptions -> {})
-                        .contentSecurityPolicy(csp -> csp.policyDirectives(
-                                "default-src 'self'; frame-ancestors 'none'; base-uri 'none'")))
+                        .contentSecurityPolicy(csp ->
+                                csp.policyDirectives("default-src 'self'; frame-ancestors 'none'; base-uri 'none'")))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/v1/ready", "/api/v1/auth/login", "/api/v1/auth/activate")
                         .permitAll()
-                        .anyRequest().authenticated())
+                        .anyRequest()
+                        .authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(new JsonAuthenticationEntryPoint())
                         .accessDeniedHandler(new JsonAccessDeniedHandler()))
@@ -133,10 +129,8 @@ public class SecurityConfig {
     @Bean
     @Order(2)
     public SecurityFilterChain webClientFilterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        http.csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> headers
                         // SpaWebConfig sets Cache-Control per path (immutable assets, revalidated
                         // index.html); Security's no-store default would defeat both.
@@ -157,6 +151,7 @@ public class SecurityConfig {
     private static Predicate<HttpServletRequest> nonInteractivePredicate() {
         AntPathMatcher matcher = new AntPathMatcher();
         return request -> "GET".equals(request.getMethod())
-                && NON_INTERACTIVE_GET_PATTERNS.stream().anyMatch(pattern -> matcher.match(pattern, request.getServletPath()));
+                && NON_INTERACTIVE_GET_PATTERNS.stream()
+                        .anyMatch(pattern -> matcher.match(pattern, request.getServletPath()));
     }
 }

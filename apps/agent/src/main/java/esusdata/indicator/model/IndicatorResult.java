@@ -21,8 +21,7 @@ public record IndicatorResult(
         String dataCutoff,
         String municipalityIbge,
         List<String> limitations,
-        String calculationPolicyVersion
-) {
+        String calculationPolicyVersion) {
     public IndicatorResult {
         limitations = List.copyOf(limitations);
     }

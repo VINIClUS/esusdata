@@ -1,6 +1,7 @@
 package esusdata.auth.model;
 
 import esusdata.web.ApiExceptionHandler;
+
 /**
  * An authenticated principal lacks the permission/scope for a specific, existing object. Mapped
  * by {@link ApiExceptionHandler} to the SAME 404 response a genuinely nonexistent object gets —

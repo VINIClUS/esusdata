@@ -27,6 +27,4 @@ public record SecurityProperties(
         @DefaultValue("32") int argon2HashLength,
         @DefaultValue("v1") String securityPolicyVersion,
         @DefaultValue("30") long authorizationRevalidationIntervalSeconds,
-        @DefaultValue("24") long activationTokenValidityHours
-) {
-}
+        @DefaultValue("24") long activationTokenValidityHours) {}

@@ -1,10 +1,9 @@
 package esusdata.auth.security;
 
 import esusdata.auth.model.AuthenticatedSession;
+import java.util.List;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-
-import java.util.List;
 
 /** Carries the validated {@link AuthenticatedSession} as the principal, not just a username. */
 public final class SessionAuthenticationToken extends AbstractAuthenticationToken {

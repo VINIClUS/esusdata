@@ -6,11 +6,11 @@ import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.List;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * C1 — Mais acesso (Tech Spec §2.4, verbatim formula): {@code 100 × programados /
@@ -29,6 +29,7 @@ public final class C1Rule {
 
     /** Indicator pack identity — distinct from {@link #RULE_VERSION}, which versions the rule. */
     public static final String INDICATOR_PACK = "c1-mais-acesso";
+
     public static final String RULE_VERSION = "c1-mais-acesso@0.1.0";
     public static final String CALCULATION_POLICY_VERSION = "c1-exact-ratio@1";
     public static final String DENOMINATOR_KIND = "PROGRAMADOS_MAIS_ESPONTANEOS";
@@ -36,11 +37,9 @@ public final class C1Rule {
     private static final List<String> STANDING_LIMITATIONS = List.of(
             "cbo_policy=ALL_CBO — Q01 (ficha metodológica oficial C1) não foi recuperada nesta sessão; "
                     + "nenhum filtro de CBO foi aplicado (Portão A/B BLOCKED).",
-            "Nenhuma reconciliação com Siaps/SISAB foi realizada (Portão D NOT_IMPLEMENTED)."
-    );
+            "Nenhuma reconciliação com Siaps/SISAB foi realizada (Portão D NOT_IMPLEMENTED).");
 
-    private C1Rule() {
-    }
+    private C1Rule() {}
 
     /**
      * Release gates are deliberately supplied by the release workflow rather than inferred from
@@ -52,8 +51,7 @@ public final class C1Rule {
             boolean calculationModel,
             boolean adapter,
             boolean reconciliation,
-            boolean pilotAndOperations
-    ) {
+            boolean pilotAndOperations) {
         public static ReleaseGates allComplete() {
             return new ReleaseGates(true, true, true, true, true);
         }
@@ -63,8 +61,12 @@ public final class C1Rule {
         }
 
         public boolean isComplete() {
-            return sourceAndValidity && calculationModel && adapter
-                    && reconciliation && pilotAndOperations && STANDING_LIMITATIONS.isEmpty();
+            return sourceAndValidity
+                    && calculationModel
+                    && adapter
+                    && reconciliation
+                    && pilotAndOperations
+                    && STANDING_LIMITATIONS.isEmpty();
         }
 
         public List<String> incompleteReasons() {
@@ -85,13 +87,8 @@ public final class C1Rule {
      * exclusivos após a normalização").
      */
     public static IndicatorResult compute(
-            List<CanonicalEncounter> encounters,
-            String municipalityIbge,
-            String referencePeriod,
-            String dataCutoff
-    ) {
-        return compute(encounters, municipalityIbge, referencePeriod, dataCutoff,
-                ReleaseGates.knownIncomplete());
+            List<CanonicalEncounter> encounters, String municipalityIbge, String referencePeriod, String dataCutoff) {
+        return compute(encounters, municipalityIbge, referencePeriod, dataCutoff, ReleaseGates.knownIncomplete());
     }
 
     /**
@@ -104,8 +101,7 @@ public final class C1Rule {
             String municipalityIbge,
             String referencePeriod,
             String dataCutoff,
-            ReleaseGates releaseGates
-    ) {
+            ReleaseGates releaseGates) {
         validateRequestedScope(encounters, municipalityIbge, referencePeriod);
         Computation computation = count(encounters);
         if (!releaseGates.isComplete()) {
@@ -134,30 +130,21 @@ public final class C1Rule {
      * for a release-approved indicator.
      */
     public static IndicatorResult computeEvidenceOnly(
-            List<CanonicalEncounter> encounters,
-            String municipalityIbge,
-            String referencePeriod,
-            String dataCutoff
-    ) {
+            List<CanonicalEncounter> encounters, String municipalityIbge, String referencePeriod, String dataCutoff) {
         validateRequestedScope(encounters, municipalityIbge, referencePeriod);
         return toResult(count(encounters), municipalityIbge, referencePeriod, dataCutoff);
     }
 
     private static void validateRequestedScope(
-            List<CanonicalEncounter> encounters,
-            String municipalityIbge,
-            String referencePeriod
-    ) {
+            List<CanonicalEncounter> encounters, String municipalityIbge, String referencePeriod) {
         if (encounters == null) {
             throw new IllegalArgumentException("encounters are required");
         }
         if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
-            throw new IllegalArgumentException(
-                    "municipality must be a 7-digit IBGE code: " + municipalityIbge);
+            throw new IllegalArgumentException("municipality must be a 7-digit IBGE code: " + municipalityIbge);
         }
         if (referencePeriod == null || !referencePeriod.matches("\\d{4}-\\d{2}")) {
-            throw new IllegalArgumentException(
-                    "referencePeriod must use YYYY-MM: " + referencePeriod);
+            throw new IllegalArgumentException("referencePeriod must use YYYY-MM: " + referencePeriod);
         }
         YearMonth requestedMonth;
         try {
@@ -172,21 +159,18 @@ public final class C1Rule {
                 throw new IllegalArgumentException("encounters cannot contain null records");
             }
             if (!municipalityIbge.equals(encounter.municipalityIbge())) {
-                throw new IllegalArgumentException(
-                        "encounter municipality does not match requested municipality: "
-                                + encounter.municipalityIbge());
+                throw new IllegalArgumentException("encounter municipality does not match requested municipality: "
+                        + encounter.municipalityIbge());
             }
             LocalDate careDate;
             try {
                 careDate = LocalDate.parse(encounter.careDate());
             } catch (DateTimeParseException e) {
-                throw new IllegalArgumentException(
-                        "encounter careDate is invalid: " + encounter.careDate(), e);
+                throw new IllegalArgumentException("encounter careDate is invalid: " + encounter.careDate(), e);
             }
             if (!requestedMonth.equals(YearMonth.from(careDate))) {
-                throw new IllegalArgumentException(
-                        "encounter careDate does not match referencePeriod " + referencePeriod
-                                + ": " + encounter.careDate());
+                throw new IllegalArgumentException("encounter careDate does not match referencePeriod "
+                        + referencePeriod + ": " + encounter.careDate());
             }
         }
     }
@@ -216,20 +200,24 @@ public final class C1Rule {
     }
 
     private static IndicatorResult toResult(
-            Computation computation,
-            String municipalityIbge,
-            String referencePeriod,
-            String dataCutoff
-    ) {
+            Computation computation, String municipalityIbge, String referencePeriod, String dataCutoff) {
         BigInteger numerator = computation.numerator();
         BigInteger denominator = computation.denominator();
 
         if (denominator.signum() == 0) {
             return new IndicatorResult(
                     IndicatorResult.IndicatorStatus.NO_DENOMINATOR,
-                    null, numerator, denominator, DENOMINATOR_KIND, null,
-                    referencePeriod, RULE_VERSION, dataCutoff, municipalityIbge,
-                    computation.limitations(), CALCULATION_POLICY_VERSION);
+                    null,
+                    numerator,
+                    denominator,
+                    DENOMINATOR_KIND,
+                    null,
+                    referencePeriod,
+                    RULE_VERSION,
+                    dataCutoff,
+                    municipalityIbge,
+                    computation.limitations(),
+                    CALCULATION_POLICY_VERSION);
         }
 
         ExactRatio ratio = new ExactRatio(numerator, denominator).asPercentage();
@@ -238,17 +226,20 @@ public final class C1Rule {
 
         return new IndicatorResult(
                 IndicatorResult.IndicatorStatus.COMPUTED,
-                valueText, numerator, denominator, DENOMINATOR_KIND, classification,
-                referencePeriod, RULE_VERSION, dataCutoff, municipalityIbge,
-                computation.limitations(), CALCULATION_POLICY_VERSION);
+                valueText,
+                numerator,
+                denominator,
+                DENOMINATOR_KIND,
+                classification,
+                referencePeriod,
+                RULE_VERSION,
+                dataCutoff,
+                municipalityIbge,
+                computation.limitations(),
+                CALCULATION_POLICY_VERSION);
     }
 
-    private record Computation(
-            BigInteger numerator,
-            BigInteger denominator,
-            List<String> limitations
-    ) {
-    }
+    private record Computation(BigInteger numerator, BigInteger denominator, List<String> limitations) {}
 
     /**
      * Classification bands, verbatim from §2.4:

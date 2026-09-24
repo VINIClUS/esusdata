@@ -1,20 +1,20 @@
 package esusdata.run.controller;
 
-import esusdata.run.extract.ExtractionManifest;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import esusdata.auth.model.Role;
 import esusdata.indicator.pack.c1.C1Rule;
+import esusdata.run.extract.ExtractionManifest;
+import esusdata.web.ApiFixtureSupport;
+import java.net.URI;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-import java.net.URI;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.time.Instant;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.ApiFixtureSupport;
 /**
  * §1.10: {@code POST /runs}, {@code GET /runs/{id}}, {@code POST /runs/{id}/cancel} against the
  * real running worker — a fast poll interval (not the 2000 ms production default) keeps these
@@ -38,11 +38,11 @@ public class RunApiTest extends ApiFixtureSupport {
 
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
-        ExtractionManifest manifest = registerExtract(
-                "ext-" + System.nanoTime(), sourceId, MUNICIPALITY, "2026-03", 7, 3, 2);
+        ExtractionManifest manifest =
+                registerExtract("ext-" + System.nanoTime(), sourceId, MUNICIPALITY, "2026-03", 7, 3, 2);
 
-        HttpResponse<String> created = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
-                createRunJson(sourceId, manifest.extractionId(), "2026-03"));
+        HttpResponse<String> created = authenticatedPostWithIdempotency(
+                cookie, "idem-" + System.nanoTime(), createRunJson(sourceId, manifest.extractionId(), "2026-03"));
         assertThat(created.statusCode()).isEqualTo(202);
         assertThat(created.headers().firstValue("Location")).isPresent();
         String jobId = extractField(created.body(), "jobId");
@@ -59,22 +59,22 @@ public class RunApiTest extends ApiFixtureSupport {
         String cookie = sessionCookie(manager);
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
-        ExtractionManifest manifest = registerExtract(
-                "ext-" + System.nanoTime(), sourceId, MUNICIPALITY, "2026-03", 1, 0, 0);
+        ExtractionManifest manifest =
+                registerExtract("ext-" + System.nanoTime(), sourceId, MUNICIPALITY, "2026-03", 1, 0, 0);
         String idempotencyKey = "idem-" + System.nanoTime();
 
-        HttpResponse<String> first = authenticatedPostWithIdempotency(cookie, idempotencyKey,
-                createRunJson(sourceId, manifest.extractionId(), "2026-03"));
+        HttpResponse<String> first = authenticatedPostWithIdempotency(
+                cookie, idempotencyKey, createRunJson(sourceId, manifest.extractionId(), "2026-03"));
         assertThat(first.statusCode()).isEqualTo(202);
         String firstJobId = extractField(first.body(), "jobId");
 
-        HttpResponse<String> repeat = authenticatedPostWithIdempotency(cookie, idempotencyKey,
-                createRunJson(sourceId, manifest.extractionId(), "2026-03"));
+        HttpResponse<String> repeat = authenticatedPostWithIdempotency(
+                cookie, idempotencyKey, createRunJson(sourceId, manifest.extractionId(), "2026-03"));
         assertThat(repeat.statusCode()).isEqualTo(202);
         assertThat(extractField(repeat.body(), "jobId")).isEqualTo(firstJobId);
 
-        HttpResponse<String> conflicting = authenticatedPostWithIdempotency(cookie, idempotencyKey,
-                createRunJson(sourceId, manifest.extractionId(), "2026-04"));
+        HttpResponse<String> conflicting = authenticatedPostWithIdempotency(
+                cookie, idempotencyKey, createRunJson(sourceId, manifest.extractionId(), "2026-04"));
         assertThat(conflicting.statusCode()).isEqualTo(409);
         assertThat(conflicting.body()).contains("IDEMPOTENCY_KEY_CONFLICT");
     }
@@ -84,8 +84,8 @@ public class RunApiTest extends ApiFixtureSupport {
         String outsider = createUser("outsider-" + System.nanoTime());
         String cookie = sessionCookie(outsider);
 
-        HttpResponse<String> response = authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs"),
-                createRunJson("src-does-not-matter", null, "2026-03"));
+        HttpResponse<String> response = authenticatedPost(
+                cookie, URI.create(BASE_URL + "/api/v1/runs"), createRunJson("src-does-not-matter", null, "2026-03"));
 
         assertThat(response.statusCode()).isEqualTo(404);
     }
@@ -96,7 +96,9 @@ public class RunApiTest extends ApiFixtureSupport {
         grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
         String cookie = sessionCookie(manager);
 
-        HttpResponse<String> response = authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs"),
+        HttpResponse<String> response = authenticatedPost(
+                cookie,
+                URI.create(BASE_URL + "/api/v1/runs"),
                 "{\"municipalityIbge\":\"" + MUNICIPALITY + "\",\"indicatorPack\":\"" + C1Rule.INDICATOR_PACK
                         + "\",\"ruleVersion\":\"" + C1Rule.RULE_VERSION + "\",\"referencePeriod\":\"2026-03\"}");
 
@@ -112,8 +114,8 @@ public class RunApiTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
 
-        HttpResponse<String> response = authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs"),
-                createRunJson(sourceId, null, "2026-03"));
+        HttpResponse<String> response = authenticatedPost(
+                cookie, URI.create(BASE_URL + "/api/v1/runs"), createRunJson(sourceId, null, "2026-03"));
 
         assertThat(response.statusCode()).isEqualTo(400);
         assertThat(response.body()).contains("BAD_REQUEST");
@@ -127,8 +129,8 @@ public class RunApiTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
 
-        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "   ",
-                createRunJson(sourceId, null, "2026-03"));
+        HttpResponse<String> response =
+                authenticatedPostWithIdempotency(cookie, "   ", createRunJson(sourceId, null, "2026-03"));
 
         assertThat(response.statusCode()).isEqualTo(400);
         assertThat(response.body()).contains("BAD_REQUEST");
@@ -140,15 +142,17 @@ public class RunApiTest extends ApiFixtureSupport {
         grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
         String cookie = sessionCookie(manager);
 
-        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
-                createRunJson("source-does-not-exist", null, "2026-03"));
+        HttpResponse<String> response = authenticatedPostWithIdempotency(
+                cookie, "idem-" + System.nanoTime(), createRunJson("source-does-not-exist", null, "2026-03"));
 
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(response.body()).contains("NOT_FOUND");
         assertThat(jdbc.queryForObject(
-                "select count(*) from auth_audit where actor_user_id = ?"
-                        + " and event_type = 'ACCESS_DENIED' and outcome = 'DENIED'",
-                Integer.class, manager)).isEqualTo(1);
+                        "select count(*) from auth_audit where actor_user_id = ?"
+                                + " and event_type = 'ACCESS_DENIED' and outcome = 'DENIED'",
+                        Integer.class,
+                        manager))
+                .isEqualTo(1);
     }
 
     @Test
@@ -159,15 +163,17 @@ public class RunApiTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, "3550308");
 
-        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
-                createRunJson(sourceId, null, "2026-03"));
+        HttpResponse<String> response = authenticatedPostWithIdempotency(
+                cookie, "idem-" + System.nanoTime(), createRunJson(sourceId, null, "2026-03"));
 
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(response.body()).contains("NOT_FOUND");
         assertThat(jdbc.queryForObject(
-                "select count(*) from auth_audit where actor_user_id = ?"
-                        + " and event_type = 'ACCESS_DENIED' and outcome = 'DENIED'",
-                Integer.class, manager)).isEqualTo(1);
+                        "select count(*) from auth_audit where actor_user_id = ?"
+                                + " and event_type = 'ACCESS_DENIED' and outcome = 'DENIED'",
+                        Integer.class,
+                        manager))
+                .isEqualTo(1);
     }
 
     @Test
@@ -179,18 +185,20 @@ public class RunApiTest extends ApiFixtureSupport {
         String sourceOutOfScope = "src-out-of-scope-" + System.nanoTime();
         registerSource(sourceInScope, MUNICIPALITY);
         registerSource(sourceOutOfScope, "3550308");
-        ExtractionManifest manifest = registerExtract(
-                "ext-" + System.nanoTime(), sourceOutOfScope, "3550308", "2026-03", 1, 0, 0);
+        ExtractionManifest manifest =
+                registerExtract("ext-" + System.nanoTime(), sourceOutOfScope, "3550308", "2026-03", 1, 0, 0);
 
-        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
-                createRunJson(sourceInScope, manifest.extractionId(), "2026-03"));
+        HttpResponse<String> response = authenticatedPostWithIdempotency(
+                cookie, "idem-" + System.nanoTime(), createRunJson(sourceInScope, manifest.extractionId(), "2026-03"));
 
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(response.body()).contains("NOT_FOUND");
         assertThat(jdbc.queryForObject(
-                "select count(*) from auth_audit where actor_user_id = ?"
-                        + " and event_type = 'ACCESS_DENIED' and outcome = 'DENIED'",
-                Integer.class, manager)).isEqualTo(1);
+                        "select count(*) from auth_audit where actor_user_id = ?"
+                                + " and event_type = 'ACCESS_DENIED' and outcome = 'DENIED'",
+                        Integer.class,
+                        manager))
+                .isEqualTo(1);
     }
 
     @Test
@@ -201,8 +209,8 @@ public class RunApiTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
 
-        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
-                createRunJson(sourceId, "extract-does-not-exist", "2026-03"));
+        HttpResponse<String> response = authenticatedPostWithIdempotency(
+                cookie, "idem-" + System.nanoTime(), createRunJson(sourceId, "extract-does-not-exist", "2026-03"));
 
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(response.body()).contains("NOT_FOUND");
@@ -216,8 +224,8 @@ public class RunApiTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, MUNICIPALITY);
 
-        HttpResponse<String> response = authenticatedPostWithIdempotency(cookie, "idem-" + System.nanoTime(),
-                createRunJson(sourceId, "", "2026-03"));
+        HttpResponse<String> response = authenticatedPostWithIdempotency(
+                cookie, "idem-" + System.nanoTime(), createRunJson(sourceId, "", "2026-03"));
 
         assertThat(response.statusCode()).isEqualTo(400);
         assertThat(response.body()).contains("BAD_REQUEST");
@@ -232,10 +240,10 @@ public class RunApiTest extends ApiFixtureSupport {
         registerSource(sourceId, MUNICIPALITY);
         String idempotencyKey = "idem-" + System.nanoTime();
 
-        HttpResponse<String> first = authenticatedPostWithIdempotency(cookie, idempotencyKey,
-                createRunJson(sourceId, null, "2026-03", "a|b", "c"));
-        HttpResponse<String> conflicting = authenticatedPostWithIdempotency(cookie, idempotencyKey,
-                createRunJson(sourceId, null, "2026-03", "a", "b|c"));
+        HttpResponse<String> first = authenticatedPostWithIdempotency(
+                cookie, idempotencyKey, createRunJson(sourceId, null, "2026-03", "a|b", "c"));
+        HttpResponse<String> conflicting = authenticatedPostWithIdempotency(
+                cookie, idempotencyKey, createRunJson(sourceId, null, "2026-03", "a", "b|c"));
 
         assertThat(first.statusCode()).isEqualTo(202);
         assertThat(conflicting.statusCode()).isEqualTo(409);
@@ -248,8 +256,8 @@ public class RunApiTest extends ApiFixtureSupport {
         grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
         String cookie = sessionCookie(manager);
 
-        HttpResponse<String> response = authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs"),
-                createRunJson("src-x", null, "not-a-period"));
+        HttpResponse<String> response = authenticatedPost(
+                cookie, URI.create(BASE_URL + "/api/v1/runs"), createRunJson("src-x", null, "not-a-period"));
 
         assertThat(response.statusCode()).isEqualTo(400);
     }
@@ -260,8 +268,8 @@ public class RunApiTest extends ApiFixtureSupport {
         grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
         String cookie = sessionCookie(manager);
 
-        HttpResponse<String> response = authenticatedPost(cookie,
-                URI.create(BASE_URL + "/api/v1/runs/does-not-exist/cancel"), null);
+        HttpResponse<String> response =
+                authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/runs/does-not-exist/cancel"), null);
 
         assertThat(response.statusCode()).isEqualTo(404);
     }
@@ -270,12 +278,16 @@ public class RunApiTest extends ApiFixtureSupport {
         Instant deadline = Instant.now().plus(Duration.ofSeconds(10));
         String body = null;
         while (Instant.now().isBefore(deadline)) {
-            HttpResponse<String> response = java.net.http.HttpClient.newHttpClient().send(
-                    java.net.http.HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs/" + jobId))
-                            .header("Cookie", cookie).GET().build(),
-                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = java.net.http.HttpClient.newHttpClient()
+                    .send(
+                            java.net.http.HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs/" + jobId))
+                                    .header("Cookie", cookie)
+                                    .GET()
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
             body = response.body();
-            if (body.contains("\"state\":\"SUCCEEDED\"") || body.contains("\"state\":\"FAILED\"")
+            if (body.contains("\"state\":\"SUCCEEDED\"")
+                    || body.contains("\"state\":\"FAILED\"")
                     || body.contains("\"state\":\"CANCELLED\"")) {
                 return body;
             }
@@ -285,13 +297,11 @@ public class RunApiTest extends ApiFixtureSupport {
     }
 
     private String createRunJson(String sourceId, String extractionId, String referencePeriod) {
-        return createRunJson(sourceId, extractionId, referencePeriod, C1Rule.INDICATOR_PACK,
-                C1Rule.RULE_VERSION);
+        return createRunJson(sourceId, extractionId, referencePeriod, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION);
     }
 
     private String createRunJson(
-            String sourceId, String extractionId, String referencePeriod,
-            String indicatorPack, String ruleVersion) {
+            String sourceId, String extractionId, String referencePeriod, String indicatorPack, String ruleVersion) {
         String extractionField = extractionId == null ? "" : ",\"extractionId\":\"" + extractionId + "\"";
         return "{\"municipalityIbge\":\"" + MUNICIPALITY + "\",\"indicatorPack\":\"" + indicatorPack
                 + "\",\"ruleVersion\":\"" + ruleVersion + "\",\"referencePeriod\":\"" + referencePeriod

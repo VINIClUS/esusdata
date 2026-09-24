@@ -1,10 +1,8 @@
 package esusdata.auth;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.annotation.DirtiesContext;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.web.SecuritySliceTestSupport;
 import java.net.CookieManager;
 import java.net.CookieStore;
 import java.net.HttpCookie;
@@ -16,9 +14,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.SecuritySliceTestSupport;
 /**
  * The end-to-end proof this slice exists for: activate the bootstrap admin, log in, make an
  * authenticated call, log out, and confirm the session is actually gone afterward — all through
@@ -36,26 +36,34 @@ public class AuthRoundTripTest extends SecuritySliceTestSupport {
         HttpClient client = HttpClient.newBuilder().cookieHandler(cookieManager).build();
 
         // Bootstrap the CSRF cookie (also proves /ready doubles as the SPA's first request).
-        client.send(HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
+        client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
         String csrfToken = csrfTokenFrom(cookieManager);
 
         String activationToken = readActivationToken();
         String password = "a-strong-enough-passphrase-1";
 
-        HttpResponse<String> activate = post(client, "/api/v1/auth/activate", csrfToken,
+        HttpResponse<String> activate = post(
+                client,
+                "/api/v1/auth/activate",
+                csrfToken,
                 "{\"token\":\"" + activationToken + "\",\"password\":\"" + password + "\"}");
         assertThat(activate.statusCode()).isEqualTo(204);
 
-        HttpResponse<String> login = post(client, "/api/v1/auth/login", csrfToken,
-                "{\"username\":\"admin\",\"password\":\"" + password + "\"}");
+        HttpResponse<String> login = post(
+                client, "/api/v1/auth/login", csrfToken, "{\"username\":\"admin\",\"password\":\"" + password + "\"}");
         assertThat(login.statusCode()).isEqualTo(200);
         assertThat(login.headers().allValues("Set-Cookie"))
                 .anyMatch(cookie -> cookie.startsWith("OBS_SESSION=") && cookie.contains("HttpOnly"));
         String adminUserId = extractField(login.body(), "userId");
 
         HttpResponse<String> me = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/me")).GET().build(),
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/me"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertThat(me.statusCode()).isEqualTo(200);
         assertThat(me.body()).contains("userId");
@@ -63,8 +71,8 @@ public class AuthRoundTripTest extends SecuritySliceTestSupport {
         // issued — SessionManagementFilter's CsrfAuthenticationStrategy rotation firing on every
         // request (not just login) is exactly the bug this slice hunted down.
         assertThat(me.headers().allValues("Set-Cookie"))
-                .noneMatch(cookie -> cookie.startsWith("XSRF-TOKEN=")
-                        && (cookie.contains("Max-Age=0") || cookie.contains("1970")));
+                .noneMatch(cookie ->
+                        cookie.startsWith("XSRF-TOKEN=") && (cookie.contains("Max-Age=0") || cookie.contains("1970")));
 
         // §1.12.7 L539: a sensitive admin mutation is refused until reauthentication, then
         // proceeds — proving POST /api/v1/auth/reauth is genuinely wired to
@@ -75,13 +83,13 @@ public class AuthRoundTripTest extends SecuritySliceTestSupport {
         assertThat(grantBeforeReauth.statusCode()).isEqualTo(401);
         assertThat(grantBeforeReauth.body()).contains("REAUTHENTICATION_REQUIRED");
 
-        HttpResponse<String> wrongReauth = post(client, "/api/v1/auth/reauth", csrfToken,
-                "{\"password\":\"definitely-the-wrong-passphrase\"}");
+        HttpResponse<String> wrongReauth =
+                post(client, "/api/v1/auth/reauth", csrfToken, "{\"password\":\"definitely-the-wrong-passphrase\"}");
         assertThat(wrongReauth.statusCode()).isEqualTo(401);
         assertThat(wrongReauth.body()).contains("AUTHENTICATION_FAILED");
 
-        HttpResponse<String> reauth = post(client, "/api/v1/auth/reauth", csrfToken,
-                "{\"password\":\"" + password + "\"}");
+        HttpResponse<String> reauth =
+                post(client, "/api/v1/auth/reauth", csrfToken, "{\"password\":\"" + password + "\"}");
         assertThat(reauth.statusCode()).isEqualTo(204);
 
         // Refused for a DIFFERENT reason now (ENG-45 self-grant) — 403, not 401 — which is exactly
@@ -105,13 +113,14 @@ public class AuthRoundTripTest extends SecuritySliceTestSupport {
         assertThat(logout.statusCode()).isEqualTo(204);
 
         HttpResponse<String> meAfterLogout = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/me")).GET().build(),
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/me"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertThat(meAfterLogout.statusCode()).isEqualTo(401);
     }
 
-    private HttpResponse<String> post(HttpClient client, String path, String csrfToken, String body)
-            throws Exception {
+    private HttpResponse<String> post(HttpClient client, String path, String csrfToken, String body) throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(BASE_URL + path))
                 .header("Content-Type", "application/json")
                 .header("X-XSRF-TOKEN", csrfToken);

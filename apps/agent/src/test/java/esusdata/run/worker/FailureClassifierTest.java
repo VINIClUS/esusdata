@@ -1,22 +1,21 @@
 package esusdata.run.worker;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import esusdata.run.job.SourceAcquisitionBlockedException;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.SourceBudgetExceededException;
-import org.junit.jupiter.api.Test;
-
 import java.sql.SQLException;
 import java.sql.SQLTransientConnectionException;
 import java.time.Instant;
+import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.run.job.SourceAcquisitionBlockedException;
 /** ENG-22: only classes that genuinely need a retry loop are marked transient. */
 class FailureClassifierTest {
 
     @Test
     void sourceBudgetExceededIsDefinitive() {
-        var classification = FailureClassifier.classify(
-                new SourceBudgetExceededException("row ceiling exceeded"));
+        var classification = FailureClassifier.classify(new SourceBudgetExceededException("row ceiling exceeded"));
         assertThat(classification.category()).isEqualTo(FailureClassifier.Category.DEFINITIVE);
         assertThat(classification.code()).isEqualTo(SourceBudgetExceededException.CODE);
     }
@@ -30,8 +29,8 @@ class FailureClassifierTest {
 
     @Test
     void invalidExtractIntegrityIsDefinitive() {
-        var classification = FailureClassifier.classify(
-                new IllegalStateException("Checksum mismatch for extractionId=x"));
+        var classification =
+                FailureClassifier.classify(new IllegalStateException("Checksum mismatch for extractionId=x"));
         assertThat(classification.category()).isEqualTo(FailureClassifier.Category.DEFINITIVE);
         assertThat(classification.code()).isEqualTo("INCOMPATIBLE_OR_INVALID_EXTRACT");
     }
@@ -53,8 +52,7 @@ class FailureClassifierTest {
 
     @Test
     void sqlTransientExceptionTypeIsTransient() {
-        var classification = FailureClassifier.classify(
-                new SQLTransientConnectionException("pool exhausted"));
+        var classification = FailureClassifier.classify(new SQLTransientConnectionException("pool exhausted"));
         assertThat(classification.category()).isEqualTo(FailureClassifier.Category.TRANSIENT);
     }
 

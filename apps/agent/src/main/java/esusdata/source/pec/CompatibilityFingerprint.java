@@ -19,8 +19,7 @@ import java.util.Set;
  */
 public final class CompatibilityFingerprint {
 
-    private CompatibilityFingerprint() {
-    }
+    private CompatibilityFingerprint() {}
 
     /** A verdict this algorithm reached from raw probe data — never a JDBC/connection failure. */
     public static final class VerificationException extends RuntimeException {
@@ -71,8 +70,8 @@ public final class CompatibilityFingerprint {
             throw new VerificationException(
                     "Incomplete compatibility metadata for " + probe.object() + "." + item.requested());
         }
-        return item.requested() + "|" + column.dataType() + "|" + column.udtName()
-                + "|" + column.ordinalPosition() + "|" + column.isNullable();
+        return item.requested() + "|" + column.dataType() + "|" + column.udtName() + "|" + column.ordinalPosition()
+                + "|" + column.isNullable();
     }
 
     private static String uniqueKeyPart(CompatibilityProbeResult probe, ProbeItem.UniqueKeyItem item) {
@@ -142,13 +141,14 @@ public final class CompatibilityFingerprint {
     private static void requireColumnMetadata(CompatibilityProbeResult probe, String column) {
         ColumnMetadata metadata = probe.columns().get(column);
         if (metadata == null || isIncomplete(metadata)) {
-            throw new VerificationException(
-                    "Incomplete compatibility metadata for " + probe.object() + "." + column);
+            throw new VerificationException("Incomplete compatibility metadata for " + probe.object() + "." + column);
         }
     }
 
     private static boolean isIncomplete(ColumnMetadata column) {
-        return column.dataType() == null || column.udtName() == null || column.isNullable() == null
+        return column.dataType() == null
+                || column.udtName() == null
+                || column.isNullable() == null
                 || column.ordinalPosition() <= 0
                 || !("YES".equals(column.isNullable()) || "NO".equals(column.isNullable()));
     }
@@ -159,7 +159,8 @@ public final class CompatibilityFingerprint {
             throw new VerificationException("Invalid unique-key marker: " + marker);
         }
         List<String> columns = List.of(marker.substring(prefix.length()).split(",", -1));
-        if (columns.isEmpty() || columns.stream().anyMatch(String::isBlank)
+        if (columns.isEmpty()
+                || columns.stream().anyMatch(String::isBlank)
                 || columns.stream().distinct().count() != columns.size()) {
             throw new VerificationException("Invalid unique-key marker: " + marker);
         }

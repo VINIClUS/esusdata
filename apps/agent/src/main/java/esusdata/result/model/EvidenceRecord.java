@@ -11,6 +11,4 @@ public record EvidenceRecord(
         String ine,
         String cbo,
         String decision,
-        String criterionVersion
-) {
-}
+        String criterionVersion) {}

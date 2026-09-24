@@ -16,11 +16,12 @@ final class CompatibilityTestCatalog implements CompatibilityCatalog {
     }
 
     static CompatibilityTestCatalog productionEntry() {
-        var entry = PecCompatibilityMatrix.fromClasspathResource().findExact(
-                IndividualEncounterModalityCapability.CAPABILITY,
-                IndividualEncounterModalityCapability.ADAPTER_VERSION,
-                new PecSourceIdentity("matrix-test", "5.4.37", "PEC_DW", "PRONTUARIO"),
-                "9.6.13");
+        var entry = PecCompatibilityMatrix.fromClasspathResource()
+                .findExact(
+                        IndividualEncounterModalityCapability.CAPABILITY,
+                        IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                        new PecSourceIdentity("matrix-test", "5.4.37", "PEC_DW", "PRONTUARIO"),
+                        "9.6.13");
         return new CompatibilityTestCatalog("9.6.13", entry.objectFingerprints());
     }
 

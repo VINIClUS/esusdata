@@ -1,11 +1,9 @@
 package esusdata.run.controller;
 
-import esusdata.run.job.JobRepository;
-import org.springframework.stereotype.Component;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.stereotype.Component;
 
 /**
  * Bounds concurrent {@code GET /runs/{id}/events} connections. Sized against the FAST cadence

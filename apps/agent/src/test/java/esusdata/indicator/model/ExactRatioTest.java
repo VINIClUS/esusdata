@@ -1,10 +1,9 @@
 package esusdata.indicator.model;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigInteger;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 /** ENG-25: "Valores imediatamente abaixo, iguais e acima dos limites mantêm a classificação... a
  * razão/média exata não depende de arredondamento da UI." */

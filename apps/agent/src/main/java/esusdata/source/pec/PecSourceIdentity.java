@@ -1,12 +1,7 @@
 package esusdata.source.pec;
 
 /** Trusted deployment-supplied identity for the connected PEC source. */
-public record PecSourceIdentity(
-        String sourceId,
-        String pecVersion,
-        String readModel,
-        String installationRole
-) {
+public record PecSourceIdentity(String sourceId, String pecVersion, String readModel, String installationRole) {
     public PecSourceIdentity {
         if (sourceId == null || sourceId.isBlank()) {
             throw new IllegalArgumentException("sourceId must identify the deployment source");
@@ -20,8 +15,7 @@ public record PecSourceIdentity(
         if (!"PRONTUARIO".equals(installationRole)
                 && !"CENTRALIZADOR".equals(installationRole)
                 && !"UNKNOWN".equals(installationRole)) {
-            throw new IllegalArgumentException(
-                    "installationRole must be PRONTUARIO, CENTRALIZADOR, or UNKNOWN");
+            throw new IllegalArgumentException("installationRole must be PRONTUARIO, CENTRALIZADOR, or UNKNOWN");
         }
     }
 

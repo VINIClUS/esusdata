@@ -111,7 +111,10 @@ impl std::error::Error for BudgetMarker {}
 
 impl From<io::Error> for ExtractError {
     fn from(err: io::Error) -> Self {
-        match err.get_ref().and_then(|inner| inner.downcast_ref::<BudgetMarker>()) {
+        match err
+            .get_ref()
+            .and_then(|inner| inner.downcast_ref::<BudgetMarker>())
+        {
             Some(marker) => ExtractError::BudgetExceeded(marker.0.clone()),
             None => ExtractError::Io(err.to_string()),
         }
@@ -189,14 +192,22 @@ impl ExtractSink {
     /// `ExtractValidation.rejectSymbolicLink`. Reserves free space up front, exactly like
     /// `ExtractWriter`'s constructor calling `ensureTempSpace(baseDir, maxTempFileBytes)` before
     /// creating its own temp file.
-    pub fn open(temp_path: &Path, max_temp_file_bytes: i64, scope: Scope) -> Result<Self, ExtractError> {
+    pub fn open(
+        temp_path: &Path,
+        max_temp_file_bytes: i64,
+        scope: Scope,
+    ) -> Result<Self, ExtractError> {
         if max_temp_file_bytes <= 0 {
-            return Err(ExtractError::Io("maxTempFileBytes must be positive".to_string()));
+            return Err(ExtractError::Io(
+                "maxTempFileBytes must be positive".to_string(),
+            ));
         }
         let max_bytes = max_temp_file_bytes as u64;
         let base_dir = temp_path
             .parent()
-            .ok_or_else(|| ExtractError::Io("extract temp path has no parent directory".to_string()))?
+            .ok_or_else(|| {
+                ExtractError::Io("extract temp path has no parent directory".to_string())
+            })?
             .to_path_buf();
         ensure_free_space(&base_dir, max_bytes)?;
 
@@ -209,11 +220,26 @@ impl ExtractSink {
             .map_err(|e| ExtractError::Io(format!("could not create extract temp file: {e}")))?;
 
         let written = Arc::new(AtomicU64::new(0));
-        let bounded = BoundedWriter { file, max_bytes, written: Arc::clone(&written) };
-        let digest = DigestWriter { inner: bounded, hasher: Sha256::new() };
+        let bounded = BoundedWriter {
+            file,
+            max_bytes,
+            written: Arc::clone(&written),
+        };
+        let digest = DigestWriter {
+            inner: bounded,
+            hasher: Sha256::new(),
+        };
         let gz = flate2::write::GzEncoder::new(digest, flate2::Compression::default());
 
-        Ok(ExtractSink { gz, written, max_bytes, base_dir, scope, row_count: 0, exclusion_count: 0 })
+        Ok(ExtractSink {
+            gz,
+            written,
+            max_bytes,
+            base_dir,
+            scope,
+            row_count: 0,
+            exclusion_count: 0,
+        })
     }
 
     /// Ports `ExtractWriter.write` in full: validates the record against the bound scope, checks
@@ -222,7 +248,9 @@ impl ExtractSink {
     /// chain.
     pub fn write(&mut self, encounter: &Encounter) -> Result<(), ExtractError> {
         validate(encounter, &self.scope)?;
-        let remaining = self.max_bytes.saturating_sub(self.written.load(Ordering::Relaxed));
+        let remaining = self
+            .max_bytes
+            .saturating_sub(self.written.load(Ordering::Relaxed));
         ensure_free_space(&self.base_dir, remaining)?;
 
         let mut line = serde_json::to_vec(encounter)
@@ -251,7 +279,12 @@ impl ExtractSink {
             .sync_all()
             .map_err(|e| ExtractError::Io(format!("could not fsync extract temp file: {e}")))?;
         let compressed_bytes = self.written.load(Ordering::Relaxed) as i64;
-        Ok(Completion { row_count, exclusion_count, checksum, compressed_bytes })
+        Ok(Completion {
+            row_count,
+            exclusion_count,
+            checksum,
+            compressed_bytes,
+        })
     }
 }
 
@@ -259,28 +292,42 @@ impl ExtractSink {
 /// serialized, in the same order, for the same reasons.
 fn validate(encounter: &Encounter, scope: &Scope) -> Result<(), ExtractError> {
     let source_ref = &encounter.source_ref;
-    if is_blank(&source_ref.source_id) || is_blank(&source_ref.entity_type) || is_blank(&source_ref.record_id) {
-        return Err(ExtractError::InvalidRecord("encounter source reference is incomplete".to_string()));
+    if is_blank(&source_ref.source_id)
+        || is_blank(&source_ref.entity_type)
+        || is_blank(&source_ref.record_id)
+    {
+        return Err(ExtractError::InvalidRecord(
+            "encounter source reference is incomplete".to_string(),
+        ));
     }
     if !is_seven_digit_ibge(&encounter.municipality_ibge) {
         return Err(ExtractError::InvalidRecord(
             "encounter municipality must be a 7-digit IBGE code".to_string(),
         ));
     }
-    let care_date = NaiveDate::parse_from_str(&encounter.care_date, "%Y-%m-%d")
-        .map_err(|_| ExtractError::InvalidRecord("encounter careDate must be an ISO local date".to_string()))?;
+    let care_date = NaiveDate::parse_from_str(&encounter.care_date, "%Y-%m-%d").map_err(|_| {
+        ExtractError::InvalidRecord("encounter careDate must be an ISO local date".to_string())
+    })?;
     // Every row this process ever builds already carries the envelope's fixed source_id/
     // municipality_ibge (there is exactly one query per child invocation, one acquisition, one
     // scope) — so "all records in an extract must use one sourceId" (Java's other invariant here)
     // is trivially true and isn't separately tracked. The period bound below is the real check:
     // it's what stops a malformed or hostile row (wrong care_date) from ever being written.
-    if !scope.contains(&source_ref.source_id, &encounter.municipality_ibge, care_date) {
-        return Err(ExtractError::InvalidRecord("record does not match the bound acquisition scope".to_string()));
+    if !scope.contains(
+        &source_ref.source_id,
+        &encounter.municipality_ibge,
+        care_date,
+    ) {
+        return Err(ExtractError::InvalidRecord(
+            "record does not match the bound acquisition scope".to_string(),
+        ));
     }
     for optional in [&encounter.cnes, &encounter.ine, &encounter.cbo] {
         if let Some(value) = optional {
             if is_blank(value) {
-                return Err(ExtractError::InvalidRecord("encounter optional fields cannot be blank".to_string()));
+                return Err(ExtractError::InvalidRecord(
+                    "encounter optional fields cannot be blank".to_string(),
+                ));
             }
         }
     }
@@ -406,12 +453,14 @@ mod tests {
 
     #[test]
     fn round_trips_gzip_and_checksum_through_a_real_temp_file() {
-        let dir = std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let temp_path = dir.join(format!("rt-{}.jsonl.gz.tmp", rand_suffix()));
 
         let mut sink = ExtractSink::open(&temp_path, 1_048_576, scope()).unwrap();
-        sink.write(&encounter("1", "2026-03-15", "3541307")).unwrap();
+        sink.write(&encounter("1", "2026-03-15", "3541307"))
+            .unwrap();
         let mut unmapped = encounter("2", "2026-03-16", "3541307");
         unmapped.modality = "UNMAPPED";
         sink.write(&unmapped).unwrap();
@@ -442,14 +491,17 @@ mod tests {
 
     #[test]
     fn refuses_to_exceed_the_compressed_byte_ceiling() {
-        let dir = std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let temp_path = dir.join(format!("ceiling-{}.jsonl.gz.tmp", rand_suffix()));
 
         // A ceiling far too small for even the gzip header plus one line.
         let mut sink = ExtractSink::open(&temp_path, 8, scope()).unwrap();
         let result = sink.write(&encounter("1", "2026-03-15", "3541307"));
-        assert!(matches!(result, Err(ExtractError::BudgetExceeded(msg)) if msg.contains("ceiling")));
+        assert!(
+            matches!(result, Err(ExtractError::BudgetExceeded(msg)) if msg.contains("ceiling"))
+        );
 
         std::fs::remove_file(&temp_path).ok();
         std::fs::remove_dir(&dir).ok();
@@ -457,7 +509,8 @@ mod tests {
 
     #[test]
     fn refuses_to_open_over_an_existing_file() {
-        let dir = std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let temp_path = dir.join(format!("exists-{}.jsonl.gz.tmp", rand_suffix()));
         std::fs::write(&temp_path, b"already here").unwrap();
@@ -473,7 +526,8 @@ mod tests {
     #[test]
     fn creates_the_temp_file_owner_only() {
         use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let temp_path = dir.join(format!("perms-{}.jsonl.gz.tmp", rand_suffix()));
 
@@ -488,6 +542,9 @@ mod tests {
 
     fn rand_suffix() -> u64 {
         use std::time::{SystemTime, UNIX_EPOCH};
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64
     }
 }

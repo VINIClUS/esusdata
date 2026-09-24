@@ -1,34 +1,24 @@
 package esusdata.run.acquisition;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
+
 import esusdata.indicator.model.CanonicalEncounter;
-import esusdata.run.extract.ExtractionManifest;
 import esusdata.run.extract.ExtractReader;
-import esusdata.run.worker.FailureClassifier;
+import esusdata.run.extract.ExtractionManifest;
 import esusdata.run.job.CancellationToken;
-import esusdata.source.pec.PecCompatibilityMatrix;
+import esusdata.run.job.JobCancelledException;
+import esusdata.run.worker.FailureClassifier;
+import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.CompatibilityCatalog;
 import esusdata.source.pec.IndividualEncounterModalityCapability;
 import esusdata.source.pec.JdbcCompatibilityCatalog;
-
-import esusdata.source.pec.AllowedDestinations;
+import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecConnectionProperties;
+import esusdata.source.pec.PecDataSourceFactory;
 import esusdata.source.pec.PecSourceIdentity;
 import esusdata.source.pec.ReadBudget;
 import esusdata.source.pec.SourceBudgetExceededException;
-
-import esusdata.source.pec.PecDataSourceFactory;
-import esusdata.run.job.JobCancelledException;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
-import tools.jackson.databind.ObjectMapper;
-
-import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.nio.file.Files;
@@ -46,10 +36,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.catchThrowable;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * The gated acceptance test for fatia 3 (ADR 0011): runs the real, compiled
@@ -98,10 +93,8 @@ class ExecPlaneDifferentialLiveTest {
             .withUsername("fixture_user")
             .withPassword("fixture_password");
 
-    private static final Path FIXTURE_FILE =
-            Path.of("../execplane/tests/fixtures/probe_equivalence_fixture.sql");
-    private static final Path PACKAGED_MATRIX_FILE =
-            Path.of("../../contracts/compatibility/pec-adapters.json");
+    private static final Path FIXTURE_FILE = Path.of("../execplane/tests/fixtures/probe_equivalence_fixture.sql");
+    private static final Path PACKAGED_MATRIX_FILE = Path.of("../../contracts/compatibility/pec-adapters.json");
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -115,10 +108,10 @@ class ExecPlaneDifferentialLiveTest {
     @BeforeEach
     void setUp() throws Exception {
         realBinary = System.getProperty(BINARY_PROPERTY);
-        Assumptions.assumeTrue(realBinary != null && !realBinary.isBlank(),
-                "Skipping: -D" + BINARY_PROPERTY + " not set");
-        Assumptions.assumeTrue(Files.isExecutable(Path.of(realBinary)),
-                "Skipping: " + realBinary + " is not an executable file");
+        Assumptions.assumeTrue(
+                realBinary != null && !realBinary.isBlank(), "Skipping: -D" + BINARY_PROPERTY + " not set");
+        Assumptions.assumeTrue(
+                Files.isExecutable(Path.of(realBinary)), "Skipping: " + realBinary + " is not an executable file");
 
         loadFixtureOnce();
 
@@ -138,7 +131,7 @@ class ExecPlaneDifferentialLiveTest {
             return;
         }
         try (Connection c = DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword());
-             Statement st = c.createStatement()) {
+                Statement st = c.createStatement()) {
             st.execute(Files.readString(FIXTURE_FILE));
         }
         fixtureLoaded = true;
@@ -152,9 +145,12 @@ class ExecPlaneDifferentialLiveTest {
             String extractionId, ReadBudget budget, String host, int port, String municipalityIbge) {
         return new AcquisitionCommand(
                 new PecConnectionProperties(
-                        SOURCE_ID, host, port, PG.getDatabaseName(),
-                        PG.getUsername(), "unused", municipalityIbge),
-                sourceIdentity, budget, extractionId, PERIOD_START, PERIOD_END_EXCLUSIVE,
+                        SOURCE_ID, host, port, PG.getDatabaseName(), PG.getUsername(), "unused", municipalityIbge),
+                sourceIdentity,
+                budget,
+                extractionId,
+                PERIOD_START,
+                PERIOD_END_EXCLUSIVE,
                 "America/Sao_Paulo");
     }
 
@@ -169,8 +165,8 @@ class ExecPlaneDifferentialLiveTest {
         // hardcoded, not injectable. This adapter's only job here is producing reference rows from
         // a real JDBC read; the actual Rust-vs-Java probe equivalence is proven on the Rust side
         // below, against freshly computed fingerprints, not these pinned ones.
-        var packagedEntry = PecCompatibilityMatrix.fromClasspathResource().findExact(
-                CAPABILITY, IndividualEncounterModalityCapability.ADAPTER_VERSION, sourceIdentity, "9.6.13");
+        var packagedEntry = PecCompatibilityMatrix.fromClasspathResource()
+                .findExact(CAPABILITY, IndividualEncounterModalityCapability.ADAPTER_VERSION, sourceIdentity, "9.6.13");
         CompatibilityCatalog pinnedCatalog = new CompatibilityCatalog() {
             @Override
             public String postgresVersion(Connection connection) {
@@ -225,8 +221,13 @@ class ExecPlaneDifferentialLiveTest {
 
     private ExecPlaneAcquisition rustAdapter(PecCompatibilityMatrix matrix, String password) {
         return new ExecPlaneAcquisition(
-                List.of(realBinary), secretRef -> password.toCharArray(), allowedDestinations,
-                matrix, extractsDir, Clock.systemUTC(), Duration.ofSeconds(10));
+                List.of(realBinary),
+                secretRef -> password.toCharArray(),
+                allowedDestinations,
+                matrix,
+                extractsDir,
+                Clock.systemUTC(),
+                Duration.ofSeconds(10));
     }
 
     private static class RecordingListener implements AcquisitionListener {
@@ -255,10 +256,10 @@ class ExecPlaneDifferentialLiveTest {
         PecCompatibilityMatrix syntheticMatrix = syntheticMatrixWithRealFingerprints();
         ReadBudget budget = ReadBudget.initialEngineeringProposal();
 
-        ExtractionManifest jdbcManifest = jdbcAdapter().acquire(
-                command("diff-jdbc-1", budget), new CancellationToken(), new RecordingListener());
-        ExtractionManifest rustManifest = rustAdapter(syntheticMatrix).acquire(
-                command("diff-rust-1", budget), new CancellationToken(), new RecordingListener());
+        ExtractionManifest jdbcManifest =
+                jdbcAdapter().acquire(command("diff-jdbc-1", budget), new CancellationToken(), new RecordingListener());
+        ExtractionManifest rustManifest = rustAdapter(syntheticMatrix)
+                .acquire(command("diff-rust-1", budget), new CancellationToken(), new RecordingListener());
 
         assertThat(rustManifest.rowCount()).isEqualTo(jdbcManifest.rowCount());
         assertThat(rustManifest.exclusionCount()).isEqualTo(jdbcManifest.exclusionCount());
@@ -275,15 +276,18 @@ class ExecPlaneDifferentialLiveTest {
         // by manifest identity (different extractionId/timestamps) and not by list order (no ORDER
         // BY total ordering is guaranteed across two independently executed connections) — this is
         // also the first time Java's GZIPInputStream decodes a file flate2 produced.
-        assertThat(rustEncounters).extracting(
-                        e -> e.sourceRef().recordId(), CanonicalEncounter::modality, CanonicalEncounter::careDate,
-                        CanonicalEncounter::cnes, CanonicalEncounter::ine, CanonicalEncounter::cbo)
-                .containsExactlyInAnyOrderElementsOf(
-                        jdbcEncounters.stream()
-                                .map(e -> org.assertj.core.groups.Tuple.tuple(
-                                        e.sourceRef().recordId(), e.modality(), e.careDate(),
-                                        e.cnes(), e.ine(), e.cbo()))
-                                .toList());
+        assertThat(rustEncounters)
+                .extracting(
+                        e -> e.sourceRef().recordId(),
+                        CanonicalEncounter::modality,
+                        CanonicalEncounter::careDate,
+                        CanonicalEncounter::cnes,
+                        CanonicalEncounter::ine,
+                        CanonicalEncounter::cbo)
+                .containsExactlyInAnyOrderElementsOf(jdbcEncounters.stream()
+                        .map(e -> org.assertj.core.groups.Tuple.tuple(
+                                e.sourceRef().recordId(), e.modality(), e.careDate(), e.cnes(), e.ine(), e.cbo()))
+                        .toList());
         assertThat(rustEncounters).hasSameSizeAs(jdbcEncounters);
     }
 
@@ -291,12 +295,19 @@ class ExecPlaneDifferentialLiveTest {
     void rowBudgetExceededIsClassifiedTheSameWayAsTheJdbcPath() throws Exception {
         PecCompatibilityMatrix syntheticMatrix = syntheticMatrixWithRealFingerprints();
         ReadBudget tightBudget = new ReadBudget(
-                2, Duration.ofSeconds(10), Duration.ofSeconds(10), 30_000, 10_000, 30_000,
-                2, 60_000, ReadBudget.DEFAULT_MAX_PAYLOAD_BYTES, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES);
+                2,
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(10),
+                30_000,
+                10_000,
+                30_000,
+                2,
+                60_000,
+                ReadBudget.DEFAULT_MAX_PAYLOAD_BYTES,
+                ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES);
 
-        Throwable failure = org.assertj.core.api.Assertions.catchThrowable(() ->
-                rustAdapter(syntheticMatrix).acquire(
-                        command("diff-rust-budget", tightBudget), new CancellationToken(), new RecordingListener()));
+        Throwable failure = org.assertj.core.api.Assertions.catchThrowable(() -> rustAdapter(syntheticMatrix)
+                .acquire(command("diff-rust-budget", tightBudget), new CancellationToken(), new RecordingListener()));
 
         assertThat(failure).isInstanceOf(SourceBudgetExceededException.class);
         assertThat(FailureClassifier.classify(failure).category()).isEqualTo(FailureClassifier.Category.DEFINITIVE);
@@ -315,12 +326,22 @@ class ExecPlaneDifferentialLiveTest {
     void temporaryExtractByteCeilingExceededIsClassifiedTheSameWayAsTheJdbcPath() throws Exception {
         PecCompatibilityMatrix syntheticMatrix = syntheticMatrixWithRealFingerprints();
         ReadBudget tinyTempFile = new ReadBudget(
-                2, Duration.ofSeconds(10), Duration.ofSeconds(10), 30_000, 10_000, 30_000,
-                200_000, 60_000, ReadBudget.DEFAULT_MAX_PAYLOAD_BYTES, 16);
+                2,
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(10),
+                30_000,
+                10_000,
+                30_000,
+                200_000,
+                60_000,
+                ReadBudget.DEFAULT_MAX_PAYLOAD_BYTES,
+                16);
 
-        Throwable failure = org.assertj.core.api.Assertions.catchThrowable(() ->
-                rustAdapter(syntheticMatrix).acquire(
-                        command("diff-rust-tiny-temp", tinyTempFile), new CancellationToken(), new RecordingListener()));
+        Throwable failure = org.assertj.core.api.Assertions.catchThrowable(() -> rustAdapter(syntheticMatrix)
+                .acquire(
+                        command("diff-rust-tiny-temp", tinyTempFile),
+                        new CancellationToken(),
+                        new RecordingListener()));
 
         assertThat(failure).isInstanceOf(SourceBudgetExceededException.class);
         assertThat(FailureClassifier.classify(failure).category()).isEqualTo(FailureClassifier.Category.DEFINITIVE);
@@ -340,10 +361,10 @@ class ExecPlaneDifferentialLiveTest {
         RecordingListener jdbcListener = new RecordingListener();
         RecordingListener rustListener = new RecordingListener();
 
-        Throwable jdbcFailure = catchThrowable(() -> jdbcAdapter("wrong-password").acquire(
-                command("diff-jdbc-auth", budget), new CancellationToken(), jdbcListener));
-        Throwable rustFailure = catchThrowable(() -> rustAdapter(syntheticMatrix, "wrong-password").acquire(
-                command("diff-rust-auth", budget), new CancellationToken(), rustListener));
+        Throwable jdbcFailure = catchThrowable(() -> jdbcAdapter("wrong-password")
+                .acquire(command("diff-jdbc-auth", budget), new CancellationToken(), jdbcListener));
+        Throwable rustFailure = catchThrowable(() -> rustAdapter(syntheticMatrix, "wrong-password")
+                .acquire(command("diff-rust-auth", budget), new CancellationToken(), rustListener));
 
         assertThat(FailureClassifier.classify(jdbcFailure).code()).isEqualTo("SOURCE_AUTHENTICATION_FAILED");
         assertThat(FailureClassifier.classify(rustFailure).code()).isEqualTo("SOURCE_AUTHENTICATION_FAILED");
@@ -370,12 +391,16 @@ class ExecPlaneDifferentialLiveTest {
         RecordingListener jdbcListener = new RecordingListener();
         RecordingListener rustListener = new RecordingListener();
 
-        Throwable jdbcFailure = catchThrowable(() -> jdbcAdapter().acquire(
-                command("diff-jdbc-dead", budget, "127.0.0.1", deadPort, MUNICIPALITY_IBGE),
-                new CancellationToken(), jdbcListener));
-        Throwable rustFailure = catchThrowable(() -> rustAdapter(syntheticMatrix).acquire(
-                command("diff-rust-dead", budget, "127.0.0.1", deadPort, MUNICIPALITY_IBGE),
-                new CancellationToken(), rustListener));
+        Throwable jdbcFailure = catchThrowable(() -> jdbcAdapter()
+                .acquire(
+                        command("diff-jdbc-dead", budget, "127.0.0.1", deadPort, MUNICIPALITY_IBGE),
+                        new CancellationToken(),
+                        jdbcListener));
+        Throwable rustFailure = catchThrowable(() -> rustAdapter(syntheticMatrix)
+                .acquire(
+                        command("diff-rust-dead", budget, "127.0.0.1", deadPort, MUNICIPALITY_IBGE),
+                        new CancellationToken(),
+                        rustListener));
 
         assertThat(FailureClassifier.classify(rustFailure))
                 .isEqualTo(new FailureClassifier.Classification(
@@ -403,8 +428,16 @@ class ExecPlaneDifferentialLiveTest {
         PecCompatibilityMatrix syntheticMatrix = syntheticMatrixWithRealFingerprints();
         insertBulkRowsOnce();
         ReadBudget roomyBudget = new ReadBudget(
-                2, Duration.ofSeconds(10), Duration.ofSeconds(10), 60_000, 10_000, 60_000,
-                10_000_000, 120_000, 4L * 1024 * 1024 * 1024, 4L * 1024 * 1024 * 1024);
+                2,
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(10),
+                60_000,
+                10_000,
+                60_000,
+                10_000_000,
+                120_000,
+                4L * 1024 * 1024 * 1024,
+                4L * 1024 * 1024 * 1024);
         CancellationToken cancellation = new CancellationToken();
         RecordingListener listener = new RecordingListener() {
             @Override
@@ -414,9 +447,16 @@ class ExecPlaneDifferentialLiveTest {
             }
         };
 
-        Throwable failure = catchThrowable(() -> rustAdapter(syntheticMatrix).acquire(
-                command("diff-rust-cancel", roomyBudget, PG.getHost(), PG.getMappedPort(5432), BULK_MUNICIPALITY_IBGE),
-                cancellation, listener));
+        Throwable failure = catchThrowable(() -> rustAdapter(syntheticMatrix)
+                .acquire(
+                        command(
+                                "diff-rust-cancel",
+                                roomyBudget,
+                                PG.getHost(),
+                                PG.getMappedPort(5432),
+                                BULK_MUNICIPALITY_IBGE),
+                        cancellation,
+                        listener));
 
         assertThat(failure)
                 .as("race: the whole result streamed before the cancel landed — raise BULK_ROWS")
@@ -439,7 +479,7 @@ class ExecPlaneDifferentialLiveTest {
             return;
         }
         try (Connection c = DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword());
-             Statement st = c.createStatement()) {
+                Statement st = c.createStatement()) {
             st.execute("INSERT INTO tb_dim_municipio VALUES (99, 'MUNICIPIO SINTETICO VOLUMOSO', '"
                     + BULK_MUNICIPALITY_IBGE + "')");
             st.execute("INSERT INTO tb_fat_atendimento_individual "
@@ -453,7 +493,7 @@ class ExecPlaneDifferentialLiveTest {
     private long activeObservatorioQueriesAfterSettling() throws Exception {
         long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
         try (Connection c = DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword());
-             Statement st = c.createStatement()) {
+                Statement st = c.createStatement()) {
             while (true) {
                 long active;
                 try (ResultSet rs = st.executeQuery("SELECT count(*) FROM pg_stat_activity "

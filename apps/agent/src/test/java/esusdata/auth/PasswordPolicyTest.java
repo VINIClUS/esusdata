@@ -1,9 +1,9 @@
 package esusdata.auth;
 
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * §1.12.7 L536: "Senhas entre 15 e 128 caracteres, sem truncamento silencioso; aceitar frases."
@@ -32,21 +32,18 @@ class PasswordPolicyTest {
     @Test
     void rejectsOneCharacterUnderTheMinimum() {
         String password = "a".repeat(14);
-        assertThatThrownBy(() -> policy.validate(password))
-                .isInstanceOf(PasswordPolicy.WeakPasswordException.class);
+        assertThatThrownBy(() -> policy.validate(password)).isInstanceOf(PasswordPolicy.WeakPasswordException.class);
     }
 
     @Test
     void rejectsOneCharacterOverTheMaximum() {
         String password = "a".repeat(129);
-        assertThatThrownBy(() -> policy.validate(password))
-                .isInstanceOf(PasswordPolicy.WeakPasswordException.class);
+        assertThatThrownBy(() -> policy.validate(password)).isInstanceOf(PasswordPolicy.WeakPasswordException.class);
     }
 
     @Test
     void rejectsNull() {
-        assertThatThrownBy(() -> policy.validate(null))
-                .isInstanceOf(PasswordPolicy.WeakPasswordException.class);
+        assertThatThrownBy(() -> policy.validate(null)).isInstanceOf(PasswordPolicy.WeakPasswordException.class);
     }
 
     @Test

@@ -1,15 +1,15 @@
 package esusdata.run.extract;
 
-import esusdata.source.pec.PecAcquisition;
+import esusdata.indicator.model.CanonicalEncounter;
+import esusdata.indicator.model.CanonicalModality;
 import esusdata.run.acquisition.AcquisitionCommand;
+import esusdata.source.pec.PecAcquisition;
 import esusdata.source.pec.ReadBudget;
 import esusdata.source.pec.SourceBudgetExceededException;
-import tools.jackson.databind.ObjectMapper;
-
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.channels.FileChannel;
 import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,8 +22,7 @@ import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.Objects;
 import java.util.zip.GZIPOutputStream;
-import esusdata.indicator.model.CanonicalEncounter;
-import esusdata.indicator.model.CanonicalModality;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Writes the minimal extract as gzipped JSON Lines + a separate manifest (§1.9.1). The file is
@@ -66,8 +65,7 @@ public final class ExtractWriter implements AutoCloseable {
         this(baseDir, extractionId, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES, (ExtractionScope) null);
     }
 
-    ExtractWriter(Path baseDir, String extractionId, ExtractionScope acquisitionScope)
-            throws IOException {
+    ExtractWriter(Path baseDir, String extractionId, ExtractionScope acquisitionScope) throws IOException {
         this(baseDir, extractionId, ReadBudget.DEFAULT_MAX_TEMP_FILE_BYTES, acquisitionScope);
     }
 
@@ -80,36 +78,33 @@ public final class ExtractWriter implements AutoCloseable {
     }
 
     /** Opens a writer bound to the exact source, period, and read policy of one acquisition. */
-    public ExtractWriter(
-            Path baseDir,
-            String extractionId,
-            PecAcquisition acquisition
-    ) throws IOException {
-        this(baseDir, extractionId, Objects.requireNonNull(acquisition, "acquisition is required")
-                .sourceConnection().readBudget().maxTempFileBytes(), scopeFor(acquisition));
+    public ExtractWriter(Path baseDir, String extractionId, PecAcquisition acquisition) throws IOException {
+        this(
+                baseDir,
+                extractionId,
+                Objects.requireNonNull(acquisition, "acquisition is required")
+                        .sourceConnection()
+                        .readBudget()
+                        .maxTempFileBytes(),
+                scopeFor(acquisition));
     }
 
     /** Opens a writer bound to the exact source, period, and read policy of one acquisition,
      * independently of a live JDBC {@code PecAcquisition} — the seam
      * {@code ExecPlaneAcquisition} uses, since the live connection lives in the child
      * process, not this JVM. */
-    public ExtractWriter(
-            Path baseDir,
-            String extractionId,
-            AcquisitionCommand acquisitionCommand
-    ) throws IOException {
-        this(baseDir, extractionId,
+    public ExtractWriter(Path baseDir, String extractionId, AcquisitionCommand acquisitionCommand) throws IOException {
+        this(
+                baseDir,
+                extractionId,
                 Objects.requireNonNull(acquisitionCommand, "acquisitionCommand is required")
-                        .budget().maxTempFileBytes(),
+                        .budget()
+                        .maxTempFileBytes(),
                 scopeFor(acquisitionCommand));
     }
 
-    ExtractWriter(
-            Path baseDir,
-            String extractionId,
-            long maxTempFileBytes,
-            ExtractionScope acquisitionScope
-    ) throws IOException {
+    ExtractWriter(Path baseDir, String extractionId, long maxTempFileBytes, ExtractionScope acquisitionScope)
+            throws IOException {
         this.baseDir = baseDir;
         this.extractionId = extractionId;
         if (maxTempFileBytes <= 0) {
@@ -135,8 +130,8 @@ public final class ExtractWriter implements AutoCloseable {
             ExtractPublication.ensureTempSpace(baseDir, maxTempFileBytes);
             ExtractPublication.createOwnerOnlyFile(tempFile);
             FileChannel dataChannel = FileChannel.open(tempFile, StandardOpenOption.WRITE);
-            BoundedOutputStream boundedStream = new BoundedOutputStream(
-                    Channels.newOutputStream(dataChannel), maxTempFileBytes);
+            BoundedOutputStream boundedStream =
+                    new BoundedOutputStream(Channels.newOutputStream(dataChannel), maxTempFileBytes);
             DigestOutputStream digestStream = new DigestOutputStream(boundedStream, digest);
             GZIPOutputStream gzipStream;
             try {
@@ -163,7 +158,8 @@ public final class ExtractWriter implements AutoCloseable {
         Objects.requireNonNull(acquisition, "acquisition is required");
         return new ExtractionScope(
                 acquisition.sourceId(), acquisition.municipalityIbge(),
-                acquisition.periodStart().toString(), acquisition.periodEndExclusive().toString());
+                acquisition.periodStart().toString(),
+                        acquisition.periodEndExclusive().toString());
     }
 
     private static ExtractionScope scopeFor(AcquisitionCommand acquisitionCommand) {
@@ -198,17 +194,22 @@ public final class ExtractWriter implements AutoCloseable {
             String queryChecksum,
             String adapterVersion,
             String completenessStatus,
-            String consistencyLevel
-    ) throws IOException {
+            String consistencyLevel)
+            throws IOException {
         if (acquisitionScope == null) {
-            throw new IllegalStateException(
-                    "an acquisition-bound writer is required for public finalization");
+            throw new IllegalStateException("an acquisition-bound writer is required for public finalization");
         }
         return finalizeExtract(
-                acquisitionScope.sourceId(), acquisitionScope.municipalityIbge(),
-                acquisitionScope.periodStart(), acquisitionScope.periodEndExclusive(),
-                startedAt, sourceZoneId, queryChecksum, adapterVersion,
-                completenessStatus, consistencyLevel);
+                acquisitionScope.sourceId(),
+                acquisitionScope.municipalityIbge(),
+                acquisitionScope.periodStart(),
+                acquisitionScope.periodEndExclusive(),
+                startedAt,
+                sourceZoneId,
+                queryChecksum,
+                adapterVersion,
+                completenessStatus,
+                consistencyLevel);
     }
 
     ExtractionManifest finalizeExtract(
@@ -221,10 +222,18 @@ public final class ExtractWriter implements AutoCloseable {
             String queryChecksum,
             String adapterVersion,
             String completenessStatus,
-            String consistencyLevel
-    ) throws IOException {
-        ExtractPublication.validateManifestArguments(sourceId, municipalityIbge, periodStart, periodEndExclusive,
-                startedAt, sourceZoneId, queryChecksum, adapterVersion, completenessStatus,
+            String consistencyLevel)
+            throws IOException {
+        ExtractPublication.validateManifestArguments(
+                sourceId,
+                municipalityIbge,
+                periodStart,
+                periodEndExclusive,
+                startedAt,
+                sourceZoneId,
+                queryChecksum,
+                adapterVersion,
+                completenessStatus,
                 consistencyLevel);
         ensureWrittenScopeMatches(sourceId, municipalityIbge, periodStart, periodEndExclusive);
         Path finalFile = baseDir.resolve(extractionId + ".jsonl.gz");
@@ -240,11 +249,22 @@ public final class ExtractWriter implements AutoCloseable {
 
         Instant finishedAt = Instant.now();
         ExtractionManifest manifest = new ExtractionManifest(
-                extractionId, sourceId, municipalityIbge, periodStart, periodEndExclusive,
-                startedAt.toString(), finishedAt.toString(),
-                CANONICAL_SCHEMA_VERSION, completenessStatus, consistencyLevel, sourceZoneId,
-                rowCount, exclusionCount, checksum, queryChecksum, adapterVersion
-        );
+                extractionId,
+                sourceId,
+                municipalityIbge,
+                periodStart,
+                periodEndExclusive,
+                startedAt.toString(),
+                finishedAt.toString(),
+                CANONICAL_SCHEMA_VERSION,
+                completenessStatus,
+                consistencyLevel,
+                sourceZoneId,
+                rowCount,
+                exclusionCount,
+                checksum,
+                queryChecksum,
+                adapterVersion);
         ExtractValidation.validateManifest(manifest);
 
         Path manifestTemp = baseDir.resolve(extractionId + ".manifest.json.tmp");
@@ -281,12 +301,16 @@ public final class ExtractWriter implements AutoCloseable {
         if (encounter == null || encounter.sourceRef() == null) {
             throw new IllegalArgumentException("encounter and sourceRef are required");
         }
-        if (encounter.sourceRef().sourceId() == null || encounter.sourceRef().sourceId().isBlank()
-                || encounter.sourceRef().entityType() == null || encounter.sourceRef().entityType().isBlank()
-                || encounter.sourceRef().recordId() == null || encounter.sourceRef().recordId().isBlank()) {
+        if (encounter.sourceRef().sourceId() == null
+                || encounter.sourceRef().sourceId().isBlank()
+                || encounter.sourceRef().entityType() == null
+                || encounter.sourceRef().entityType().isBlank()
+                || encounter.sourceRef().recordId() == null
+                || encounter.sourceRef().recordId().isBlank()) {
             throw new IllegalArgumentException("encounter source reference is incomplete");
         }
-        if (encounter.municipalityIbge() == null || !encounter.municipalityIbge().matches("\\d{7}")) {
+        if (encounter.municipalityIbge() == null
+                || !encounter.municipalityIbge().matches("\\d{7}")) {
             throw new IllegalArgumentException("encounter municipality must be a 7-digit IBGE code");
         }
         if (encounter.modality() == null) {
@@ -298,8 +322,9 @@ public final class ExtractWriter implements AutoCloseable {
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("encounter careDate must be an ISO local date", e);
         }
-        if (acquisitionScope != null && !acquisitionScope.contains(
-                encounter.sourceRef().sourceId(), encounter.municipalityIbge(), careDate)) {
+        if (acquisitionScope != null
+                && !acquisitionScope.contains(
+                        encounter.sourceRef().sourceId(), encounter.municipalityIbge(), careDate)) {
             throw new IllegalArgumentException("record does not match the bound acquisition scope");
         }
         if (encounter.cnes() != null && encounter.cnes().isBlank()
@@ -332,8 +357,7 @@ public final class ExtractWriter implements AutoCloseable {
         }
         if (writtenSourceId == null) {
             if (acquisitionScope == null) {
-                throw new IllegalArgumentException(
-                        "an acquisition scope is required to finalize an empty extract");
+                throw new IllegalArgumentException("an acquisition scope is required to finalize an empty extract");
             }
             return;
         }

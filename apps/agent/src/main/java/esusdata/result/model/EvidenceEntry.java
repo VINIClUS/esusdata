@@ -14,10 +14,10 @@ public record EvidenceEntry(
         String ine,
         String cbo,
         String decision,
-        String criterionVersion
-) {
+        String criterionVersion) {
     public EvidenceEntry {
-        if (!"IN_NUMERATOR".equals(decision) && !"DENOMINATOR_ONLY".equals(decision)
+        if (!"IN_NUMERATOR".equals(decision)
+                && !"DENOMINATOR_ONLY".equals(decision)
                 && !"EXCLUDED_UNMAPPED".equals(decision)) {
             throw new IllegalArgumentException("unknown evidence decision: " + decision);
         }

@@ -1,14 +1,14 @@
 package esusdata.auth.security;
 
+import esusdata.web.ApiError;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import tools.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
-import esusdata.web.ApiError;
 /** Every unauthenticated {@code /api/**} request gets a JSON 401, never a login-page redirect. */
 public final class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
@@ -21,7 +21,7 @@ public final class JsonAuthenticationEntryPoint implements AuthenticationEntryPo
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json");
         response.setHeader("Cache-Control", "no-store");
-        response.getWriter().write(mapper.writeValueAsString(
-                new ApiError("UNAUTHENTICATED", "authentication is required")));
+        response.getWriter()
+                .write(mapper.writeValueAsString(new ApiError("UNAUTHENTICATED", "authentication is required")));
     }
 }

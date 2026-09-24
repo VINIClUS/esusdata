@@ -1,7 +1,8 @@
 package esusdata.run.extract;
 
-import java.nio.file.Path;
 import esusdata.result.ReproducibilityCheck;
+import java.nio.file.Path;
+
 /**
  * The extract data-file naming convention, confirmed against {@code ExtractWriter}/{@code
  * ExtractReader} (not inferred): {@code baseDir/<extractionId>.jsonl.gz}, manifest at {@code
@@ -10,8 +11,7 @@ import esusdata.result.ReproducibilityCheck;
  */
 public final class ExtractionFilePaths {
 
-    private ExtractionFilePaths() {
-    }
+    private ExtractionFilePaths() {}
 
     public static Path dataFile(Path baseDir, String extractionId) {
         return baseDir.resolve(extractionId + ".jsonl.gz");

@@ -1,15 +1,18 @@
 package esusdata.run.worker;
 
-import esusdata.run.extract.ExtractFixtures;
-import esusdata.run.extract.ExtractionManifest;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.result.model.StagingRequest;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
+import esusdata.run.extract.ExtractFixtures;
+import esusdata.run.extract.ExtractionManifest;
+import esusdata.run.job.Job;
+import esusdata.run.job.JobRepository;
+import esusdata.run.job.JobState;
+import esusdata.run.job.SourceAcquisitionBlockedException;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -17,15 +20,11 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import esusdata.run.job.Job;
-import esusdata.run.job.JobState;
-import esusdata.run.job.SourceAcquisitionBlockedException;
-import esusdata.run.job.CancellationToken;
-import esusdata.run.job.JobRepository;
 /**
  * §1.9.4/ENG-06/ENG-21/ENG-51: an abandoned RUNNING/STAGED job is never resumed or republished;
  * it is requeued (if attempts remain) or failed, any staged evidence is neutralized, and a
@@ -52,30 +51,67 @@ class JobRecoveryTest {
         fixture.close();
     }
 
-    private void insertJob(String jobId, String state, int attempt, int maxAttempts,
-            long generation, String processInstanceId, String stagingId) {
-        fixture.jdbc.update("""
+    private void insertJob(
+            String jobId,
+            String state,
+            int attempt,
+            int maxAttempts,
+            long generation,
+            String processInstanceId,
+            String stagingId) {
+        fixture.jdbc.update(
+                """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, process_instance_id,
                     execution_generation, created_at, started_at, source_id, staging_id)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """, jobId, "run-" + jobId, "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
-                "2026-03", state, attempt, maxAttempts, processInstanceId, generation,
-                clock.instant().toString(), clock.instant().toString(), "src-1", stagingId);
+                """,
+                jobId,
+                "run-" + jobId,
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                state,
+                attempt,
+                maxAttempts,
+                processInstanceId,
+                generation,
+                clock.instant().toString(),
+                clock.instant().toString(),
+                "src-1",
+                stagingId);
     }
 
     private String stageOpenResult(String jobId, long generation, String processInstanceId) throws Exception {
-        ExtractionManifest manifest = ExtractFixtures.write(
-                fixture.extractsDir, "ext-" + jobId, "src-1", "3541307", "2026-03", 5, 5, 0);
+        ExtractionManifest manifest =
+                ExtractFixtures.write(fixture.extractsDir, "ext-" + jobId, "src-1", "3541307", "2026-03", 5, 5, 0);
         IndicatorResult result = new IndicatorResult(
-                IndicatorResult.IndicatorStatus.COMPUTED, "50.0000", BigInteger.valueOf(5),
-                BigInteger.valueOf(10), "PROGRAMADOS_MAIS_ESPONTANEOS", Classification.OTIMO,
-                "2026-03", "c1-mais-acesso@0.1.0", "2026-03-31", "3541307", List.of(),
+                IndicatorResult.IndicatorStatus.COMPUTED,
+                "50.0000",
+                BigInteger.valueOf(5),
+                BigInteger.valueOf(10),
+                "PROGRAMADOS_MAIS_ESPONTANEOS",
+                Classification.OTIMO,
+                "2026-03",
+                "c1-mais-acesso@0.1.0",
+                "2026-03-31",
+                "3541307",
+                List.of(),
                 "c1-exact-ratio@1");
         String stagingId = "stg-" + UUID.randomUUID();
-        fixture.stagingArea.open(new StagingRequest(stagingId, jobId, generation, processInstanceId,
-                clock.instant(), "c1-mais-acesso", result, manifest.extractionId(),
-                manifest.adapterVersion(), "SOURCE_EVENT", "sha256:" + "0".repeat(64)));
+        fixture.stagingArea.open(new StagingRequest(
+                stagingId,
+                jobId,
+                generation,
+                processInstanceId,
+                clock.instant(),
+                "c1-mais-acesso",
+                result,
+                manifest.extractionId(),
+                manifest.adapterVersion(),
+                "SOURCE_EVENT",
+                "sha256:" + "0".repeat(64)));
         return stagingId;
     }
 
@@ -144,7 +180,8 @@ class JobRecoveryTest {
 
     private void assertThatCodeDoesNotBlock() {
         org.assertj.core.api.Assertions.assertThatCode(
-                () -> fixture.acquisitionGuard().requireUnblocked("src-1")).doesNotThrowAnyException();
+                        () -> fixture.acquisitionGuard().requireUnblocked("src-1"))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -170,16 +207,30 @@ class JobRecoveryTest {
         // A RUNNING job with extraction_id set never opened a PEC connection at all — blocking
         // the source's next LIVE_READ_ONLY acquisition on its account would be pure cost, no
         // safety benefit (ENG-51 only protects an abandoned *live* session).
-        ExtractionManifest manifest = ExtractFixtures.write(
-                fixture.extractsDir, "ext-job-6", "src-1", "3541307", "2026-03", 5, 5, 0);
-        fixture.jdbc.update("""
+        ExtractionManifest manifest =
+                ExtractFixtures.write(fixture.extractsDir, "ext-job-6", "src-1", "3541307", "2026-03", 5, 5, 0);
+        fixture.jdbc.update(
+                """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, process_instance_id,
                     execution_generation, created_at, started_at, source_id, extraction_id)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """, "job-6", "run-job-6", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
-                "2026-03", "RUNNING", 1, 3, "proc-old", 1, clock.instant().toString(),
-                clock.instant().toString(), "src-1", manifest.extractionId());
+                """,
+                "job-6",
+                "run-job-6",
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                "RUNNING",
+                1,
+                3,
+                "proc-old",
+                1,
+                clock.instant().toString(),
+                clock.instant().toString(),
+                "src-1",
+                manifest.extractionId());
 
         var report = fixture.jobRecovery().reconcile("proc-new");
         assertThat(report.requeued()).isEqualTo(1);

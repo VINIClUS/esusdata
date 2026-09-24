@@ -1,16 +1,5 @@
 package esusdata.run.worker;
 
-import esusdata.result.model.ResultStagingArea;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.dao.TransientDataAccessResourceException;
-
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.Optional;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
@@ -21,11 +10,22 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import esusdata.result.model.ResultStagingArea;
 import esusdata.run.job.Job;
+import esusdata.run.job.JobRepository;
 import esusdata.run.job.JobState;
 import esusdata.run.job.RetryPolicy;
 import esusdata.run.job.SourceAcquisitionBlockedException;
-import esusdata.run.job.JobRepository;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.dao.TransientDataAccessResourceException;
+
 /**
  * §1.9.4: "um worker de cálculo ativo por instalação" — the worker thread must survive an
  * infrastructure hiccup, not die with it. {@code acquireNext} is a single CAS query; under
@@ -69,9 +69,34 @@ class JobWorkerTest {
     @Test
     void runOnceSurvivesATransientFailureInsideItsOwnFailureHandling() throws Exception {
         Instant now = Instant.parse("2026-09-20T12:00:00Z");
-        Job job = new Job("job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
-                "2026-03", JobState.RUNNING, 0, 3, "proc-1", 1, null, null, now, now, null,
-                null, null, "ext-1", null, "src-1", null, null, null, null, null, null);
+        Job job = new Job(
+                "job-1",
+                "run-1",
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                JobState.RUNNING,
+                0,
+                3,
+                "proc-1",
+                1,
+                null,
+                null,
+                now,
+                now,
+                null,
+                null,
+                null,
+                "ext-1",
+                null,
+                "src-1",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
 
         JobRepository jobRepository = mock(JobRepository.class);
         when(jobRepository.acquireNext(anyString(), any(Instant.class))).thenReturn(Optional.of(job));
@@ -105,57 +130,150 @@ class JobWorkerTest {
     void handleFailureSchedulesTheRetryNoEarlierThanTheAcquisitionCooldown() throws Exception {
         Instant now = Instant.parse("2026-09-20T12:00:00Z");
         Instant blockedUntil = now.plusSeconds(65); // outlives the default policy's first backoff
-        Job job = new Job("job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
-                "2026-03", JobState.RUNNING, 0, 3, "proc-1", 1, null, null, now, now, null,
-                null, null, null, null, "src-1", null, null, null, null, null, null);
+        Job job = new Job(
+                "job-1",
+                "run-1",
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                JobState.RUNNING,
+                0,
+                3,
+                "proc-1",
+                1,
+                null,
+                null,
+                now,
+                now,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "src-1",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
 
         JobRepository jobRepository = mock(JobRepository.class);
         when(jobRepository.acquireNext(anyString(), any(Instant.class))).thenReturn(Optional.of(job));
         when(jobRepository.findById("job-1")).thenReturn(Optional.of(job));
-        when(jobRepository.requeueForRetryAndRecordAttempt(
-                any(), any(), anyLong(), any(), any(), any(), any(), any()))
+        when(jobRepository.requeueForRetryAndRecordAttempt(any(), any(), anyLong(), any(), any(), any(), any(), any()))
                 .thenReturn(true);
 
         RunExecutor executor = mock(RunExecutor.class);
-        when(executor.runLive(any(), any())).thenThrow(new SourceAcquisitionBlockedException(
-                "source src-1 is on cooldown until " + blockedUntil, blockedUntil));
+        when(executor.runLive(any(), any()))
+                .thenThrow(new SourceAcquisitionBlockedException(
+                        "source src-1 is on cooldown until " + blockedUntil, blockedUntil));
 
         JobWorker worker = new JobWorker(
-                jobRepository, executor, mock(ResultStagingArea.class), new CancellationRegistry(),
-                RetryPolicy.defaultPolicy(), Clock.fixed(now, ZoneOffset.UTC), "proc-1", Duration.ofMillis(1));
+                jobRepository,
+                executor,
+                mock(ResultStagingArea.class),
+                new CancellationRegistry(),
+                RetryPolicy.defaultPolicy(),
+                Clock.fixed(now, ZoneOffset.UTC),
+                "proc-1",
+                Duration.ofMillis(1));
 
         worker.runOnce();
 
         ArgumentCaptor<Instant> nextAttemptAt = ArgumentCaptor.forClass(Instant.class);
-        verify(jobRepository).requeueForRetryAndRecordAttempt(
-                eq("job-1"), eq("proc-1"), eq(1L), eq(JobState.RUNNING), nextAttemptAt.capture(),
-                eq("SOURCE_ACQUISITION_BLOCKED"), any(), eq(now));
+        verify(jobRepository)
+                .requeueForRetryAndRecordAttempt(
+                        eq("job-1"),
+                        eq("proc-1"),
+                        eq(1L),
+                        eq(JobState.RUNNING),
+                        nextAttemptAt.capture(),
+                        eq("SOURCE_ACQUISITION_BLOCKED"),
+                        any(),
+                        eq(now));
         assertThat(nextAttemptAt.getValue()).isEqualTo(blockedUntil);
-        verify(jobRepository, never()).markFailedAndRecordAttempt(
-                any(), any(), anyLong(), any(), any(), any(), any());
+        verify(jobRepository, never()).markFailedAndRecordAttempt(any(), any(), anyLong(), any(), any(), any(), any());
     }
 
     @Test
     void rechecksPersistedCancellationImmediatelyAfterRegisteringTheToken() throws Exception {
         Instant now = Instant.parse("2026-09-20T12:00:00Z");
-        Job acquired = new Job("job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
-                "2026-03", JobState.RUNNING, 1, 3, "proc-1", 1, null, null, now, now, null,
-                null, null, "ext-1", null, "src-1", null, "user-1", null, null, null, null);
+        Job acquired = new Job(
+                "job-1",
+                "run-1",
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                JobState.RUNNING,
+                1,
+                3,
+                "proc-1",
+                1,
+                null,
+                null,
+                now,
+                now,
+                null,
+                null,
+                null,
+                "ext-1",
+                null,
+                "src-1",
+                null,
+                "user-1",
+                null,
+                null,
+                null,
+                null);
         Job persistedCancellation = new Job(
-                "job-1", "run-1", "3541307", "c1-mais-acesso", "c1-mais-acesso@0.1.0",
-                "2026-03", JobState.CANCEL_REQUESTED, 1, 3, "proc-1", 1, null, null, now, now, null,
-                null, null, "ext-1", null, "src-1", null, "user-1", null, null, null, now);
+                "job-1",
+                "run-1",
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                JobState.CANCEL_REQUESTED,
+                1,
+                3,
+                "proc-1",
+                1,
+                null,
+                null,
+                now,
+                now,
+                null,
+                null,
+                null,
+                "ext-1",
+                null,
+                "src-1",
+                null,
+                "user-1",
+                null,
+                null,
+                null,
+                now);
 
         JobRepository jobRepository = mock(JobRepository.class);
         when(jobRepository.acquireNext(anyString(), any(Instant.class))).thenReturn(Optional.of(acquired));
         when(jobRepository.findById("job-1"))
                 .thenReturn(Optional.of(persistedCancellation), Optional.of(persistedCancellation));
-        when(jobRepository.markCancelledAndRecordAttempt("job-1", "proc-1", 1, now)).thenReturn(true);
+        when(jobRepository.markCancelledAndRecordAttempt("job-1", "proc-1", 1, now))
+                .thenReturn(true);
 
         RunExecutor executor = mock(RunExecutor.class);
         JobWorker worker = new JobWorker(
-                jobRepository, executor, mock(ResultStagingArea.class), new CancellationRegistry(),
-                RetryPolicy.defaultPolicy(), Clock.fixed(now, ZoneOffset.UTC), "proc-1", Duration.ofMillis(1));
+                jobRepository,
+                executor,
+                mock(ResultStagingArea.class),
+                new CancellationRegistry(),
+                RetryPolicy.defaultPolicy(),
+                Clock.fixed(now, ZoneOffset.UTC),
+                "proc-1",
+                Duration.ofMillis(1));
 
         worker.runOnce();
 

@@ -1,9 +1,8 @@
 package esusdata.run;
 
+import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
-
-import java.time.Duration;
 
 /**
  * ADR 0016: {@code binary} must name the packaged Rust execution plane — {@link RunConfig} refuses to
@@ -13,6 +12,4 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "observatorio.execution-plane")
 public record ExecPlaneProperties(
         @DefaultValue("") String binary,
-        @DefaultValue("30s") Duration exitGrace
-) {
-}
+        @DefaultValue("30s") Duration exitGrace) {}

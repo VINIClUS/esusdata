@@ -1,9 +1,13 @@
 package esusdata.auth;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.transaction.support.TransactionTemplate;
-
+import esusdata.auth.model.ActivationTokens;
+import esusdata.auth.model.Grant;
+import esusdata.auth.model.GrantRepository;
+import esusdata.auth.model.Role;
+import esusdata.auth.model.ScopeKind;
+import esusdata.auth.model.UserAccount;
+import esusdata.auth.model.UserRepository;
+import esusdata.auth.model.UserState;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -17,14 +21,9 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import esusdata.auth.model.ActivationTokens;
-import esusdata.auth.model.Grant;
-import esusdata.auth.model.Role;
-import esusdata.auth.model.ScopeKind;
-import esusdata.auth.model.UserAccount;
-import esusdata.auth.model.UserState;
-import esusdata.auth.model.GrantRepository;
-import esusdata.auth.model.UserRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * §1.4 L110 / §1.12.7 L536: "Primeiro acesso por procedimento local de ativação, sem senha padrão
@@ -41,7 +40,8 @@ public final class BootstrapActivation {
 
     private static final String UNUSABLE_PASSWORD_HASH = "UNSET";
     private static final RowMapper<TokenRow> TOKEN_MAPPER = (rs, rowNum) -> new TokenRow(
-            rs.getString("token_hash"), rs.getString("user_id"),
+            rs.getString("token_hash"),
+            rs.getString("user_id"),
             Instant.parse(rs.getString("expires_at")),
             rs.getString("consumed_at") == null ? null : Instant.parse(rs.getString("consumed_at")));
 
@@ -56,9 +56,15 @@ public final class BootstrapActivation {
     private final Path tokenFile;
 
     public BootstrapActivation(
-            UserRepository userRepository, GrantRepository grantRepository, JdbcTemplate jdbc,
-            TransactionTemplate transactionTemplate, Clock clock, SecurityProperties properties,
-            PasswordPolicy passwordPolicy, Argon2Profile argon2Profile, Path dataDirectory) {
+            UserRepository userRepository,
+            GrantRepository grantRepository,
+            JdbcTemplate jdbc,
+            TransactionTemplate transactionTemplate,
+            Clock clock,
+            SecurityProperties properties,
+            PasswordPolicy passwordPolicy,
+            Argon2Profile argon2Profile,
+            Path dataDirectory) {
         this.userRepository = userRepository;
         this.grantRepository = grantRepository;
         this.jdbc = jdbc;
@@ -95,12 +101,30 @@ public final class BootstrapActivation {
 
         transactionTemplate.executeWithoutResult(status -> {
             userRepository.insert(new UserAccount(
-                    userId, "admin", "Administrador técnico (ativação pendente)",
-                    UNUSABLE_PASSWORD_HASH, "NONE", "{}", properties.securityPolicyVersion(), 1,
-                    UserState.PENDING_ACTIVATION, now, "bootstrap", null));
+                    userId,
+                    "admin",
+                    "Administrador técnico (ativação pendente)",
+                    UNUSABLE_PASSWORD_HASH,
+                    "NONE",
+                    "{}",
+                    properties.securityPolicyVersion(),
+                    1,
+                    UserState.PENDING_ACTIVATION,
+                    now,
+                    "bootstrap",
+                    null));
             grantRepository.insert(new Grant(
-                    "grant-" + UUID.randomUUID(), userId, Role.TECHNICAL_ADMIN, ScopeKind.INSTALLATION,
-                    null, null, null, now, "bootstrap", null, null));
+                    "grant-" + UUID.randomUUID(),
+                    userId,
+                    Role.TECHNICAL_ADMIN,
+                    ScopeKind.INSTALLATION,
+                    null,
+                    null,
+                    null,
+                    now,
+                    "bootstrap",
+                    null,
+                    null));
             jdbc.update("""
                     INSERT INTO activation_tokens (token_hash, user_id, expires_at, consumed_at)
                     VALUES (?,?,?,null)
@@ -122,9 +146,10 @@ public final class BootstrapActivation {
         // throws before ever changing the password/state, and if activation fails after a
         // successful claim for any other reason, the rollback un-consumes the token too.
         return transactionTemplate.execute(status -> {
-            TokenRow row = jdbc.query("select * from activation_tokens where token_hash = ?",
-                    TOKEN_MAPPER, tokenHash).stream().findFirst()
-                    .orElseThrow(() -> new ActivationFailedException("invalid activation token"));
+            TokenRow row =
+                    jdbc.query("select * from activation_tokens where token_hash = ?", TOKEN_MAPPER, tokenHash).stream()
+                            .findFirst()
+                            .orElseThrow(() -> new ActivationFailedException("invalid activation token"));
             if (row.consumedAt() != null) {
                 throw new ActivationFailedException("activation token already used");
             }
@@ -136,15 +161,21 @@ public final class BootstrapActivation {
 
             int claimed = jdbc.update(
                     "update activation_tokens set consumed_at = ? where token_hash = ? and consumed_at is null",
-                    now.toString(), tokenHash);
+                    now.toString(),
+                    tokenHash);
             if (claimed != 1) {
                 throw new ActivationFailedException("activation token already used");
             }
 
-            userRepository.setPassword(row.userId(), encodedHash, Argon2Profile.ALGO,
-                    argon2Profile.effectiveParamsJson(), properties.securityPolicyVersion());
+            userRepository.setPassword(
+                    row.userId(),
+                    encodedHash,
+                    Argon2Profile.ALGO,
+                    argon2Profile.effectiveParamsJson(),
+                    properties.securityPolicyVersion());
             userRepository.setState(row.userId(), UserState.ACTIVE);
-            return userRepository.findById(row.userId())
+            return userRepository
+                    .findById(row.userId())
                     .orElseThrow(() -> new IllegalStateException("activated user vanished mid-activation"));
         });
     }
@@ -156,16 +187,17 @@ public final class BootstrapActivation {
                 Files.getFileAttributeView(tokenFile.getParent(), PosixFileAttributeView.class);
         if (posixView != null) {
             Files.deleteIfExists(tokenFile);
-            Path created = Files.createFile(tokenFile, PosixFilePermissions.asFileAttribute(
-                    Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
+            Path created = Files.createFile(
+                    tokenFile,
+                    PosixFilePermissions.asFileAttribute(
+                            Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
             Files.writeString(created, contents, StandardCharsets.UTF_8);
         } else {
             Files.writeString(tokenFile, contents, StandardCharsets.UTF_8);
         }
     }
 
-    private record TokenRow(String tokenHash, String userId, Instant expiresAt, Instant consumedAt) {
-    }
+    private record TokenRow(String tokenHash, String userId, Instant expiresAt, Instant consumedAt) {}
 
     public static final class ActivationFailedException extends RuntimeException {
         public ActivationFailedException(String message) {

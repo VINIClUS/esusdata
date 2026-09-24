@@ -1,8 +1,8 @@
 package esusdata.auth.security;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.web.SecuritySliceTestSupport;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -15,9 +15,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.SecuritySliceTestSupport;
 /** ENG-49: CSRF, Origin/Host validation, and the fixed security headers on every response. */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class CsrfAndOriginTest extends SecuritySliceTestSupport {
@@ -26,15 +26,16 @@ public class CsrfAndOriginTest extends SecuritySliceTestSupport {
     void readyResponseCarriesTheFixedSecurityHeaders() throws Exception {
         HttpClient client = HttpClient.newHttpClient();
         HttpResponse<String> response = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
         assertThat(response.headers().firstValue("X-Frame-Options")).contains("DENY");
         assertThat(response.headers().firstValue("X-Content-Type-Options")).contains("nosniff");
         assertThat(response.headers().firstValue("Content-Security-Policy")).isPresent();
-        assertThat(response.headers().allValues("Set-Cookie"))
-                .anyMatch(cookie -> cookie.startsWith("XSRF-TOKEN="));
+        assertThat(response.headers().allValues("Set-Cookie")).anyMatch(cookie -> cookie.startsWith("XSRF-TOKEN="));
     }
 
     @Test
@@ -42,7 +43,10 @@ public class CsrfAndOriginTest extends SecuritySliceTestSupport {
         CookieManager cookieManager = new CookieManager();
         HttpClient client = HttpClient.newBuilder().cookieHandler(cookieManager).build();
         // Fetch the CSRF cookie first, deliberately never send it back as a header.
-        client.send(HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
+        client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
 
         HttpResponse<String> response = client.send(
@@ -59,7 +63,10 @@ public class CsrfAndOriginTest extends SecuritySliceTestSupport {
     void loginWithAMismatchedOriginIsRejected() throws Exception {
         CookieManager cookieManager = new CookieManager();
         HttpClient client = HttpClient.newBuilder().cookieHandler(cookieManager).build();
-        client.send(HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
+        client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
         String csrfToken = csrfTokenFrom(cookieManager);
 
@@ -80,7 +87,10 @@ public class CsrfAndOriginTest extends SecuritySliceTestSupport {
     void theViteDevelopmentOriginIsAcceptedForStateChangingRequests() throws Exception {
         CookieManager cookieManager = new CookieManager();
         HttpClient client = HttpClient.newBuilder().cookieHandler(cookieManager).build();
-        client.send(HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
+        client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
         String csrfToken = csrfTokenFrom(cookieManager);
 
@@ -101,9 +111,8 @@ public class CsrfAndOriginTest extends SecuritySliceTestSupport {
         String rawResponse;
         try (Socket socket = new Socket("127.0.0.1", PORT)) {
             OutputStream out = socket.getOutputStream();
-            String request = "GET /api/v1/ready HTTP/1.1\r\n"
-                    + "Host: attacker.example.com\r\n"
-                    + "Connection: close\r\n\r\n";
+            String request =
+                    "GET /api/v1/ready HTTP/1.1\r\n" + "Host: attacker.example.com\r\n" + "Connection: close\r\n\r\n";
             out.write(request.getBytes(StandardCharsets.US_ASCII));
             out.flush();
             StringBuilder sb = new StringBuilder();

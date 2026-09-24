@@ -1,6 +1,14 @@
 package esusdata.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import esusdata.config.SqliteConfig;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,15 +16,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
-
-import java.nio.file.Path;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * §1.12.7 L538: "cinco falhas por conta em quinze minutos iniciam atraso progressivo com teto de
@@ -41,8 +40,13 @@ class LoginThrottleTest {
         now = Instant.parse("2026-09-20T12:00:00Z");
         context = new AnnotationConfigApplicationContext();
         context.register(SqliteConfig.class);
-        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("test",
-                Map.of("observatorio.data.directory", dataDir.resolve("db").toString())));
+        context.getEnvironment()
+                .getPropertySources()
+                .addFirst(new MapPropertySource(
+                        "test",
+                        Map.of(
+                                "observatorio.data.directory",
+                                dataDir.resolve("db").toString())));
         context.refresh();
 
         jdbc = context.getBean(JdbcTemplate.class);
@@ -76,10 +80,11 @@ class LoginThrottleTest {
     void theDelayEndsAndACleanCheckSucceedsOnceTheRetryAfterInstantHasPassed() {
         recordFailures("alice", "203.0.113.1", 5);
 
-        LoginThrottle.LoginThrottledException thrown = catchThrottled(() ->
-                throttle.checkAllowed("alice", "203.0.113.1", now));
+        LoginThrottle.LoginThrottledException thrown =
+                catchThrottled(() -> throttle.checkAllowed("alice", "203.0.113.1", now));
 
-        assertThatCode(() -> throttle.checkAllowed("alice", "203.0.113.1", thrown.retryAfter().plusSeconds(1)))
+        assertThatCode(() -> throttle.checkAllowed(
+                        "alice", "203.0.113.1", thrown.retryAfter().plusSeconds(1)))
                 .doesNotThrowAnyException();
     }
 
@@ -97,8 +102,8 @@ class LoginThrottleTest {
         // of raw delay — must be capped at throttleCeilingMinutes (15), not applied uncapped.
         recordFailures("alice", "203.0.113.1", 25);
 
-        LoginThrottle.LoginThrottledException thrown = catchThrottled(() ->
-                throttle.checkAllowed("alice", "203.0.113.1", now));
+        LoginThrottle.LoginThrottledException thrown =
+                catchThrottled(() -> throttle.checkAllowed("alice", "203.0.113.1", now));
 
         Instant lastFailureAt = now; // recordFailures uses `now` for every attempt in this test
         assertThat(thrown.retryAfter()).isEqualTo(lastFailureAt.plus(Duration.ofMinutes(15)));
@@ -121,13 +126,13 @@ class LoginThrottleTest {
             recordFailures("user-" + account, "203.0.113.1", 4);
         }
 
-        LoginThrottle.LoginThrottledException thrown = catchThrottled(() ->
-                throttle.checkAllowed("user-999", "203.0.113.1", now));
+        LoginThrottle.LoginThrottledException thrown =
+                catchThrottled(() -> throttle.checkAllowed("user-999", "203.0.113.1", now));
 
         assertThat(thrown.retryAfter())
                 .isBeforeOrEqualTo(now.plus(Duration.ofMinutes(properties.throttleCeilingMinutes())));
         assertThatCode(() -> throttle.checkAllowed(
-                "user-999", "203.0.113.1", thrown.retryAfter().plusSeconds(1)))
+                        "user-999", "203.0.113.1", thrown.retryAfter().plusSeconds(1)))
                 .doesNotThrowAnyException();
     }
 

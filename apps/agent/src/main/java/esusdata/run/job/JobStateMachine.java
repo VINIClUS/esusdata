@@ -2,6 +2,7 @@ package esusdata.run.job;
 
 import java.util.Map;
 import java.util.Set;
+
 /**
  * Tech Spec §1.9.4 transition table, verbatim:
  *
@@ -32,11 +33,9 @@ public final class JobStateMachine {
             JobState.CANCEL_REQUESTED, Set.of(JobState.CANCELLED),
             JobState.CANCELLED, Set.of(),
             JobState.SUCCEEDED, Set.of(),
-            JobState.FAILED, Set.of()
-    );
+            JobState.FAILED, Set.of());
 
-    private JobStateMachine() {
-    }
+    private JobStateMachine() {}
 
     public static boolean isAllowed(JobState from, JobState to) {
         return ALLOWED.getOrDefault(from, Set.of()).contains(to);

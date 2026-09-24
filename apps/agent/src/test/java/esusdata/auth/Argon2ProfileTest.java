@@ -1,8 +1,8 @@
 package esusdata.auth;
 
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * §1.12.7 L534: "Argon2id com salt individual, parâmetros versionados... registrar parâmetros
@@ -42,8 +42,12 @@ class Argon2ProfileTest {
     void effectiveParamsJsonRecordsWhatWasActuallyUsedNotTheCurrentBaseline() {
         String json = profile.effectiveParamsJson();
 
-        assertThat(json).contains("\"saltLength\":16").contains("\"hashLength\":32")
-                .contains("\"parallelism\":1").contains("\"memoryKib\":8").contains("\"iterations\":1");
+        assertThat(json)
+                .contains("\"saltLength\":16")
+                .contains("\"hashLength\":32")
+                .contains("\"parallelism\":1")
+                .contains("\"memoryKib\":8")
+                .contains("\"iterations\":1");
     }
 
     @Test
@@ -69,9 +73,11 @@ class Argon2ProfileTest {
 
         String hash = productionProfile.encode("a-strong-enough-passphrase");
 
-        assertThat(productionProfile.matches("a-strong-enough-passphrase", hash)).isTrue();
+        assertThat(productionProfile.matches("a-strong-enough-passphrase", hash))
+                .isTrue();
         assertThat(productionProfile.matches("a-different-passphrase", hash)).isFalse();
         assertThat(productionProfile.effectiveParamsJson())
-                .contains("\"memoryKib\":19456").contains("\"iterations\":2");
+                .contains("\"memoryKib\":19456")
+                .contains("\"iterations\":2");
     }
 }

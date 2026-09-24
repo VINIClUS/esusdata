@@ -17,8 +17,7 @@ public record Grant(
         Instant grantedAt,
         String grantedBy,
         Instant revokedAt,
-        String revokedBy
-) {
+        String revokedBy) {
     public boolean isActive() {
         return revokedAt == null;
     }

@@ -46,19 +46,16 @@ public final class ProcessLock implements AutoCloseable {
             if (lock == null) {
                 channel.close();
                 raf.close();
-                throw new ProcessLockUnavailableException(
-                        "Data directory already locked by another running instance: " + lockFile
-                                + ". Refusing to start a second process against the same data directory.");
+                throw new ProcessLockUnavailableException("Data directory already locked by another running instance: "
+                        + lockFile + ". Refusing to start a second process against the same data directory.");
             }
             return new ProcessLock(raf, channel, lock);
         } catch (OverlappingFileLockException e) {
             closeQuietly(channel, raf);
-            throw new ProcessLockUnavailableException(
-                    "Data directory already locked within this JVM: " + lockFile, e);
+            throw new ProcessLockUnavailableException("Data directory already locked within this JVM: " + lockFile, e);
         } catch (IOException e) {
             closeQuietly(channel, raf);
-            throw new ProcessLockUnavailableException(
-                    "Could not acquire process lock on " + lockFile, e);
+            throw new ProcessLockUnavailableException("Could not acquire process lock on " + lockFile, e);
         }
     }
 

@@ -1,7 +1,8 @@
 package esusdata.result.dto;
 
-import java.util.List;
 import esusdata.auth.dto.ScopeResponse;
+import java.util.List;
+
 /**
  * The result contract of §1.10 L395, plus the provenance of §1.8 L284 and the independent status
  * dimensions of §1.10.1 L407. A domain record ({@code PublishedResult}) is never returned
@@ -39,6 +40,4 @@ public record ResultResponse(
         String canonicalSchemaVersion,
         String evidenceGrain,
         String appBuild,
-        String publishedAt
-) {
-}
+        String publishedAt) {}

@@ -1,14 +1,13 @@
 package esusdata.source.pec;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
+import java.io.InputStream;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
-
-import java.io.InputStream;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class PecAdaptersSchemaTest {
 
@@ -16,7 +15,7 @@ class PecAdaptersSchemaTest {
     void packagedCompatibilityMatrixValidatesAgainstItsPackagedDraft202012Schema() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         try (InputStream schemaStream = resource("/compatibility/pec-adapters.schema.json");
-             InputStream matrixStream = resource("/compatibility/pec-adapters.json")) {
+                InputStream matrixStream = resource("/compatibility/pec-adapters.json")) {
             Schema schema = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
                     .getSchema(schemaStream);
             var matrix = mapper.readTree(matrixStream);
@@ -29,8 +28,7 @@ class PecAdaptersSchemaTest {
 
     @Test
     void compatibilityResourcesAreAvailableWithoutTheCurrentWorkingDirectory() throws Exception {
-        assertThat(resource("/compatibility/pec-adapters.json").readAllBytes())
-                .isNotEmpty();
+        assertThat(resource("/compatibility/pec-adapters.json").readAllBytes()).isNotEmpty();
         assertThat(resource("/compatibility/pec-adapters.schema.json").readAllBytes())
                 .isNotEmpty();
     }

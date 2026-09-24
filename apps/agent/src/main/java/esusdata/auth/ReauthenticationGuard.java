@@ -1,7 +1,8 @@
 package esusdata.auth;
 
-import java.time.Instant;
 import esusdata.auth.model.AuthenticatedSession;
+import java.time.Instant;
+
 /**
  * §1.12.7 L537: "Reautenticação realizada nos últimos cinco minutos para concessão de acesso,
  * mudança de destino/segredo ou exportação individualizada." One explicit check point for those

@@ -1,4 +1,3 @@
 package esusdata.auth.dto;
 
-public record ReauthRequest(String password) {
-}
+public record ReauthRequest(String password) {}

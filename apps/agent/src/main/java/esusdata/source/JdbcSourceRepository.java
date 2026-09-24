@@ -1,10 +1,10 @@
 package esusdata.source;
 
+import esusdata.source.model.SourceRecord;
+import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
-import java.util.Optional;
-import esusdata.source.model.SourceRecord;
 /**
  * Persists {@code sources} rows. {@code secret_ref} is a reference/state string only — the secret
  * value itself never passes through this class (§1.12.7).
@@ -34,7 +34,8 @@ public final class JdbcSourceRepository implements SourceRepository {
     }
 
     public void upsert(SourceRecord source) {
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO sources (id, source_configuration_version, source_family,
                     pec_installation_role, source_location_kind, host, port, database_name,
                     db_user, secret_ref, municipality_ibge, pec_version, read_model, created_at)
@@ -49,15 +50,24 @@ public final class JdbcSourceRepository implements SourceRepository {
                     secret_ref = excluded.secret_ref, municipality_ibge = excluded.municipality_ibge,
                     pec_version = excluded.pec_version, read_model = excluded.read_model
                 """,
-                source.id(), source.sourceConfigurationVersion(), source.sourceFamily(),
-                source.pecInstallationRole(), source.sourceLocationKind(), source.host(),
-                source.port(), source.databaseName(), source.dbUser(), source.secretRef(),
-                source.municipalityIbge(), source.pecVersion(), source.readModel(),
+                source.id(),
+                source.sourceConfigurationVersion(),
+                source.sourceFamily(),
+                source.pecInstallationRole(),
+                source.sourceLocationKind(),
+                source.host(),
+                source.port(),
+                source.databaseName(),
+                source.dbUser(),
+                source.secretRef(),
+                source.municipalityIbge(),
+                source.pecVersion(),
+                source.readModel(),
                 source.createdAt());
     }
 
     public Optional<SourceRecord> findById(String id) {
-        return jdbc.query("select * from sources where id = ?", MAPPER, id)
-                .stream().findFirst();
+        return jdbc.query("select * from sources where id = ?", MAPPER, id).stream()
+                .findFirst();
     }
 }

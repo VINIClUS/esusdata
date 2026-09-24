@@ -18,6 +18,5 @@ public interface EvidenceRepository {
      * {@code hasMore}/{@code nextCursor} (a page could come back short of {@code limit} while more
      * matching rows exist further down the {@code seq} order).
      */
-    EvidencePage page(
-            String resultId, String municipalityIbge, String cnes, String ine, Long afterSeq, int limit);
+    EvidencePage page(String resultId, String municipalityIbge, String cnes, String ine, Long afterSeq, int limit);
 }

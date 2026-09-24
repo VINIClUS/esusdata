@@ -1,15 +1,14 @@
 package esusdata.web;
 
-import esusdata.auth.model.Role;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.auth.model.Role;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
 
 /**
  * §1.10.1 L409/L1788: "importações/exportações só são expostas quando implementadas" — and the
@@ -25,10 +24,14 @@ public class UnimplementedRoutesTest extends ApiFixtureSupport {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> imports = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/imports")).GET().build(),
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/imports"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
         HttpResponse<String> exports = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/exports")).GET().build(),
+                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/exports"))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(imports.statusCode()).isEqualTo(401);
@@ -43,11 +46,15 @@ public class UnimplementedRoutesTest extends ApiFixtureSupport {
 
         HttpResponse<String> imports = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/imports"))
-                        .header("Cookie", sessionCookie(user)).GET().build(),
+                        .header("Cookie", sessionCookie(user))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
         HttpResponse<String> exports = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/exports"))
-                        .header("Cookie", sessionCookie(user)).GET().build(),
+                        .header("Cookie", sessionCookie(user))
+                        .GET()
+                        .build(),
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(imports.statusCode()).isEqualTo(404);

@@ -1,12 +1,13 @@
 package esusdata.auth;
 
-import esusdata.result.model.PublicationAuthorization;
-import esusdata.result.model.PublicationAuthorizationRefusedException;
 import esusdata.auth.model.GrantRevalidationException;
 import esusdata.auth.model.Permission;
 import esusdata.auth.model.UserAccount;
-import esusdata.auth.model.UserState;
 import esusdata.auth.model.UserRepository;
+import esusdata.auth.model.UserState;
+import esusdata.result.model.PublicationAuthorization;
+import esusdata.result.model.PublicationAuthorizationRefusedException;
+
 /**
  * §1.9.4 L365: "Revalidar as concessões do usuário/escopo antes da aquisição e da publicação,
  * independentemente da sessão do navegador... Revogação de acesso ou bloqueio da conta impede
@@ -42,9 +43,8 @@ public final class GrantRevalidator implements PublicationAuthorization {
                     "principal " + principal + " is not an active user — access revoked or blocked");
         }
         if (!scopeResolver.hasPermission(principal, permission, municipalityIbge)) {
-            throw new GrantRevalidationException(
-                    "principal " + principal + " no longer holds " + permission.dbValue()
-                            + " for municipality " + municipalityIbge);
+            throw new GrantRevalidationException("principal " + principal + " no longer holds " + permission.dbValue()
+                    + " for municipality " + municipalityIbge);
         }
     }
 
@@ -54,8 +54,7 @@ public final class GrantRevalidator implements PublicationAuthorization {
             requireCurrentlyAuthorized(principal, municipalityIbge, Permission.RUN_INDICATOR);
         } catch (GrantRevalidationException revoked) {
             throw new PublicationAuthorizationRefusedException(
-                    "publication refused — authorization no longer current (§1.9.4 L365): "
-                            + revoked.getMessage());
+                    "publication refused — authorization no longer current (§1.9.4 L365): " + revoked.getMessage());
         }
     }
 }

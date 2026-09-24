@@ -39,14 +39,18 @@ pub fn objects_to_probe(
     read_model: &str,
     installation_role: &str,
 ) -> Vec<MatrixObject> {
-    let matrix: Matrix = serde_json::from_str(MATRIX_JSON).expect("packaged compatibility matrix is malformed");
+    let matrix: Matrix =
+        serde_json::from_str(MATRIX_JSON).expect("packaged compatibility matrix is malformed");
     matrix
         .tested_with
         .into_iter()
         .find(|entry| {
             entry.capability == capability
                 && entry.adapter_version == adapter_version
-                && entry.pec_versions.iter().any(|listed| listed == pec_version)
+                && entry
+                    .pec_versions
+                    .iter()
+                    .any(|listed| listed == pec_version)
                 && entry.read_model == read_model
                 && entry.installation_role == installation_role
         })
@@ -68,7 +72,9 @@ mod tests {
             "PRONTUARIO",
         );
         assert_eq!(objects.len(), 7);
-        assert!(objects.iter().any(|o| o.object == "tb_fat_atendimento_individual"));
+        assert!(objects
+            .iter()
+            .any(|o| o.object == "tb_fat_atendimento_individual"));
     }
 
     #[test]

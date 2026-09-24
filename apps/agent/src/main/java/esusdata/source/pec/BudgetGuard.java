@@ -35,8 +35,7 @@ public final class BudgetGuard {
     public void onRow() {
         rowCount++;
         if (rowCount > budget.maxRows()) {
-            throw new SourceBudgetExceededException(
-                    "Row ceiling exceeded: " + rowCount + " > " + budget.maxRows());
+            throw new SourceBudgetExceededException("Row ceiling exceeded: " + rowCount + " > " + budget.maxRows());
         }
         checkDuration();
     }

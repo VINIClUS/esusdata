@@ -1,7 +1,6 @@
 package esusdata.source.pec;
 
 import com.zaxxer.hikari.HikariDataSource;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -48,13 +47,15 @@ public final class PecSourceConnection implements AutoCloseable {
             PecConnectionProperties properties,
             PecSourceIdentity sourceIdentity,
             ReadBudget readBudget,
-            SourceAcquisitionLimiter.Permit permit
-    ) throws SQLException {
+            SourceAcquisitionLimiter.Permit permit)
+            throws SQLException {
         return new PecSourceConnection(
-                pool.getConnection(), Objects.requireNonNull(properties, "source properties are required"),
+                pool.getConnection(),
+                Objects.requireNonNull(properties, "source properties are required"),
                 sourceIdentity,
                 readBudget,
-                pool, permit::close);
+                pool,
+                permit::close);
     }
 
     /** Test-only binding for fixture connections; not part of the production API. */
@@ -85,8 +86,7 @@ public final class PecSourceConnection implements AutoCloseable {
 
     /** Starts one immutable period-bound acquisition using this connection's read policy. */
     public PecAcquisition acquire(LocalDate periodStart, LocalDate periodEndExclusive) {
-        return new PecAcquisition(
-                this, periodStart, periodEndExclusive, new BudgetGuard(readBudget));
+        return new PecAcquisition(this, periodStart, periodEndExclusive, new BudgetGuard(readBudget));
     }
 
     /**

@@ -9,5 +9,4 @@ import java.util.Map;
  * actually requested), and {@code items} is one entry per requested {@code columns_used} string,
  * in the same order. {@link CompatibilityFingerprint#compute} turns this into the signature.
  */
-public record CompatibilityProbeResult(String object, Map<String, ColumnMetadata> columns, List<ProbeItem> items) {
-}
+public record CompatibilityProbeResult(String object, Map<String, ColumnMetadata> columns, List<ProbeItem> items) {}

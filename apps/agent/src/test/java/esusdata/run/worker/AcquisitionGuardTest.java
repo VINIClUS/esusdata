@@ -1,19 +1,19 @@
 package esusdata.run.worker;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import esusdata.run.job.JdbcAcquisitionGuardStore;
+import esusdata.run.job.SourceAcquisitionBlockedException;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Path;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import esusdata.run.job.SourceAcquisitionBlockedException;
-import esusdata.run.job.JdbcAcquisitionGuardStore;
 /**
  * ENG-51: a source blocked after an abandoned live acquisition refuses a new LIVE_READ_ONLY
  * attempt until the cooldown expires; IMMUTABLE_EXTRACT never consults this guard at all (proven
@@ -72,8 +72,7 @@ class AcquisitionGuardTest {
         guard.block("src-1", farFuture, "first abandonment");
         guard.block("src-1", clock.instant().plusSeconds(10), "second, shorter, abandonment");
 
-        assertThatThrownBy(() -> guard.requireUnblocked("src-1"))
-                .isInstanceOf(SourceAcquisitionBlockedException.class);
+        assertThatThrownBy(() -> guard.requireUnblocked("src-1")).isInstanceOf(SourceAcquisitionBlockedException.class);
         // Still blocked well past the shorter request's cooldown — the longer one won.
         Clock past10s = Clock.fixed(clock.instant().plusSeconds(20), ZoneOffset.UTC);
         assertThatThrownBy(() -> new AcquisitionGuard(new JdbcAcquisitionGuardStore(fixture.jdbc), past10s)

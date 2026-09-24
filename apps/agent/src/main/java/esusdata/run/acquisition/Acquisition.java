@@ -1,6 +1,7 @@
 package esusdata.run.acquisition;
 
 import esusdata.run.extract.ExtractionManifest;
+
 /**
  * Reads one immutable window of the PEC and writes a finalized extract — the seam
  * {@code jobrunner.application.RunExecutor} calls instead of touching JDBC, the PEC
@@ -19,7 +20,5 @@ import esusdata.run.extract.ExtractionManifest;
 public interface Acquisition {
 
     ExtractionManifest acquire(
-            AcquisitionCommand command,
-            CancellationSignal cancellation,
-            AcquisitionListener listener);
+            AcquisitionCommand command, CancellationSignal cancellation, AcquisitionListener listener);
 }

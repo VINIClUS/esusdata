@@ -1,21 +1,19 @@
 package esusdata.run.extract;
 
+import esusdata.indicator.model.CanonicalEncounter;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
-import esusdata.indicator.model.CanonicalEncounter;
 
 /** Shared validation rules for the immutable extract publication and read boundaries. */
 final class ExtractValidation {
 
     private static final String SHA256 = "(?:sha256:)?[0-9a-fA-F]{64}";
 
-    private ExtractValidation() {
-    }
+    private ExtractValidation() {}
 
     static void validateExtractionId(Path baseDir, String extractionId) {
         if (baseDir == null) {
@@ -49,19 +47,16 @@ final class ExtractValidation {
         validateExtractionId(Path.of("."), manifest.extractionId());
 
         if (!"COMPLETE".equals(manifest.completenessStatus())) {
-            throw new IllegalStateException(
-                    "Extract completeness status must be exactly COMPLETE, got "
-                            + manifest.completenessStatus() + " for extractionId=" + manifest.extractionId());
+            throw new IllegalStateException("Extract completeness status must be exactly COMPLETE, got "
+                    + manifest.completenessStatus() + " for extractionId=" + manifest.extractionId());
         }
         if (!ExtractWriter.CANONICAL_SCHEMA_VERSION.equals(manifest.canonicalSchemaVersion())) {
-            throw new IllegalStateException(
-                    "Unsupported canonical schema version " + manifest.canonicalSchemaVersion()
-                            + " for extractionId=" + manifest.extractionId());
+            throw new IllegalStateException("Unsupported canonical schema version " + manifest.canonicalSchemaVersion()
+                    + " for extractionId=" + manifest.extractionId());
         }
         if (!"SNAPSHOT".equals(manifest.consistencyLevel())) {
-            throw new IllegalStateException(
-                    "Only SNAPSHOT extracts are calculation inputs; consistency level was "
-                            + manifest.consistencyLevel());
+            throw new IllegalStateException("Only SNAPSHOT extracts are calculation inputs; consistency level was "
+                    + manifest.consistencyLevel());
         }
         requireNonBlank(manifest.sourceId(), "sourceId");
         requireMunicipality(manifest.municipalityIbge());
@@ -87,9 +82,8 @@ final class ExtractValidation {
             throw new IllegalStateException("Manifest rowCount cannot be negative");
         }
         if (manifest.exclusionCount() < 0 || manifest.exclusionCount() > manifest.rowCount()) {
-            throw new IllegalStateException(
-                    "Manifest exclusion count is invalid: " + manifest.exclusionCount()
-                            + " for rowCount=" + manifest.rowCount());
+            throw new IllegalStateException("Manifest exclusion count is invalid: " + manifest.exclusionCount()
+                    + " for rowCount=" + manifest.rowCount());
         }
         if (!isSha256Digest(manifest.checksum())) {
             throw new IllegalStateException("Manifest checksum must be a SHA-256 digest");
@@ -113,8 +107,8 @@ final class ExtractValidation {
         requireNonBlank(record.sourceRef().recordId(), "record source record id");
         requireMunicipality(record.municipalityIbge());
         if (!manifest.sourceId().equals(record.sourceRef().sourceId())) {
-            throw new IllegalStateException(
-                    "Record source does not match manifest sourceId: " + record.sourceRef().sourceId());
+            throw new IllegalStateException("Record source does not match manifest sourceId: "
+                    + record.sourceRef().sourceId());
         }
         if (!manifest.municipalityIbge().equals(record.municipalityIbge())) {
             throw new IllegalStateException(
@@ -124,9 +118,8 @@ final class ExtractValidation {
         LocalDate periodStart = parseDate(manifest.periodStart(), "period start");
         LocalDate periodEnd = parseDate(manifest.periodEndExclusive(), "period end");
         if (careDate.isBefore(periodStart) || !careDate.isBefore(periodEnd)) {
-            throw new IllegalStateException(
-                    "Record careDate " + careDate + " is outside manifest period "
-                            + manifest.periodStart() + ".." + manifest.periodEndExclusive());
+            throw new IllegalStateException("Record careDate " + careDate + " is outside manifest period "
+                    + manifest.periodStart() + ".." + manifest.periodEndExclusive());
         }
         if (record.modality() == null) {
             throw new IllegalStateException("Decoded extract record has no modality");

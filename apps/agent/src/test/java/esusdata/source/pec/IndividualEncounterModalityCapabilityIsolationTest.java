@@ -1,14 +1,9 @@
 package esusdata.source.pec;
 
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -19,8 +14,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
  * ENG-37 (real PostgreSQL, not H2/mocks) + ENG-38 (municipal isolation in a shared source).
@@ -48,8 +46,7 @@ class IndividualEncounterModalityCapabilityIsolationTest {
             .withUsername("fixture_user")
             .withPassword("fixture_password");
 
-    private static final Path FIXTURE_FILE =
-            Path.of("src/test/resources/fixtures/pec_synthetic_fixture.sql");
+    private static final Path FIXTURE_FILE = Path.of("src/test/resources/fixtures/pec_synthetic_fixture.sql");
 
     @Test
     void queryingMunicipalityAReturnsOnlyMunicipalityARowsDespiteSharedSurrogateIds() throws Exception {
@@ -62,27 +59,29 @@ class IndividualEncounterModalityCapabilityIsolationTest {
             List<RawEncounterRecord> municipalityA = new ArrayList<>();
             var sourceA = new PecConnectionProperties(
                     "fixture-a", "127.0.0.1", 5432, "esus_fixture", "fixture_user", "unused", "1100015");
-            PecSourceConnection sourceConnectionA =
-                    PecSourceConnectionTestSupport.bind(c, sourceA, CT133_IDENTITY_A);
+            PecSourceConnection sourceConnectionA = PecSourceConnectionTestSupport.bind(c, sourceA, CT133_IDENTITY_A);
             IndividualEncounterModalityCapability.stream(
                     sourceConnectionA.acquire(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1)),
-                    municipalityA::add, CompatibilityTestCatalog.productionEntry());
+                    municipalityA::add,
+                    CompatibilityTestCatalog.productionEntry());
 
             List<RawEncounterRecord> municipalityB = new ArrayList<>();
             var sourceB = new PecConnectionProperties(
                     "fixture-b", "127.0.0.1", 5432, "esus_fixture", "fixture_user", "unused", "3550308");
-            PecSourceConnection sourceConnectionB =
-                    PecSourceConnectionTestSupport.bind(c, sourceB, CT133_IDENTITY_B);
+            PecSourceConnection sourceConnectionB = PecSourceConnectionTestSupport.bind(c, sourceB, CT133_IDENTITY_B);
             IndividualEncounterModalityCapability.stream(
                     sourceConnectionB.acquire(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1)),
-                    municipalityB::add, CompatibilityTestCatalog.productionEntry());
+                    municipalityB::add,
+                    CompatibilityTestCatalog.productionEntry());
 
             // Municipality A: 3 programados (ids 1,3, one more), 2 espontaneos -> 5 total.
             assertThat(municipalityA).hasSize(5);
             long programadosA = municipalityA.stream()
-                    .filter(r -> r.modality() == EncounterModality.PROGRAMADO).count();
+                    .filter(r -> r.modality() == EncounterModality.PROGRAMADO)
+                    .count();
             long espontaneosA = municipalityA.stream()
-                    .filter(r -> r.modality() == EncounterModality.ESPONTANEO).count();
+                    .filter(r -> r.modality() == EncounterModality.ESPONTANEO)
+                    .count();
             assertThat(programadosA).isEqualTo(3);
             assertThat(espontaneosA).isEqualTo(2);
 
@@ -90,9 +89,11 @@ class IndividualEncounterModalityCapabilityIsolationTest {
             // identical unidade/equipe/cbo surrogate ids in the fixture.
             assertThat(municipalityB).hasSize(8);
             long programadosB = municipalityB.stream()
-                    .filter(r -> r.modality() == EncounterModality.PROGRAMADO).count();
+                    .filter(r -> r.modality() == EncounterModality.PROGRAMADO)
+                    .count();
             long espontaneosB = municipalityB.stream()
-                    .filter(r -> r.modality() == EncounterModality.ESPONTANEO).count();
+                    .filter(r -> r.modality() == EncounterModality.ESPONTANEO)
+                    .count();
             assertThat(programadosB).isEqualTo(7);
             assertThat(espontaneosB).isEqualTo(1);
 
@@ -109,7 +110,7 @@ class IndividualEncounterModalityCapabilityIsolationTest {
         // text on ";" ourselves is not equivalent -- this fixture's own prose comments contain a
         // semicolon, which broke a naive split into a bogus "statement".
         try (Connection c = DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword());
-             Statement st = c.createStatement()) {
+                Statement st = c.createStatement()) {
             st.execute(Files.readString(FIXTURE_FILE));
         }
     }

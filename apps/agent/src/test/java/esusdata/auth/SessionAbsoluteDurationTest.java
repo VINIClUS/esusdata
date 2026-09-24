@@ -1,6 +1,15 @@
 package esusdata.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import esusdata.auth.model.UserAccount;
+import esusdata.auth.model.UserRepository;
+import esusdata.auth.model.UserState;
 import esusdata.config.SqliteConfig;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,16 +17,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
-
-import java.nio.file.Path;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.auth.model.UserAccount;
-import esusdata.auth.model.UserState;
-import esusdata.auth.model.UserRepository;
 
 /**
  * §1.12.7 L533: an absolute session duration counted from login, independent of activity —
@@ -42,15 +41,30 @@ class SessionAbsoluteDurationTest {
         loginAt = Instant.parse("2026-09-20T08:00:00Z");
         context = new AnnotationConfigApplicationContext();
         context.register(SqliteConfig.class);
-        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("test",
-                Map.of("observatorio.data.directory", dataDir.resolve("db").toString())));
+        context.getEnvironment()
+                .getPropertySources()
+                .addFirst(new MapPropertySource(
+                        "test",
+                        Map.of(
+                                "observatorio.data.directory",
+                                dataDir.resolve("db").toString())));
         context.refresh();
 
         JdbcTemplate jdbc = context.getBean(JdbcTemplate.class);
         UserRepository userRepository = new JdbcUserRepository(jdbc);
         userRepository.insert(new UserAccount(
-                USER_ID, "user-1", "User One", "irrelevant-hash", "ARGON2ID", "{}", "v1", 1,
-                UserState.ACTIVE, loginAt, "test-fixture", null));
+                USER_ID,
+                "user-1",
+                "User One",
+                "irrelevant-hash",
+                "ARGON2ID",
+                "{}",
+                "v1",
+                1,
+                UserState.ACTIVE,
+                loginAt,
+                "test-fixture",
+                null));
 
         // inactivityMinutes=15, absoluteDurationHours=8 — the spec's own baseline.
         SecurityProperties properties =
@@ -69,7 +83,8 @@ class SessionAbsoluteDurationTest {
         warmUpEveryTenMinutesUpTo(Duration.ofHours(7).plus(Duration.ofMinutes(55)));
 
         Instant justBeforeEightHours = loginAt.plus(Duration.ofHours(8)).minusSeconds(1);
-        assertThat(sessionService.validate(rawToken, justBeforeEightHours, true)).isPresent();
+        assertThat(sessionService.validate(rawToken, justBeforeEightHours, true))
+                .isPresent();
     }
 
     @Test
@@ -122,8 +137,8 @@ class SessionAbsoluteDurationTest {
     private String sha256Hex(String rawTokenValue) {
         try {
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-            return java.util.HexFormat.of().formatHex(
-                    digest.digest(rawTokenValue.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            return java.util.HexFormat.of()
+                    .formatHex(digest.digest(rawTokenValue.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }

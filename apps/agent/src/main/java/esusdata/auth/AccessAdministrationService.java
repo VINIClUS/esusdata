@@ -1,15 +1,16 @@
 package esusdata.auth;
 
+import esusdata.auth.model.Grant;
+import esusdata.auth.model.GrantRepository;
+import esusdata.auth.model.Role;
+import esusdata.auth.model.ScopeKind;
+import esusdata.auth.model.UserRepository;
+import esusdata.auth.model.UserState;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.transaction.support.TransactionTemplate;
-import esusdata.auth.model.Grant;
-import esusdata.auth.model.Role;
-import esusdata.auth.model.ScopeKind;
-import esusdata.auth.model.UserState;
-import esusdata.auth.model.GrantRepository;
-import esusdata.auth.model.UserRepository;
+
 /**
  * Grant/revoke/block mutations behind {@code POST /users/{id}/grants}, {@code DELETE
  * /users/{id}/grants/{grantId}} and {@code POST /users/{id}/block}. Every mutation runs through
@@ -32,8 +33,10 @@ public final class AccessAdministrationService {
     private final Clock clock;
 
     public AccessAdministrationService(
-            UserRepository userRepository, GrantRepository grantRepository,
-            AuthorizationVersionGuard authorizationVersionGuard, TransactionTemplate transactionTemplate,
+            UserRepository userRepository,
+            GrantRepository grantRepository,
+            AuthorizationVersionGuard authorizationVersionGuard,
+            TransactionTemplate transactionTemplate,
             Clock clock) {
         this.userRepository = userRepository;
         this.grantRepository = grantRepository;
@@ -43,8 +46,13 @@ public final class AccessAdministrationService {
     }
 
     public Grant grant(
-            String targetUserId, Role role, ScopeKind scopeKind, String municipalityIbge,
-            String cnes, String ine, String actorUserId) {
+            String targetUserId,
+            Role role,
+            ScopeKind scopeKind,
+            String municipalityIbge,
+            String cnes,
+            String ine,
+            String actorUserId) {
         if (targetUserId.equals(actorUserId)) {
             throw new SelfGrantForbiddenException("a caller cannot grant a role to their own account");
         }
@@ -53,8 +61,17 @@ public final class AccessAdministrationService {
 
         return transactionTemplate.execute(status -> {
             Grant newGrant = new Grant(
-                    "grant-" + UUID.randomUUID(), targetUserId, role, scopeKind, municipalityIbge,
-                    cnes, ine, clock.instant(), actorUserId, null, null);
+                    "grant-" + UUID.randomUUID(),
+                    targetUserId,
+                    role,
+                    scopeKind,
+                    municipalityIbge,
+                    cnes,
+                    ine,
+                    clock.instant(),
+                    actorUserId,
+                    null,
+                    null);
             grantRepository.insert(newGrant);
             authorizationVersionGuard.bumpAndRevokeSessions(
                     targetUserId, "GRANT_ADDED", "role " + role + " granted by " + actorUserId, actorUserId);
@@ -114,21 +131,18 @@ public final class AccessAdministrationService {
     }
 
     private void requireExists(String userId) {
-        userRepository.findById(userId).orElseThrow(
-                () -> new UserNotFoundException("unknown user: " + userId));
+        userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException("unknown user: " + userId));
     }
 
     /** Mirrors the {@code user_grants} CHECK constraint in V3 — fail before the INSERT, not via SQLite's error. */
     private void validateScopeShape(ScopeKind scopeKind, String municipalityIbge, String cnes, String ine) {
         if (scopeKind == ScopeKind.INSTALLATION) {
             if (municipalityIbge != null || cnes != null || ine != null) {
-                throw new IllegalArgumentException(
-                        "INSTALLATION scope must not carry municipality_ibge/cnes/ine");
+                throw new IllegalArgumentException("INSTALLATION scope must not carry municipality_ibge/cnes/ine");
             }
         } else {
             if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
-                throw new IllegalArgumentException(
-                        "municipality_ibge must be a 7-digit code for MUNICIPALITY scope");
+                throw new IllegalArgumentException("municipality_ibge must be a 7-digit code for MUNICIPALITY scope");
             }
         }
     }
