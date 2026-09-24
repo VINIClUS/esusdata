@@ -20,6 +20,4 @@ public record UserAccount(
         UserState state,
         Instant createdAt,
         String createdBy,
-        Instant lastLoginAt
-) {
-}
+        Instant lastLoginAt) {}

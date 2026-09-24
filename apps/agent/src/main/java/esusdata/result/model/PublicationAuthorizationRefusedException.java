@@ -1,5 +1,7 @@
 package esusdata.result.model;
 
+import java.io.Serial;
+
 /**
  * Publication was refused because the job's principal no longer holds a current grant for the
  * job's municipality (§1.9.4 L365) — distinct from {@link PublicationRefusedException} (an
@@ -8,7 +10,14 @@ package esusdata.result.model;
  * the job is actually {@code CANCEL_REQUESTED}.
  */
 public final class PublicationAuthorizationRefusedException extends RuntimeException {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     public PublicationAuthorizationRefusedException(String message) {
         super(message);
+    }
+
+    public PublicationAuthorizationRefusedException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

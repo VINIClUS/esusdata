@@ -2,25 +2,27 @@ package esusdata.auth.security;
 
 import esusdata.auth.SessionService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Clock;
+import java.util.Set;
+import java.util.function.Predicate;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.CacheControlConfig;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.util.AntPathMatcher;
-
-import java.time.Clock;
-import java.util.Set;
-import java.util.function.Predicate;
 
 /**
  * The one place the HTTP filter chains are assembled. Under {@code /api/**}, no {@code permitAll}
@@ -66,7 +68,7 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http, SessionService sessionService, Clock clock, WebSecurityProperties webProperties)
-            throws Exception {
+            throws Exception { // NOPMD - SignatureDeclareThrowsException: HttpSecurity#build() declares it
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         // CsrfConfigurer unconditionally calls SessionManagementConfigurer.addSessionAuthentication
         // Strategy(new CsrfAuthenticationStrategy(...)) — confirmed by decompiling CsrfConfigurer
@@ -86,29 +88,26 @@ public class SecurityConfig {
         RequestAttributeSecurityContextRepository securityContextRepository =
                 new RequestAttributeSecurityContextRepository();
 
-        http
-                .securityMatcher("/api/**")
+        http.securityMatcher("/api/**")
                 .securityContext(sc -> sc.securityContextRepository(securityContextRepository))
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(csrfTokenRepository)
+                .csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .headers(headers -> headers
-                        .frameOptions(frame -> frame.deny())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(headers -> headers.frameOptions(FrameOptionsConfig::deny)
                         .contentTypeOptions(contentTypeOptions -> {})
-                        .contentSecurityPolicy(csp -> csp.policyDirectives(
-                                "default-src 'self'; frame-ancestors 'none'; base-uri 'none'")))
+                        .contentSecurityPolicy(csp ->
+                                csp.policyDirectives("default-src 'self'; frame-ancestors 'none'; base-uri 'none'")))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/v1/ready", "/api/v1/auth/login", "/api/v1/auth/activate")
                         .permitAll()
-                        .anyRequest().authenticated())
+                        .anyRequest()
+                        .authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(new JsonAuthenticationEntryPoint())
                         .accessDeniedHandler(new JsonAccessDeniedHandler()))
-                .httpBasic(basic -> basic.disable())
-                .formLogin(form -> form.disable())
-                .logout(logout -> logout.disable())
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
                 .addFilterBefore(new CsrfCookieFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(
                         new SessionAuthenticationFilter(
@@ -132,24 +131,23 @@ public class SecurityConfig {
      */
     @Bean
     @Order(2)
-    public SecurityFilterChain webClientFilterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+    public SecurityFilterChain webClientFilterChain(HttpSecurity http)
+            throws Exception { // NOPMD - SignatureDeclareThrowsException: HttpSecurity#build() declares it
+        http.csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> headers
                         // SpaWebConfig sets Cache-Control per path (immutable assets, revalidated
                         // index.html); Security's no-store default would defeat both.
-                        .cacheControl(cache -> cache.disable())
-                        .frameOptions(frame -> frame.deny())
+                        .cacheControl(CacheControlConfig::disable)
+                        .frameOptions(FrameOptionsConfig::deny)
                         .contentTypeOptions(contentTypeOptions -> {})
                         .contentSecurityPolicy(csp -> csp.policyDirectives(
                                 "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
                                         + "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")))
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
-                .httpBasic(basic -> basic.disable())
-                .formLogin(form -> form.disable())
-                .logout(logout -> logout.disable());
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable);
 
         return http.build();
     }
@@ -157,6 +155,7 @@ public class SecurityConfig {
     private static Predicate<HttpServletRequest> nonInteractivePredicate() {
         AntPathMatcher matcher = new AntPathMatcher();
         return request -> "GET".equals(request.getMethod())
-                && NON_INTERACTIVE_GET_PATTERNS.stream().anyMatch(pattern -> matcher.match(pattern, request.getServletPath()));
+                && NON_INTERACTIVE_GET_PATTERNS.stream()
+                        .anyMatch(pattern -> matcher.match(pattern, request.getServletPath()));
     }
 }

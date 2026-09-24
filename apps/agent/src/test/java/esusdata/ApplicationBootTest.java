@@ -1,7 +1,10 @@
 package esusdata;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import esusdata.run.worker.JobRecovery;
 import esusdata.run.worker.JobWorker;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,10 +12,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-
-import java.nio.file.Path;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The full production wiring — {@code RunConfig} + {@code AuthConfig} on top of
@@ -28,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ApplicationBootTest {
 
     @TempDir
+    // JUnit injects a static @TempDir once for the whole class.
+    @SuppressWarnings("PMD.MutableStaticState")
     static Path dataDir;
 
     @Autowired
@@ -39,7 +40,8 @@ class ApplicationBootTest {
     @DynamicPropertySource
     static void dataDirectory(DynamicPropertyRegistry registry) {
         // Any executable satisfies RunConfig's startup check; this context never acquires.
-        registry.add("observatorio.execution-plane.binary",
+        registry.add(
+                "observatorio.execution-plane.binary",
                 () -> ProcessHandle.current().info().command().orElseThrow());
         registry.add("observatorio.data.directory", dataDir::toString);
         // Cheap Argon2id parameters — this test only needs the bean to construct, never to hash.

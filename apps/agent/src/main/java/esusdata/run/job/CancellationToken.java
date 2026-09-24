@@ -35,7 +35,7 @@ public final class CancellationToken implements CancellationSignal {
 
     @Override
     public void unbindInterrupt() {
-        this.activeInterrupt = null;
+        this.activeInterrupt = null; // NOPMD - NullAssignment: null means no interrupt is bound
     }
 
     @Override
@@ -45,13 +45,13 @@ public final class CancellationToken implements CancellationSignal {
         }
     }
 
-    private void runInterrupt(Runnable interrupt) {
+    private static void runInterrupt(Runnable interrupt) {
         if (interrupt == null) {
             return;
         }
         try {
             interrupt.run();
-        } catch (Exception ignored) {
+        } catch (Exception ignored) { // NOPMD - best-effort interrupt; see comment below
             // Best-effort only — some drivers/states do not support interrupting an in-flight
             // statement, and the caller-supplied Runnable is expected to swallow its own checked
             // failures already; this is defense in depth, not the primary safety net.

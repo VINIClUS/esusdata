@@ -1,10 +1,10 @@
 package esusdata.run.worker;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.run.job.EnqueueRequest;
+import esusdata.run.job.Job;
+import esusdata.run.job.JobState;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
@@ -17,11 +17,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.run.job.EnqueueRequest;
-import esusdata.run.job.Job;
-import esusdata.run.job.JobState;
 /**
  * ENG-08: "quantidade de usuários HTTP não multiplica extrações" — the concurrency boundary is
  * enforced at the {@code jobs} CAS itself, not by trusting a single-threaded caller. Several
@@ -52,12 +52,27 @@ class SingleWorkerConcurrencyTest {
 
     @Test
     void concurrentAcquisitionAttemptsClaimOneQueuedJobExactlyOnce() throws Exception {
-        fixture.jobRepository.enqueue(new EnqueueRequest("job-1", "run-1", "3541307",
-                "c1-mais-acesso", "c1-mais-acesso@0.1.0", "2026-03", 3, "src-1", "ext-1",
-                null, null, null, null, null, clock.instant()));
+        fixture.jobRepository.enqueue(new EnqueueRequest(
+                "job-1",
+                "run-1",
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                3,
+                "src-1",
+                "ext-1",
+                null,
+                null,
+                null,
+                null,
+                null,
+                clock.instant()));
 
         int attempts = 4;
         AtomicInteger claims = new AtomicInteger(0);
+        // shut down with shutdownNow() in finally: close() would wait on the blocked tasks
+        @SuppressWarnings("PMD.CloseResource")
         ExecutorService pool = Executors.newFixedThreadPool(attempts);
         try {
             List<Callable<Void>> tasks = new ArrayList<>();
@@ -92,7 +107,7 @@ class SingleWorkerConcurrencyTest {
         for (int i = 0; i < 20; i++) {
             try {
                 return fixture.jobRepository.acquireNext(processInstanceId, clock.instant());
-            } catch (RuntimeException busy) {
+            } catch (RuntimeException busy) { // NOPMD - SQLITE_BUSY surfaces unchecked; retried
                 lastFailure = busy;
                 Thread.sleep(10);
             }

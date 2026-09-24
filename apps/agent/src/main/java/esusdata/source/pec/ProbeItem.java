@@ -12,22 +12,16 @@ import java.util.Set;
  */
 public sealed interface ProbeItem {
 
-    record ColumnItem(String requested) implements ProbeItem {
-    }
+    record ColumnItem(String requested) implements ProbeItem {}
 
     record UniqueKeyItem(String marker, String matchedConstraintType, boolean uniquenessViolationFound)
-            implements ProbeItem {
-    }
+            implements ProbeItem {}
 
-    record RequiredDimensionsItem(String marker, Long violatingFactEventId) implements ProbeItem {
-    }
+    record RequiredDimensionsItem(String marker, Long violatingFactEventId) implements ProbeItem {}
 
-    record LeafSemanticsItem(String marker, List<LeafRow> rows) implements ProbeItem {
-    }
+    record LeafSemanticsItem(String marker, List<LeafRow> rows) implements ProbeItem {}
 
-    record LeafIdsItem(String marker, Set<Integer> foundIds) implements ProbeItem {
-    }
+    record LeafIdsItem(String marker, Set<Integer> foundIds) implements ProbeItem {}
 
-    record LeafRow(int id, String description, Integer parentId) {
-    }
+    record LeafRow(int id, String description, Integer parentId) {}
 }

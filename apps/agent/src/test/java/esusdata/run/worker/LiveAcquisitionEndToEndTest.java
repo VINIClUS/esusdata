@@ -1,21 +1,21 @@
 package esusdata.run.worker;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import esusdata.indicator.pack.c1.C1Rule;
-import esusdata.source.pec.CompatibilityCatalog;
-import esusdata.source.pec.PecCompatibilityMatrix;
+import esusdata.run.job.CancellationToken;
+import esusdata.run.job.EnqueueRequest;
+import esusdata.run.job.Job;
+import esusdata.run.job.JobCancelledException;
+import esusdata.run.job.JobState;
+import esusdata.run.job.SourceAcquisitionBlockedException;
 import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
+import esusdata.source.pec.CompatibilityCatalog;
+import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecDataSourceFactory;
 import esusdata.source.pec.PecSourceIdentity;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
-
 import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,15 +29,15 @@ import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import esusdata.run.job.EnqueueRequest;
-import esusdata.run.job.Job;
-import esusdata.run.job.JobCancelledException;
-import esusdata.run.job.JobState;
-import esusdata.run.job.SourceAcquisitionBlockedException;
-import esusdata.run.job.CancellationToken;
 /**
  * Exercises {@link RunExecutor#runLive} end to end against a real PostgreSQL connection
  * — grant revalidation, {@link AcquisitionGuard}, the pooled connection, the cancellable {@code
@@ -66,15 +66,15 @@ class LiveAcquisitionEndToEndTest {
             .withUsername("fixture_user")
             .withPassword("fixture_password");
 
-    private static final Path FIXTURE_FILE =
-            Path.of("src/test/resources/fixtures/pec_synthetic_fixture.sql");
+    private static final Path FIXTURE_FILE = Path.of("src/test/resources/fixtures/pec_synthetic_fixture.sql");
 
     @TempDir
     Path dataDir;
 
     private JobRunnerTestFixture fixture;
     private Clock clock;
-    private CompatibilityCatalog fixtureCatalog;
+
+    private static boolean fixtureLoaded;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -92,10 +92,13 @@ class LiveAcquisitionEndToEndTest {
         // Computed before the fixture (which now wires the Acquisition at construction time,
         // not per-call) — depends only on the packaged matrix and the pinned PG version, not on
         // anything the fixture itself builds.
-        var entry = PecCompatibilityMatrix.fromClasspathResource().findExact(
-                "individual_encounter_modality", "0.1.0",
-                new PecSourceIdentity("fixture-a", "5.4.37", "PEC_DW", "PRONTUARIO"), "9.6.13");
-        fixtureCatalog = new CompatibilityCatalog() {
+        var entry = PecCompatibilityMatrix.fromClasspathResource()
+                .findExact(
+                        "individual_encounter_modality",
+                        "0.1.0",
+                        new PecSourceIdentity("fixture-a", "5.4.37", "PEC_DW", "PRONTUARIO"),
+                        "9.6.13");
+        CompatibilityCatalog fixtureCatalog = new CompatibilityCatalog() {
             @Override
             public String postgresVersion(Connection connection) {
                 return "9.6.13";
@@ -105,7 +108,9 @@ class LiveAcquisitionEndToEndTest {
             public String fingerprint(Connection connection, String object, List<String> columnsUsed)
                     throws SQLException {
                 String fingerprint = entry.objectFingerprints().get(object);
-                if (fingerprint == null) throw new SQLException("No fixture fingerprint for " + object);
+                if (fingerprint == null) {
+                    throw new SQLException("No fixture fingerprint for " + object);
+                }
                 return fingerprint;
             }
         };
@@ -113,9 +118,20 @@ class LiveAcquisitionEndToEndTest {
         fixture = new JobRunnerTestFixture(dataDir, clock, factory, fixtureCatalog);
 
         fixture.sourceRepository.upsert(new SourceRecord(
-                "fixture-a", 1, "PEC_POSTGRESQL", "PRONTUARIO", "PRIMARY",
-                PG.getHost(), PG.getMappedPort(5432), "esus_fixture", "fixture_user", "unused",
-                "1100015", "5.4.37", "PEC_DW", Instant.EPOCH.toString()));
+                "fixture-a",
+                1,
+                "PEC_POSTGRESQL",
+                "PRONTUARIO",
+                "PRIMARY",
+                PG.getHost(),
+                PG.getMappedPort(5432),
+                "esus_fixture",
+                "fixture_user",
+                "unused",
+                "1100015",
+                "5.4.37",
+                "PEC_DW",
+                Instant.EPOCH.toString()));
         fixture.registerPrincipal("test-principal", "1100015");
     }
 
@@ -124,29 +140,47 @@ class LiveAcquisitionEndToEndTest {
         fixture.close();
     }
 
-    private static boolean fixtureLoaded = false;
-
-    private void loadFixtureOnce() throws Exception {
+    private static void loadFixtureOnce() throws Exception {
         if (fixtureLoaded) {
             return;
         }
         try (Connection c = DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword());
-             Statement st = c.createStatement()) {
+                Statement st = c.createStatement()) {
             st.execute(Files.readString(FIXTURE_FILE));
         }
         fixtureLoaded = true;
     }
 
     private RunExecutor.RunContext liveContext(String jobId, String municipalityIbge) {
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
-                jobId, "run-" + jobId, municipalityIbge, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
-                "2026-03", 3, "fixture-a", null,
-                "test-principal", null, null, null, null, clock.instant()));
-        Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
+        fixture.jobRepository.enqueue(new EnqueueRequest(
+                jobId,
+                "run-" + jobId,
+                municipalityIbge,
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                3,
+                "fixture-a",
+                null,
+                "test-principal",
+                null,
+                null,
+                null,
+                null,
+                clock.instant()));
+        Job acquired =
+                fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
         return new RunExecutor.RunContext(
-                acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
-                acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
-                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion(),
+                acquired.jobId(),
+                acquired.runId(),
+                acquired.sourceId(),
+                acquired.executionGeneration(),
+                acquired.processInstanceId(),
+                acquired.extractionId(),
+                acquired.municipalityIbge(),
+                acquired.referencePeriod(),
+                acquired.indicatorPack(),
+                acquired.ruleVersion(),
                 acquired.idempotencyPrincipal());
     }
 
@@ -179,13 +213,16 @@ class LiveAcquisitionEndToEndTest {
         assertThatThrownBy(() -> fixture.executor.runLive(context, cancellation))
                 .isInstanceOf(JobCancelledException.class);
 
-        assertThat(fixture.jdbc.queryForObject(
-                "select count(*) from results", Integer.class)).isZero();
-        assertThat(fixture.jdbc.queryForObject(
-                "select count(*) from result_staging", Integer.class)).isZero();
+        assertThat(fixture.jdbc.queryForObject("select count(*) from results", Integer.class))
+                .isZero();
+        assertThat(fixture.jdbc.queryForObject("select count(*) from result_staging", Integer.class))
+                .isZero();
         // The job itself is left RUNNING here — JobWorker (not the executor) is what resolves a
         // JobCancelledException into a terminal state; that path is proven by other tests.
-        assertThat(fixture.jobRepository.findById("job-live-cancel").orElseThrow().state())
+        assertThat(fixture.jobRepository
+                        .findById("job-live-cancel")
+                        .orElseThrow()
+                        .state())
                 .isEqualTo(JobState.RUNNING);
     }
 

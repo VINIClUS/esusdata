@@ -7,8 +7,8 @@ package esusdata.result.model;
  * grants no access by itself; every call still re-resolves and re-checks the municipality scope.
  */
 public interface EvidenceRepository {
-    static final int DEFAULT_PAGE_SIZE = 100;
-    static final int MAX_PAGE_SIZE = 500;
+    int DEFAULT_PAGE_SIZE = 100;
+    int MAX_PAGE_SIZE = 500;
 
     EvidencePage page(String resultId, String municipalityIbge, Long afterSeq, int limit);
 
@@ -18,6 +18,5 @@ public interface EvidenceRepository {
      * {@code hasMore}/{@code nextCursor} (a page could come back short of {@code limit} while more
      * matching rows exist further down the {@code seq} order).
      */
-    EvidencePage page(
-            String resultId, String municipalityIbge, String cnes, String ine, Long afterSeq, int limit);
+    EvidencePage page(String resultId, String municipalityIbge, String cnes, String ine, Long afterSeq, int limit);
 }

@@ -1,6 +1,7 @@
 package esusdata.run.job;
 
 import java.time.Instant;
+
 /**
  * Inputs to create one job. {@code extractionId} present selects {@code IMMUTABLE_EXTRACT}
  * (§1.9.1) — replay of an already-finalized extract. {@code extractionId} absent selects {@code
@@ -24,8 +25,7 @@ public record EnqueueRequest(
         String requestHash,
         Instant idempotencyExpiresAt,
         String requestedScopeJson,
-        Instant createdAt
-) {
+        Instant createdAt) {
     public EnqueueRequest {
         boolean hasExtractionId = extractionId != null && !extractionId.isBlank();
         boolean hasSourceId = sourceId != null && !sourceId.isBlank();

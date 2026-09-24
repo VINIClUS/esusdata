@@ -1,10 +1,7 @@
 package esusdata.source.pec;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledOnOs;
-import org.junit.jupiter.api.condition.EnabledOnOs;
-import org.junit.jupiter.api.condition.OS;
-import org.junit.jupiter.api.io.TempDir;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -19,9 +16,11 @@ import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.api.io.TempDir;
 
 class EnvFileSecretResolverTest {
 
@@ -32,18 +31,19 @@ class EnvFileSecretResolverTest {
     void preservesHashCharactersInsideSecretValues() throws IOException {
         Path file = writeSecretFile("DB_PASSWORD=P@ss#word1\n# comment\n");
 
-        assertThat(new EnvFileSecretResolver(file).resolve("DB_PASSWORD"))
-                .containsExactly("P@ss#word1".toCharArray());
+        assertThat(new EnvFileSecretResolver(file).resolve("DB_PASSWORD")).containsExactly("P@ss#word1".toCharArray());
     }
 
     @Test
     @DisabledOnOs(OS.WINDOWS)
     void rejectsGroupOrWorldReadableSecretFiles() throws IOException {
         Path file = writeSecretFile("DB_PASSWORD=secret\n");
-        Files.setPosixFilePermissions(file, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.GROUP_READ));
+        Files.setPosixFilePermissions(
+                file,
+                Set.of(
+                        PosixFilePermission.OWNER_READ,
+                        PosixFilePermission.OWNER_WRITE,
+                        PosixFilePermission.GROUP_READ));
 
         assertThatThrownBy(() -> new EnvFileSecretResolver(file).resolve("DB_PASSWORD"))
                 .isInstanceOf(IllegalStateException.class)
@@ -74,8 +74,7 @@ class EnvFileSecretResolverTest {
         Path file = writeSecretFile("DB_PASSWORD=secret\n");
         grant(file, principal("NT AUTHORITY\\SYSTEM"), AclEntryPermission.READ_DATA);
 
-        assertThat(new EnvFileSecretResolver(file).resolve("DB_PASSWORD"))
-                .containsExactly("secret".toCharArray());
+        assertThat(new EnvFileSecretResolver(file).resolve("DB_PASSWORD")).containsExactly("secret".toCharArray());
     }
 
     @Test
@@ -106,18 +105,16 @@ class EnvFileSecretResolverTest {
         Path file = dir.resolve("pec.env");
         Files.writeString(file, content);
         if (Files.getFileAttributeView(file, PosixFileAttributeView.class) != null) {
-            Files.setPosixFilePermissions(file, Set.of(
-                    PosixFilePermission.OWNER_READ,
-                    PosixFilePermission.OWNER_WRITE));
+            Files.setPosixFilePermissions(
+                    file, Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
         } else {
-            Files.getFileAttributeView(file, AclFileAttributeView.class).setAcl(List.of(
-                    allow(Files.getOwner(file), Set.of(AclEntryPermission.values()))));
+            Files.getFileAttributeView(file, AclFileAttributeView.class)
+                    .setAcl(List.of(allow(Files.getOwner(file), Set.of(AclEntryPermission.values()))));
         }
         return file;
     }
 
-    private static void grant(Path file, UserPrincipal principal, AclEntryPermission permission)
-            throws IOException {
+    private static void grant(Path file, UserPrincipal principal, AclEntryPermission permission) throws IOException {
         AclFileAttributeView view = Files.getFileAttributeView(file, AclFileAttributeView.class);
         List<AclEntry> acl = new ArrayList<>(view.getAcl());
         acl.add(allow(principal, Set.of(permission)));
@@ -125,8 +122,11 @@ class EnvFileSecretResolverTest {
     }
 
     private static AclEntry allow(UserPrincipal principal, Set<AclEntryPermission> permissions) {
-        return AclEntry.newBuilder().setType(AclEntryType.ALLOW)
-                .setPrincipal(principal).setPermissions(permissions).build();
+        return AclEntry.newBuilder()
+                .setType(AclEntryType.ALLOW)
+                .setPrincipal(principal)
+                .setPermissions(permissions)
+                .build();
     }
 
     private UserPrincipal principal(String name) throws IOException {

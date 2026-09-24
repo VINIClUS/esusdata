@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 /**
  * PostgreSQL implementation of the compatibility probe, restricted to the packaged contract.
  * Only ever gathers raw data (runs the frozen probe queries, including the marker-driven
@@ -44,10 +45,14 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
     public String postgresVersion(Connection connection) throws SQLException {
         requireConnection(connection);
         try (PreparedStatement statement = connection.prepareStatement(VERSION_QUERY);
-             ResultSet result = statement.executeQuery()) {
-            if (!result.next()) throw new SQLException("PostgreSQL version probe returned no row");
+                ResultSet result = statement.executeQuery()) {
+            if (!result.next()) {
+                throw new SQLException("PostgreSQL version probe returned no row");
+            }
             String version = result.getString(1);
-            if (version == null || version.isBlank()) throw new SQLException("PostgreSQL version probe was blank");
+            if (version == null || version.isBlank()) {
+                throw new SQLException("PostgreSQL version probe was blank");
+            }
             return version.trim();
         }
     }
@@ -85,7 +90,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         try {
             return CompatibilityFingerprint.compute(probe);
         } catch (CompatibilityFingerprint.VerificationException e) {
-            throw new SQLException(e.getMessage(), e.getCause());
+            throw new SQLException(e.getMessage(), e);
         }
     }
 
@@ -95,9 +100,11 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
             statement.setString(1, object);
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
-                    columns.put(result.getString("column_name"), new ColumnMetadata(
-                            result.getString("data_type"), result.getString("udt_name"),
-                            result.getString("is_nullable"), result.getInt("ordinal_position")));
+                    columns.put(
+                            result.getString("column_name"),
+                            new ColumnMetadata(
+                                    result.getString("data_type"), result.getString("udt_name"),
+                                    result.getString("is_nullable"), result.getInt("ordinal_position")));
                 }
             }
         }
@@ -109,7 +116,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         try {
             expectedColumns = CompatibilityFingerprint.parseUniqueKeyColumns(marker);
         } catch (CompatibilityFingerprint.VerificationException e) {
-            throw new SQLException(e.getMessage(), e.getCause());
+            throw new SQLException(e.getMessage(), e);
         }
 
         Map<String, String> constraintTypes = new LinkedHashMap<>();
@@ -120,7 +127,8 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
                 while (result.next()) {
                     String name = result.getString("constraint_name");
                     constraintTypes.put(name, result.getString("constraint_type"));
-                    constraintColumns.computeIfAbsent(name, ignored -> new ArrayList<>())
+                    constraintColumns
+                            .computeIfAbsent(name, ignored -> new ArrayList<>())
                             .add(result.getString("column_name"));
                 }
             }
@@ -140,14 +148,15 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         String keyExpression = String.join(",", expectedColumns);
         String uniquenessQuery = "SELECT " + keyExpression + " FROM public." + object
                 + " GROUP BY " + keyExpression
-                + " HAVING COUNT(*) > 1 OR " + expectedColumns.stream()
+                + " HAVING COUNT(*) > 1 OR "
+                + expectedColumns.stream()
                         .map(column -> column + " IS NULL")
                         .collect(java.util.stream.Collectors.joining(" OR "))
                 + " LIMIT 1";
         boolean violation;
         try (PreparedStatement statement = connection.prepareStatement(uniquenessQuery);
-             ResultSet result = statement.executeQuery()) {
-            violation = result.next();
+                ResultSet result = statement.executeQuery()) {
+            violation = result.next(); // NOPMD - CheckResultSet: the row's existence is the answer
         }
         return new ProbeItem.UniqueKeyItem(marker, null, violation);
     }
@@ -166,7 +175,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
                 """;
         Long violatingFactId = null;
         try (PreparedStatement statement = connection.prepareStatement(query);
-             ResultSet result = statement.executeQuery()) {
+                ResultSet result = statement.executeQuery()) {
             if (result.next()) {
                 violatingFactId = result.getLong(1);
             }
@@ -179,7 +188,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         try {
             expected = CompatibilityFingerprint.parseLeafSemanticsIds(marker);
         } catch (CompatibilityFingerprint.VerificationException e) {
-            throw new SQLException(e.getMessage(), e.getCause());
+            throw new SQLException(e.getMessage(), e);
         }
         String placeholders = "?,".repeat(expected.size());
         placeholders = placeholders.substring(0, placeholders.length() - 1);
@@ -190,7 +199,9 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         List<ProbeItem.LeafRow> rows = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(query)) {
             int index = 1;
-            for (Integer value : expected) statement.setInt(index++, value);
+            for (Integer value : expected) {
+                statement.setInt(index++, value);
+            }
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
                     int id = result.getInt(1);
@@ -209,7 +220,7 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         try {
             expected = CompatibilityFingerprint.parseLeafIdsSet(marker);
         } catch (CompatibilityFingerprint.VerificationException e) {
-            throw new SQLException(e.getMessage(), e.getCause());
+            throw new SQLException(e.getMessage(), e);
         }
         String placeholders = "?,".repeat(expected.size());
         placeholders = placeholders.substring(0, placeholders.length() - 1);
@@ -219,15 +230,21 @@ public final class JdbcCompatibilityCatalog implements CompatibilityCatalog {
         Set<Integer> found = new java.util.HashSet<>();
         try (PreparedStatement statement = connection.prepareStatement(query)) {
             int index = 1;
-            for (Integer value : expected) statement.setInt(index++, value);
+            for (Integer value : expected) {
+                statement.setInt(index++, value);
+            }
             try (ResultSet result = statement.executeQuery()) {
-                while (result.next()) found.add(result.getInt(1));
+                while (result.next()) {
+                    found.add(result.getInt(1));
+                }
             }
         }
         return new ProbeItem.LeafIdsItem(marker, found);
     }
 
     private static void requireConnection(Connection connection) throws SQLException {
-        if (connection == null) throw new SQLException("A connected PostgreSQL session is required");
+        if (connection == null) {
+            throw new SQLException("A connected PostgreSQL session is required");
+        }
     }
 }

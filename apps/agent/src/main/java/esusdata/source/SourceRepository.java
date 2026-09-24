@@ -1,7 +1,6 @@
 package esusdata.source;
 
 import esusdata.source.model.SourceRecord;
-
 import java.util.Optional;
 
 /**

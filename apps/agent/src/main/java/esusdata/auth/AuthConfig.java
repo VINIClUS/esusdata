@@ -1,10 +1,13 @@
 package esusdata.auth;
 
 import esusdata.auth.model.AuthAuditWriter;
-
 import esusdata.auth.model.GrantRepository;
-
 import esusdata.auth.model.UserRepository;
+import esusdata.config.SqliteConfig;
+import esusdata.config.SqliteProperties;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -14,10 +17,6 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.nio.file.Path;
-import java.time.Clock;
-import java.util.Optional;
-import esusdata.config.SqliteProperties;
 /**
  * Wires {@code identityaccess}. Every bean here that touches {@code users}/{@code user_grants}/
  * {@code sessions}/etc. depends, directly or transitively, on {@code flywayMigration} (V3).
@@ -29,19 +28,19 @@ public class AuthConfig {
     private static final Logger log = LoggerFactory.getLogger(AuthConfig.class);
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public UserRepository userRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcUserRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public GrantRepository grantRepository(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcGrantRepository(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public ScopeResolver scopeResolver(JdbcTemplate sqliteJdbcTemplate) {
         return new ScopeResolver(sqliteJdbcTemplate);
     }
@@ -62,7 +61,7 @@ public class AuthConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public SessionService sessionService(
             JdbcTemplate sqliteJdbcTemplate, UserRepository userRepository, SecurityProperties properties) {
         return new SessionService(sqliteJdbcTemplate, userRepository, properties);
@@ -74,61 +73,84 @@ public class AuthConfig {
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public AuthenticationService authenticationService(
-            UserRepository userRepository, Argon2Profile argon2Profile, SessionService sessionService,
-            LoginThrottle loginThrottle, AuthAuditWriter authAuditWriter, Clock clock) {
-        return new AuthenticationService(
-                userRepository, argon2Profile, sessionService, loginThrottle, authAuditWriter, clock);
+            UserRepository userRepository,
+            Argon2Profile argon2Profile,
+            SessionService sessionService,
+            LoginThrottle loginThrottle,
+            AuthAuditWriter authAuditWriter) {
+        return new AuthenticationService(userRepository, argon2Profile, sessionService, loginThrottle, authAuditWriter);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public AuthAuditWriter authAuditWriter(JdbcTemplate sqliteJdbcTemplate) {
         return new JdbcAuthAuditWriter(sqliteJdbcTemplate);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public AuthorizationVersionGuard authorizationVersionGuard(
-            JdbcTemplate sqliteJdbcTemplate, TransactionTemplate sqliteTransactionTemplate,
-            UserRepository userRepository, AuthAuditWriter authAuditWriter, Clock clock) {
+            JdbcTemplate sqliteJdbcTemplate,
+            TransactionTemplate sqliteTransactionTemplate,
+            UserRepository userRepository,
+            AuthAuditWriter authAuditWriter,
+            Clock clock) {
         return new AuthorizationVersionGuard(
                 sqliteJdbcTemplate, sqliteTransactionTemplate, userRepository, authAuditWriter, clock);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public LoginThrottle loginThrottle(JdbcTemplate sqliteJdbcTemplate, SecurityProperties properties) {
         return new LoginThrottle(sqliteJdbcTemplate, properties);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public UserProvisioning userProvisioning(
-            UserRepository userRepository, JdbcTemplate sqliteJdbcTemplate,
-            TransactionTemplate sqliteTransactionTemplate, Clock clock, SecurityProperties properties) {
+            UserRepository userRepository,
+            JdbcTemplate sqliteJdbcTemplate,
+            TransactionTemplate sqliteTransactionTemplate,
+            Clock clock,
+            SecurityProperties properties) {
         return new UserProvisioning(userRepository, sqliteJdbcTemplate, sqliteTransactionTemplate, clock, properties);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public AccessAdministrationService accessAdministrationService(
-            UserRepository userRepository, GrantRepository grantRepository,
-            AuthorizationVersionGuard authorizationVersionGuard, TransactionTemplate sqliteTransactionTemplate,
+            UserRepository userRepository,
+            GrantRepository grantRepository,
+            AuthorizationVersionGuard authorizationVersionGuard,
+            TransactionTemplate sqliteTransactionTemplate,
             Clock clock) {
         return new AccessAdministrationService(
                 userRepository, grantRepository, authorizationVersionGuard, sqliteTransactionTemplate, clock);
     }
 
     @Bean
-    @DependsOn("flywayMigration")
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
     public BootstrapActivation bootstrapActivation(
-            UserRepository userRepository, GrantRepository grantRepository, JdbcTemplate sqliteJdbcTemplate,
-            TransactionTemplate sqliteTransactionTemplate, Clock clock, SecurityProperties properties,
-            PasswordPolicy passwordPolicy, Argon2Profile argon2Profile, SqliteProperties sqliteProperties) {
-        return new BootstrapActivation(userRepository, grantRepository, sqliteJdbcTemplate,
-                sqliteTransactionTemplate, clock, properties, passwordPolicy, argon2Profile,
+            UserRepository userRepository,
+            GrantRepository grantRepository,
+            JdbcTemplate sqliteJdbcTemplate,
+            TransactionTemplate sqliteTransactionTemplate,
+            Clock clock,
+            SecurityProperties properties,
+            PasswordPolicy passwordPolicy,
+            Argon2Profile argon2Profile,
+            SqliteProperties sqliteProperties) {
+        return new BootstrapActivation(
+                userRepository,
+                grantRepository,
+                sqliteJdbcTemplate,
+                sqliteTransactionTemplate,
+                clock,
+                properties,
+                passwordPolicy,
+                argon2Profile,
                 sqliteProperties.resolvedDirectory());
     }
 
@@ -139,8 +161,9 @@ public class AuthConfig {
      * exists. Logs only the activation token's file path — never its contents.
      */
     @Bean
-    @DependsOn({"flywayMigration", "userRepository"})
-    public Optional<Path> bootstrapActivationResult(BootstrapActivation bootstrapActivation) throws java.io.IOException {
+    @DependsOn({SqliteConfig.FLYWAY_MIGRATION, "userRepository"})
+    public Optional<Path> bootstrapActivationResult(BootstrapActivation bootstrapActivation)
+            throws java.io.IOException {
         Optional<Path> tokenFile = bootstrapActivation.ensureBootstrapAdmin();
         tokenFile.ifPresentOrElse(
                 path -> log.info("Bootstrap admin created; activation token written to {}", path),

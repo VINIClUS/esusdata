@@ -1,12 +1,11 @@
 package esusdata.run.controller;
 
+import esusdata.result.model.ResultRepository;
 import esusdata.run.job.Job;
 import esusdata.run.job.JobRepository;
 import esusdata.run.job.JobState;
-import esusdata.result.model.ResultRepository;
-import org.springframework.stereotype.Component;
-
 import java.util.List;
+import org.springframework.stereotype.Component;
 
 /** Shared {@code Job} → {@link RunResponse} mapping — {@code RunController} and {@code RunEventsController} (SSE) must never render a run differently. */
 @Component
@@ -22,20 +21,38 @@ public class RunResponseFactory {
 
     RunResponse toResponse(Job job) {
         String resultId = job.state() == JobState.SUCCEEDED
-                ? resultRepository.findResultIdByJobId(job.jobId(), job.municipalityIbge()).orElse(null)
+                ? resultRepository
+                        .findResultIdByJobId(job.jobId(), job.municipalityIbge())
+                        .orElse(null)
                 : null;
         List<AttemptResponse> attempts = jobRepository.findAttempts(job.jobId()).stream()
-                .map(a -> new AttemptResponse(a.attempt(), a.startedAt().toString(),
-                        a.finishedAt() == null ? null : a.finishedAt().toString(), a.outcome(),
-                        a.failureCode(), a.failureDetail()))
+                .map(a -> new AttemptResponse(
+                        a.attempt(),
+                        a.startedAt().toString(),
+                        a.finishedAt() == null ? null : a.finishedAt().toString(),
+                        a.outcome(),
+                        a.failureCode(),
+                        a.failureDetail()))
                 .toList();
         return new RunResponse(
-                job.jobId(), job.runId(), job.state().name(), job.attempt(), job.maxAttempts(),
-                job.municipalityIbge(), job.indicatorPack(), job.ruleVersion(), job.referencePeriod(),
-                job.sourceId(), job.extractionId(), job.createdAt() == null ? null : job.createdAt().toString(),
+                job.jobId(),
+                job.runId(),
+                job.state().name(),
+                job.attempt(),
+                job.maxAttempts(),
+                job.municipalityIbge(),
+                job.indicatorPack(),
+                job.ruleVersion(),
+                job.referencePeriod(),
+                job.sourceId(),
+                job.extractionId(),
+                job.createdAt() == null ? null : job.createdAt().toString(),
                 job.startedAt() == null ? null : job.startedAt().toString(),
                 job.finishedAt() == null ? null : job.finishedAt().toString(),
                 job.lastProgressAt() == null ? null : job.lastProgressAt().toString(),
-                job.failureCode(), job.failureDetail(), resultId, attempts);
+                job.failureCode(),
+                job.failureDetail(),
+                resultId,
+                attempts);
     }
 }

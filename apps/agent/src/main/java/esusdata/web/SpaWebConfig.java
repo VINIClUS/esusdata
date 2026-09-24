@@ -1,14 +1,13 @@
 package esusdata.web;
 
+import java.io.IOException;
+import java.time.Duration;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.PathResourceResolver;
-
-import java.io.IOException;
-import java.time.Duration;
 
 /**
  * Serves the web client (apps/web, bundled under {@code static/} by {@code mvn -Pweb}) from the same
@@ -26,7 +25,8 @@ public class SpaWebConfig implements WebMvcConfigurer {
         // Vite puts a content hash in every asset name, so a cached copy can never go stale.
         registry.addResourceHandler("/assets/**")
                 .addResourceLocations(LOCATION + "assets/")
-                .setCacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable());
+                .setCacheControl(
+                        CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable());
         // index.html (and anything unhashed) is revalidated, so a new build is picked up at once.
         registry.addResourceHandler("/**")
                 .addResourceLocations(LOCATION)
@@ -50,7 +50,7 @@ public class SpaWebConfig implements WebMvcConfigurer {
 
         /** Unknown API paths and missing files (anything with an extension) stay 404. */
         private static boolean isClientRoute(String resourcePath) {
-            if (resourcePath.equals("api") || resourcePath.startsWith("api/")) {
+            if ("api".equals(resourcePath) || resourcePath.startsWith("api/")) {
                 return false;
             }
             String lastSegment = resourcePath.substring(resourcePath.lastIndexOf('/') + 1);

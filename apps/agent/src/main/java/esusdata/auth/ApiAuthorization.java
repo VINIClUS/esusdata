@@ -3,13 +3,11 @@ package esusdata.auth;
 import esusdata.auth.model.AuthAuditWriter;
 import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.Permission;
-
+import esusdata.auth.model.ScopeDeniedException;
 import esusdata.auth.model.ScopeKind;
-
+import java.time.Clock;
 import org.springframework.stereotype.Component;
 
-import java.time.Clock;
-import esusdata.auth.model.ScopeDeniedException;
 /**
  * The one place an HTTP controller asks "is this session currently authorized for this object?"
  * — always resolved fresh against {@link ScopeResolver}, never cached (§1.7.3 L274). Every denial
@@ -26,8 +24,10 @@ public final class ApiAuthorization {
     private final Clock clock;
 
     public ApiAuthorization(
-            ScopeResolver scopeResolver, ReauthenticationGuard reauthenticationGuard,
-            AuthAuditWriter authAuditWriter, Clock clock) {
+            ScopeResolver scopeResolver,
+            ReauthenticationGuard reauthenticationGuard,
+            AuthAuditWriter authAuditWriter,
+            Clock clock) {
         this.scopeResolver = scopeResolver;
         this.reauthenticationGuard = reauthenticationGuard;
         this.authAuditWriter = authAuditWriter;
@@ -40,8 +40,7 @@ public final class ApiAuthorization {
     }
 
     public void requireObjectScope(
-            AuthenticatedSession session, Permission permission, String municipalityIbge,
-            String cnes, String ine) {
+            AuthenticatedSession session, Permission permission, String municipalityIbge, String cnes, String ine) {
         if (!scopeResolver.hasPermission(session.userId(), permission, municipalityIbge, cnes, ine)) {
             deny(session, permission, municipalityIbge);
         }
@@ -49,8 +48,13 @@ public final class ApiAuthorization {
 
     /** Records an authorization denial without throwing, for an existing object hidden as 404. */
     public void auditDenied(AuthenticatedSession session, Permission permission, String municipalityIbge) {
-        authAuditWriter.record(clock.instant(), session.userId(), "ACCESS_DENIED",
-                municipalityIbge, "DENIED", "{\"permission\":\"" + permission.dbValue() + "\"}");
+        authAuditWriter.record(
+                clock.instant(),
+                session.userId(),
+                "ACCESS_DENIED",
+                municipalityIbge,
+                "DENIED",
+                "{\"permission\":\"" + permission.dbValue() + "\"}");
     }
 
     /**
@@ -60,8 +64,13 @@ public final class ApiAuthorization {
      */
     public void requireInstallationPermission(AuthenticatedSession session, Permission permission) {
         if (!scopeResolver.hasInstallationPermission(session.userId(), permission)) {
-            authAuditWriter.record(clock.instant(), session.userId(), "ACCESS_DENIED",
-                    "installation", "DENIED", "{\"permission\":\"" + permission.dbValue() + "\"}");
+            authAuditWriter.record(
+                    clock.instant(),
+                    session.userId(),
+                    "ACCESS_DENIED",
+                    "installation",
+                    "DENIED",
+                    "{\"permission\":\"" + permission.dbValue() + "\"}");
             throw new ScopeDeniedException(
                     "principal " + session.userId() + " lacks installation-scoped " + permission.dbValue());
         }
@@ -128,7 +137,6 @@ public final class ApiAuthorization {
     private void deny(AuthenticatedSession session, Permission permission, String municipalityIbge) {
         auditDenied(session, permission, municipalityIbge);
         throw new ScopeDeniedException(
-                "principal " + session.userId() + " lacks " + permission.dbValue()
-                        + " for the requested scope");
+                "principal " + session.userId() + " lacks " + permission.dbValue() + " for the requested scope");
     }
 }

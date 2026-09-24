@@ -1,20 +1,18 @@
 package esusdata.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import esusdata.auth.model.Grant;
 import esusdata.auth.model.Role;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
-
+import esusdata.web.ApiFixtureSupport;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.ApiFixtureSupport;
-
-import esusdata.source.SourceController;
 /**
  * ENG-45 at the HTTP level. {@code role_permissions} (V3 seed) structurally never gives
  * TECHNICAL_ADMIN {@code read_clinical} — no row exists to grant. This pins the other half:
@@ -23,7 +21,7 @@ import esusdata.source.SourceController;
  * missing row by granting themselves a clinical role.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class TechnicalAdminCannotGrantClinicalTest extends ApiFixtureSupport {
+class TechnicalAdminCannotGrantClinicalTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 
@@ -33,10 +31,10 @@ public class TechnicalAdminCannotGrantClinicalTest extends ApiFixtureSupport {
         grantInstallation(admin, Role.TECHNICAL_ADMIN);
         String cookie = reauthenticatedSessionCookie(admin);
 
-        HttpResponse<String> response = authenticatedPost(cookie,
+        HttpResponse<String> response = authenticatedPost(
+                cookie,
                 URI.create(BASE_URL + "/api/v1/users/" + admin + "/grants"),
-                "{\"role\":\"MANAGER\",\"scopeKind\":\"MUNICIPALITY\",\"municipalityIbge\":\""
-                        + MUNICIPALITY + "\"}");
+                "{\"role\":\"MANAGER\",\"scopeKind\":\"MUNICIPALITY\",\"municipalityIbge\":\"" + MUNICIPALITY + "\"}");
 
         assertThat(response.statusCode()).isEqualTo(403);
         assertThat(response.body()).contains("SELF_GRANT_FORBIDDEN");
@@ -54,8 +52,8 @@ public class TechnicalAdminCannotGrantClinicalTest extends ApiFixtureSupport {
         grantInstallation(admin, Role.TECHNICAL_ADMIN);
         String cookie = reauthenticatedSessionCookie(admin);
 
-        HttpResponse<String> response = authenticatedPost(cookie,
-                URI.create(BASE_URL + "/api/v1/users/" + admin + "/block"), null);
+        HttpResponse<String> response =
+                authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/users/" + admin + "/block"), null);
 
         assertThat(response.statusCode()).isEqualTo(403);
         assertThat(response.body()).contains("SELF_BLOCK_FORBIDDEN");
@@ -75,8 +73,8 @@ public class TechnicalAdminCannotGrantClinicalTest extends ApiFixtureSupport {
         List<Grant> grants = grantRepository.activeGrantsForUser(admin);
         String grantId = grants.get(0).grantId();
 
-        HttpResponse<String> response = authenticatedDelete(cookie,
-                URI.create(BASE_URL + "/api/v1/users/" + admin + "/grants/" + grantId));
+        HttpResponse<String> response =
+                authenticatedDelete(cookie, URI.create(BASE_URL + "/api/v1/users/" + admin + "/grants/" + grantId));
 
         assertThat(response.statusCode()).isEqualTo(403);
         assertThat(response.body()).contains("SELF_GRANT_FORBIDDEN");
@@ -93,7 +91,8 @@ public class TechnicalAdminCannotGrantClinicalTest extends ApiFixtureSupport {
     @Test
     void aCallerWithoutInstallationScopedManageAccessIsRefusedTheSame404() throws Exception {
         String noGrants = createUser("no-grants-" + System.nanoTime());
-        HttpResponse<String> withoutAnyGrant = authenticatedPost(reauthenticatedSessionCookie(noGrants),
+        HttpResponse<String> withoutAnyGrant = authenticatedPost(
+                reauthenticatedSessionCookie(noGrants),
                 URI.create(BASE_URL + "/api/v1/users"),
                 "{\"username\":\"attempt-1-" + System.nanoTime() + "\",\"displayName\":\"x\"}");
         assertThat(withoutAnyGrant.statusCode()).isEqualTo(404);
@@ -114,18 +113,21 @@ public class TechnicalAdminCannotGrantClinicalTest extends ApiFixtureSupport {
         String cookie = reauthenticatedSessionCookie(admin);
         String target = createUser("manager-" + System.nanoTime());
 
-        HttpResponse<String> response = authenticatedPost(cookie,
+        HttpResponse<String> response = authenticatedPost(
+                cookie,
                 URI.create(BASE_URL + "/api/v1/users/" + target + "/grants"),
-                "{\"role\":\"MANAGER\",\"scopeKind\":\"MUNICIPALITY\",\"municipalityIbge\":\""
-                        + MUNICIPALITY + "\"}");
+                "{\"role\":\"MANAGER\",\"scopeKind\":\"MUNICIPALITY\",\"municipalityIbge\":\"" + MUNICIPALITY + "\"}");
         assertThat(response.statusCode()).isEqualTo(201);
         assertThat(response.body()).contains("MANAGER");
 
-        HttpResponse<String> adminReadsResults = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/results?municipalityIbge="
-                                + MUNICIPALITY + "&indicatorPack=c1-mais-acesso&referencePeriod=2026-03"))
-                        .header("Cookie", sessionCookie(admin)).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> adminReadsResults = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/results?municipalityIbge=" + MUNICIPALITY
+                                        + "&indicatorPack=c1-mais-acesso&referencePeriod=2026-03"))
+                                .header("Cookie", sessionCookie(admin))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
         assertThat(adminReadsResults.statusCode()).isEqualTo(404);
     }
 }

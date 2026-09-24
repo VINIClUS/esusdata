@@ -1,27 +1,26 @@
 package esusdata.run.acquisition;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
+
 import esusdata.indicator.model.CanonicalEncounter;
 import esusdata.indicator.model.CanonicalModality;
-import esusdata.run.extract.ExtractionManifest;
 import esusdata.run.extract.ExtractReader;
+import esusdata.run.extract.ExtractionManifest;
 import esusdata.run.job.CancellationToken;
 import esusdata.run.job.JobCancelledException;
+import esusdata.run.worker.FailureClassifier;
+import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.ColumnMetadata;
 import esusdata.source.pec.CompatibilityFingerprint;
 import esusdata.source.pec.CompatibilityProbeResult;
-import esusdata.source.pec.ProbeItem;
-import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.IndividualEncounterModalityCapability;
-
-import esusdata.source.pec.AllowedDestinations;
-
+import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecConnectionProperties;
 import esusdata.source.pec.PecSourceIdentity;
+import esusdata.source.pec.ProbeItem;
 import esusdata.source.pec.ReadBudget;
-import esusdata.run.worker.FailureClassifier;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -32,10 +31,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.tuple;
 /**
  * Exercises {@link ExecPlaneAcquisition}'s NDJSON protocol against a real spawned JVM
  * subprocess ({@link StubExecPlaneMain}) standing in for the Rust execution plane — process
@@ -49,11 +47,16 @@ class ExecPlaneAcquisitionTest {
     // The same algorithm the adapter itself uses, over the exact raw column data
     // StubExecPlaneMain reports for "test_object.col_a" — this test never hardcodes a
     // fingerprint string, it derives the expectation the same way the adapter must.
-    private static final String TEST_OBJECT_FINGERPRINT = CompatibilityFingerprint.compute(
-            new CompatibilityProbeResult(
-                    "test_object",
-                    java.util.Map.of("col_a", new ColumnMetadata("text", "text", "NO", 1)),
-                    List.of(new ProbeItem.ColumnItem("col_a"))));
+    private static final String TEST_OBJECT_FINGERPRINT = CompatibilityFingerprint.compute(new CompatibilityProbeResult(
+            "test_object",
+            java.util.Map.of("col_a", new ColumnMetadata("text", "text", "NO", 1)),
+            List.of(new ProbeItem.ColumnItem("col_a"))));
+
+    private static final AllowedDestinations ALLOWED =
+            new AllowedDestinations(java.util.Set.of(new AllowedDestinations.HostPort("127.0.0.1", 5432)));
+
+    @TempDir
+    Path extractsDir;
 
     private static class RecordingListener implements AcquisitionListener {
         final AtomicInteger progressCount = new AtomicInteger();
@@ -70,20 +73,19 @@ class ExecPlaneAcquisitionTest {
         }
     }
 
-    private static final AllowedDestinations ALLOWED = new AllowedDestinations(
-            java.util.Set.of(new AllowedDestinations.HostPort("127.0.0.1", 5432)));
-
-    @TempDir
-    Path extractsDir;
-
     private ExecPlaneAcquisition adapter(String scenario) {
         return adapter(scenario, ALLOWED);
     }
 
     private ExecPlaneAcquisition adapter(String scenario, AllowedDestinations allowedDestinations) {
-        List<String> command = List.of(javaBinary(), "-cp", System.getProperty("java.class.path"),
-                StubExecPlaneMain.class.getName(), scenario);
-        PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromJson("""
+        List<String> command = List.of(
+                javaBinary(),
+                "-cp",
+                System.getProperty("java.class.path"),
+                StubExecPlaneMain.class.getName(),
+                scenario);
+        PecCompatibilityMatrix matrix =
+                PecCompatibilityMatrix.fromJson("""
                 {
                   "schema_version": "2",
                   "validation_status": "VALIDATED",
@@ -103,30 +105,35 @@ class ExecPlaneAcquisitionTest {
                 }
                 """.formatted(QUERY_CHECKSUM, TEST_OBJECT_FINGERPRINT));
         return new ExecPlaneAcquisition(
-                command, secretRef -> "fixture-password".toCharArray(), allowedDestinations, matrix,
-                extractsDir, Clock.systemUTC(), Duration.ofSeconds(5));
+                command,
+                secretRef -> "fixture-password".toCharArray(),
+                allowedDestinations,
+                matrix,
+                extractsDir,
+                Clock.systemUTC(),
+                Duration.ofSeconds(5));
     }
 
     private static String javaBinary() {
-        return System.getProperty("java.home") + java.io.File.separator + "bin"
-                + java.io.File.separator + "java";
+        return System.getProperty("java.home") + java.io.File.separator + "bin" + java.io.File.separator + "java";
     }
 
-    private AcquisitionCommand command() {
+    private static AcquisitionCommand command() {
         return new AcquisitionCommand(
-                new PecConnectionProperties("src-1", "127.0.0.1", 5432, "esus", "esus_leitura",
-                        "PEC_DB_PASSWORD", "3541307"),
+                new PecConnectionProperties(
+                        "src-1", "127.0.0.1", 5432, "esus", "esus_leitura", "PEC_DB_PASSWORD", "3541307"),
                 new PecSourceIdentity("src-1", "5.4.37", "PEC_DW", "PRONTUARIO"),
                 ReadBudget.initialEngineeringProposal(),
-                "live-job-1-g1", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1),
+                "live-job-1-g1",
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
                 "America/Sao_Paulo");
     }
 
     @Test
     void happyPathWritesRowsThroughDelegatedExtractPublicationAndReportsProgress() throws IOException {
         RecordingListener listener = new RecordingListener();
-        ExtractionManifest manifest =
-                adapter("happy").acquire(command(), new CancellationToken(), listener);
+        ExtractionManifest manifest = adapter("happy").acquire(command(), new CancellationToken(), listener);
 
         // rowCount/exclusionCount/checksum come from the child's own "complete" report (fatia 3 /
         // ADR 0011) — DelegatedExtractPublication.publish verified them against the actual file
@@ -145,10 +152,10 @@ class ExecPlaneAcquisitionTest {
         // intact, not just that the child's self-reported counters were internally consistent.
         ExtractReader reader = new ExtractReader();
         List<CanonicalEncounter> encounters = reader.readEncounters(extractsDir, manifest);
-        assertThat(encounters).extracting(e -> e.sourceRef().recordId(), CanonicalEncounter::modality)
+        assertThat(encounters)
+                .extracting(e -> e.sourceRef().recordId(), CanonicalEncounter::modality)
                 .containsExactlyInAnyOrder(
-                        tuple("1", CanonicalModality.PROGRAMADO),
-                        tuple("2", CanonicalModality.ESPONTANEO));
+                        tuple("1", CanonicalModality.PROGRAMADO), tuple("2", CanonicalModality.ESPONTANEO));
     }
 
     /**
@@ -166,8 +173,7 @@ class ExecPlaneAcquisitionTest {
     void outOfScopeRowIsPublishedButRejectedOnRead() {
         RecordingListener listener = new RecordingListener();
 
-        ExtractionManifest manifest =
-                adapter("out-of-scope-row").acquire(command(), new CancellationToken(), listener);
+        ExtractionManifest manifest = adapter("out-of-scope-row").acquire(command(), new CancellationToken(), listener);
 
         assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).exists();
         assertThat(listener.uncertainReasons).isEmpty();
@@ -236,7 +242,8 @@ class ExecPlaneAcquisitionTest {
     void exitingZeroWithoutACompleteMessageIsTreatedAsUncertain() {
         RecordingListener listener = new RecordingListener();
 
-        assertThatThrownBy(() -> adapter("exit0-without-complete").acquire(command(), new CancellationToken(), listener))
+        assertThatThrownBy(
+                        () -> adapter("exit0-without-complete").acquire(command(), new CancellationToken(), listener))
                 .isInstanceOf(PecAcquisitionException.class);
         assertThat(extractsDir.resolve("live-job-1-g1.jsonl.gz")).doesNotExist();
         assertThat(listener.uncertainReasons).hasSize(1);
@@ -278,8 +285,8 @@ class ExecPlaneAcquisitionTest {
         RecordingListener listener = new RecordingListener();
         CancellationToken cancellation = new CancellationToken();
 
-        CompletableFuture<ExtractionManifest> future = CompletableFuture.supplyAsync(
-                () -> adapter("cancel").acquire(command(), cancellation, listener));
+        CompletableFuture<ExtractionManifest> future =
+                CompletableFuture.supplyAsync(() -> adapter("cancel").acquire(command(), cancellation, listener));
 
         // Not load-bearing for correctness: bindInterrupt happens right after "proceed" is sent,
         // before any progress is read, so a cancel requested before the bind still fires against
@@ -288,8 +295,7 @@ class ExecPlaneAcquisitionTest {
         Thread.sleep(300);
         cancellation.requestCancel();
 
-        assertThatThrownBy(() -> future.get(5, TimeUnit.SECONDS))
-                .hasCauseInstanceOf(JobCancelledException.class);
+        assertThatThrownBy(() -> future.get(5, TimeUnit.SECONDS)).hasCauseInstanceOf(JobCancelledException.class);
         assertThat(listener.uncertainReasons).hasSize(1);
     }
 
@@ -354,7 +360,8 @@ class ExecPlaneAcquisitionTest {
     void sqlErrorDuringTheProbeCarriesItsSqlStateAndFlagsUncertain() {
         RecordingListener listener = new RecordingListener();
 
-        assertThat(FailureClassifier.classify(catchFailure("probe-sql-error", listener)).code())
+        assertThat(FailureClassifier.classify(catchFailure("probe-sql-error", listener))
+                        .code())
                 .isEqualTo("SQL_ERROR");
         assertThat(listener.uncertainReasons).hasSize(1);
     }
@@ -362,7 +369,7 @@ class ExecPlaneAcquisitionTest {
     private Throwable catchFailure(String scenario, RecordingListener listener) {
         try {
             adapter(scenario).acquire(command(), new CancellationToken(), listener);
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException failure) { // NOPMD - captures whatever the adapter throws for the assertion
             return failure;
         }
         throw new AssertionError("scenario " + scenario + " unexpectedly succeeded");

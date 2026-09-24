@@ -6,6 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
+
 /**
  * Shared opaque-token generation/hashing for {@code activation_tokens} — used by both {@link
  * BootstrapActivation} (the first local admin) and {@code UserProvisioning} (every later account),
@@ -16,8 +17,7 @@ public final class ActivationTokens {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private ActivationTokens() {
-    }
+    private ActivationTokens() {}
 
     public static String newOpaqueToken() {
         byte[] bytes = new byte[32];

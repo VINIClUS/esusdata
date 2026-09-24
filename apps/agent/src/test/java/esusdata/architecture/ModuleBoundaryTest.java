@@ -1,12 +1,12 @@
 package esusdata.architecture;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.Test;
-
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
  * The three package rules worth enforcing by code (ADR 0013). Everything else about package
@@ -23,6 +23,8 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 class ModuleBoundaryTest {
 
     private static final String BASE = "esusdata";
+
+    @SuppressWarnings("PMD.LooseCoupling") // ArchUnit's own collection type, no interface to use
     private static final JavaClasses CLASSES = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages(BASE);
@@ -30,8 +32,10 @@ class ModuleBoundaryTest {
     @Test
     void indicatorCoreIsPureJava() {
         classes()
-                .that().resideInAnyPackage(BASE + ".indicator.model..", BASE + ".indicator.pack..")
-                .should().onlyDependOnClassesThat()
+                .that()
+                .resideInAnyPackage(BASE + ".indicator.model..", BASE + ".indicator.pack..")
+                .should()
+                .onlyDependOnClassesThat()
                 .resideInAnyPackage("java..", BASE + ".indicator..")
                 .check(CLASSES);
     }
@@ -39,16 +43,22 @@ class ModuleBoundaryTest {
     @Test
     void postgresDriverOnlyReachableFromPecConnectionAndAcquisition() {
         noClasses()
-                .that().resideOutsideOfPackages(BASE + ".source.pec..", BASE + ".run.acquisition..")
-                .should().dependOnClassesThat().resideInAPackage("org.postgresql..")
+                .that()
+                .resideOutsideOfPackages(BASE + ".source.pec..", BASE + ".run.acquisition..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("org.postgresql..")
                 .check(CLASSES);
     }
 
     @Test
     void sourceAndAuthDoNotDependOnRun() {
         noClasses()
-                .that().resideInAnyPackage(BASE + ".source..", BASE + ".auth..", BASE + ".indicator..")
-                .should().dependOnClassesThat().resideInAPackage(BASE + ".run..")
+                .that()
+                .resideInAnyPackage(BASE + ".source..", BASE + ".auth..", BASE + ".indicator..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage(BASE + ".run..")
                 .check(CLASSES);
     }
 }

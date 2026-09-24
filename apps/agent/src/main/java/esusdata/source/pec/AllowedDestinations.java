@@ -1,5 +1,6 @@
 package esusdata.source.pec;
 
+import java.io.Serial;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Locale;
@@ -58,9 +59,8 @@ public final class AllowedDestinations {
             String resolvedIp = resolved.getHostAddress();
             HostPort resolvedAddr = new HostPort(resolvedIp, port);
             if (!allowed.contains(resolvedAddr)) {
-                throw new DestinationNotAllowedException(
-                        "Host " + host + " resolved to address " + resolvedIp + ":" + port
-                                + " which is not in the approved allowlist — DNS rebinding protection.");
+                throw new DestinationNotAllowedException("Host " + host + " resolved to address " + resolvedIp + ":"
+                        + port + " which is not in the approved allowlist — DNS rebinding protection.");
             }
         }
         return resolvedAddresses[0];
@@ -76,7 +76,7 @@ public final class AllowedDestinations {
             if (host == null || host.isBlank()) {
                 throw new IllegalArgumentException("allowlist host is required");
             }
-            if (port <= 0 || port > 65535) {
+            if (port <= 0 || port > 65_535) {
                 throw new IllegalArgumentException("allowlist port out of range: " + port);
             }
             host = normalizeHost(host);
@@ -92,6 +92,9 @@ public final class AllowedDestinations {
     }
 
     public static final class DestinationNotAllowedException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public DestinationNotAllowedException(String message) {
             super(message);
         }

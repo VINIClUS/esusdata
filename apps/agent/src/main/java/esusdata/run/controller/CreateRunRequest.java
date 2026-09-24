@@ -6,6 +6,9 @@ package esusdata.run.controller;
  * fresh LIVE_READ_ONLY acquisition; it never substitutes for {@code sourceId}.
  */
 public record CreateRunRequest(
-        String municipalityIbge, String indicatorPack, String ruleVersion, String referencePeriod,
-        String sourceId, String extractionId) {
-}
+        String municipalityIbge,
+        String indicatorPack,
+        String ruleVersion,
+        String referencePeriod,
+        String sourceId,
+        String extractionId) {}

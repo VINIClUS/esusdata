@@ -1,23 +1,21 @@
 package esusdata.run.controller;
 
-import esusdata.run.job.JobRepository;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import esusdata.auth.model.Grant;
 import esusdata.auth.model.Role;
 import esusdata.auth.model.ScopeKind;
+import esusdata.auth.security.SessionCookie;
 import esusdata.indicator.pack.c1.C1Rule;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-
+import esusdata.web.ApiFixtureSupport;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Iterator;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -26,19 +24,18 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.ApiFixtureSupport;
-import esusdata.auth.AdminController;
-import esusdata.auth.security.SessionAuthenticationFilter;
-import esusdata.auth.security.SessionCookie;
 /**
  * §1.10 L397: "a consulta do job é a fonte de verdade" and "reconexão reenvia estado atual" — the
  * fast poll interval below (not the 2000 ms production default) and a short revalidation window
  * keep these tests from being needlessly slow without changing what they prove.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class RunEventsApiTest extends ApiFixtureSupport {
+class RunEventsApiTest extends ApiFixtureSupport {
 
     private static final String MUNICIPALITY = "3541307";
 
@@ -74,8 +71,17 @@ public class RunEventsApiTest extends ApiFixtureSupport {
         String manager = createUser("manager-" + System.nanoTime());
         String grantId = "grant-" + UUID.randomUUID();
         grantRepository.insert(new Grant(
-                grantId, manager, Role.MANAGER, ScopeKind.MUNICIPALITY, MUNICIPALITY, null, null,
-                clock.instant(), "test-fixture", null, null));
+                grantId,
+                manager,
+                Role.MANAGER,
+                ScopeKind.MUNICIPALITY,
+                MUNICIPALITY,
+                null,
+                null,
+                clock.instant(),
+                "test-fixture",
+                null,
+                null));
         String cookie = sessionCookie(manager);
         String jobId = insertRunningJob(MUNICIPALITY);
 
@@ -176,7 +182,8 @@ public class RunEventsApiTest extends ApiFixtureSupport {
             insertAttempt(jobId, "SUCCEEDED");
 
             String data = readNextDataLine(stream.iterator());
-            assertThat(data).contains("\"state\":\"SUCCEEDED\"")
+            assertThat(data)
+                    .contains("\"state\":\"SUCCEEDED\"")
                     .contains("\"attempts\":[{\"attempt\":1")
                     .contains("\"outcome\":\"SUCCEEDED\"");
         }
@@ -191,14 +198,14 @@ public class RunEventsApiTest extends ApiFixtureSupport {
 
         try (Stream<String> stream = openEventStream(cookie, jobId)) {
             Iterator<String> lines = stream.iterator();
-            assertThat(readNextDataLine(lines)).contains("\"state\":\"QUEUED\"")
-                    .contains("\"attempts\":[]");
+            assertThat(readNextDataLine(lines)).contains("\"state\":\"QUEUED\"").contains("\"attempts\":[]");
 
             // JobWorker requeues before recording the transiently failed attempt. The stream must
             // emit again when that history row appears even though the job snapshot is unchanged.
             insertAttempt(jobId, "FAILED_TRANSIENT");
 
-            assertThat(readNextDataLine(lines)).contains("\"state\":\"QUEUED\"")
+            assertThat(readNextDataLine(lines))
+                    .contains("\"state\":\"QUEUED\"")
                     .contains("\"attempts\":[{\"attempt\":1")
                     .contains("\"outcome\":\"FAILED_TRANSIENT\"");
         }
@@ -229,8 +236,7 @@ public class RunEventsApiTest extends ApiFixtureSupport {
     }
 
     @Test
-    void aJobAlreadyTerminalAtConnectClosesAfterOneEventAndDoesNotLeakTheScheduledPollOrTheSlot()
-            throws Exception {
+    void aJobAlreadyTerminalAtConnectClosesAfterOneEventAndDoesNotLeakTheScheduledPollOrTheSlot() throws Exception {
         String manager = createUser("manager-" + System.nanoTime());
         grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
         String cookie = sessionCookie(manager);
@@ -273,12 +279,14 @@ public class RunEventsApiTest extends ApiFixtureSupport {
             readNextDataLine(s3.iterator());
             readNextDataLine(s4.iterator());
 
-            HttpResponse<Stream<String>> fifth = HttpClient.newHttpClient().send(
-                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/events"))
-                            .header("Cookie", cookie)
-                            .timeout(Duration.ofSeconds(20))
-                            .GET().build(),
-                    HttpResponse.BodyHandlers.ofLines());
+            HttpResponse<Stream<String>> fifth = HttpClient.newHttpClient()
+                    .send(
+                            HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/events"))
+                                    .header("Cookie", cookie)
+                                    .timeout(Duration.ofSeconds(20))
+                                    .GET()
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofLines());
             assertThat(fifth.statusCode()).isEqualTo(503);
         }
     }
@@ -293,13 +301,22 @@ public class RunEventsApiTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, municipalityIbge);
         String jobId = "job-" + UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, process_instance_id,
                     execution_generation, created_at, source_id, finished_at)
                 VALUES (?,?,?,?,?,?, 'SUCCEEDED', 1, 3, 'proc-test-owns-nothing', 1, ?, ?, ?)
-                """, jobId, "run-" + jobId, municipalityIbge, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
-                "2026-03", Instant.now().toString(), sourceId, Instant.now().toString());
+                """,
+                jobId,
+                "run-" + jobId,
+                municipalityIbge,
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                Instant.now().toString(),
+                sourceId,
+                Instant.now().toString());
         return jobId;
     }
 
@@ -307,13 +324,22 @@ public class RunEventsApiTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, municipalityIbge);
         String jobId = "job-" + UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, process_instance_id,
                     execution_generation, next_attempt_at, created_at, source_id)
                 VALUES (?,?,?,?,?,?, 'QUEUED', 1, 3, NULL, 1, ?, ?, ?)
-                """, jobId, "run-" + jobId, municipalityIbge, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
-                "2026-03", Instant.now().plusSeconds(3600).toString(), Instant.now().toString(), sourceId);
+                """,
+                jobId,
+                "run-" + jobId,
+                municipalityIbge,
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                Instant.now().plusSeconds(3600).toString(),
+                Instant.now().toString(),
+                sourceId);
         return jobId;
     }
 
@@ -329,45 +355,57 @@ public class RunEventsApiTest extends ApiFixtureSupport {
         String sourceId = "src-" + System.nanoTime();
         registerSource(sourceId, municipalityIbge);
         String jobId = "job-" + UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, process_instance_id,
                     execution_generation, created_at, source_id)
                 VALUES (?,?,?,?,?,?, 'RUNNING', 1, 3, 'proc-test-owns-nothing', 1, ?, ?)
-                """, jobId, "run-" + jobId, municipalityIbge, C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
-                "2026-03", Instant.now().toString(), sourceId);
+                """,
+                jobId,
+                "run-" + jobId,
+                municipalityIbge,
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                Instant.now().toString(),
+                sourceId);
         return jobId;
     }
 
-    private Stream<String> openEventStream(String cookie, String jobId) throws Exception {
-        HttpResponse<Stream<String>> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/events"))
-                        .header("Cookie", cookie)
-                        .timeout(Duration.ofSeconds(20))
-                        .GET().build(),
-                HttpResponse.BodyHandlers.ofLines());
+    private static Stream<String> openEventStream(String cookie, String jobId) throws Exception {
+        HttpResponse<Stream<String>> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/runs/" + jobId + "/events"))
+                                .header("Cookie", cookie)
+                                .timeout(Duration.ofSeconds(20))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofLines());
         assertThat(response.statusCode()).isEqualTo(200);
         return response.body();
     }
 
-    private String readNextDataLine(Iterator<String> lines) throws Exception {
+    private static String readNextDataLine(Iterator<String> lines) throws Exception {
         return readNextLineWithPrefix(lines, "data:");
     }
 
-    private String readNextCommentLine(Iterator<String> lines) throws Exception {
+    private static String readNextCommentLine(Iterator<String> lines) throws Exception {
         return readNextLineWithPrefix(lines, ":");
     }
 
-    private String readNextLineWithPrefix(Iterator<String> lines, String prefix) throws Exception {
-        return withTimeout(() -> {
-            while (lines.hasNext()) {
-                String line = lines.next();
-                if (line.startsWith(prefix)) {
-                    return line.substring(prefix.length()).trim();
-                }
-            }
-            throw new AssertionError("stream ended before a \"" + prefix + "\" line arrived");
-        }, Duration.ofSeconds(10));
+    private static String readNextLineWithPrefix(Iterator<String> lines, String prefix) throws Exception {
+        return withTimeout(
+                () -> {
+                    while (lines.hasNext()) {
+                        String line = lines.next();
+                        if (line.startsWith(prefix)) {
+                            return line.substring(prefix.length()).trim();
+                        }
+                    }
+                    throw new AssertionError("stream ended before a \"" + prefix + "\" line arrived");
+                },
+                Duration.ofSeconds(10));
     }
 
     /**
@@ -376,24 +414,28 @@ public class RunEventsApiTest extends ApiFixtureSupport {
      *     mid-read, which the JDK HTTP client surfaces to the reader as an {@code IOException},
      *     not a clean EOF).
      */
-    private boolean drainWithin(Iterator<String> lines, Duration timeout) throws Exception {
+    private static boolean drainWithin(Iterator<String> lines, Duration timeout) throws Exception {
         try {
-            return withTimeout(() -> {
-                try {
-                    while (lines.hasNext()) {
-                        lines.next();
-                    }
-                    return true;
-                } catch (java.io.UncheckedIOException e) {
-                    return true;
-                }
-            }, timeout);
+            return withTimeout(
+                    () -> {
+                        try {
+                            while (lines.hasNext()) {
+                                lines.next();
+                            }
+                            return true;
+                        } catch (java.io.UncheckedIOException e) {
+                            return true;
+                        }
+                    },
+                    timeout);
         } catch (TimeoutException e) {
             return false;
         }
     }
 
-    private <T> T withTimeout(Callable<T> task, Duration timeout) throws Exception {
+    private static <T> T withTimeout(Callable<T> task, Duration timeout) throws Exception {
+        // shut down with shutdownNow() in finally: close() would wait on the blocked task
+        @SuppressWarnings("PMD.CloseResource")
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             return executor.submit(task).get(timeout.toMillis(), TimeUnit.MILLISECONDS);

@@ -1,8 +1,7 @@
 package esusdata.config;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
 import java.nio.file.Path;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Canonical data directory for the Observatório's own persistence (§1.12.1). Never SMB/NFS in

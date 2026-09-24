@@ -90,7 +90,6 @@ public record ExactRatio(BigInteger numerator, BigInteger denominator) {
      * exibição").
      */
     public BigDecimal toScaledBigDecimal(int scale) {
-        return new BigDecimal(numerator)
-                .divide(new BigDecimal(denominator), scale, RoundingMode.HALF_UP);
+        return new BigDecimal(numerator).divide(new BigDecimal(denominator), scale, RoundingMode.HALF_UP);
     }
 }

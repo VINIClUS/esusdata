@@ -1,16 +1,16 @@
 package esusdata.auth;
 
-import esusdata.auth.model.Role;
-import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.auth.model.Role;
+import esusdata.web.ApiFixtureSupport;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.annotation.DirtiesContext;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import esusdata.web.ApiFixtureSupport;
 /**
  * The other half of the plan's Fatia B destravamento: {@code POST /api/v1/users}, and the claim
  * in {@link esusdata.auth.UserProvisioning}'s javadoc that the returned
@@ -19,7 +19,7 @@ import esusdata.web.ApiFixtureSupport;
  * inspecting the source.
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class UserProvisioningApiTest extends ApiFixtureSupport {
+class UserProvisioningApiTest extends ApiFixtureSupport {
 
     @Test
     void anAdminCanProvisionAUserAndTheReturnedTokenActivatesItThroughTheRealRoute() throws Exception {
@@ -28,7 +28,8 @@ public class UserProvisioningApiTest extends ApiFixtureSupport {
         String cookie = reauthenticatedSessionCookie(admin);
         String username = "gestor-" + System.nanoTime();
 
-        HttpResponse<String> created = authenticatedPost(cookie,
+        HttpResponse<String> created = authenticatedPost(
+                cookie,
                 URI.create(BASE_URL + "/api/v1/users"),
                 "{\"username\":\"" + username + "\",\"displayName\":\"Gestora de Teste\"}");
 
@@ -36,36 +37,41 @@ public class UserProvisioningApiTest extends ApiFixtureSupport {
         String activationToken = extractField(created.body(), "activationToken");
         assertThat(activationToken).isNotBlank();
 
-        HttpResponse<String> duplicate = authenticatedPost(cookie,
+        HttpResponse<String> duplicate = authenticatedPost(
+                cookie,
                 URI.create(BASE_URL + "/api/v1/users"),
                 "{\"username\":\"" + username + "\",\"displayName\":\"Outra Pessoa\"}");
         assertThat(duplicate.statusCode()).isEqualTo(409);
         assertThat(duplicate.body()).contains("USERNAME_ALREADY_EXISTS");
 
         String csrfToken = csrfTokenViaReady();
-        HttpResponse<String> activate = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/activate"))
-                        .header("Content-Type", "application/json")
-                        .header("Cookie", "XSRF-TOKEN=" + csrfToken)
-                        .header("X-XSRF-TOKEN", csrfToken)
-                        .POST(HttpRequest.BodyPublishers.ofString("{\"token\":\"" + activationToken
-                                + "\",\"password\":\"a-strong-enough-passphrase-2\"}"))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> activate = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/auth/activate"))
+                                .header("Content-Type", "application/json")
+                                .header("Cookie", "XSRF-TOKEN=" + csrfToken)
+                                .header("X-XSRF-TOKEN", csrfToken)
+                                .POST(HttpRequest.BodyPublishers.ofString("{\"token\":\"" + activationToken
+                                        + "\",\"password\":\"a-strong-enough-passphrase-2\"}"))
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
         assertThat(activate.statusCode()).isEqualTo(204);
     }
 
-    private String extractField(String json, String field) {
+    private static String extractField(String json, String field) {
         String marker = "\"" + field + "\":\"";
         int start = json.indexOf(marker) + marker.length();
         int end = json.indexOf('"', start);
         return json.substring(start, end);
     }
 
-    private String csrfTokenViaReady() throws Exception {
-        HttpResponse<String> ready = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready")).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
+    private static String csrfTokenViaReady() throws Exception {
+        HttpResponse<String> ready = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
         for (String setCookie : ready.headers().allValues("Set-Cookie")) {
             if (setCookie.startsWith("XSRF-TOKEN=")) {
                 String rest = setCookie.substring("XSRF-TOKEN=".length());

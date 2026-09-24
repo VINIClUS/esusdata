@@ -6,5 +6,4 @@ package esusdata.indicator.model;
  * (or a DW/OLTP pair) be compared or deduplicated without their surrogate keys colliding by
  * coincidence.
  */
-public record SourceRef(String sourceId, String entityType, String recordId) {
-}
+public record SourceRef(String sourceId, String entityType, String recordId) {}

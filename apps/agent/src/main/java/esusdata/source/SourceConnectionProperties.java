@@ -1,9 +1,8 @@
 package esusdata.source;
 
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
-
-import java.util.List;
 
 /**
  * §1.12.6 / ENG-46: the destination allowlist is "administrada por procedimento de implantação
@@ -14,7 +13,4 @@ import java.util.List;
  */
 @ConfigurationProperties(prefix = "observatorio.source")
 public record SourceConnectionProperties(
-        List<String> allowedDestinations,
-        @DefaultValue("") String secretFile
-) {
-}
+        List<String> allowedDestinations, @DefaultValue("") String secretFile) {}

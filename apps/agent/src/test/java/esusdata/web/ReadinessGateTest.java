@@ -1,33 +1,20 @@
 package esusdata.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import esusdata.indicator.pack.c1.C1Rule;
-import esusdata.run.worker.AcquisitionGuard;
-import esusdata.run.worker.JobRecovery;
+import esusdata.result.model.ResultStagingArea;
 import esusdata.run.job.JobRepository;
 import esusdata.run.job.RetryPolicy;
-import esusdata.result.model.ResultStagingArea;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.Test;
-import org.sqlite.SQLiteDataSource;
-import org.mockito.Mockito;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.support.TransactionTemplate;
-
-import java.nio.file.Files;
-import java.sql.Connection;
-import java.sql.Statement;
+import esusdata.run.worker.AcquisitionGuard;
+import esusdata.run.worker.JobRecovery;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -35,8 +22,20 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.sqlite.SQLiteDataSource;
 
 /**
  * §1.9.4: "não iniciar outro worker enquanto o anterior ainda puder ler a fonte ou produzir
@@ -59,7 +58,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Import(ReadinessGateTest.RecoveryProbeConfiguration.class)
-public class ReadinessGateTest extends SecuritySliceTestSupport {
+class ReadinessGateTest extends SecuritySliceTestSupport {
 
     @Autowired
     JdbcTemplate jdbc;
@@ -91,20 +90,27 @@ public class ReadinessGateTest extends SecuritySliceTestSupport {
                 Clock clock,
                 Duration liveAcquisitionCooldownMargin) {
             JobRecovery delegate = new JobRecovery(
-                    jobRepository, sqliteTransactionTemplate, resultStagingArea, acquisitionGuard,
-                    retryPolicy, clock, liveAcquisitionCooldownMargin);
+                    jobRepository,
+                    sqliteTransactionTemplate,
+                    resultStagingArea,
+                    acquisitionGuard,
+                    retryPolicy,
+                    clock,
+                    liveAcquisitionCooldownMargin);
             JobRecovery probe = Mockito.spy(delegate);
             Mockito.doAnswer(invocation -> {
-                Thread readinessProbe = new Thread(
-                        ReadinessGateTest::probeReadinessWhileRecoveryIsBlocked,
-                        "readiness-gate-probe");
-                readinessProbe.start();
-                if (!READINESS_PROBE_FINISHED.await(
-                        READINESS_PROBE_WINDOW.plusSeconds(1).toMillis(), TimeUnit.MILLISECONDS)) {
-                    throw new IllegalStateException("readiness probe did not finish while recovery was blocked");
-                }
-                return invocation.callRealMethod();
-            }).when(probe).reconcile(Mockito.anyString());
+                        Thread readinessProbe = new Thread(
+                                ReadinessGateTest::probeReadinessWhileRecoveryIsBlocked, "readiness-gate-probe");
+                        readinessProbe.start();
+                        if (!READINESS_PROBE_FINISHED.await(
+                                READINESS_PROBE_WINDOW.plusSeconds(1).toMillis(), TimeUnit.MILLISECONDS)) {
+                            throw new IllegalStateException(
+                                    "readiness probe did not finish while recovery was blocked");
+                        }
+                        return invocation.callRealMethod();
+                    })
+                    .when(probe)
+                    .reconcile(Mockito.anyString());
             return probe;
         }
     }
@@ -112,12 +118,16 @@ public class ReadinessGateTest extends SecuritySliceTestSupport {
     @DynamicPropertySource
     static void seedAStaleRunningJobBeforeTheRealContextStarts(DynamicPropertyRegistry registry) throws Exception {
         SQLiteDataSource dataSource = new SQLiteDataSource();
-        dataSource.setUrl("jdbc:sqlite:" + Files.createDirectories(dataDir)
-                .resolve("observatorio.sqlite"));
+        dataSource.setUrl("jdbc:sqlite:" + Files.createDirectories(dataDir).resolve("observatorio.sqlite"));
 
-        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
+        Flyway.configure()
+                .dataSource(dataSource)
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
 
-        try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
+        try (Connection connection = dataSource.getConnection();
+                Statement statement = connection.createStatement()) {
             statement.execute("""
                     INSERT INTO sources (id, source_configuration_version, source_family,
                         pec_installation_role, source_location_kind, host, port, database_name,
@@ -131,14 +141,19 @@ public class ReadinessGateTest extends SecuritySliceTestSupport {
                         execution_generation, created_at, source_id)
                     VALUES ('%s', 'run-%s', '%s', '%s', '%s', '2026-03', 'RUNNING', 1, 3,
                         'proc-from-a-previous-boot-that-crashed', 1, '%s', '%s')
-                    """.formatted(STALE_JOB_ID, STALE_JOB_ID, MUNICIPALITY, C1Rule.INDICATOR_PACK,
-                    C1Rule.RULE_VERSION, Instant.EPOCH, SOURCE_ID));
+                    """.formatted(
+                            STALE_JOB_ID,
+                            STALE_JOB_ID,
+                            MUNICIPALITY,
+                            C1Rule.INDICATOR_PACK,
+                            C1Rule.RULE_VERSION,
+                            Instant.EPOCH,
+                            SOURCE_ID));
         }
     }
 
     @Test
-    void aJobAbandonedByAPreviousBootIsAlreadyRecoveredByTheTimeTheApplicationIsReady()
-            throws InterruptedException {
+    void aJobAbandonedByAPreviousBootIsAlreadyRecoveredByTheTimeTheApplicationIsReady() throws InterruptedException {
         assertThat(READINESS_PROBE_FINISHED.await(1, TimeUnit.SECONDS))
                 .as("the recovery probe must run during context initialization")
                 .isTrue();
@@ -147,42 +162,40 @@ public class ReadinessGateTest extends SecuritySliceTestSupport {
                 .as("/ready must not answer 200 while boot recovery is blocked")
                 .isTrue();
 
-        String state = jdbc.queryForObject(
-                "select state from jobs where job_id = ?", String.class, STALE_JOB_ID);
+        String state = jdbc.queryForObject("select state from jobs where job_id = ?", String.class, STALE_JOB_ID);
 
         assertThat(state).isEqualTo("QUEUED");
         assertThat(jdbc.queryForObject(
-                "select process_instance_id from jobs where job_id = ?", String.class, STALE_JOB_ID))
+                        "select process_instance_id from jobs where job_id = ?", String.class, STALE_JOB_ID))
                 .isNull();
     }
 
     private static void probeReadinessWhileRecoveryIsBlocked() {
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(100))
-                .build();
-        HttpRequest request = HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
-                .GET()
-                .build();
-        long deadline = System.nanoTime() + READINESS_PROBE_WINDOW.toNanos();
-        try {
-            while (System.nanoTime() < deadline) {
-                try {
-                    HttpResponse<String> response = client.send(
-                            request, HttpResponse.BodyHandlers.ofString());
-                    EARLY_READY_STATUS.set(response.statusCode());
-                    return;
-                } catch (java.io.IOException ignored) {
-                    // A closed port is expected while synchronous recovery holds context refresh.
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    return;
+        try (HttpClient client =
+                HttpClient.newBuilder().connectTimeout(Duration.ofMillis(100)).build()) {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/ready"))
+                    .GET()
+                    .build();
+            long deadline = System.nanoTime() + READINESS_PROBE_WINDOW.toNanos();
+            try {
+                while (System.nanoTime() < deadline) {
+                    try {
+                        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                        EARLY_READY_STATUS.set(response.statusCode());
+                        return;
+                    } catch (java.io.IOException ignored) {
+                        // A closed port is expected while synchronous recovery holds context refresh.
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    Thread.sleep(25);
                 }
-                Thread.sleep(25);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } finally {
+                READINESS_PROBE_FINISHED.countDown();
             }
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-        } finally {
-            READINESS_PROBE_FINISHED.countDown();
         }
     }
 }

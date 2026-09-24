@@ -19,11 +19,15 @@ public interface UserRepository {
 
     void recordLogin(String userId, Instant at);
 
-    void setPassword(String userId, String passwordHash, String passwordAlgo,
-            String passwordParamsJson, String securityPolicyVersion);
+    void setPassword(
+            String userId,
+            String passwordHash,
+            String passwordAlgo,
+            String passwordParamsJson,
+            String securityPolicyVersion);
 
     void setState(String userId, UserState state);
 
-    /** @return the new {@code authorization_version} */
+    /** Increments the user's {@code authorization_version} and returns the new value. */
     long bumpAuthorizationVersion(String userId);
 }

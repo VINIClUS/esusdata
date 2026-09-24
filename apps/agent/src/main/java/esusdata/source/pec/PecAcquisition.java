@@ -2,8 +2,7 @@ package esusdata.source.pec;
 
 import java.time.LocalDate;
 import java.util.Objects;
-import esusdata.source.pec.BudgetGuard;
-import esusdata.source.pec.PecSourceConnection;
+
 /**
  * Immutable acquisition session bound to one source connection, period, and source read budget.
  * The adapter and extraction writer consume this session so callers cannot combine a connection
@@ -23,8 +22,7 @@ public final class PecAcquisition {
             BudgetGuard budgetGuard) {
         this.sourceConnection = Objects.requireNonNull(sourceConnection, "source connection is required");
         this.periodStart = Objects.requireNonNull(periodStart, "periodStart is required");
-        this.periodEndExclusive = Objects.requireNonNull(
-                periodEndExclusive, "periodEndExclusive is required");
+        this.periodEndExclusive = Objects.requireNonNull(periodEndExclusive, "periodEndExclusive is required");
         if (!periodEndExclusive.isAfter(periodStart)) {
             throw new IllegalArgumentException("periodEndExclusive must be after periodStart");
         }

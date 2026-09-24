@@ -5,27 +5,24 @@ import esusdata.auth.dto.LoginRequest;
 import esusdata.auth.dto.LoginResponse;
 import esusdata.auth.dto.MeResponse;
 import esusdata.auth.dto.ReauthRequest;
-
 import esusdata.auth.model.AuthenticationFailedException;
 import esusdata.auth.model.Permission;
-
+import esusdata.auth.security.SessionCookie;
+import esusdata.web.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Clock;
+import java.time.Duration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Clock;
-import java.time.Duration;
-import esusdata.web.ApiError;
-import esusdata.auth.security.NoStoreCacheControlFilter;
-import esusdata.auth.security.SessionCookie;
 /**
  * The auth HTTP surface the spec leaves undefined (plan decision 5) —
  * {@code docs/adr/0008-superficie-http-de-autenticacao.md}. Every response here also carries
@@ -41,8 +38,10 @@ public class AuthController {
     private final Clock clock;
 
     public AuthController(
-            AuthenticationService authenticationService, BootstrapActivation bootstrapActivation,
-            ScopeResolver scopeResolver, Clock clock) {
+            AuthenticationService authenticationService,
+            BootstrapActivation bootstrapActivation,
+            ScopeResolver scopeResolver,
+            Clock clock) {
         this.authenticationService = authenticationService;
         this.bootstrapActivation = bootstrapActivation;
         this.scopeResolver = scopeResolver;
@@ -54,24 +53,27 @@ public class AuthController {
         var result = authenticationService.login(
                 request.username(), request.password(), httpRequest.getRemoteAddr(), clock.instant());
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, newSessionCookie(result.rawToken(), httpRequest).toString())
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        newSessionCookie(result.rawToken(), httpRequest).toString())
                 .body(new LoginResponse(result.userId(), result.displayName()));
     }
 
     @PostMapping("/api/v1/auth/logout")
     public ResponseEntity<Void> logout(
-            @AuthenticationPrincipal esusdata.auth.model.AuthenticatedSession session,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal esusdata.auth.model.AuthenticatedSession session, HttpServletRequest httpRequest) {
         authenticationService.logout(session.sessionId(), session.userId(), clock.instant());
         return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, clearedSessionCookie(httpRequest).toString())
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        clearedSessionCookie(httpRequest).toString())
                 .build();
     }
 
     @GetMapping("/api/v1/auth/me")
-    public MeResponse me(
-            @AuthenticationPrincipal esusdata.auth.model.AuthenticatedSession session) {
-        return new MeResponse(session.userId(),
+    public MeResponse me(@AuthenticationPrincipal esusdata.auth.model.AuthenticatedSession session) {
+        return new MeResponse(
+                session.userId(),
                 scopeResolver.municipalitiesWithAggregateAccess(session.userId(), Permission.READ_CLINICAL));
     }
 
@@ -85,14 +87,18 @@ public class AuthController {
     @PostMapping("/api/v1/auth/reauth")
     public ResponseEntity<Void> reauth(
             @AuthenticationPrincipal esusdata.auth.model.AuthenticatedSession session,
-            @RequestBody ReauthRequest request, HttpServletRequest httpRequest) {
+            @RequestBody ReauthRequest request,
+            HttpServletRequest httpRequest) {
         authenticationService.reauthenticate(
-                session.sessionId(), session.userId(), request.password(),
-                httpRequest.getRemoteAddr(), clock.instant());
+                session.sessionId(),
+                session.userId(),
+                request.password(),
+                httpRequest.getRemoteAddr(),
+                clock.instant());
         return ResponseEntity.noContent().build();
     }
 
-    private ResponseCookie newSessionCookie(String rawToken, HttpServletRequest httpRequest) {
+    private static ResponseCookie newSessionCookie(String rawToken, HttpServletRequest httpRequest) {
         return ResponseCookie.from(SessionCookie.NAME, rawToken)
                 .httpOnly(true)
                 .secure(httpRequest.isSecure())
@@ -101,7 +107,7 @@ public class AuthController {
                 .build();
     }
 
-    private ResponseCookie clearedSessionCookie(HttpServletRequest httpRequest) {
+    private static ResponseCookie clearedSessionCookie(HttpServletRequest httpRequest) {
         return ResponseCookie.from(SessionCookie.NAME, "")
                 .httpOnly(true)
                 .secure(httpRequest.isSecure())
@@ -124,9 +130,7 @@ public class AuthController {
         // reject or ignore outright. Ceiling (not floor) the remaining delay: truncating a
         // sub-second remainder to 0 would tell a still-throttled client to retry immediately.
         Duration remaining = Duration.between(clock.instant(), e.retryAfter());
-        long retryAfterSeconds = remaining.isPositive()
-                ? (remaining.toMillis() + 999) / 1000
-                : 0;
+        long retryAfterSeconds = remaining.isPositive() ? (remaining.toMillis() + 999) / 1000 : 0;
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header("Retry-After", Long.toString(retryAfterSeconds))
                 .body(new ApiError("LOGIN_THROTTLED", "too many failed attempts; try again later"));
@@ -134,13 +138,11 @@ public class AuthController {
 
     @ExceptionHandler(BootstrapActivation.ActivationFailedException.class)
     public ResponseEntity<ApiError> handleActivationFailed(BootstrapActivation.ActivationFailedException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ApiError("ACTIVATION_FAILED", e.getMessage()));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiError("ACTIVATION_FAILED", e.getMessage()));
     }
 
     @ExceptionHandler(PasswordPolicy.WeakPasswordException.class)
     public ResponseEntity<ApiError> handleWeakPassword(PasswordPolicy.WeakPasswordException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ApiError("WEAK_PASSWORD", e.getMessage()));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiError("WEAK_PASSWORD", e.getMessage()));
     }
 }

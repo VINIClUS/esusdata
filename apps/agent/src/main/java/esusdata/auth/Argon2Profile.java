@@ -25,8 +25,10 @@ public final class Argon2Profile {
     public Argon2Profile(SecurityProperties properties) {
         this.properties = properties;
         this.encoder = new Argon2PasswordEncoder(
-                properties.argon2SaltLength(), properties.argon2HashLength(),
-                properties.argon2Parallelism(), properties.argon2MemoryKib(),
+                properties.argon2SaltLength(),
+                properties.argon2HashLength(),
+                properties.argon2Parallelism(),
+                properties.argon2MemoryKib(),
                 properties.argon2Iterations());
     }
 

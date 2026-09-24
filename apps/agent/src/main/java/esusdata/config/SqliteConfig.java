@@ -1,16 +1,5 @@
 package esusdata.config;
 
-import org.flywaydb.core.Flyway;
-import org.sqlite.SQLiteConfig;
-import org.sqlite.SQLiteDataSource;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.DependsOn;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-
-import javax.sql.DataSource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -22,6 +11,16 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Set;
+import javax.sql.DataSource;
+import org.flywaydb.core.Flyway;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.sqlite.SQLiteConfig;
+import org.sqlite.SQLiteDataSource;
 
 /**
  * Own persistence — SQLite. Tech Spec §1.12.1: WAL, {@code synchronous=FULL},
@@ -37,6 +36,9 @@ import java.util.Set;
 @Configuration
 @EnableConfigurationProperties(SqliteProperties.class)
 public class SqliteConfig {
+
+    /** Bean name of {@link #flywayMigration}: every bean touching SQLite tables depends on it. */
+    public static final String FLYWAY_MIGRATION = "flywayMigration";
 
     /** SQLite floor per §1.12.1 — the WAL-reset correction. */
     static final int[] MIN_SQLITE_VERSION = {3, 51, 3};
@@ -76,18 +78,15 @@ public class SqliteConfig {
         }
         try {
             if (Files.isSymbolicLink(directory)) {
-                throw new IllegalStateException(
-                        "SQLite data directory must not be a symbolic link: " + directory);
+                throw new IllegalStateException("SQLite data directory must not be a symbolic link: " + directory);
             }
             Files.createDirectories(directory);
-            if (Files.isSymbolicLink(directory)
-                    || !Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
-                throw new IllegalStateException(
-                        "SQLite data path is not a real directory: " + directory);
+            if (Files.isSymbolicLink(directory) || !Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IllegalStateException("SQLite data path is not a real directory: " + directory);
             }
 
-            PosixFileAttributeView posix = Files.getFileAttributeView(
-                    directory, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+            PosixFileAttributeView posix =
+                    Files.getFileAttributeView(directory, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
             if (posix != null) {
                 Set<PosixFilePermission> ownerOnly = Set.of(
                         PosixFilePermission.OWNER_READ,
@@ -96,13 +95,11 @@ public class SqliteConfig {
                 posix.setPermissions(ownerOnly);
                 if (!posix.readAttributes().permissions().equals(ownerOnly)) {
                     throw new IllegalStateException(
-                            "SQLite data directory is not owner-only after permission hardening: "
-                                    + directory);
+                            "SQLite data directory is not owner-only after permission hardening: " + directory);
                 }
             }
         } catch (IOException e) {
-            throw new IllegalStateException(
-                    "Could not create or restrict SQLite data directory " + directory, e);
+            throw new IllegalStateException("Could not create or restrict SQLite data directory " + directory, e);
         }
     }
 
@@ -114,7 +111,8 @@ public class SqliteConfig {
     @Bean
     @DependsOn("sqliteDataSource")
     public SqliteRuntimeAssertion sqliteRuntimeAssertion(DataSource sqliteDataSource) throws SQLException {
-        try (Connection c = sqliteDataSource.getConnection(); Statement st = c.createStatement()) {
+        try (Connection c = sqliteDataSource.getConnection();
+                Statement st = c.createStatement()) {
             assertPragma(st, "journal_mode", "wal");
             assertPragma(st, "foreign_keys", "1");
             assertPragma(st, "synchronous", "2"); // FULL = 2
@@ -123,36 +121,36 @@ public class SqliteConfig {
         return new SqliteRuntimeAssertion();
     }
 
-    private void assertPragma(Statement st, String pragma, String expected) throws SQLException {
+    private static void assertPragma(Statement st, String pragma, String expected) throws SQLException {
         try (ResultSet rs = st.executeQuery("PRAGMA " + pragma)) {
             if (!rs.next()) {
                 throw new IllegalStateException("PRAGMA " + pragma + " returned no row");
             }
             String actual = rs.getString(1);
             if (!expected.equalsIgnoreCase(actual)) {
-                throw new IllegalStateException(
-                        "SQLite pragma " + pragma + " expected " + expected + " but was " + actual
-                                + " — refusing to start (Tech Spec §1.12.1 / ENG-28).");
+                throw new IllegalStateException("SQLite pragma " + pragma + " expected " + expected + " but was "
+                        + actual + " — refusing to start (Tech Spec §1.12.1 / ENG-28).");
             }
         }
     }
 
-    private void assertMinimumVersion(Statement st) throws SQLException {
+    private static void assertMinimumVersion(Statement st) throws SQLException {
         try (ResultSet rs = st.executeQuery("select sqlite_version()")) {
-            rs.next();
+            if (!rs.next()) {
+                throw new IllegalStateException("select sqlite_version() returned no row");
+            }
             String version = rs.getString(1);
             int[] parts = parseVersion(version);
             if (compareVersions(parts, MIN_SQLITE_VERSION) < 0) {
-                throw new IllegalStateException(
-                        "SQLite runtime version " + version + " is below the floor "
-                                + MIN_SQLITE_VERSION[0] + "." + MIN_SQLITE_VERSION[1] + "." + MIN_SQLITE_VERSION[2]
-                                + " (WAL-reset fix, Tech Spec §1.12.1). Refusing to start.");
+                throw new IllegalStateException("SQLite runtime version " + version + " is below the floor "
+                        + MIN_SQLITE_VERSION[0] + "." + MIN_SQLITE_VERSION[1] + "." + MIN_SQLITE_VERSION[2]
+                        + " (WAL-reset fix, Tech Spec §1.12.1). Refusing to start.");
             }
         }
     }
 
     static int[] parseVersion(String version) {
-        String[] segments = version.split("\\.");
+        String[] segments = version.split("\\.", -1);
         int[] result = new int[3];
         for (int i = 0; i < 3 && i < segments.length; i++) {
             result[i] = Integer.parseInt(segments[i].replaceAll("[^0-9].*", ""));
@@ -160,10 +158,13 @@ public class SqliteConfig {
         return result;
     }
 
+    @SuppressWarnings("PMD.UseVarargs") // two fixed-length version triples, not an argument list
     static int compareVersions(int[] a, int[] b) {
         for (int i = 0; i < 3; i++) {
             int cmp = Integer.compare(a[i], b[i]);
-            if (cmp != 0) return cmp;
+            if (cmp != 0) {
+                return cmp;
+            }
         }
         return 0;
     }
@@ -190,9 +191,8 @@ public class SqliteConfig {
         try (Connection c = sqliteDataSource.getConnection()) {
             String url = c.getMetaData().getURL();
             if (url == null || !url.startsWith("jdbc:sqlite:")) {
-                throw new IllegalStateException(
-                        "Flyway migration guard: expected a jdbc:sqlite: DataSource, got " + url
-                                + ". Refusing to migrate — Flyway must never touch the PEC DataSource (ENG-29).");
+                throw new IllegalStateException("Flyway migration guard: expected a jdbc:sqlite: DataSource, got " + url
+                        + ". Refusing to migrate — Flyway must never touch the PEC DataSource (ENG-29).");
             }
         }
 
@@ -205,9 +205,7 @@ public class SqliteConfig {
         return new FlywayMigrationResult(result.migrationsExecuted, result.success);
     }
 
-    public record FlywayMigrationResult(int migrationsExecuted, boolean success) {
-    }
+    public record FlywayMigrationResult(int migrationsExecuted, boolean success) {}
 
-    public static final class SqliteRuntimeAssertion {
-    }
+    public static final class SqliteRuntimeAssertion {}
 }

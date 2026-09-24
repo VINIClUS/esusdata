@@ -1,5 +1,7 @@
 package esusdata.auth;
 
+import java.io.Serial;
+
 /**
  * §1.12.7 L536: "Senhas entre 15 e 128 caracteres, sem truncamento silencioso; aceitar frases."
  * Length is measured in Unicode code points, not UTF-16 chars or bytes — a passphrase with
@@ -29,6 +31,9 @@ public final class PasswordPolicy {
     }
 
     public static final class WeakPasswordException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public WeakPasswordException(String message) {
             super(message);
         }

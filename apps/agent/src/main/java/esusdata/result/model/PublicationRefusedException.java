@@ -1,5 +1,7 @@
 package esusdata.result.model;
 
+import java.io.Serial;
+
 /**
  * Publication was refused because the job's ownership (process/generation/state) or the staging
  * row's state changed since the run started — the cancel/publish race resolved against
@@ -7,6 +9,9 @@ package esusdata.result.model;
  * mirror, never publish once the job left the state this run believed it owned).
  */
 public final class PublicationRefusedException extends RuntimeException {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     public PublicationRefusedException(String message) {
         super(message);
     }

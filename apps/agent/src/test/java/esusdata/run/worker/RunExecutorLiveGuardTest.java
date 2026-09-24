@@ -1,24 +1,24 @@
 package esusdata.run.worker;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import esusdata.indicator.pack.c1.C1Rule;
 import esusdata.run.extract.ExtractFixtures;
 import esusdata.run.extract.ExtractionManifest;
-import esusdata.indicator.pack.c1.C1Rule;
+import esusdata.run.job.CancellationToken;
+import esusdata.run.job.EnqueueRequest;
+import esusdata.run.job.Job;
+import esusdata.run.job.SourceAcquisitionBlockedException;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Path;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import esusdata.run.job.EnqueueRequest;
-import esusdata.run.job.Job;
-import esusdata.run.job.SourceAcquisitionBlockedException;
-import esusdata.run.job.CancellationToken;
 /**
  * ENG-51's only production caller: {@link RunExecutor#runLive} refuses to open a PEC
  * connection while its source is on cooldown — checked before any socket is opened, so this needs
@@ -50,24 +50,44 @@ class RunExecutorLiveGuardTest {
     void runLiveRefusesWhileTheSourceIsOnCooldown() {
         fixture.acquisitionGuard().block("src-1", clock.instant().plusSeconds(60), "test cooldown");
 
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
-                "job-live", "run-1", "3541307", C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
-                "2026-03", 3, "src-1", null,
-                "test-principal", null, null, null, null, clock.instant()));
-        Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
+        fixture.jobRepository.enqueue(new EnqueueRequest(
+                "job-live",
+                "run-1",
+                "3541307",
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                3,
+                "src-1",
+                null,
+                "test-principal",
+                null,
+                null,
+                null,
+                null,
+                clock.instant()));
+        Job acquired =
+                fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
 
         var context = new RunExecutor.RunContext(
-                acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
-                acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
-                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion(),
+                acquired.jobId(),
+                acquired.runId(),
+                acquired.sourceId(),
+                acquired.executionGeneration(),
+                acquired.processInstanceId(),
+                acquired.extractionId(),
+                acquired.municipalityIbge(),
+                acquired.referencePeriod(),
+                acquired.indicatorPack(),
+                acquired.ruleVersion(),
                 acquired.idempotencyPrincipal());
 
         assertThatThrownBy(() -> fixture.executor.runLive(context, new CancellationToken()))
                 .isInstanceOf(SourceAcquisitionBlockedException.class);
 
         // Never reached a PEC connection, never wrote an extract, never staged or published.
-        assertThat(fixture.jdbc.queryForObject(
-                "select count(*) from results", Integer.class)).isZero();
+        assertThat(fixture.jdbc.queryForObject("select count(*) from results", Integer.class))
+                .isZero();
     }
 
     @Test
@@ -76,16 +96,36 @@ class RunExecutorLiveGuardTest {
 
         ExtractionManifest manifest = ExtractFixtures.write(
                 fixture.extractsDir, "ext-under-cooldown", "src-1", "3541307", "2026-03", 7, 3, 0);
-        Job job = fixture.jobRepository.enqueue(new EnqueueRequest(
-                "job-extract", "run-1", "3541307", C1Rule.INDICATOR_PACK, C1Rule.RULE_VERSION,
-                "2026-03", 3, "src-1", manifest.extractionId(),
-                "test-principal", null, null, null, null, clock.instant()));
-        Job acquired = fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
+        fixture.jobRepository.enqueue(new EnqueueRequest(
+                "job-extract",
+                "run-1",
+                "3541307",
+                C1Rule.INDICATOR_PACK,
+                C1Rule.RULE_VERSION,
+                "2026-03",
+                3,
+                "src-1",
+                manifest.extractionId(),
+                "test-principal",
+                null,
+                null,
+                null,
+                null,
+                clock.instant()));
+        Job acquired =
+                fixture.jobRepository.acquireNext("proc-1", clock.instant()).orElseThrow();
 
         var context = new RunExecutor.RunContext(
-                acquired.jobId(), acquired.runId(), acquired.sourceId(), acquired.executionGeneration(),
-                acquired.processInstanceId(), acquired.extractionId(), acquired.municipalityIbge(),
-                acquired.referencePeriod(), acquired.indicatorPack(), acquired.ruleVersion(),
+                acquired.jobId(),
+                acquired.runId(),
+                acquired.sourceId(),
+                acquired.executionGeneration(),
+                acquired.processInstanceId(),
+                acquired.extractionId(),
+                acquired.municipalityIbge(),
+                acquired.referencePeriod(),
+                acquired.indicatorPack(),
+                acquired.ruleVersion(),
                 acquired.idempotencyPrincipal());
 
         var outcome = fixture.executor.runFromExtract(context, new CancellationToken());

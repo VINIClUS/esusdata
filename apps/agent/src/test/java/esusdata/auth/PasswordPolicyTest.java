@@ -1,9 +1,10 @@
 package esusdata.auth;
 
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * §1.12.7 L536: "Senhas entre 15 e 128 caracteres, sem truncamento silencioso; aceitar frases."
@@ -13,40 +14,37 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PasswordPolicyTest {
 
     private final SecurityProperties properties =
-            new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19456, 2, 1, 16, 32, "v1", 30, 24);
+            new SecurityProperties(15, 8, 5, 5, 15, 15, 15, 128, 19_456, 2, 1, 16, 32, "v1", 30, 24);
     private final PasswordPolicy policy = new PasswordPolicy(properties);
 
     @Test
     void acceptsExactlyTheMinimumLength() {
         String password = "a".repeat(15);
         assertThat(password.codePointCount(0, password.length())).isEqualTo(15);
-        policy.validate(password); // does not throw
+        assertThatCode(() -> policy.validate(password)).doesNotThrowAnyException();
     }
 
     @Test
     void acceptsExactlyTheMaximumLength() {
         String password = "a".repeat(128);
-        policy.validate(password); // does not throw
+        assertThatCode(() -> policy.validate(password)).doesNotThrowAnyException();
     }
 
     @Test
     void rejectsOneCharacterUnderTheMinimum() {
         String password = "a".repeat(14);
-        assertThatThrownBy(() -> policy.validate(password))
-                .isInstanceOf(PasswordPolicy.WeakPasswordException.class);
+        assertThatThrownBy(() -> policy.validate(password)).isInstanceOf(PasswordPolicy.WeakPasswordException.class);
     }
 
     @Test
     void rejectsOneCharacterOverTheMaximum() {
         String password = "a".repeat(129);
-        assertThatThrownBy(() -> policy.validate(password))
-                .isInstanceOf(PasswordPolicy.WeakPasswordException.class);
+        assertThatThrownBy(() -> policy.validate(password)).isInstanceOf(PasswordPolicy.WeakPasswordException.class);
     }
 
     @Test
     void rejectsNull() {
-        assertThatThrownBy(() -> policy.validate(null))
-                .isInstanceOf(PasswordPolicy.WeakPasswordException.class);
+        assertThatThrownBy(() -> policy.validate(null)).isInstanceOf(PasswordPolicy.WeakPasswordException.class);
     }
 
     @Test

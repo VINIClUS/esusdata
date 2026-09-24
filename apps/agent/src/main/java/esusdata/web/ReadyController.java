@@ -1,9 +1,8 @@
 package esusdata.web;
 
+import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 /**
  * Readiness probe — no clinical data, {@code permitAll}, also doubles as the SPA's first request

@@ -1,14 +1,15 @@
 package esusdata.run.worker;
 
-import org.springframework.dao.DataAccessException;
-
+import esusdata.run.job.EnqueueRequest;
+import esusdata.run.job.Job;
+import esusdata.run.job.JobRepository;
+import esusdata.run.job.JobRequestConflictException;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.util.Locale;
-import esusdata.run.job.EnqueueRequest;
-import esusdata.run.job.Job;
-import esusdata.run.job.JobRequestConflictException;
-import esusdata.run.job.JobRepository;
+import java.util.Optional;
+import org.springframework.dao.DataAccessException;
+
 /**
  * ENG-24: "mesmo pedido/chave reutiliza job somente com autorização atual; payload/município/
  * escopo diferente conflita; nova aquisição retificada gera nova entrada/run." Separates request
@@ -30,20 +31,15 @@ public final class IdempotencyResolver {
             return jobRepository.enqueue(request);
         }
 
-        var existing = jobRepository.findByIdempotency(
-                request.idempotencyPrincipal(), request.idempotencyKey());
+        var existing = jobRepository.findByIdempotency(request.idempotencyPrincipal(), request.idempotencyKey());
         if (existing.isPresent()) {
             Job job = existing.get();
             boolean expired = job.idempotencyExpiresAt() != null
                     && job.idempotencyExpiresAt().isBefore(clock.instant());
             if (!expired) {
-                if (!request.requestHash().equals(job.requestHash())) {
-                    throw new JobRequestConflictException(
-                            "idempotency key " + request.idempotencyKey()
-                                    + " was already used with a different request payload");
-                }
+                requireSameRequest(request, job);
                 return job; // identical repetition — same job, current authorization already
-                            // re-checked by whatever authorizes the caller before reaching here
+                // re-checked by whatever authorizes the caller before reaching here
             }
             // Expired: free the key so the unique index (which has no notion of expiry) accepts
             // a fresh job under the same (principal, key) pair.
@@ -61,15 +57,13 @@ public final class IdempotencyResolver {
             // and apply the exact same hash check as the non-racing path; otherwise a genuinely
             // different payload (different município/escopo) under the same key would silently
             // adopt the winner's job instead of conflicting.
-            Job winner = jobRepository.findByIdempotency(
-                            request.idempotencyPrincipal(), request.idempotencyKey())
-                    .orElseThrow(() -> raced);
-            if (!request.requestHash().equals(winner.requestHash())) {
-                throw new JobRequestConflictException(
-                        "idempotency key " + request.idempotencyKey()
-                                + " was already used with a different request payload");
+            Optional<Job> winner =
+                    jobRepository.findByIdempotency(request.idempotencyPrincipal(), request.idempotencyKey());
+            if (winner.isEmpty()) {
+                throw raced;
             }
-            return winner;
+            requireSameRequest(request, winner.get());
+            return winner.get();
         }
     }
 
@@ -98,5 +92,12 @@ public final class IdempotencyResolver {
             }
         }
         return false;
+    }
+
+    private static void requireSameRequest(EnqueueRequest request, Job job) {
+        if (!request.requestHash().equals(job.requestHash())) {
+            throw new JobRequestConflictException("idempotency key " + request.idempotencyKey()
+                    + " was already used with a different request payload");
+        }
     }
 }

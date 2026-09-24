@@ -4,13 +4,11 @@ import esusdata.auth.dto.CreateGrantRequest;
 import esusdata.auth.dto.CreateUserRequest;
 import esusdata.auth.dto.CreateUserResponse;
 import esusdata.auth.dto.GrantResponse;
-
 import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.Grant;
 import esusdata.auth.model.Permission;
 import esusdata.auth.model.Role;
 import esusdata.auth.model.ScopeKind;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -36,7 +34,8 @@ public class AdminController {
     private final ApiAuthorization authorization;
 
     public AdminController(
-            UserProvisioning userProvisioning, AccessAdministrationService accessAdministrationService,
+            UserProvisioning userProvisioning,
+            AccessAdministrationService accessAdministrationService,
             ApiAuthorization authorization) {
         this.userProvisioning = userProvisioning;
         this.accessAdministrationService = accessAdministrationService;
@@ -50,13 +49,17 @@ public class AdminController {
         authorization.requireRecentReauth(session);
         UserProvisioning.ProvisionedUser provisioned =
                 userProvisioning.provision(request.username(), request.displayName(), session.userId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(new CreateUserResponse(
-                provisioned.userId(), provisioned.activationToken(), provisioned.expiresAt().toString()));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new CreateUserResponse(
+                        provisioned.userId(),
+                        provisioned.activationToken(),
+                        provisioned.expiresAt().toString()));
     }
 
     @PostMapping("/api/v1/users/{id}/grants")
     public ResponseEntity<GrantResponse> grant(
-            @AuthenticationPrincipal AuthenticatedSession session, @PathVariable("id") String userId,
+            @AuthenticationPrincipal AuthenticatedSession session,
+            @PathVariable("id") String userId,
             @RequestBody CreateGrantRequest request) {
         authorization.requireInstallationPermission(session, Permission.MANAGE_ACCESS);
         authorization.requireRecentReauth(session);
@@ -64,14 +67,20 @@ public class AdminController {
             throw new IllegalArgumentException("role and scopeKind are required");
         }
         Grant grant = accessAdministrationService.grant(
-                userId, Role.valueOf(request.role()), ScopeKind.valueOf(request.scopeKind()),
-                request.municipalityIbge(), request.cnes(), request.ine(), session.userId());
+                userId,
+                Role.valueOf(request.role()),
+                ScopeKind.valueOf(request.scopeKind()),
+                request.municipalityIbge(),
+                request.cnes(),
+                request.ine(),
+                session.userId());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(grant));
     }
 
     @DeleteMapping("/api/v1/users/{id}/grants/{grantId}")
     public ResponseEntity<Void> revoke(
-            @AuthenticationPrincipal AuthenticatedSession session, @PathVariable("id") String userId,
+            @AuthenticationPrincipal AuthenticatedSession session,
+            @PathVariable("id") String userId,
             @PathVariable("grantId") String grantId) {
         authorization.requireInstallationPermission(session, Permission.MANAGE_ACCESS);
         authorization.requireRecentReauth(session);
@@ -88,10 +97,16 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
-    private GrantResponse toResponse(Grant grant) {
+    private static GrantResponse toResponse(Grant grant) {
         return new GrantResponse(
-                grant.grantId(), grant.userId(), grant.role().name(), grant.scopeKind().name(),
-                grant.municipalityIbge(), grant.cnes(), grant.ine(), grant.grantedAt().toString(),
+                grant.grantId(),
+                grant.userId(),
+                grant.role().name(),
+                grant.scopeKind().name(),
+                grant.municipalityIbge(),
+                grant.cnes(),
+                grant.ine(),
+                grant.grantedAt().toString(),
                 grant.grantedBy());
     }
 }

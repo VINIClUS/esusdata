@@ -1,8 +1,9 @@
 package esusdata.source.pec;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * ENG-43 guard: the frozen {@code query_checksum} recorded in
@@ -16,11 +17,12 @@ class PecAdaptersMatrixConsistencyTest {
     @ParameterizedTest
     @ValueSource(strings = {"5.4.37", "5.5.28"})
     void frozenQueryChecksumMatchesTheLiveAdapterQuery(String pecVersion) {
-        var entry = PecCompatibilityMatrix.fromClasspathResource().findExact(
-                IndividualEncounterModalityCapability.CAPABILITY,
-                IndividualEncounterModalityCapability.ADAPTER_VERSION,
-                new PecSourceIdentity("matrix-test", pecVersion, "PEC_DW", "PRONTUARIO"),
-                "9.6.13");
+        var entry = PecCompatibilityMatrix.fromClasspathResource()
+                .findExact(
+                        IndividualEncounterModalityCapability.CAPABILITY,
+                        IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                        new PecSourceIdentity("matrix-test", pecVersion, "PEC_DW", "PRONTUARIO"),
+                        "9.6.13");
 
         assertThat(entry.capability()).isEqualTo("individual_encounter_modality");
         assertThat(entry.queryChecksum())

@@ -1,16 +1,16 @@
 package esusdata.run.worker;
 
 import esusdata.result.model.ResultStagingArea;
-import org.springframework.transaction.support.TransactionTemplate;
-
+import esusdata.run.job.Job;
+import esusdata.run.job.JobRepository;
+import esusdata.run.job.JobState;
+import esusdata.run.job.RetryPolicy;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import esusdata.run.job.Job;
-import esusdata.run.job.JobState;
-import esusdata.run.job.RetryPolicy;
-import esusdata.run.job.JobRepository;
+import org.springframework.transaction.support.TransactionTemplate;
+
 /**
  * Boot-time reconciliation (§1.9.4, ENG-06, ENG-21, ENG-51). Runs once per process start, after
  * the {@code ProcessLock} and Flyway migration, before the worker accepts any job — enforced by
@@ -50,8 +50,7 @@ public final class JobRecovery {
         this.liveAcquisitionCooldownMargin = liveAcquisitionCooldownMargin;
     }
 
-    public record RecoveryReport(int requeued, int failed, int cancelled) {
-    }
+    public record RecoveryReport(int requeued, int failed, int cancelled) {}
 
     public RecoveryReport reconcile(String newProcessInstanceId) {
         int requeued = 0;
@@ -74,6 +73,33 @@ public final class JobRecovery {
         return new RecoveryReport(requeued, failed, cancelled);
     }
 
+    /** The cooldown's end if the job may have held a live PEC session, else {@code null}. */
+    private Instant blockSourceIfLive(Job job, Instant now) {
+        if (job.isImmutableExtract() || job.state() != JobState.RUNNING) {
+            // A RUNNING LIVE_READ_ONLY job may have had a live PEC session open; an
+            // IMMUTABLE_EXTRACT job never opens one (it only reads a finalized extract file),
+            // and a STAGED job's acquisition was already closed before staging began — neither
+            // needs the guard.
+            return null;
+        }
+        Instant blockedUntil = now.plus(liveAcquisitionCooldownMargin);
+        acquisitionGuard.block(job.sourceId(), blockedUntil, "recovered abandoned RUNNING job " + job.jobId());
+        return blockedUntil;
+    }
+
+    private Instant nextAttemptAfterRecovery(Job job, Instant now, Instant blockedUntil) {
+        Instant nextAttemptAt = retryPolicy.nextAttemptAt(now, job.attempt());
+        if (blockedUntil != null && blockedUntil.isAfter(nextAttemptAt)) {
+            // Ordinary retry backoff starts far shorter than the cooldown just written above —
+            // without this, the requeued attempt would fire while still blocked, hit
+            // AcquisitionGuard, and burn retry budget on a wait condition instead of a real
+            // failure (the same class of bug JobWorker.handleFailure guards against for a live
+            // failure discovered at runtime, not at boot).
+            return blockedUntil;
+        }
+        return nextAttemptAt;
+    }
+
     /** Returns {@code true} if the job was requeued, {@code false} if it was failed instead. */
     private boolean recoverRunningOrStaged(Job job) {
         Boolean requeued = transactionTemplate.execute(status -> {
@@ -83,40 +109,29 @@ public final class JobRecovery {
             boolean retriable = retryPolicy.canRetry(job.attempt(), job.maxAttempts());
             Instant now = clock.instant();
 
-            Instant blockedUntil = null;
-            if (!job.isImmutableExtract() && job.state() == JobState.RUNNING) {
-                // A RUNNING LIVE_READ_ONLY job may have had a live PEC session open; an
-                // IMMUTABLE_EXTRACT job never opens one (it only reads a finalized extract file),
-                // and a STAGED job's acquisition was already closed before staging began — neither
-                // needs the guard.
-                blockedUntil = now.plus(liveAcquisitionCooldownMargin);
-                acquisitionGuard.block(job.sourceId(), blockedUntil,
-                        "recovered abandoned RUNNING job " + job.jobId());
-            }
-
-            boolean transitioned;
-            if (retriable) {
-                Instant nextAttemptAt = retryPolicy.nextAttemptAt(now, job.attempt());
-                if (blockedUntil != null && blockedUntil.isAfter(nextAttemptAt)) {
-                    // Ordinary retry backoff starts far shorter than the cooldown just written
-                    // above — without this, the requeued attempt would fire while still blocked,
-                    // hit AcquisitionGuard, and burn retry budget on a wait condition instead of a
-                    // real failure (the same class of bug JobWorker.handleFailure guards against
-                    // for a live failure discovered at runtime, not at boot).
-                    nextAttemptAt = blockedUntil;
-                }
-                transitioned = jobRepository.requeueAbandoned(job.jobId(), job.state(), nextAttemptAt);
-            } else {
-                transitioned = jobRepository.failAbandoned(job.jobId(), job.state(),
-                        "RECOVERED_ABANDONED", "attempts exhausted after process restart", now);
-            }
+            Instant blockedUntil = blockSourceIfLive(job, now);
+            boolean transitioned = retriable
+                    ? jobRepository.requeueAbandoned(
+                            job.jobId(), job.state(), nextAttemptAfterRecovery(job, now, blockedUntil))
+                    : jobRepository.failAbandoned(
+                            job.jobId(),
+                            job.state(),
+                            "RECOVERED_ABANDONED",
+                            "attempts exhausted after process restart",
+                            now);
             if (!transitioned) {
                 status.setRollbackOnly();
                 throw new IllegalStateException("recovery CAS failed for job " + job.jobId());
             }
-            jobRepository.recordAttempt(job.jobId(), job.attempt(), job.processInstanceId(),
-                    job.executionGeneration(), job.startedAt() == null ? now : job.startedAt(), now,
-                    "ABANDONED", "RECOVERED_ABANDONED",
+            jobRepository.recordAttempt(
+                    job.jobId(),
+                    job.attempt(),
+                    job.processInstanceId(),
+                    job.executionGeneration(),
+                    job.startedAt() == null ? now : job.startedAt(),
+                    now,
+                    "ABANDONED",
+                    "RECOVERED_ABANDONED",
                     "process restarted while job was " + job.state());
             return retriable;
         });
@@ -134,7 +149,9 @@ public final class JobRecovery {
                 // PostgreSQL when this process died — cancellation is cooperative and best-effort
                 // (CancellationToken's own contract), so an abandoned CANCEL_REQUESTED job is no
                 // more provably closed than an abandoned RUNNING one. Same cooldown, same reason.
-                acquisitionGuard.block(job.sourceId(), now.plus(liveAcquisitionCooldownMargin),
+                acquisitionGuard.block(
+                        job.sourceId(),
+                        now.plus(liveAcquisitionCooldownMargin),
                         "recovered abandoned CANCEL_REQUESTED job " + job.jobId());
             }
             boolean transitioned = jobRepository.cancelAbandoned(job.jobId(), now);
@@ -142,9 +159,15 @@ public final class JobRecovery {
                 status.setRollbackOnly();
                 throw new IllegalStateException("recovery CAS failed for job " + job.jobId());
             }
-            jobRepository.recordAttempt(job.jobId(), job.attempt(), job.processInstanceId(),
-                    job.executionGeneration(), job.startedAt() == null ? now : job.startedAt(), now,
-                    "ABANDONED", "RECOVERED_ABANDONED",
+            jobRepository.recordAttempt(
+                    job.jobId(),
+                    job.attempt(),
+                    job.processInstanceId(),
+                    job.executionGeneration(),
+                    job.startedAt() == null ? now : job.startedAt(),
+                    now,
+                    "ABANDONED",
+                    "RECOVERED_ABANDONED",
                     "process restarted with a pending cancel request");
         });
     }

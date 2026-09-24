@@ -1,5 +1,6 @@
 package esusdata.source.pec;
 
+import java.io.Serial;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -19,11 +20,13 @@ import java.util.Set;
  */
 public final class CompatibilityFingerprint {
 
-    private CompatibilityFingerprint() {
-    }
+    private CompatibilityFingerprint() {}
 
     /** A verdict this algorithm reached from raw probe data — never a JDBC/connection failure. */
     public static final class VerificationException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public VerificationException(String message) {
             super(message);
         }
@@ -71,8 +74,8 @@ public final class CompatibilityFingerprint {
             throw new VerificationException(
                     "Incomplete compatibility metadata for " + probe.object() + "." + item.requested());
         }
-        return item.requested() + "|" + column.dataType() + "|" + column.udtName()
-                + "|" + column.ordinalPosition() + "|" + column.isNullable();
+        return item.requested() + "|" + column.dataType() + "|" + column.udtName() + "|" + column.ordinalPosition()
+                + "|" + column.isNullable();
     }
 
     private static String uniqueKeyPart(CompatibilityProbeResult probe, ProbeItem.UniqueKeyItem item) {
@@ -142,13 +145,14 @@ public final class CompatibilityFingerprint {
     private static void requireColumnMetadata(CompatibilityProbeResult probe, String column) {
         ColumnMetadata metadata = probe.columns().get(column);
         if (metadata == null || isIncomplete(metadata)) {
-            throw new VerificationException(
-                    "Incomplete compatibility metadata for " + probe.object() + "." + column);
+            throw new VerificationException("Incomplete compatibility metadata for " + probe.object() + "." + column);
         }
     }
 
     private static boolean isIncomplete(ColumnMetadata column) {
-        return column.dataType() == null || column.udtName() == null || column.isNullable() == null
+        return column.dataType() == null
+                || column.udtName() == null
+                || column.isNullable() == null
                 || column.ordinalPosition() <= 0
                 || !("YES".equals(column.isNullable()) || "NO".equals(column.isNullable()));
     }
@@ -159,7 +163,8 @@ public final class CompatibilityFingerprint {
             throw new VerificationException("Invalid unique-key marker: " + marker);
         }
         List<String> columns = List.of(marker.substring(prefix.length()).split(",", -1));
-        if (columns.isEmpty() || columns.stream().anyMatch(String::isBlank)
+        if (columns.isEmpty()
+                || columns.stream().anyMatch(String::isBlank)
                 || columns.stream().distinct().count() != columns.size()) {
             throw new VerificationException("Invalid unique-key marker: " + marker);
         }
@@ -172,7 +177,7 @@ public final class CompatibilityFingerprint {
             throw new VerificationException("Invalid leaf semantic marker: " + marker);
         }
         Set<Integer> expected = new HashSet<>();
-        for (String value : marker.substring(prefix.length()).split(",")) {
+        for (String value : marker.substring(prefix.length()).split(",", -1)) {
             try {
                 if (!expected.add(Integer.valueOf(value))) {
                     throw new VerificationException("Duplicate frozen leaf id in marker: " + marker);
@@ -193,7 +198,7 @@ public final class CompatibilityFingerprint {
             throw new VerificationException("Invalid leaf-id marker: " + marker);
         }
         Set<Integer> expected = new HashSet<>();
-        for (String value : marker.substring(prefix.length()).split(",")) {
+        for (String value : marker.substring(prefix.length()).split(",", -1)) {
             try {
                 expected.add(Integer.valueOf(value));
             } catch (NumberFormatException e) {

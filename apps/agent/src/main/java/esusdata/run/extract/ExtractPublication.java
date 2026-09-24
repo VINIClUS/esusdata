@@ -27,8 +27,7 @@ import java.util.Set;
  */
 final class ExtractPublication {
 
-    private ExtractPublication() {
-    }
+    private ExtractPublication() {}
 
     static void validateManifestArguments(
             String sourceId,
@@ -40,27 +39,20 @@ final class ExtractPublication {
             String queryChecksum,
             String adapterVersion,
             String completenessStatus,
-            String consistencyLevel
-    ) {
-        if (sourceId == null || sourceId.isBlank()) throw new IllegalArgumentException("sourceId is required");
+            String consistencyLevel) {
+        requireText(sourceId, "sourceId");
         if (municipalityIbge == null || !municipalityIbge.matches("\\d{7}")) {
             throw new IllegalArgumentException("municipalityIbge must be a 7-digit IBGE code");
         }
-        LocalDate start;
-        LocalDate end;
-        try {
-            start = LocalDate.parse(periodStart);
-            end = LocalDate.parse(periodEndExclusive);
-        } catch (RuntimeException e) {
-            throw new IllegalArgumentException("period must use ISO local dates", e);
+        validatePeriod(periodStart, periodEndExclusive);
+        if (startedAt == null) {
+            throw new IllegalArgumentException("startedAt is required");
         }
-        if (!end.isAfter(start)) throw new IllegalArgumentException("period end must be after period start");
-        if (startedAt == null) throw new IllegalArgumentException("startedAt is required");
-        if (sourceZoneId == null || sourceZoneId.isBlank()) throw new IllegalArgumentException("sourceZoneId is required");
+        requireText(sourceZoneId, "sourceZoneId");
         if (!ExtractValidation.isSha256Digest(queryChecksum)) {
             throw new IllegalArgumentException("queryChecksum must be a SHA-256 digest");
         }
-        if (adapterVersion == null || adapterVersion.isBlank()) throw new IllegalArgumentException("adapterVersion is required");
+        requireText(adapterVersion, "adapterVersion");
         if (!"COMPLETE".equals(completenessStatus)) {
             throw new IllegalArgumentException("only COMPLETE extracts may be published");
         }
@@ -69,8 +61,28 @@ final class ExtractPublication {
         }
         try {
             java.time.ZoneId.of(sourceZoneId);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e) { // NOPMD - unknown zone or null, converted with its cause
             throw new IllegalArgumentException("sourceZoneId is invalid", e);
+        }
+    }
+
+    private static void requireText(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " is required");
+        }
+    }
+
+    private static void validatePeriod(String periodStart, String periodEndExclusive) {
+        LocalDate start;
+        LocalDate end;
+        try {
+            start = LocalDate.parse(periodStart);
+            end = LocalDate.parse(periodEndExclusive);
+        } catch (RuntimeException e) { // NOPMD - parse failure or null, converted with its cause
+            throw new IllegalArgumentException("period must use ISO local dates", e);
+        }
+        if (!end.isAfter(start)) {
+            throw new IllegalArgumentException("period end must be after period start");
         }
     }
 
@@ -78,17 +90,20 @@ final class ExtractPublication {
         createOwnerOnlyFile(path);
         try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE)) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
-            while (buffer.hasRemaining()) channel.write(buffer);
+            while (buffer.hasRemaining()) {
+                channel.write(buffer);
+            }
             channel.force(true);
         }
     }
 
     static void createOwnerOnlyFile(Path path) throws IOException {
-        PosixFileAttributeView posixView = Files.getFileAttributeView(
-                path.getParent(), PosixFileAttributeView.class);
+        PosixFileAttributeView posixView = Files.getFileAttributeView(path.getParent(), PosixFileAttributeView.class);
         if (posixView != null) {
-            Files.createFile(path, PosixFilePermissions.asFileAttribute(Set.of(
-                    PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
+            Files.createFile(
+                    path,
+                    PosixFilePermissions.asFileAttribute(
+                            Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
         } else {
             Files.createFile(path);
         }
@@ -128,9 +143,8 @@ final class ExtractPublication {
             throw new SourceBudgetExceededException(
                     SourceBudgetExceededException.CODE + ": temporary extract byte ceiling exceeded");
         }
-        long reserveBytes = maxTempFileBytes > Long.MAX_VALUE - 1_048_576L
-                ? Long.MAX_VALUE
-                : maxTempFileBytes + 1_048_576L;
+        long reserveBytes =
+                maxTempFileBytes > Long.MAX_VALUE - 1_048_576L ? Long.MAX_VALUE : maxTempFileBytes + 1_048_576L;
         long usableBytes = Files.getFileStore(directory).getUsableSpace();
         if (usableBytes < reserveBytes) {
             throw new SourceBudgetExceededException(

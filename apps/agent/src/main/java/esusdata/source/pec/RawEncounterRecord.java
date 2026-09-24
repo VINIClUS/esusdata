@@ -16,8 +16,7 @@ public record RawEncounterRecord(
         String ine,
         String cbo,
         String uuidFicha,
-        int nuAtendimento
-) {
+        int nuAtendimento) {
     public EncounterModality modality() {
         return EncounterTypeMapping.classify(tipoAtendimentoId);
     }

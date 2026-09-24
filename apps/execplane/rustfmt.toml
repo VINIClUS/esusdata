@@ -1,0 +1,6 @@
+# Static-analysis gate (ADR 0018): stable options only, so the pinned toolchain's rustfmt applies
+# them without nightly.
+edition = "2021"
+newline_style = "Unix"
+use_field_init_shorthand = true
+use_try_shorthand = true

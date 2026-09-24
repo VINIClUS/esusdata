@@ -1,12 +1,12 @@
 package esusdata.run.job;
 
-import org.junit.jupiter.api.Test;
-
-import java.util.concurrent.atomic.AtomicInteger;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
+
 /**
  * ENG-07: "tentar cancelar statement quando suportado." Unit-level proof of the interrupt-binding
  * half — that {@link CancellationToken#requestCancel()} actually invokes whatever {@code Runnable}
@@ -52,7 +52,7 @@ class CancellationTokenTest {
     void aFailingInterruptIsSwallowedBestEffort() {
         CancellationToken token = new CancellationToken();
         token.bindInterrupt(() -> {
-            throw new RuntimeException("driver does not support cancel");
+            throw new IllegalStateException("driver does not support cancel");
         });
 
         assertThatCode(token::requestCancel).doesNotThrowAnyException();

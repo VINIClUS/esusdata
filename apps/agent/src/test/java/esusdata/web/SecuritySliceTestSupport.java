@@ -1,13 +1,12 @@
 package esusdata.web;
 
+import java.net.CookieManager;
+import java.net.http.HttpClient;
+import java.nio.file.Path;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-
-import java.net.CookieManager;
-import java.net.http.HttpClient;
-import java.nio.file.Path;
 
 /**
  * Fixed test port (not random): {@code observatorio.web.allowed-hosts}/{@code allowed-origins}
@@ -16,24 +15,29 @@ import java.nio.file.Path;
  * checked against.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
+// Abstract so JUnit never runs the shared context setup as a test class of its own.
+@SuppressWarnings("PMD.AbstractClassWithoutAbstractMethod")
 public abstract class SecuritySliceTestSupport {
 
-    public static final int PORT = 18443;
+    public static final int PORT = 18_443;
     public static final String BASE_URL = "http://127.0.0.1:" + PORT;
 
     @TempDir
+    // JUnit injects a static @TempDir once for the whole class.
+    @SuppressWarnings("PMD.MutableStaticState")
     public static Path dataDir;
 
     @DynamicPropertySource
     public static void props(DynamicPropertyRegistry registry) {
         // Any executable satisfies RunConfig's startup check; this context never acquires.
-        registry.add("observatorio.execution-plane.binary",
+        registry.add(
+                "observatorio.execution-plane.binary",
                 () -> ProcessHandle.current().info().command().orElseThrow());
         registry.add("server.port", () -> PORT);
         registry.add("observatorio.data.directory", dataDir::toString);
         registry.add("observatorio.web.allowed-hosts", () -> "127.0.0.1:" + PORT);
-        registry.add("observatorio.web.allowed-origins",
-                () -> BASE_URL + ",http://127.0.0.1:5173,http://localhost:5173");
+        registry.add(
+                "observatorio.web.allowed-origins", () -> BASE_URL + ",http://127.0.0.1:5173,http://localhost:5173");
         registry.add("observatorio.security.argon2-memory-kib", () -> "8");
         registry.add("observatorio.security.argon2-iterations", () -> "1");
     }

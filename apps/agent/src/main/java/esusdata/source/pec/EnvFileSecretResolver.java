@@ -47,16 +47,16 @@ public final class EnvFileSecretResolver implements PecSecretResolver {
                     Files.newInputStream(envFile, LinkOption.NOFOLLOW_LINKS), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = input.readLine()) != null) {
-                String trimmed = line.trim();
-                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                    continue;
-                }
-                int i = line.indexOf('=');
-                if (i > 0) {
-                    String key = line.substring(0, i).trim();
-                    String value = line.substring(i + 1);
-                    values.put(key, value);
-                }
+                    String trimmed = line.trim();
+                    if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                        continue;
+                    }
+                    int i = line.indexOf('=');
+                    if (i > 0) {
+                        String key = line.substring(0, i).trim();
+                        String value = line.substring(i + 1);
+                        values.put(key, value);
+                    }
                 }
             }
         } catch (IOException e) {
@@ -80,15 +80,13 @@ public final class EnvFileSecretResolver implements PecSecretResolver {
             throw new IllegalStateException("Secret file must be a regular file: " + envFile);
         }
         try {
-            if (Files.getFileAttributeView(envFile, PosixFileAttributeView.class,
-                    LinkOption.NOFOLLOW_LINKS) != null) {
+            if (Files.getFileAttributeView(envFile, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS) != null) {
                 validatePosixPermissions();
-            } else if (Files.getFileAttributeView(envFile, AclFileAttributeView.class,
-                    LinkOption.NOFOLLOW_LINKS) != null) {
+            } else if (Files.getFileAttributeView(envFile, AclFileAttributeView.class, LinkOption.NOFOLLOW_LINKS)
+                    != null) {
                 validateAclPermissions();
             } else {
-                throw new IllegalStateException(
-                        "Cannot verify secret file permissions on this filesystem: " + envFile);
+                throw new IllegalStateException("Cannot verify secret file permissions on this filesystem: " + envFile);
             }
         } catch (IOException e) {
             throw new IllegalStateException("Could not inspect secret file permissions: " + envFile, e);
@@ -96,11 +94,12 @@ public final class EnvFileSecretResolver implements PecSecretResolver {
     }
 
     private void validatePosixPermissions() throws IOException {
-        PosixFileAttributes attributes = Files.readAttributes(
-                envFile, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        PosixFileAttributes attributes =
+                Files.readAttributes(envFile, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
         Set<PosixFilePermission> permissions = attributes.permissions();
-        if (permissions.stream().anyMatch(permission -> permission.name().startsWith("GROUP_")
-                || permission.name().startsWith("OTHERS_"))) {
+        if (permissions.stream()
+                .anyMatch(permission -> permission.name().startsWith("GROUP_")
+                        || permission.name().startsWith("OTHERS_"))) {
             throw new IllegalStateException(
                     "Secret file permissions must be owner-only (0600 or stricter): " + envFile);
         }
@@ -124,10 +123,11 @@ public final class EnvFileSecretResolver implements PecSecretResolver {
         } catch (UserPrincipalNotFoundException e) {
             // The owner and SYSTEM still apply; anything else fails closed below.
         }
-        List<AclEntry> acl = Files.getFileAttributeView(
-                envFile, AclFileAttributeView.class, LinkOption.NOFOLLOW_LINKS).getAcl();
+        List<AclEntry> acl = Files.getFileAttributeView(envFile, AclFileAttributeView.class, LinkOption.NOFOLLOW_LINKS)
+                .getAcl();
         for (AclEntry entry : acl) {
-            if (entry.type() == AclEntryType.ALLOW && !entry.permissions().isEmpty()
+            if (entry.type() == AclEntryType.ALLOW
+                    && !entry.permissions().isEmpty()
                     && !allowed.contains(entry.principal())) {
                 throw new IllegalStateException("Secret file must be accessible only to its owner,"
                         + " the account running the service and SYSTEM, but the ACL grants "

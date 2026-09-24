@@ -1,12 +1,11 @@
 package esusdata.testsupport;
 
-import org.junit.jupiter.api.Assumptions;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.Assumptions;
 
 /**
  * Shared skip-guard for tests that talk to the real PEC on CT 133 through the dev SSH tunnel
@@ -20,13 +19,12 @@ public final class LivePecAssumptions {
     public static final Path ENV_FILE =
             Path.of(System.getProperty("user.home"), ".config", "observatorio-aps", "pec.env");
 
-    private LivePecAssumptions() {
-    }
+    private LivePecAssumptions() {}
 
     public static void assumeReachable(String host, int port) {
-        Assumptions.assumeTrue(Files.exists(ENV_FILE),
-                "Skipping: no dev PEC secret file at " + ENV_FILE);
-        Assumptions.assumeTrue(isReachable(host, port),
+        Assumptions.assumeTrue(Files.exists(ENV_FILE), "Skipping: no dev PEC secret file at " + ENV_FILE);
+        Assumptions.assumeTrue(
+                isReachable(host, port),
                 "Skipping: " + host + ":" + port + " not reachable — SSH tunnel likely down "
                         + "(NetBird session may have expired; see ADR 0003 for the reconnect command)");
     }

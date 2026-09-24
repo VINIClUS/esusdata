@@ -1,8 +1,9 @@
 package esusdata.auth;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
-
+import esusdata.auth.model.AuthenticatedSession;
+import esusdata.auth.model.UserAccount;
+import esusdata.auth.model.UserRepository;
+import esusdata.auth.model.UserState;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -12,10 +13,8 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Optional;
-import esusdata.auth.model.AuthenticatedSession;
-import esusdata.auth.model.UserAccount;
-import esusdata.auth.model.UserState;
-import esusdata.auth.model.UserRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 
 /**
  * Deliberately NOT backed by {@code HttpSession}: §1.12.7 needs two independent expiry clocks
@@ -32,9 +31,12 @@ public final class SessionService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final RowMapper<Row> MAPPER = (rs, rowNum) -> new Row(
-            rs.getString("session_id"), rs.getString("user_id"),
-            Instant.parse(rs.getString("login_at")), Instant.parse(rs.getString("last_interactive_at")),
-            Instant.parse(rs.getString("absolute_expires_at")), rs.getLong("authorization_version_at_login"),
+            rs.getString("session_id"),
+            rs.getString("user_id"),
+            Instant.parse(rs.getString("login_at")),
+            Instant.parse(rs.getString("last_interactive_at")),
+            Instant.parse(rs.getString("absolute_expires_at")),
+            rs.getLong("authorization_version_at_login"),
             rs.getString("reauth_at") == null ? null : Instant.parse(rs.getString("reauth_at")),
             rs.getString("revoked_at"));
 
@@ -48,17 +50,22 @@ public final class SessionService {
         this.properties = properties;
     }
 
-    /** @return the raw opaque token — set as the session cookie value, never stored. */
+    /** Creates a session and returns its raw opaque token — set as the session cookie value, never stored. */
     public String create(String userId, long authorizationVersionAtLogin, Instant now) {
         String rawToken = newOpaqueToken();
         String sessionId = hash(rawToken);
         Instant absoluteExpiresAt = now.plus(Duration.ofHours(properties.absoluteDurationHours()));
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO sessions (session_id, user_id, login_at, last_interactive_at,
                     absolute_expires_at, authorization_version_at_login, reauth_at, revoked_at, revoked_reason)
                 VALUES (?,?,?,?,?,?,null,null,null)
                 """,
-                sessionId, userId, now.toString(), now.toString(), absoluteExpiresAt.toString(),
+                sessionId,
+                userId,
+                now.toString(),
+                now.toString(),
+                absoluteExpiresAt.toString(),
                 authorizationVersionAtLogin);
         return rawToken;
     }
@@ -78,12 +85,16 @@ public final class SessionService {
             return Optional.empty();
         }
         if (interactive) {
-            jdbc.update("update sessions set last_interactive_at = ? where session_id = ?",
-                    now.toString(), sessionId);
+            jdbc.update("update sessions set last_interactive_at = ? where session_id = ?", now.toString(), sessionId);
         }
         return Optional.of(new AuthenticatedSession(
-                sessionId, row.userId(), row.loginAt(), interactive ? now : row.lastInteractiveAt(),
-                row.absoluteExpiresAt(), row.authorizationVersionAtLogin(), row.reauthAt()));
+                sessionId,
+                row.userId(),
+                row.loginAt(),
+                interactive ? now : row.lastInteractiveAt(),
+                row.absoluteExpiresAt(),
+                row.authorizationVersionAtLogin(),
+                row.reauthAt()));
     }
 
     /**
@@ -99,8 +110,9 @@ public final class SessionService {
     }
 
     private Row findRow(String sessionId) {
-        return jdbc.query("select * from sessions where session_id = ?", MAPPER, sessionId)
-                .stream().findFirst().orElse(null);
+        return jdbc.query("select * from sessions where session_id = ?", MAPPER, sessionId).stream()
+                .findFirst()
+                .orElse(null);
     }
 
     private boolean isCurrentlyValid(Row row, Instant now) {
@@ -129,15 +141,18 @@ public final class SessionService {
 
     /** §1.12.7: "Reautenticação realizada nos últimos cinco minutos" — for sensitive actions. */
     public boolean reauthenticatedRecently(AuthenticatedSession session, Instant now) {
-        if (session.reauthAt() == null) {
-            return false;
-        }
-        return session.reauthAt().plus(Duration.ofMinutes(properties.reauthWindowMinutes())).isAfter(now);
+        return session.reauthAt() != null
+                && session.reauthAt()
+                        .plus(Duration.ofMinutes(properties.reauthWindowMinutes()))
+                        .isAfter(now);
     }
 
     public void revoke(String sessionId, Instant now, String reason) {
-        jdbc.update("update sessions set revoked_at = ?, revoked_reason = ? where session_id = ?",
-                now.toString(), reason, sessionId);
+        jdbc.update(
+                "update sessions set revoked_at = ?, revoked_reason = ? where session_id = ?",
+                now.toString(),
+                reason,
+                sessionId);
     }
 
     private static String newOpaqueToken() {
@@ -156,7 +171,12 @@ public final class SessionService {
     }
 
     private record Row(
-            String sessionId, String userId, Instant loginAt, Instant lastInteractiveAt,
-            Instant absoluteExpiresAt, long authorizationVersionAtLogin, Instant reauthAt, String revokedAt) {
-    }
+            String sessionId,
+            String userId,
+            Instant loginAt,
+            Instant lastInteractiveAt,
+            Instant absoluteExpiresAt,
+            long authorizationVersionAtLogin,
+            Instant reauthAt,
+            String revokedAt) {}
 }
