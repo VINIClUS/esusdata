@@ -9,6 +9,7 @@ import esusdata.source.pec.PecDataSourceFactory;
 import esusdata.source.pec.PecSourceIdentity;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.junit.jupiter.Container;
@@ -54,6 +55,8 @@ import esusdata.run.job.CancellationToken;
  * uses the real {@code JdbcCompatibilityCatalog}; only this test injects a substitute, through
  * {@link JobRunnerTestFixture}'s catalog-accepting constructor.
  */
+// Linux containers: excluded on Windows (package-windows.ps1).
+@Tag("docker")
 @Testcontainers
 class LiveAcquisitionEndToEndTest {
 

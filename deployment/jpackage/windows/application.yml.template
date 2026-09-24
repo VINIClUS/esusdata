@@ -1,0 +1,20 @@
+# Observatório APS — local overrides. Loaded after the defaults shipped in
+# C:\Program Files\ObservatorioAPS\app\observatorio-aps.yml; anything set here wins.
+# Restart after editing: Restart-Service observatorio-aps
+#
+# observatorio:
+#   data:
+#     # The service account (LocalService) can only write under C:/ProgramData/ObservatorioAPS/data
+#     # and logs; another directory needs the same access granted by hand.
+#     directory: C:/ProgramData/ObservatorioAPS/data
+#   source:
+#     allowed-destinations: ["10.0.0.5:5432"]
+#     # Create it here from an elevated prompt: it inherits this directory's ACL and is owned by
+#     # Administrators, which is what the service accepts (readable only by its owner,
+#     # LocalService and SYSTEM).
+#     secret-file: C:/ProgramData/ObservatorioAPS/config/pec.env
+#   execution-plane:
+#     # "" (with quotes) turns the Rust execution plane off and uses in-process JDBC
+#     binary: ""
+# server:
+#   address: 127.0.0.1

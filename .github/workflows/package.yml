@@ -72,6 +72,9 @@ jobs:
         run: |
           rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal
           rustup default $env:RUST_TOOLCHAIN
+      - name: Execution plane tests
+        shell: pwsh
+        run: cargo test --release --locked --manifest-path apps/execplane/Cargo.toml
       # jpackage 21 drives WiX 3 (candle/light). Installed explicitly rather than trusting the
       # runner image to still carry it.
       - name: WiX Toolset 3
@@ -83,7 +86,8 @@ jobs:
           $wix = Get-ChildItem 'C:\Program Files (x86)' -Directory -Filter 'WiX Toolset v3*' |
             Sort-Object Name -Descending | Select-Object -First 1
           if ($wix) { "$($wix.FullName)\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH }
-      # ADR 0014: tests skipped — the POSIX-only secret check and directory fsync fail on Windows.
+      # Verify without the "docker" tests: the runner cannot start Linux containers (the linux
+      # job runs them).
       - name: Package
         shell: pwsh
         run: deployment/jpackage/package-windows.ps1
@@ -112,11 +116,25 @@ jobs:
       - name: Install, run, reinstall, remove, purge
         run: sudo deployment/jpackage/test-deb-lifecycle.sh dist/*.deb
 
-  # Draft only: the MSI still has no Windows service nor working acquisition (ADR 0014), so a
-  # person reviews the notes before publishing.
+  # Same for the MSI: the runner is a disposable VM where the job runs as an administrator.
+  msi-lifecycle:
+    needs: windows
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: observatorio-aps-windows-msi
+          path: dist
+      - name: Install, run, reinstall, uninstall
+        shell: pwsh
+        run: deployment/jpackage/test-msi-lifecycle.ps1 (Get-Item dist/*.msi).FullName
+
+  # Draft only: live acquisition on Windows is tested only against a test PEC by hand (ADR 0014),
+  # so a person reviews the notes before publishing.
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [linux, windows, deb-lifecycle]
+    needs: [linux, windows, deb-lifecycle, msi-lifecycle]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -152,7 +170,11 @@ jobs:
           - **Linux (testado no Ubuntu 24.04; exige `libasound2t64`, Ubuntu 24.04+ / Debian 13)**: `sudo apt install ./observatorio-aps_*_amd64.deb`
             — serviço systemd `observatorio-aps`, dados em `/var/lib/observatorio-aps`, configuração
             local em `/etc/observatorio-aps/application.yml`.
-          - **Windows (.msi)**: prévia — ainda sem serviço do Windows e sem aquisição do PEC (ADR 0014).
+          - **Windows 10/11 (.msi, testado no Windows Server 2022 e Windows 11)**: instale como
+            administrador — serviço do Windows `observatorio-aps` (conta LocalService), dados em
+            `C:\ProgramData\ObservatorioAPS\data`, configuração local em
+            `C:\ProgramData\ObservatorioAPS\config\application.yml` e atalho "Observatorio APS"
+            no Menu Iniciar para o cliente web.
 
           Confira os downloads com `sha256sum -c SHA256SUMS`.
           MD

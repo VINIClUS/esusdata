@@ -2,9 +2,7 @@
 # first and C:/ProgramData/ObservatorioAPS/config/application.yml after it, so anything set there
 # wins. Never edit this copy in place: an upgrade replaces it.
 #
-# ADR 0014: on Windows the MSI installs, but live acquisition does not work yet — the secret file
-# check and the extract directory fsync are POSIX-only today — and no Windows service is
-# registered. Both are the next slice.
+# The service runs as LocalService, which can write only under data\ and logs\ (ADR 0014).
 observatorio:
   data:
     directory: C:/ProgramData/ObservatorioAPS/data

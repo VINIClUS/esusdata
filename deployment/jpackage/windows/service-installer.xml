@@ -1,0 +1,21 @@
+<!--
+  WinSW 2.12 configuration (ADR 0014). WinSW is shipped as service-installer.exe in the app image
+  root and reads this file, same base name, from next to itself; the MSI registers the service
+  (resources/observatorio-aps-service-install.wxi), so none of WinSW's install-time options apply here.
+-->
+<service>
+  <id>observatorio-aps</id>
+  <name>Observatorio APS</name>
+  <description>Observatorio APS - servico local de indicadores sobre o PEC e-SUS</description>
+  <executable>%BASE%\observatorio-aps.exe</executable>
+  <!-- Stop sends Ctrl+C, which the console launcher (win-console) turns into a clean JVM
+       shutdown; the grace covers observatorio.execution-plane.exit-grace (30s), as TimeoutStopSec
+       does in the systemd unit. -->
+  <stoptimeout>60 sec</stoptimeout>
+  <logpath>%ProgramData%\ObservatorioAPS\logs</logpath>
+  <!-- Console output only; the application log is logging.file.name in observatorio-aps.yml. -->
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>3</keepFiles>
+  </log>
+</service>

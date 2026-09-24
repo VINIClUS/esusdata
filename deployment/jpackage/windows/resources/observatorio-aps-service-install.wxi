@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Overrides jpackage 21's service-install.wxi (ADR 0014); jpackage looks overrides up as
+  <launcher>-service-install.wxi. It puts this inside the component of service-installer.exe,
+  which is WinSW here (package-windows.ps1): the MSI registers, starts, stops and removes the
+  service itself, so there is one wrapper and no `winsw install` (§1.12.5).
+  Differences from the default: LocalService instead of LocalSystem. Restart on failure is set in
+  observatorio-aps-service-config.wxi.
+-->
+<Include xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <ServiceInstall Type="ownProcess"
+                  Start="auto"
+                  Id="si_APPLICATION_LAUNCHER_ID"
+                  Name="SERVICE_NAME"
+                  DisplayName="Observatorio APS"
+                  Description="SERVICE_DESCRIPTION"
+                  ErrorControl="normal"
+                  Account="NT AUTHORITY\LocalService"
+                  Vital="yes"
+  />
+  <ServiceControl Start="install"
+                  Stop="both"
+                  Remove="uninstall"
+                  Wait="yes"
+                  Id="sc_APPLICATION_LAUNCHER_ID"
+                  Name="SERVICE_NAME"
+  />
+</Include>
