@@ -1,5 +1,6 @@
 package esusdata.source.pec;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -30,6 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * so this test can only pass if the adapter's join genuinely binds on
  * {@code tb_dim_municipio.co_ibge}, not on any key that happens not to collide.
  */
+// Linux containers: excluded on Windows (package-windows.ps1).
+@Tag("docker")
 @Testcontainers
 class IndividualEncounterModalityCapabilityIsolationTest {
 

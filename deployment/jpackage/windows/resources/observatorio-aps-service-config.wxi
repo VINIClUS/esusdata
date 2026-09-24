@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Overrides jpackage 21's service-config.wxi (looked up as <launcher>-service-config.wxi), whose
+  NSSM registry values WinSW does not read (WinSW reads service-installer.xml next to itself). jpackage adds every component here to the installed
+  files, so this is also where the MSI lays out what postinst does on Linux (ADR 0014):
+
+  - C:\ProgramData\ObservatorioAPS\{config,data,logs}. The ACLs are SDDL, so no localized account
+    name is involved, and protected (P), so nothing inherits from C:\ProgramData, whose Users
+    entry would make pec.env readable by every local user. SYSTEM and Administrators (SY, BA) have
+    full control, LocalService (LS), the service account, reads config and modifies data and logs.
+    Permanent: uninstalling keeps data, configuration and logs, like the .deb without purge.
+  - config\application.yml with commented local overrides, only if there is none yet.
+  - Restart on failure, as Restart=on-failure in the systemd unit: WinSW exits without reporting a
+    stop when the application dies, which the SCM counts as a failure. Set with sc.exe because
+    Windows Installer's own ServiceConfigFailureActions fails with error 1939 for restart actions,
+    and jpackage cannot copy util:ServiceConfig (it drops the util namespace declaration).
+  - The Event Log source WinSW writes to (its service id). LocalService cannot create a source,
+    since that means reading every log, Security included.
+  - A Start Menu shortcut to the web client served by the service (windows/observatorio-aps.url).
+
+  The GUIDs are fixed forever: they identify these components across upgrades.
+-->
+<Include xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <DirectoryRef Id="TARGETDIR">
+    <Directory Id="CommonAppDataFolder">
+      <Directory Id="ObservatorioProgramData" Name="ObservatorioAPS">
+        <Component Id="ObservatorioProgramDataDir" Guid="{6A4D2C1E-83B5-4F0A-9E61-2D7C5B3A9F01}"
+                   Permanent="yes" Win64="yes">
+          <CreateFolder>
+            <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;;0x1200a9;;;LS)"/>
+          </CreateFolder>
+        </Component>
+        <Directory Id="ObservatorioConfigDir" Name="config">
+          <Component Id="ObservatorioConfigDir" Guid="{6A4D2C1E-83B5-4F0A-9E61-2D7C5B3A9F02}"
+                     Permanent="yes" Win64="yes">
+            <CreateFolder>
+              <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;LS)"/>
+            </CreateFolder>
+          </Component>
+          <Component Id="ObservatorioLocalConfig" Guid="{6A4D2C1E-83B5-4F0A-9E61-2D7C5B3A9F03}"
+                     Permanent="yes" NeverOverwrite="yes" Win64="yes">
+            <File Id="ObservatorioLocalConfigFile" Name="application.yml"
+                  Source="app\application.yml.template" KeyPath="yes"/>
+          </Component>
+        </Directory>
+        <Directory Id="ObservatorioDataDir" Name="data">
+          <Component Id="ObservatorioDataDir" Guid="{6A4D2C1E-83B5-4F0A-9E61-2D7C5B3A9F04}"
+                     Permanent="yes" Win64="yes">
+            <CreateFolder>
+              <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;LS)"/>
+            </CreateFolder>
+          </Component>
+        </Directory>
+        <Directory Id="ObservatorioLogsDir" Name="logs">
+          <Component Id="ObservatorioLogsDir" Guid="{6A4D2C1E-83B5-4F0A-9E61-2D7C5B3A9F05}"
+                     Permanent="yes" Win64="yes">
+            <CreateFolder>
+              <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;LS)"/>
+            </CreateFolder>
+          </Component>
+        </Directory>
+      </Directory>
+    </Directory>
+    <Component Id="ObservatorioEventSource" Guid="{6A4D2C1E-83B5-4F0A-9E61-2D7C5B3A9F07}"
+               Win64="yes">
+      <RegistryKey Root="HKLM"
+                   Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\SERVICE_NAME">
+        <RegistryValue Name="EventMessageFile" Type="expandable" KeyPath="yes"
+                       Value="%SystemRoot%\Microsoft.NET\Framework64\v4.0.30319\EventLogMessages.dll"/>
+      </RegistryKey>
+    </Component>
+    <Directory Id="ProgramMenuFolder">
+      <!-- ICE38: a shortcut component needs an HKCU key path, as in jpackage's own shortcuts. -->
+      <Component Id="ObservatorioWebShortcut" Guid="{6A4D2C1E-83B5-4F0A-9E61-2D7C5B3A9F06}"
+                 Win64="yes">
+        <!-- A plain .url file: jpackage cannot copy util:InternetShortcut (another namespace). -->
+        <File Id="ObservatorioWebShortcut" Name="Observatorio APS.url"
+              Source="app\observatorio-aps.url"/>
+        <RegistryValue Root="HKCU" Key="Software\Observatorio APS\observatorio-aps"
+                       Name="WebShortcut" Type="integer" Value="1" KeyPath="yes"/>
+      </Component>
+    </Directory>
+  </DirectoryRef>
+  <CustomAction Id="ObservatorioServiceRecovery" Directory="TARGETDIR" Execute="deferred"
+                Impersonate="no" Return="check"
+                ExeCommand="&quot;[System64Folder]sc.exe&quot; failure SERVICE_NAME reset= 86400 actions= restart/10000/restart/10000/restart/60000"/>
+  <InstallExecuteSequence>
+    <Custom Action="ObservatorioServiceRecovery" After="InstallServices">NOT REMOVE="ALL"</Custom>
+  </InstallExecuteSequence>
+</Include>

@@ -1,12 +1,23 @@
 package esusdata.source.pec;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +37,7 @@ class EnvFileSecretResolverTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void rejectsGroupOrWorldReadableSecretFiles() throws IOException {
         Path file = writeSecretFile("DB_PASSWORD=secret\n");
         Files.setPosixFilePermissions(file, Set.of(
@@ -56,12 +68,68 @@ class EnvFileSecretResolverTest {
                 .hasMessageContaining("regular file");
     }
 
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void acceptsSecretFilesReadableBySystemOnNtfs() throws IOException {
+        Path file = writeSecretFile("DB_PASSWORD=secret\n");
+        grant(file, principal("NT AUTHORITY\\SYSTEM"), AclEntryPermission.READ_DATA);
+
+        assertThat(new EnvFileSecretResolver(file).resolve("DB_PASSWORD"))
+                .containsExactly("secret".toCharArray());
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void rejectsSecretFilesReadableByOtherPrincipalsOnNtfs() throws IOException {
+        Path file = writeSecretFile("DB_PASSWORD=secret\n");
+        // A principal whose English name resolves on any Windows display language.
+        grant(file, principal("NT AUTHORITY\\LocalService"), AclEntryPermission.READ_DATA);
+
+        assertThatThrownBy(() -> new EnvFileSecretResolver(file).resolve("DB_PASSWORD"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("the ACL grants");
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void rejectsSecretFilesWritableByOtherPrincipalsOnNtfs() throws IOException {
+        Path file = writeSecretFile("DB_PASSWORD=secret\n");
+        // Write without read still lets the principal swap the credential or rewrite the ACL.
+        grant(file, principal("NT AUTHORITY\\LocalService"), AclEntryPermission.WRITE_ACL);
+
+        assertThatThrownBy(() -> new EnvFileSecretResolver(file).resolve("DB_PASSWORD"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("the ACL grants");
+    }
+
     private Path writeSecretFile(String content) throws IOException {
         Path file = dir.resolve("pec.env");
         Files.writeString(file, content);
-        Files.setPosixFilePermissions(file, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE));
+        if (Files.getFileAttributeView(file, PosixFileAttributeView.class) != null) {
+            Files.setPosixFilePermissions(file, Set.of(
+                    PosixFilePermission.OWNER_READ,
+                    PosixFilePermission.OWNER_WRITE));
+        } else {
+            Files.getFileAttributeView(file, AclFileAttributeView.class).setAcl(List.of(
+                    allow(Files.getOwner(file), Set.of(AclEntryPermission.values()))));
+        }
         return file;
+    }
+
+    private static void grant(Path file, UserPrincipal principal, AclEntryPermission permission)
+            throws IOException {
+        AclFileAttributeView view = Files.getFileAttributeView(file, AclFileAttributeView.class);
+        List<AclEntry> acl = new ArrayList<>(view.getAcl());
+        acl.add(allow(principal, Set.of(permission)));
+        view.setAcl(acl);
+    }
+
+    private static AclEntry allow(UserPrincipal principal, Set<AclEntryPermission> permissions) {
+        return AclEntry.newBuilder().setType(AclEntryType.ALLOW)
+                .setPrincipal(principal).setPermissions(permissions).build();
+    }
+
+    private UserPrincipal principal(String name) throws IOException {
+        return dir.getFileSystem().getUserPrincipalLookupService().lookupPrincipalByName(name);
     }
 }

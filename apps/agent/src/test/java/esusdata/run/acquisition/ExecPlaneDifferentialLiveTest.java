@@ -20,6 +20,7 @@ import esusdata.source.pec.PecDataSourceFactory;
 import esusdata.run.job.JobCancelledException;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.junit.jupiter.Container;
@@ -79,6 +80,8 @@ import static org.assertj.core.api.Assertions.catchThrowable;
  * identical {@code CompatibilityFingerprint.compute}, disagrees with what Java just measured on
  * the same database, the acquisition fails closed before any row is read.
  */
+// Linux containers: excluded on Windows (package-windows.ps1).
+@Tag("docker")
 @Testcontainers
 class ExecPlaneDifferentialLiveTest {
 

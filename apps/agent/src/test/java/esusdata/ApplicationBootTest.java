@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -22,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * container.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+// Closes the context, and its SQLite file, before @TempDir cleanup: Windows cannot delete open files.
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class ApplicationBootTest {
 
     @TempDir
