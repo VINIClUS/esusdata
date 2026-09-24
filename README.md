@@ -64,7 +64,8 @@ cd apps/web && npm install && npm run dev
 # próprio backend em http://127.0.0.1:8080/ — é o que o empacotamento (ADR 0014) usa
 cd apps/agent && mvn -Pweb package -DskipTests
 
-# plano de execução (ADR 0010, ADR 0011, ADR 0016) — único caminho de aquisição: sem
+# plano de execução (ADR 0010, ADR 0011, ADR 0016, ADR 0017) — único caminho até o PEC, para
+# aquisição e para o diagnóstico de fonte (POST /sources/{id}/test); o pgJDBC é só de teste: sem
 # observatorio.execution-plane.binary apontando para o binário compilado o backend não inicia, então
 # rodá-lo localmente exige o cargo build abaixo antes. O mvn verify não depende do binário (os
 # testes usam o adaptador JDBC de src/test como referência). O filho é dono de todo
@@ -80,8 +81,9 @@ cd apps/agent && mvn -Pweb package -DskipTests
 # PEC_MUNICIPALITY_IBGE no arquivo de segredo, escolhido com
 # -Dobservatorio.execution-plane.live-pec.env-file), só com o opt-in explícito
 # -Dobservatorio.execution-plane.live-pec=true — o comando abaixo nunca toca o PEC real. Passou
-# 4/4 contra o PEC 5.5.28 em produção, com as fingerprints do Rust e do JDBC idênticas às da
-# matriz (docs/discovery/2026-09-24-pec-5528.md).
+# 6/6 contra o PEC 5.5.28 em produção, com as fingerprints do Rust e do JDBC idênticas às da
+# matriz e o diagnóstico de fonte igual ao do JDBC (docs/discovery/2026-09-24-pec-5528.md);
+# SourceDiagnosticsDifferentialLiveTest compara os dois diagnósticos em container, mesmo gate.
 cd apps/execplane && cargo build --release && cargo test
 cd apps/agent && mvn verify -Dsurefire.reuseForks=false \
   -Dobservatorio.execution-plane.binary=$PWD/../execplane/target/release/observatorio-execplane

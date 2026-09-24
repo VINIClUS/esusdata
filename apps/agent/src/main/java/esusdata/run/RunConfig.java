@@ -15,6 +15,7 @@ import esusdata.result.model.ResultRepository;
 import esusdata.result.model.ResultStagingArea;
 import esusdata.run.acquisition.Acquisition;
 import esusdata.run.acquisition.ExecPlaneAcquisition;
+import esusdata.run.acquisition.ExecPlaneConnectivityCheck;
 import esusdata.run.extract.ExtractStore;
 import esusdata.run.extract.FileExtractStore;
 import esusdata.run.job.AcquisitionGuardStore;
@@ -30,11 +31,11 @@ import esusdata.run.worker.JobWorker;
 import esusdata.run.worker.RunExecutor;
 import esusdata.source.JdbcSourceRepository;
 import esusdata.source.SourceConnectionProperties;
+import esusdata.source.SourceConnectivityCheck;
 import esusdata.source.SourceDiagnosticsService;
 import esusdata.source.SourceRepository;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.EnvFileSecretResolver;
-import esusdata.source.pec.PecDataSourceFactory;
 import esusdata.source.pec.PecSecretResolver;
 import esusdata.source.pec.ReadBudget;
 import java.nio.file.Files;
@@ -151,8 +152,8 @@ public class RunConfig {
     public SourceDiagnosticsService sourceDiagnosticsService(
             SourceRepository sourceRepository,
             AllowedDestinations allowedDestinations,
-            PecDataSourceFactory pecDataSourceFactory) {
-        return new SourceDiagnosticsService(sourceRepository, allowedDestinations, pecDataSourceFactory);
+            SourceConnectivityCheck sourceConnectivityCheck) {
+        return new SourceDiagnosticsService(sourceRepository, allowedDestinations, sourceConnectivityCheck);
     }
 
     // --- jobrunner -------------------------------------------------------------------------
@@ -330,12 +331,6 @@ public class RunConfig {
         return new EnvFileSecretResolver(secretFile);
     }
 
-    @Bean
-    public PecDataSourceFactory pecDataSourceFactory(
-            AllowedDestinations allowedDestinations, PecSecretResolver pecSecretResolver) {
-        return new PecDataSourceFactory(allowedDestinations, pecSecretResolver);
-    }
-
     /**
      * ADR 0016: the Rust execution plane is the only production acquisition path — there is no
      * in-process JDBC fallback. A missing or non-executable {@code observatorio.execution-plane.binary}
@@ -348,6 +343,27 @@ public class RunConfig {
             ExecPlaneProperties executionPlaneProperties,
             PecSecretResolver pecSecretResolver,
             AllowedDestinations allowedDestinations) {
+        return new ExecPlaneAcquisition(
+                executionPlaneCommand(executionPlaneProperties),
+                pecSecretResolver,
+                allowedDestinations,
+                properties.extractsDirectory(),
+                clock,
+                executionPlaneProperties.exitGrace());
+    }
+
+    /** ADR 0017: the source diagnostic runs through the same binary as every acquisition. */
+    @Bean
+    public SourceConnectivityCheck sourceConnectivityCheck(
+            ExecPlaneProperties executionPlaneProperties, PecSecretResolver pecSecretResolver) {
+        return new ExecPlaneConnectivityCheck(
+                executionPlaneCommand(executionPlaneProperties),
+                pecSecretResolver,
+                executionPlaneProperties.exitGrace());
+    }
+
+    /** Whichever bean Spring creates first fails startup with this message, never a bare NPE. */
+    private static List<String> executionPlaneCommand(ExecPlaneProperties executionPlaneProperties) {
         String binary = executionPlaneProperties.binary();
         if (binary == null || binary.isBlank() || !Files.isExecutable(Path.of(binary))) {
             throw new IllegalStateException(
@@ -355,13 +371,7 @@ public class RunConfig {
                             + "(ADR 0016: the execution plane is the only acquisition path); got '"
                             + (binary == null ? "" : binary) + "'");
         }
-        return new ExecPlaneAcquisition(
-                List.of(binary),
-                pecSecretResolver,
-                allowedDestinations,
-                properties.extractsDirectory(),
-                clock,
-                executionPlaneProperties.exitGrace());
+        return List.of(binary);
     }
 
     private static List<String> orEmpty(List<String> list) {

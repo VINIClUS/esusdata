@@ -3,8 +3,8 @@ package esusdata.source.pec;
 /**
  * Structured connection descriptor for a PEC source — Tech Spec §1.12.6 (SSRF control):
  * "Aceitar host/porta/database estruturados, não uma URL JDBC arbitrária." There is deliberately
- * no {@code jdbcUrl} field anywhere in this type; {@code PecDataSourceFactory} is the only place
- * the JDBC URL string is assembled, and only from these fields.
+ * no {@code jdbcUrl} field anywhere in this type. Production code never assembles a JDBC URL at all
+ * since ADR 0017: the execution plane receives these structured fields in its envelope.
  *
  * @param sourceId          persistent identity of the source (§1.4.1), independent of host changes
  * @param host              validated against {@link AllowedDestinations} before any connection attempt

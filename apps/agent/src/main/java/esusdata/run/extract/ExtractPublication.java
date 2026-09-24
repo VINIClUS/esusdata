@@ -18,8 +18,8 @@ import java.time.LocalDate;
 import java.util.Set;
 
 /**
- * Static file-publication mechanics shared by {@link ExtractWriter} (the JDBC path, which writes
- * its own data file byte-by-byte) and {@link DelegatedExtractPublication} (the execution-plane
+ * Static file-publication mechanics shared by {@code ExtractWriter} (the JDBC path, which writes
+ * its own data file byte-by-byte; test-only since ADR 0017) and {@link DelegatedExtractPublication} (the execution-plane
  * path, fatia 3 / ADR 0011, whose data file is written by the Rust child) — owner-only file
  * creation, atomic hard-link publication, directory fsync, free-space reservation, and the
  * manifest-argument invariants are the same mechanics regardless of who produced the data file's

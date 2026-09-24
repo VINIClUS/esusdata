@@ -85,10 +85,12 @@
       <artifactId>jackson-databind</artifactId>
     </dependency>
 
-    <!-- PEC access: pgJDBC only, no JPA/Hibernate anywhere in this project -->
+    <!-- pgJDBC is test scope only (ADR 0017): production reads the PEC through the execution
+         plane; the JDBC path survives in src/test as the differential tests' reference. -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
+      <scope>test</scope>
     </dependency>
 
     <!-- Own persistence: SQLite -->
