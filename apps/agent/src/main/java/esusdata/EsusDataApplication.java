@@ -12,10 +12,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * DataSource") provable rather than incidental.
  */
 @SpringBootApplication
-public final class EsusDataApplication {
+// Spring instantiates this configuration class and may subclass it (proxyBeanMethods): it must stay
+// non-final with a visible constructor, although it only declares main().
+@SuppressWarnings("PrivateConstructorForUtilityClass")
+public class EsusDataApplication {
     public static void main(String[] args) {
         SpringApplication.run(EsusDataApplication.class, args);
     }
-
-    private EsusDataApplication() {}
 }
