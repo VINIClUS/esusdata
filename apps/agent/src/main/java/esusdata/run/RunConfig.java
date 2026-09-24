@@ -36,7 +36,6 @@ import esusdata.source.SourceDiagnosticsService;
 import esusdata.source.SourceRepository;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.EnvFileSecretResolver;
-import esusdata.source.pec.PecDataSourceFactory;
 import esusdata.source.pec.PecSecretResolver;
 import esusdata.source.pec.ReadBudget;
 import java.nio.file.Files;
@@ -330,12 +329,6 @@ public class RunConfig {
                 ? Path.of(System.getProperty("user.home"), ".config", "observatorio-aps", "pec.env")
                 : Path.of(configured);
         return new EnvFileSecretResolver(secretFile);
-    }
-
-    @Bean
-    public PecDataSourceFactory pecDataSourceFactory(
-            AllowedDestinations allowedDestinations, PecSecretResolver pecSecretResolver) {
-        return new PecDataSourceFactory(allowedDestinations, pecSecretResolver);
     }
 
     /**

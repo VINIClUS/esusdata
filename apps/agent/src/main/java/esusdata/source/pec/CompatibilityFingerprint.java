@@ -13,8 +13,8 @@ import java.util.Set;
 /**
  * Plan §1.3/§2.2: the ENG-43 fingerprint algorithm exists in exactly one place, working only from
  * already-fetched raw data ({@link CompatibilityProbeResult}) — never touching a live connection.
- * {@code JdbcCompatibilityCatalog} builds the probe result from JDBC; the Rust execution plane
- * will build the equivalent from what it measures over its own connection, but the byte-for-byte
+ * The Rust execution plane measures the raw data over its own connection ({@code
+ * JdbcCompatibilityCatalog}, test-only since ADR 0017, measures the same over pgJDBC), but the byte-for-byte
  * signature assembly is never reimplemented — both sides compare the same SHA-256 this class
  * produces against the packaged matrix, never against each other.
  */

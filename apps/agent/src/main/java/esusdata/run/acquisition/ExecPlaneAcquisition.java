@@ -6,7 +6,7 @@ import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.ColumnMetadata;
 import esusdata.source.pec.CompatibilityFingerprint;
 import esusdata.source.pec.CompatibilityProbeResult;
-import esusdata.source.pec.IndividualEncounterModalityCapability;
+import esusdata.source.pec.IndividualEncounterModalityContract;
 import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecSecretResolver;
 import esusdata.source.pec.ProbeItem;
@@ -319,8 +319,8 @@ public final class ExecPlaneAcquisition implements Acquisition {
                     compressedBytes,
                     startedAt,
                     sourceZoneId,
-                    IndividualEncounterModalityCapability.QUERY_CHECKSUM,
-                    IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                    IndividualEncounterModalityContract.QUERY_CHECKSUM,
+                    IndividualEncounterModalityContract.ADAPTER_VERSION,
                     "COMPLETE",
                     "SNAPSHOT");
         } catch (IOException publishFailure) {
@@ -344,7 +344,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             listener.onUncertainOutcome("execution plane reported an uncertain outcome: " + detail);
         }
         // Cancellation wins if it was actually requested — mirrors how
-        // IndividualEncounterModalityCapability.stream's cancellationCheck already works: this
+        // IndividualEncounterModalityContract.stream's cancellationCheck already works: this
         // throws JobCancelledException itself when the concrete CancellationSignal is a cancelled
         // CancellationToken, without this class ever naming that type.
         cancellation.checkCancelled();
@@ -396,13 +396,13 @@ public final class ExecPlaneAcquisition implements Acquisition {
         try {
             entry = matrix.findExact(
                     CAPABILITY,
-                    IndividualEncounterModalityCapability.ADAPTER_VERSION,
+                    IndividualEncounterModalityContract.ADAPTER_VERSION,
                     acquisitionCommand.sourceIdentity(),
                     postgresVersion);
         } catch (RuntimeException noEntry) { // NOPMD - any lookup failure is a reported compatibility mismatch
             return "no compatibility matrix entry: " + noEntry.getMessage();
         }
-        if (!IndividualEncounterModalityCapability.QUERY_CHECKSUM.equals(entry.queryChecksum())) {
+        if (!IndividualEncounterModalityContract.QUERY_CHECKSUM.equals(entry.queryChecksum())) {
             return "query checksum mismatch: matrix has " + entry.queryChecksum();
         }
         String probeQueryChecksum = ExecPlaneProcess.text(probe, "query_checksum");
@@ -446,7 +446,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
      * The child never reports a fingerprint string — only the raw data it measured (column
      * metadata, and one raw result per {@code columns_used} marker). This class computes the
      * fingerprint itself via {@link CompatibilityFingerprint#compute}, the exact same algorithm
-     * {@code JdbcCompatibilityCatalog} uses (plan §1.3/§2.2) — there is no second implementation
+     * the test-only {@code JdbcCompatibilityCatalog} uses (plan §1.3/§2.2) — there is no second implementation
      * of the ENG-43 signature algorithm for a child to drift from.
      */
     private static CompatibilityProbeResult buildProbeResult(
@@ -581,8 +581,8 @@ public final class ExecPlaneAcquisition implements Acquisition {
             // reserved path — the same path DelegatedExtractPublication already took the
             // .extract.lock for and reconciled, before this process was ever spawned.
             envelope.put("extract_temp_path", extractTempPath.toString());
-            envelope.put("query_checksum", IndividualEncounterModalityCapability.QUERY_CHECKSUM);
-            envelope.put("adapter_version", IndividualEncounterModalityCapability.ADAPTER_VERSION);
+            envelope.put("query_checksum", IndividualEncounterModalityContract.QUERY_CHECKSUM);
+            envelope.put("adapter_version", IndividualEncounterModalityContract.ADAPTER_VERSION);
             envelope.put("budget", budgetFields);
             ExecPlaneProcess.writeLine(stdin, envelope);
         } finally {

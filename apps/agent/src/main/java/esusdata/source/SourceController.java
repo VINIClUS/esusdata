@@ -21,9 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * §1.10: source registration and its network/read/capability/budget diagnostic. {@code
  * ModuleBoundaryTest.apiDoesNotDependOnPecAdapterOrSourceConnector} forbids this controller from
- * touching {@code sourceconnector} directly — {@link SourceDiagnosticsService} in {@code jobrunner}
- * is the seam, reusing the exact {@code AllowedDestinations}/{@code PecDataSourceFactory} the live
- * acquisition path uses.
+ * touching {@code sourceconnector} directly — {@link SourceDiagnosticsService} is the seam, running
+ * the diagnostic through the same {@code AllowedDestinations} check and execution plane binary the
+ * live acquisition path uses (ADR 0017).
  */
 @RestController
 public class SourceController {
