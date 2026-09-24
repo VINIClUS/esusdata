@@ -314,7 +314,8 @@ class ExecPlaneLivePecTest {
     /**
      * ADR 0017's gate against the production PEC: the execution plane's diagnostic returns the same
      * {@link Diagnostics} as the pgJDBC one it replaced. One login each; the wrong-password case
-     * below adds one failed login per path, nothing more.
+     * below costs ~11 failed logins on the server: HikariCP retries the JDBC reference's login until
+     * its acquisition timeout (~10), the execution plane tries once.
      */
     @Test
     void diagnosticMatchesTheJdbcReference() {

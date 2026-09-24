@@ -343,15 +343,8 @@ public class RunConfig {
             ExecPlaneProperties executionPlaneProperties,
             PecSecretResolver pecSecretResolver,
             AllowedDestinations allowedDestinations) {
-        String binary = executionPlaneProperties.binary();
-        if (binary == null || binary.isBlank() || !Files.isExecutable(Path.of(binary))) {
-            throw new IllegalStateException(
-                    "observatorio.execution-plane.binary must point to the observatorio-execplane executable "
-                            + "(ADR 0016: the execution plane is the only acquisition path); got '"
-                            + (binary == null ? "" : binary) + "'");
-        }
         return new ExecPlaneAcquisition(
-                List.of(binary),
+                executionPlaneCommand(executionPlaneProperties),
                 pecSecretResolver,
                 allowedDestinations,
                 properties.extractsDirectory(),
@@ -364,7 +357,21 @@ public class RunConfig {
     public SourceConnectivityCheck sourceConnectivityCheck(
             ExecPlaneProperties executionPlaneProperties, PecSecretResolver pecSecretResolver) {
         return new ExecPlaneConnectivityCheck(
-                List.of(executionPlaneProperties.binary()), pecSecretResolver, executionPlaneProperties.exitGrace());
+                executionPlaneCommand(executionPlaneProperties),
+                pecSecretResolver,
+                executionPlaneProperties.exitGrace());
+    }
+
+    /** Whichever bean Spring creates first fails startup with this message, never a bare NPE. */
+    private static List<String> executionPlaneCommand(ExecPlaneProperties executionPlaneProperties) {
+        String binary = executionPlaneProperties.binary();
+        if (binary == null || binary.isBlank() || !Files.isExecutable(Path.of(binary))) {
+            throw new IllegalStateException(
+                    "observatorio.execution-plane.binary must point to the observatorio-execplane executable "
+                            + "(ADR 0016: the execution plane is the only acquisition path); got '"
+                            + (binary == null ? "" : binary) + "'");
+        }
+        return List.of(binary);
     }
 
     private static List<String> orEmpty(List<String> list) {

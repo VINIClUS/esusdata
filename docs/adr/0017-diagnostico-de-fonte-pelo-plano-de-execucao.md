@@ -48,6 +48,9 @@ com o novo:
 
 - O diagnóstico agora sobe um processo. A espera máxima é a do prazo acima, na mesma ordem do
   timeout de aquisição do pool que o JDBC usava.
+- Uma senha errada agora gera **um** login falho no PEC. O caminho JDBC, via HikariCP, repetia a
+  tentativa até o timeout de aquisição (10 logins falhos medidos em container). O registro
+  `Diagnostics` é igual; o rastro no log do servidor é menor.
 - Sem o binário o backend já não subia (ADR 0016); o diagnóstico não acrescenta requisito.
 - Mexer no pgJDBC ou no código JDBC não afeta mais a produção, mas quebra as diferenciais, que
   continuam sendo a forma de provar uma mudança do filho.
