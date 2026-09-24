@@ -15,6 +15,8 @@ on:
       - 'apps/execplane/**'
       - 'apps/web/**'
       - 'contracts/**'
+      # Controls the bytes of the checksummed contract files embedded in both packages.
+      - '.gitattributes'
       - '.github/workflows/package.yml'
 
 permissions:
