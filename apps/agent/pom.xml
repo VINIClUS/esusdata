@@ -27,6 +27,9 @@
     <networknt-json-schema.version>3.0.7</networknt-json-schema.version>
     <!-- sqlite-jdbc pinned above the BOM's 3.53.2.1: asserts the WAL-reset floor (>=3.51.3, §1.12.1) -->
     <sqlite-jdbc.version>3.53.2.1</sqlite-jdbc.version>
+    <!-- Static-analysis gate (ADR 0018): outside the BOM, pinned exactly (§1.12.8) -->
+    <spotless.version>3.10.2</spotless.version>
+    <palantir-java-format.version>2.99.0</palantir-java-format.version>
   </properties>
 
   <dependencies>
@@ -150,6 +153,30 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <!-- Static-analysis gate (ADR 0018): formatting is checked at verify, never applied silently;
+           `mvn spotless:apply` rewrites the tree. palantir-java-format also orders and prunes
+           imports, so no separate import steps. -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless.version}</version>
+        <configuration>
+          <java>
+            <palantirJavaFormat>
+              <version>${palantir-java-format.version}</version>
+              <style>PALANTIR</style>
+            </palantirJavaFormat>
+            <formatAnnotations/>
+          </java>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
