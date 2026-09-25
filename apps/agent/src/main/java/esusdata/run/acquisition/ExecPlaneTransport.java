@@ -1,5 +1,6 @@
 package esusdata.run.acquisition;
 
+import esusdata.source.pec.AllowedDestinations;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
@@ -16,7 +17,8 @@ import java.util.regex.Pattern;
  * network, so {@link #forDeployment} refuses a plaintext deployment whose allowlist names any
  * non-loopback address — plaintext stays possible only through a local tunnel (ADR 0003). The
  * allowlist already requires every address a host resolves to to be listed literally, so checking
- * the literal addresses covers every destination a session can actually reach.
+ * the literal addresses covers every destination a session can actually reach. Entries are parsed
+ * exactly as the allowlist parses them, so both see the same host.
  *
  * @param rootCertificate PEM file with the trusted root(s), or {@code null} for plaintext
  */
@@ -40,7 +42,7 @@ public record ExecPlaneTransport(String rootCertificate) {
             return new ExecPlaneTransport(rootCertificate);
         }
         for (String entry : allowedDestinations == null ? List.<String>of() : allowedDestinations) {
-            String host = hostOf(entry);
+            String host = AllowedDestinations.HostPort.parse(entry).host();
             if (isAddressLiteral(host) && !isLoopback(host)) {
                 throw new IllegalStateException("observatorio.source.allowed-destinations allows " + entry
                         + ", which is not loopback: set observatorio.source.tls-root-cert so the session is "
@@ -48,12 +50,6 @@ public record ExecPlaneTransport(String rootCertificate) {
             }
         }
         return PLAINTEXT;
-    }
-
-    private static String hostOf(String entry) {
-        int colon = entry.lastIndexOf(':');
-        String host = colon <= 0 ? entry : entry.substring(0, colon);
-        return host.startsWith("[") && host.endsWith("]") ? host.substring(1, host.length() - 1) : host;
     }
 
     private static boolean isAddressLiteral(String host) {

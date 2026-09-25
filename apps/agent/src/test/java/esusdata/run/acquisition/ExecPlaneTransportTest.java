@@ -33,6 +33,14 @@ class ExecPlaneTransportTest {
     }
 
     @Test
+    void anEntryTheAllowlistNormalizesIsCheckedAsTheAllowlistSeesIt() {
+        assertThatThrownBy(() -> ExecPlaneTransport.forDeployment(List.of(" 192.168.1.253:5433"), ""))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> ExecPlaneTransport.forDeployment(List.of("192.168.1.253 : 5433"), ""))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void aReadableRootCertificateSelectsTls() throws IOException {
         Path root = Files.writeString(directory.resolve("pec-ca.pem"), "-----BEGIN CERTIFICATE-----\n");
 

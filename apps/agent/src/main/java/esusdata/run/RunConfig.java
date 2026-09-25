@@ -307,14 +307,7 @@ public class RunConfig {
     public AllowedDestinations allowedDestinations(SourceConnectionProperties properties) {
         Set<AllowedDestinations.HostPort> parsed = new HashSet<>();
         for (String entry : orEmpty(properties.allowedDestinations())) {
-            int colon = entry.lastIndexOf(':');
-            if (colon <= 0 || colon == entry.length() - 1) {
-                throw new IllegalArgumentException(
-                        "observatorio.source.allowed-destinations entry must be host:port, got: " + entry);
-            }
-            String host = entry.substring(0, colon);
-            int port = Integer.parseInt(entry.substring(colon + 1));
-            parsed.add(new AllowedDestinations.HostPort(host, port));
+            parsed.add(AllowedDestinations.HostPort.parse(entry));
         }
         return new AllowedDestinations(parsed);
     }
