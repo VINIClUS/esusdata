@@ -51,7 +51,9 @@ export function StatusChip({ status, label, size = 'md', withIcon = true }: Stat
         whiteSpace: 'nowrap',
       }}
     >
-      {withIcon && Icon && <Icon size={size === 'sm' ? 13 : 15} strokeWidth={2.2} fill={def.color} color="#fff" />}
+      {withIcon && Icon && (
+        <Icon size={size === 'sm' ? 13 : 15} strokeWidth={2.2} fill={def.color} color="#fff" />
+      )}
       {label ?? def.label}
     </Box>
   )

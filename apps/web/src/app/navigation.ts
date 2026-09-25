@@ -17,7 +17,13 @@ export interface NavItem {
 }
 
 export const navItems: NavItem[] = [
-  { to: '/painel', label: 'Painel', shortLabel: 'Painel', icon: House, match: (p) => p.startsWith('/painel') },
+  {
+    to: '/painel',
+    label: 'Painel',
+    shortLabel: 'Painel',
+    icon: House,
+    match: (p) => p.startsWith('/painel'),
+  },
   {
     to: '/indicadores',
     label: 'Indicadores',

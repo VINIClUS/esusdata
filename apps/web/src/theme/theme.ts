@@ -16,7 +16,13 @@ export const theme = createTheme({
   shape: { borderRadius: radius.button },
   typography: {
     fontFamily: "'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-    h1: { fontSize: 32, fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.5px', '@media (max-width:899px)': { fontSize: 26 } },
+    h1: {
+      fontSize: 32,
+      fontWeight: 700,
+      lineHeight: 1.15,
+      letterSpacing: '-0.5px',
+      '@media (max-width:899px)': { fontSize: 26 },
+    },
     h2: { fontSize: 22, fontWeight: 700, lineHeight: 1.2 },
     h3: { fontSize: 16, fontWeight: 700, lineHeight: 1.3 },
     h4: { fontSize: 15, fontWeight: 600, lineHeight: 1.3 },
@@ -79,7 +85,12 @@ export const theme = createTheme({
     MuiInputLabel: { styleOverrides: { root: { fontSize: 14 } } },
     MuiTableCell: {
       styleOverrides: {
-        root: { borderBottomColor: colors.border, fontSize: 13, paddingBlock: 10, paddingInline: 12 },
+        root: {
+          borderBottomColor: colors.border,
+          fontSize: 13,
+          paddingBlock: 10,
+          paddingInline: 12,
+        },
         head: {
           backgroundColor: colors.bgSubtle,
           color: colors.textSecondary,

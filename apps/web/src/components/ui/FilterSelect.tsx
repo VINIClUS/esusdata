@@ -16,11 +16,27 @@ interface FilterSelectProps {
 }
 
 function Chevron(props: object) {
-  return <ChevronDown size={18} color={colors.textSecondary} {...props} style={{ right: 12, position: 'absolute', pointerEvents: 'none' }} />
+  return (
+    <ChevronDown
+      size={18}
+      color={colors.textSecondary}
+      {...props}
+      style={{ right: 12, position: 'absolute', pointerEvents: 'none' }}
+    />
+  )
 }
 
 /** Select with an inline prefix label ("Status: Todos") or an icon prefix. */
-export function FilterSelect({ label, value, options, onChange, icon: Icon, fullWidth, size = 'md', bold }: FilterSelectProps) {
+export function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+  icon: Icon,
+  fullWidth,
+  size = 'md',
+  bold,
+}: FilterSelectProps) {
   const h = size === 'sm' ? 36 : 50
   return (
     <Select
@@ -31,8 +47,14 @@ export function FilterSelect({ label, value, options, onChange, icon: Icon, full
       renderValue={(v) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
           {Icon && <Icon size={20} color={colors.primary} />}
-          {label && <Box component="span" sx={{ color: colors.textSecondary, fontWeight: 400 }}>{label}:</Box>}
-          <Box component="span" sx={{ color: colors.navy, fontWeight: bold ? 600 : 500 }}>{v}</Box>
+          {label && (
+            <Box component="span" sx={{ color: colors.textSecondary, fontWeight: 400 }}>
+              {label}:
+            </Box>
+          )}
+          <Box component="span" sx={{ color: colors.navy, fontWeight: bold ? 600 : 500 }}>
+            {v}
+          </Box>
         </Box>
       )}
       sx={{

@@ -92,7 +92,10 @@ test('builds the existing results query and adapts its response for the detail v
     publishedAt: '2026-08-16T10:05:00Z',
   })
 
-  assert.equal(path, '/results?municipalityIbge=3541307&indicatorPack=c1-mais-acesso&referencePeriod=2026-08')
+  assert.equal(
+    path,
+    '/results?municipalityIbge=3541307&indicatorPack=c1-mais-acesso&referencePeriod=2026-08',
+  )
   assert.equal(detail.codigo, 'c1-mais-acesso')
   assert.equal(detail.nome, 'C1 – Mais acesso')
   assert.equal(detail.status, 'concluido')
@@ -201,7 +204,10 @@ test('keeps publication pending while cancellation is requested', () => {
 })
 
 test('builds the scope-discovery queries', () => {
-  assert.equal(normalizers.publishedPeriodsPath('3541307'), '/results/periods?municipalityIbge=3541307')
+  assert.equal(
+    normalizers.publishedPeriodsPath('3541307'),
+    '/results/periods?municipalityIbge=3541307',
+  )
   assert.equal(normalizers.recentRunsPath('3541307', 1), '/runs?municipalityIbge=3541307&limit=1')
 })
 

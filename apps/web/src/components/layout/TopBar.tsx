@@ -32,7 +32,15 @@ interface ScopeSelectorProps {
 }
 
 /** A SelectorChip that opens a menu only when there is more than one option to choose from. */
-function ScopeSelector({ icon, label, attached, options, selected, formatOption, onSelect }: ScopeSelectorProps) {
+function ScopeSelector({
+  icon,
+  label,
+  attached,
+  options,
+  selected,
+  formatOption,
+  onSelect,
+}: ScopeSelectorProps) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const selectable = options.length > 1
   return (
@@ -41,7 +49,11 @@ function ScopeSelector({ icon, label, attached, options, selected, formatOption,
         icon={icon}
         label={label}
         attached={attached}
-        onClick={selectable ? (event: MouseEvent<HTMLElement>) => setAnchor(event.currentTarget) : undefined}
+        onClick={
+          selectable
+            ? (event: MouseEvent<HTMLElement>) => setAnchor(event.currentTarget)
+            : undefined
+        }
       />
       <Menu anchorEl={anchor} open={anchor !== null} onClose={() => setAnchor(null)}>
         {options.map((option) => (
@@ -66,7 +78,10 @@ export function TopBar({ compact, phone, onOpenMenu }: TopBarProps) {
   const scope = useScope()
   const displayContext = USE_MOCKS
     ? { municipio: demoContext.municipio, competencia: demoContext.competencia }
-    : realContextForScope({ municipalityIbge: scope.municipalityIbge, referencePeriod: scope.referencePeriod })
+    : realContextForScope({
+        municipalityIbge: scope.municipalityIbge,
+        referencePeriod: scope.referencePeriod,
+      })
   return (
     <Box
       component="header"
@@ -141,14 +156,20 @@ export function TopBar({ compact, phone, onOpenMenu }: TopBarProps) {
       )}
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, cursor: 'pointer' }}>
-        <Avatar sx={{ bgcolor: colors.primary, width: 40, height: 40, fontSize: 14, fontWeight: 700 }}>
+        <Avatar
+          sx={{ bgcolor: colors.primary, width: 40, height: 40, fontSize: 14, fontWeight: 700 }}
+        >
           {user?.iniciais ?? 'US'}
         </Avatar>
         {!phone && (
           <>
             <Box sx={{ lineHeight: 1.15 }}>
-              <Typography sx={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>{user?.nome}</Typography>
-              <Typography sx={{ fontSize: 12.5, color: colors.textSecondary }}>{user?.papel}</Typography>
+              <Typography sx={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>
+                {user?.nome}
+              </Typography>
+              <Typography sx={{ fontSize: 12.5, color: colors.textSecondary }}>
+                {user?.papel}
+              </Typography>
             </Box>
             <ChevronDown size={18} color={colors.textSecondary} />
           </>

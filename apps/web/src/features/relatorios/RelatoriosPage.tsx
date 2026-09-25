@@ -32,10 +32,28 @@ const conteudo = [
 ]
 
 const columns: Column<RelatorioGerado>[] = [
-  { key: 'nome', header: 'Nome', render: (r) => <Typography sx={{ fontSize: 14, color: colors.navy }}>{r.nome}</Typography> },
-  { key: 'periodo', header: 'Período', render: (r) => <Typography sx={{ fontSize: 14, color: colors.primary }}>{r.periodo}</Typography> },
-  { key: 'gerado', header: 'Gerado em', render: (r) => <Typography sx={{ fontSize: 14, color: colors.navy }}>{r.geradoEm}</Typography> },
-  { key: 'formato', header: 'Formato', render: (r) => <Typography sx={{ fontSize: 14, color: colors.navy }}>{r.formato}</Typography> },
+  {
+    key: 'nome',
+    header: 'Nome',
+    render: (r) => <Typography sx={{ fontSize: 14, color: colors.navy }}>{r.nome}</Typography>,
+  },
+  {
+    key: 'periodo',
+    header: 'Período',
+    render: (r) => (
+      <Typography sx={{ fontSize: 14, color: colors.primary }}>{r.periodo}</Typography>
+    ),
+  },
+  {
+    key: 'gerado',
+    header: 'Gerado em',
+    render: (r) => <Typography sx={{ fontSize: 14, color: colors.navy }}>{r.geradoEm}</Typography>,
+  },
+  {
+    key: 'formato',
+    header: 'Formato',
+    render: (r) => <Typography sx={{ fontSize: 14, color: colors.navy }}>{r.formato}</Typography>,
+  },
   {
     key: 'acoes',
     header: 'Ações',
@@ -60,10 +78,37 @@ function FilterField({ label, children }: { label: string; children: React.React
 
 function ReportIllustration() {
   return (
-    <Box sx={{ width: 170, height: 170, borderRadius: '50%', bgcolor: '#e4edfb', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+    <Box
+      sx={{
+        width: 170,
+        height: 170,
+        borderRadius: '50%',
+        bgcolor: '#e4edfb',
+        display: 'grid',
+        placeItems: 'center',
+        flexShrink: 0,
+      }}
+    >
       <svg width="120" height="130" viewBox="0 0 120 130" aria-hidden>
-        <rect x="8" y="22" width="86" height="104" rx="10" fill="#c9dcfb" transform="rotate(-8 51 74)" />
-        <rect x="24" y="8" width="86" height="104" rx="10" fill="#fff" stroke="#c9dcfb" strokeWidth="2" />
+        <rect
+          x="8"
+          y="22"
+          width="86"
+          height="104"
+          rx="10"
+          fill="#c9dcfb"
+          transform="rotate(-8 51 74)"
+        />
+        <rect
+          x="24"
+          y="8"
+          width="86"
+          height="104"
+          rx="10"
+          fill="#fff"
+          stroke="#c9dcfb"
+          strokeWidth="2"
+        />
         <rect x="38" y="70" width="10" height="24" rx="2" fill="#5aa0ff" />
         <rect x="54" y="56" width="10" height="38" rx="2" fill="#2f7cf6" />
         <rect x="70" y="42" width="10" height="52" rx="2" fill="#1a6ef5" />
@@ -90,12 +135,26 @@ export function RelatoriosPage() {
 
   return (
     <>
-      <PageHeader title="Relatórios" subtitle="Gere relatórios personalizados com base nos indicadores e evidências do e-SUS PEC." />
+      <PageHeader
+        title="Relatórios"
+        subtitle="Gere relatórios personalizados com base nos indicadores e evidências do e-SUS PEC."
+      />
 
       <UnderlineTabs items={tabs} value={tab} onChange={setTab} sx={{ mb: 2 }} />
 
-      <SectionCard title="Filtros do relatório" subtitle="Selecione o período, a categoria e o formato do relatório." sx={{ mb: 2 }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr 0.8fr 1.1fr' }, gap: 2.5, alignItems: 'end' }}>
+      <SectionCard
+        title="Filtros do relatório"
+        subtitle="Selecione o período, a categoria e o formato do relatório."
+        sx={{ mb: 2 }}
+      >
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr 0.8fr 1.1fr' },
+            gap: 2.5,
+            alignItems: 'end',
+          }}
+        >
           <FilterField label="Competência inicial">
             <FilterSelect value="01/2025" options={['01/2025']} icon={Calendar} fullWidth bold />
           </FilterField>
@@ -106,30 +165,88 @@ export function RelatoriosPage() {
             <FilterSelect value="Todas" options={['Todas']} icon={List} fullWidth bold />
           </FilterField>
           <FilterField label="Formato">
-            <FilterSelect value="PDF" options={['PDF', 'XLSX', 'CSV']} icon={FileText} fullWidth bold />
+            <FilterSelect
+              value="PDF"
+              options={['PDF', 'XLSX', 'CSV']}
+              icon={FileText}
+              fullWidth
+              bold
+            />
           </FilterField>
-          <Button variant="contained" size="large" startIcon={<FileText size={20} />} sx={{ minHeight: 50, fontSize: 16, fontWeight: 500 }}>
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<FileText size={20} />}
+            sx={{ minHeight: 50, fontSize: 16, fontWeight: 500 }}
+          >
             Gerar relatório
           </Button>
         </Box>
       </SectionCard>
 
-      <SectionCard title="Relatórios recentes" subtitle="Histórico dos últimos relatórios gerados no sistema." action={<LinkButton>Ver todos</LinkButton>} sx={{ mb: 2 }}>
-        <DataTable columns={columns} rows={data} getRowKey={(r) => r.id} bordered sx={{ '& th': { fontSize: 14, py: 1.1 }, '& td': { py: 1 } }} />
+      <SectionCard
+        title="Relatórios recentes"
+        subtitle="Histórico dos últimos relatórios gerados no sistema."
+        action={<LinkButton>Ver todos</LinkButton>}
+        sx={{ mb: 2 }}
+      >
+        <DataTable
+          columns={columns}
+          rows={data}
+          getRowKey={(r) => r.id}
+          bordered
+          sx={{ '& th': { fontSize: 14, py: 1.1 }, '& td': { py: 1 } }}
+        />
       </SectionCard>
 
-      <Box sx={{ bgcolor: colors.primarySoft, border: `1px solid ${colors.infoBorder}`, borderRadius: '14px', p: 2.5, display: 'flex', gap: 4, alignItems: 'center' }}>
+      <Box
+        sx={{
+          bgcolor: colors.primarySoft,
+          border: `1px solid ${colors.infoBorder}`,
+          borderRadius: '14px',
+          p: 2.5,
+          display: 'flex',
+          gap: 4,
+          alignItems: 'center',
+        }}
+      >
         <ReportIllustration />
         <Box sx={{ flex: 1 }}>
-          <Typography sx={{ fontSize: 19, fontWeight: 700, color: colors.navy, mb: 1 }}>Sobre o Relatório de Indicadores</Typography>
-          <Typography sx={{ fontSize: 14.5, color: colors.textSecondary, lineHeight: 1.55, mb: 2.5 }}>
-            Este relatório apresenta os principais indicadores da APS, com dados extraídos do e-SUS PEC, no período selecionado. Inclui gráficos, tabelas, evolução temporal e análise comparativa entre competências, permitindo o acompanhamento da performance do município.
+          <Typography sx={{ fontSize: 19, fontWeight: 700, color: colors.navy, mb: 1 }}>
+            Sobre o Relatório de Indicadores
           </Typography>
-          <Typography sx={{ fontSize: 15, fontWeight: 700, color: colors.navy, mb: 1.5 }}>O que o relatório contém:</Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5, columnGap: 3 }}>
+          <Typography
+            sx={{ fontSize: 14.5, color: colors.textSecondary, lineHeight: 1.55, mb: 2.5 }}
+          >
+            Este relatório apresenta os principais indicadores da APS, com dados extraídos do e-SUS
+            PEC, no período selecionado. Inclui gráficos, tabelas, evolução temporal e análise
+            comparativa entre competências, permitindo o acompanhamento da performance do município.
+          </Typography>
+          <Typography sx={{ fontSize: 15, fontWeight: 700, color: colors.navy, mb: 1.5 }}>
+            O que o relatório contém:
+          </Typography>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+              gap: 1.5,
+              columnGap: 3,
+            }}
+          >
             {conteudo.map((c) => (
               <Box key={c} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                <Box sx={{ width: 26, height: 26, borderRadius: '50%', bgcolor: colors.primary, color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <Box
+                  sx={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: '50%',
+                    bgcolor: colors.primary,
+                    color: '#fff',
+                    display: 'grid',
+                    placeItems: 'center',
+                    flexShrink: 0,
+                  }}
+                >
                   <Check size={14} strokeWidth={3} />
                 </Box>
                 <Typography sx={{ fontSize: 13.5, color: colors.navy }}>{c}</Typography>

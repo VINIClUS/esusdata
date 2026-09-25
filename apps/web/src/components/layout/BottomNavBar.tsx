@@ -10,7 +10,9 @@ import { useAuth } from '@/app/auth'
 import { CircleQuestionMark, LogOut } from 'lucide-react'
 import { colors, layout } from '@/theme/tokens'
 
-const primary = navItems.filter((n) => ['/painel', '/indicadores', '/execucao', '/relatorios'].includes(n.to))
+const primary = navItems.filter((n) =>
+  ['/painel', '/indicadores', '/execucao', '/relatorios'].includes(n.to),
+)
 const secondary = navItems.filter((n) => ['/base-de-dados', '/configuracoes'].includes(n.to))
 
 export function BottomNavBar() {
@@ -62,26 +64,61 @@ export function BottomNavBar() {
           </Box>
         )
       })}
-      <Box component="button" type="button" onClick={open} sx={itemSx(moreActive)} aria-label="Mais opções">
+      <Box
+        component="button"
+        type="button"
+        onClick={open}
+        sx={itemSx(moreActive)}
+        aria-label="Mais opções"
+      >
         <Ellipsis size={22} />
         <span>Mais</span>
       </Box>
-      <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={close} anchorOrigin={{ vertical: 'top', horizontal: 'right' }} transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+      <Menu
+        anchorEl={anchor}
+        open={Boolean(anchor)}
+        onClose={close}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
         {secondary.map((item) => {
           const Icon = item.icon
           return (
-            <MenuItem key={item.to} onClick={() => { close(); navigate(item.to) }}>
-              <ListItemIcon><Icon size={18} /></ListItemIcon>
+            <MenuItem
+              key={item.to}
+              onClick={() => {
+                close()
+                navigate(item.to)
+              }}
+            >
+              <ListItemIcon>
+                <Icon size={18} />
+              </ListItemIcon>
               {item.label}
             </MenuItem>
           )
         })}
-        <MenuItem onClick={() => { close(); navigate('/ajuda') }}>
-          <ListItemIcon><CircleQuestionMark size={18} /></ListItemIcon>
+        <MenuItem
+          onClick={() => {
+            close()
+            navigate('/ajuda')
+          }}
+        >
+          <ListItemIcon>
+            <CircleQuestionMark size={18} />
+          </ListItemIcon>
           Ajuda
         </MenuItem>
-        <MenuItem onClick={async () => { close(); await logout(); navigate('/login') }}>
-          <ListItemIcon><LogOut size={18} /></ListItemIcon>
+        <MenuItem
+          onClick={async () => {
+            close()
+            await logout()
+            navigate('/login')
+          }}
+        >
+          <ListItemIcon>
+            <LogOut size={18} />
+          </ListItemIcon>
           Sair
         </MenuItem>
       </Menu>

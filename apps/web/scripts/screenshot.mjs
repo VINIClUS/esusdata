@@ -17,10 +17,26 @@ const shots = [
   { slug: '05-execucao', path: '/execucao?mock-login=1', viewport: desktop },
   { slug: '06-fonte-de-dados', path: '/configuracoes?mock-login=1', viewport: desktop },
   { slug: '07-relatorios', path: '/relatorios?mock-login=1', viewport: desktop },
-  { slug: '08-isolamento-municipal', path: '/configuracoes/isolamento-municipal?mock-login=1', viewport: desktop },
-  { slug: '09-tablet-painel', path: '/painel?mock-login=1', viewport: { width: 1024, height: 768 } },
-  { slug: '09-phone-indicadores', path: '/indicadores?mock-login=1', viewport: { width: 390, height: 844 } },
-  { slug: '09-phone-detalhe', path: '/indicadores/PB-01?mock-login=1', viewport: { width: 390, height: 844 } },
+  {
+    slug: '08-isolamento-municipal',
+    path: '/configuracoes/isolamento-municipal?mock-login=1',
+    viewport: desktop,
+  },
+  {
+    slug: '09-tablet-painel',
+    path: '/painel?mock-login=1',
+    viewport: { width: 1024, height: 768 },
+  },
+  {
+    slug: '09-phone-indicadores',
+    path: '/indicadores?mock-login=1',
+    viewport: { width: 390, height: 844 },
+  },
+  {
+    slug: '09-phone-detalhe',
+    path: '/indicadores/PB-01?mock-login=1',
+    viewport: { width: 390, height: 844 },
+  },
 ]
 
 await mkdir(outDir, { recursive: true })
@@ -28,7 +44,11 @@ const browser = await chromium.launch()
 const errors = []
 for (const shot of shots) {
   if (args.only && !args.only.split(',').includes(shot.slug)) continue
-  const context = await browser.newContext({ viewport: shot.viewport, deviceScaleFactor: 1, locale: 'pt-BR' })
+  const context = await browser.newContext({
+    viewport: shot.viewport,
+    deviceScaleFactor: 1,
+    locale: 'pt-BR',
+  })
   const page = await context.newPage()
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(`${shot.slug}: ${m.text()}`)

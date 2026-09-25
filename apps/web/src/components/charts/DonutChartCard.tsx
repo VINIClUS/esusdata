@@ -18,7 +18,13 @@ interface DonutChartProps {
   thickness?: number
 }
 
-export function DonutChart({ data, centerValue, centerLabel, size = 170, thickness = 22 }: DonutChartProps) {
+export function DonutChart({
+  data,
+  centerValue,
+  centerLabel,
+  size = 170,
+  thickness = 22,
+}: DonutChartProps) {
   return (
     <Box sx={{ position: 'relative', width: size, height: size, mx: 'auto' }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -40,10 +46,32 @@ export function DonutChart({ data, centerValue, centerLabel, size = 170, thickne
           </Pie>
         </PieChart>
       </ResponsiveContainer>
-      <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', textAlign: 'center', pointerEvents: 'none' }}>
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          display: 'grid',
+          placeItems: 'center',
+          textAlign: 'center',
+          pointerEvents: 'none',
+        }}
+      >
         <Box>
-          <Typography sx={{ fontSize: size > 150 ? 32 : 24, fontWeight: 700, color: colors.navy, lineHeight: 1.05 }}>{centerValue}</Typography>
-          {centerLabel && <Typography sx={{ fontSize: 12.5, color: colors.navy, lineHeight: 1.25, mt: 0.5 }}>{centerLabel}</Typography>}
+          <Typography
+            sx={{
+              fontSize: size > 150 ? 32 : 24,
+              fontWeight: 700,
+              color: colors.navy,
+              lineHeight: 1.05,
+            }}
+          >
+            {centerValue}
+          </Typography>
+          {centerLabel && (
+            <Typography sx={{ fontSize: 12.5, color: colors.navy, lineHeight: 1.25, mt: 0.5 }}>
+              {centerLabel}
+            </Typography>
+          )}
         </Box>
       </Box>
     </Box>

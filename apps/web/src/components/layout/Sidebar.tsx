@@ -59,7 +59,12 @@ function NavRow({
     )
   }
   return (
-    <Box component="button" type="button" onClick={onClick} sx={{ ...sx, border: 0, width: 'calc(100% - 24px)', font: 'inherit', textAlign: 'left' }}>
+    <Box
+      component="button"
+      type="button"
+      onClick={onClick}
+      sx={{ ...sx, border: 0, width: 'calc(100% - 24px)', font: 'inherit', textAlign: 'left' }}
+    >
       {content}
     </Box>
   )
@@ -90,7 +95,9 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         <Logo size="md" />
       </Box>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, position: 'relative', zIndex: 1 }}>
+      <Box
+        sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, position: 'relative', zIndex: 1 }}
+      >
         {navItems.map((item) => (
           <NavRow
             key={item.to}
@@ -105,8 +112,23 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
       <Box sx={{ flex: 1 }} />
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, position: 'relative', zIndex: 1, pb: 2 }}>
-        <NavRow to="/ajuda" label="Ajuda" icon={CircleQuestionMark} active={pathname.startsWith('/ajuda')} onClick={onNavigate} />
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5,
+          position: 'relative',
+          zIndex: 1,
+          pb: 2,
+        }}
+      >
+        <NavRow
+          to="/ajuda"
+          label="Ajuda"
+          icon={CircleQuestionMark}
+          active={pathname.startsWith('/ajuda')}
+          onClick={onNavigate}
+        />
         <NavRow
           label="Sair"
           icon={LogOut}
@@ -125,7 +147,9 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           <br />
           Uma APS mais forte.
         </Typography>
-        <Typography sx={{ fontSize: 12.5, color: 'rgba(255,255,255,0.7)', textAlign: 'right', mt: 0.5 }}>
+        <Typography
+          sx={{ fontSize: 12.5, color: 'rgba(255,255,255,0.7)', textAlign: 'right', mt: 0.5 }}
+        >
           {demoContext.versao}
         </Typography>
       </Box>

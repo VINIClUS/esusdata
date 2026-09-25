@@ -6,7 +6,11 @@ interface LogoProps {
   tone?: 'light' | 'dark'
 }
 
-const sizes = { sm: { icon: 28, title: 16, sub: 13 }, md: { icon: 40, title: 22, sub: 18 }, lg: { icon: 96, title: 56, sub: 44 } }
+const sizes = {
+  sm: { icon: 28, title: 16, sub: 13 },
+  md: { icon: 40, title: 22, sub: 18 },
+  lg: { icon: 96, title: 56, sub: 44 },
+}
 
 export function LogoMark({ size = 40 }: { size?: number }) {
   return (
@@ -25,10 +29,22 @@ export function Logo({ size = 'md', tone = 'light' }: LogoProps) {
     <Box sx={{ display: 'flex', alignItems: 'center', gap: size === 'lg' ? 2.5 : 1.25 }}>
       <LogoMark size={s.icon} />
       <Box sx={{ lineHeight: 1 }}>
-        <Typography component="div" sx={{ color, fontWeight: 700, fontSize: s.title, lineHeight: 1.05, letterSpacing: '-0.3px' }}>
+        <Typography
+          component="div"
+          sx={{
+            color,
+            fontWeight: 700,
+            fontSize: s.title,
+            lineHeight: 1.05,
+            letterSpacing: '-0.3px',
+          }}
+        >
           Esusdata
         </Typography>
-        <Typography component="div" sx={{ color, fontWeight: 400, fontSize: s.sub, lineHeight: 1.1, opacity: 0.92 }}>
+        <Typography
+          component="div"
+          sx={{ color, fontWeight: 400, fontSize: s.sub, lineHeight: 1.1, opacity: 0.92 }}
+        >
           Helper
         </Typography>
       </Box>

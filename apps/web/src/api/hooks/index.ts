@@ -44,9 +44,13 @@ interface ApiScope {
 
 const NO_MUNICIPALITY = 'Nenhum município autorizado para leitura de resultados.'
 
-function resolveApiIndicadorDetalhe(codigo: string, { municipalityIbge, referencePeriod }: ApiScope): Promise<IndicadorDetalhe> {
+function resolveApiIndicadorDetalhe(
+  codigo: string,
+  { municipalityIbge, referencePeriod }: ApiScope,
+): Promise<IndicadorDetalhe> {
   if (!municipalityIbge) return Promise.reject(new Error(NO_MUNICIPALITY))
-  if (!referencePeriod) return Promise.reject(new Error(`Nenhum resultado publicado para ${codigo}.`))
+  if (!referencePeriod)
+    return Promise.reject(new Error(`Nenhum resultado publicado para ${codigo}.`))
 
   return apiFetch<IndicatorResultResponse[]>(
     indicatorResultsPath({ municipalityIbge, indicatorPack: codigo, referencePeriod }),
@@ -57,7 +61,10 @@ function resolveApiIndicadorDetalhe(codigo: string, { municipalityIbge, referenc
   })
 }
 
-async function resolveApiPainelResumo({ municipalityIbge, referencePeriod }: ApiScope): Promise<PainelResumo> {
+async function resolveApiPainelResumo({
+  municipalityIbge,
+  referencePeriod,
+}: ApiScope): Promise<PainelResumo> {
   const packs = await apiFetch<IndicatorPack[]>('/indicator-packs')
   if (!municipalityIbge || !referencePeriod) {
     return normalizePainelResumo(packs, [], referencePeriod || 'período atual')
@@ -88,7 +95,9 @@ export function usePainelResumo() {
   return useQuery({
     queryKey: ['painel', municipalityIbge, referencePeriod],
     queryFn: () =>
-      USE_MOCKS ? resolveMock(painelFixture) : resolveApiPainelResumo({ municipalityIbge, referencePeriod }),
+      USE_MOCKS
+        ? resolveMock(painelFixture)
+        : resolveApiPainelResumo({ municipalityIbge, referencePeriod }),
     enabled: !isLoading,
   })
 }
@@ -119,7 +128,8 @@ export function useExecucaoAtual() {
   const { municipalityIbge, isLoading } = useScope()
   return useQuery({
     queryKey: ['execucao', municipalityIbge],
-    queryFn: () => (USE_MOCKS ? resolveMock(execucaoFixture) : resolveApiExecucaoAtual(municipalityIbge)),
+    queryFn: () =>
+      USE_MOCKS ? resolveMock(execucaoFixture) : resolveApiExecucaoAtual(municipalityIbge),
     enabled: !isLoading,
   })
 }

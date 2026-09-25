@@ -25,13 +25,30 @@ export function Pagination({ page, count, onChange }: PaginationProps) {
     '&:hover': { bgcolor: active ? colors.primaryDark : colors.primarySoft },
   })
   return (
-    <Box component="nav" aria-label="Paginação" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+    <Box
+      component="nav"
+      aria-label="Paginação"
+      sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+    >
       {Array.from({ length: count }, (_, i) => i + 1).map((p) => (
-        <Box key={p} component="button" type="button" aria-current={p === page ? 'page' : undefined} onClick={() => onChange(p)} sx={btn(p === page)}>
+        <Box
+          key={p}
+          component="button"
+          type="button"
+          aria-current={p === page ? 'page' : undefined}
+          onClick={() => onChange(p)}
+          sx={btn(p === page)}
+        >
           {p}
         </Box>
       ))}
-      <Box component="button" type="button" aria-label="Próxima página" onClick={() => onChange(Math.min(count, page + 1))} sx={btn(false)}>
+      <Box
+        component="button"
+        type="button"
+        aria-label="Próxima página"
+        onClick={() => onChange(Math.min(count, page + 1))}
+        sx={btn(false)}
+      >
         <ChevronRight size={18} />
       </Box>
     </Box>

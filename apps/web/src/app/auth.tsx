@@ -1,9 +1,22 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { USE_MOCKS, apiFetch, ensureApiReady } from '@/api/client'
 import { demoUser } from '@/api/fixtures/context'
 import type { SessionUser } from '@/api/types'
-import { sessionUserFromLogin, sessionUserFromMe, type AuthLoginResponse, type AuthMeResponse } from './auth-model'
+import {
+  sessionUserFromLogin,
+  sessionUserFromMe,
+  type AuthLoginResponse,
+  type AuthMeResponse,
+} from './auth-model'
 
 const STORAGE_KEY = 'esusdata.session'
 
@@ -91,7 +104,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [queryClient])
 
-  const value = useMemo(() => ({ user, isLoading, login, logout }), [user, isLoading, login, logout])
+  const value = useMemo(
+    () => ({ user, isLoading, login, logout }),
+    [user, isLoading, login, logout],
+  )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

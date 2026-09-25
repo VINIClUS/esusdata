@@ -35,7 +35,9 @@ function remember(key: string, value: string) {
 
 /** Município and competência come from the API (grants and published periods), never from the build. */
 export function ScopeProvider({ children }: { children: ReactNode }) {
-  const [storedMunicipality, setStoredMunicipality] = useState(() => remembered(SCOPE_STORAGE_KEYS.municipality))
+  const [storedMunicipality, setStoredMunicipality] = useState(() =>
+    remembered(SCOPE_STORAGE_KEYS.municipality),
+  )
   const [storedPeriod, setStoredPeriod] = useState(() => remembered(SCOPE_STORAGE_KEYS.period))
 
   const me = useQuery({
@@ -66,8 +68,24 @@ export function ScopeProvider({ children }: { children: ReactNode }) {
   // isLoading, not isPending: a disabled query (mock mode, no municipality) stays pending forever.
   const isLoading = me.isLoading || periodsQuery.isLoading
   const value = useMemo(
-    () => ({ municipalityIbge, referencePeriod, municipalities, periods, isLoading, setMunicipality, setPeriod }),
-    [municipalityIbge, referencePeriod, municipalities, periods, isLoading, setMunicipality, setPeriod],
+    () => ({
+      municipalityIbge,
+      referencePeriod,
+      municipalities,
+      periods,
+      isLoading,
+      setMunicipality,
+      setPeriod,
+    }),
+    [
+      municipalityIbge,
+      referencePeriod,
+      municipalities,
+      periods,
+      isLoading,
+      setMunicipality,
+      setPeriod,
+    ],
   )
   return <ScopeContext.Provider value={value}>{children}</ScopeContext.Provider>
 }

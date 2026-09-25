@@ -38,7 +38,11 @@ export const execucaoFixture: ExecucaoAtual = {
   ],
   log: [
     { hora: '10:12:01', nivel: 'success', texto: 'Iniciando execução de dados...' },
-    { hora: '10:12:03', nivel: 'success', texto: 'Conectando ao servidor PostgreSQL (e-SUS PEC)...' },
+    {
+      hora: '10:12:03',
+      nivel: 'success',
+      texto: 'Conectando ao servidor PostgreSQL (e-SUS PEC)...',
+    },
     { hora: '10:12:05', nivel: 'success', texto: 'Conexão estabelecida com sucesso.' },
     { hora: '10:13:21', nivel: 'success', texto: 'Lendo dados de cadastros individuais...' },
     { hora: '10:13:48', nivel: 'success', texto: '24.852 registros de cadastros carregados.' },

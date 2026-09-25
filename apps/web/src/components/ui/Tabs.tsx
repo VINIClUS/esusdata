@@ -55,7 +55,13 @@ export function PillTabs({ items, value, onChange, sx }: TabsProps) {
 }
 
 /** Underline tabs; with `boxed` the active tab gets a bordered box (Execução). */
-export function UnderlineTabs({ items, value, onChange, boxed, sx }: TabsProps & { boxed?: boolean }) {
+export function UnderlineTabs({
+  items,
+  value,
+  onChange,
+  boxed,
+  sx,
+}: TabsProps & { boxed?: boolean }) {
   return (
     <Box
       role="tablist"
@@ -64,7 +70,15 @@ export function UnderlineTabs({ items, value, onChange, boxed, sx }: TabsProps &
         gap: boxed ? 0 : 1,
         borderBottom: `1px solid ${colors.border}`,
         overflowX: 'auto',
-        ...(boxed ? { border: `1px solid ${colors.border}`, borderBottom: 0, borderRadius: '12px 12px 0 0', width: 'fit-content', bgcolor: '#f7f9fd' } : {}),
+        ...(boxed
+          ? {
+              border: `1px solid ${colors.border}`,
+              borderBottom: 0,
+              borderRadius: '12px 12px 0 0',
+              width: 'fit-content',
+              bgcolor: '#f7f9fd',
+            }
+          : {}),
         ...sx,
       }}
     >
