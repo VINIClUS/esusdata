@@ -29,9 +29,27 @@ export function IconRow({ icon, title, text, iconVariant = 'circle', size = 'md'
         {icon}
       </Box>
       <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ fontSize: size === 'sm' ? 12 : 14, fontWeight: 700, color: colors.navy, lineHeight: 1.3 }}>{title}</Typography>
+        <Typography
+          sx={{
+            fontSize: size === 'sm' ? 12 : 14,
+            fontWeight: 700,
+            color: colors.navy,
+            lineHeight: 1.3,
+          }}
+        >
+          {title}
+        </Typography>
         {text && (
-          <Typography sx={{ fontSize: size === 'sm' ? 11.5 : 13, color: colors.textSecondary, lineHeight: 1.4, mt: 0.15 }}>{text}</Typography>
+          <Typography
+            sx={{
+              fontSize: size === 'sm' ? 11.5 : 13,
+              color: colors.textSecondary,
+              lineHeight: 1.4,
+              mt: 0.15,
+            }}
+          >
+            {text}
+          </Typography>
         )}
       </Box>
     </Box>

@@ -265,7 +265,7 @@ export function IndicadoresListPage() {
             getRowKey={(r) => r.codigo}
             cardMode
             renderCard={(r) => <IndicadorCard item={r} />}
-            onRowClick={(r) => navigate(`/indicadores/${r.codigo}`)}
+            onRowClick={(r) => void navigate(`/indicadores/${r.codigo}`)}
           />
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
             <Pagination page={current} count={pageCount} onChange={setPage} />
@@ -278,7 +278,7 @@ export function IndicadoresListPage() {
             rows={rows}
             getRowKey={(r) => r.codigo}
             bordered
-            onRowClick={(r) => navigate(`/indicadores/${r.codigo}`)}
+            onRowClick={(r) => void navigate(`/indicadores/${r.codigo}`)}
             sx={{
               border: 0,
               borderRadius: 0,

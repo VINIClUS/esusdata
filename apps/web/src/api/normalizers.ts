@@ -9,7 +9,7 @@ import type {
 } from './types'
 import type { ExecucaoAtual, RunResponse } from './types'
 
-type CategoryDefinition = {
+interface CategoryDefinition {
   key: string
   label: CategoriaIndicador
   matches: (family: string) => boolean
@@ -91,10 +91,9 @@ export function normalizePainelResumo(
   const computedCount = packs.filter(
     (pack) => resultByPack.get(pack.id)?.status === 'COMPUTED',
   ).length
-  const pendingPacks = packs.filter(
-    (pack) => resultByPack.get(pack.id)?.status !== 'COMPUTED',
-  )
-  const computedPercent = packs.length === 0 ? null : Math.round((computedCount / packs.length) * 100)
+  const pendingPacks = packs.filter((pack) => resultByPack.get(pack.id)?.status !== 'COMPUTED')
+  const computedPercent =
+    packs.length === 0 ? null : Math.round((computedCount / packs.length) * 100)
   const alertas: PainelResumo['alertas'] = pendingPacks.map((pack) => {
     const result = resultByPack.get(pack.id)
     const description =
@@ -122,7 +121,12 @@ export function normalizePainelResumo(
         chip: computedPercent === null ? undefined : { label: '', valor: `${computedPercent}%` },
         tendencia: { texto: `Competência ${referencePeriod}`, tom: 'up' },
       },
-      { id: 'cobertura', icone: 'cobertura', label: 'Cobertura da população', valor: 'Indisponível' },
+      {
+        id: 'cobertura',
+        icone: 'cobertura',
+        label: 'Cobertura da população',
+        valor: 'Indisponível',
+      },
       { id: 'cadastros', icone: 'cadastros', label: 'Cadastros ativos', valor: 'Indisponível' },
       {
         id: 'pendencias',
@@ -231,7 +235,7 @@ function runLog(response: RunResponse): ExecucaoAtual['log'] {
 }
 
 export function normalizeRunResponse(response: RunResponse): ExecucaoAtual {
-  const stages: Array<{ titulo: string; timestamp: string | null; descricao: string }> = [
+  const stages: { titulo: string; timestamp: string | null; descricao: string }[] = [
     {
       titulo: 'Enfileiramento',
       timestamp: response.createdAt,
@@ -310,7 +314,9 @@ export function normalizeIndicatorResult(result: IndicatorResultResponse): Indic
     resultado: {
       valor: value,
       meta: '—',
-      tendencia: result.classification ? `Classificação: ${result.classification}` : 'Sem classificação',
+      tendencia: result.classification
+        ? `Classificação: ${result.classification}`
+        : 'Sem classificação',
     },
     numerador: { valor: requiredNumberFromApi(result.numerator), label: 'Numerador' },
     denominador: {

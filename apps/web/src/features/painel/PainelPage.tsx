@@ -2,7 +2,19 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Grid from '@mui/material/Grid'
 import Typography from '@mui/material/Typography'
-import { Bell, ChartColumn, ChevronRight, CircleAlert, Database, ExternalLink, Info, Play, TriangleAlert, Users, type LucideIcon } from 'lucide-react'
+import {
+  Bell,
+  ChartColumn,
+  ChevronRight,
+  CircleAlert,
+  Database,
+  ExternalLink,
+  Info,
+  Play,
+  TriangleAlert,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
 import { usePainelResumo } from '@/api/hooks'
 import type { Alerta, ExecucaoResumo, IndicadorPendencia, Kpi } from '@/api/types'
 import { DonutChart } from '@/components/charts/DonutChartCard'
@@ -34,16 +46,37 @@ const alertIcon = {
 }
 
 const pendenciaColumns: Column<IndicadorPendencia>[] = [
-  { key: 'indicador', header: 'Indicador', render: (r) => <Typography sx={{ fontSize: 12.5, color: colors.navy, lineHeight: 1.3 }}>{r.indicador}</Typography> },
+  {
+    key: 'indicador',
+    header: 'Indicador',
+    render: (r) => (
+      <Typography sx={{ fontSize: 12.5, color: colors.navy, lineHeight: 1.3 }}>
+        {r.indicador}
+      </Typography>
+    ),
+  },
   {
     key: 'pendencias',
     header: 'Pendências',
     align: 'center',
     render: (r) => (
-      <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: r.status === 'regular' ? colors.navy : colors.error }}>{r.pendencias}</Typography>
+      <Typography
+        sx={{
+          fontSize: 13.5,
+          fontWeight: 700,
+          color: r.status === 'regular' ? colors.navy : colors.error,
+        }}
+      >
+        {r.pendencias}
+      </Typography>
     ),
   },
-  { key: 'status', header: 'Status', align: 'center', render: (r) => <StatusChip status={r.status} size="sm" withIcon={false} /> },
+  {
+    key: 'status',
+    header: 'Status',
+    align: 'center',
+    render: (r) => <StatusChip status={r.status} size="sm" withIcon={false} />,
+  },
 ]
 
 const execucaoColumns: Column<ExecucaoResumo>[] = [
@@ -53,7 +86,15 @@ const execucaoColumns: Column<ExecucaoResumo>[] = [
     key: 'status',
     header: 'Status',
     render: () => (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: colors.success, fontWeight: 600 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          color: colors.success,
+          fontWeight: 600,
+        }}
+      >
         <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: colors.success }} />
         Concluída
       </Box>
@@ -65,15 +106,36 @@ function AlertRow({ alerta }: { alerta: Alerta }) {
   const def = alertIcon[alerta.severidade]
   const Icon = def.icon
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, borderBottom: `1px solid ${colors.border}`, '&:last-of-type': { borderBottom: 0 } }}>
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.5,
+        py: 1,
+        borderBottom: `1px solid ${colors.border}`,
+        '&:last-of-type': { borderBottom: 0 },
+      }}
+    >
       <Box sx={{ color: def.color, display: 'flex', flexShrink: 0 }}>
         <Icon size={22} fill={def.color} color="#fff" strokeWidth={2} />
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color: colors.navy }}>{alerta.titulo}</Typography>
-        <Typography sx={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.35 }}>{alerta.descricao}</Typography>
+        <Typography sx={{ fontSize: 13, fontWeight: 700, color: colors.navy }}>
+          {alerta.titulo}
+        </Typography>
+        <Typography sx={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.35 }}>
+          {alerta.descricao}
+        </Typography>
       </Box>
-      <Box sx={{ textAlign: 'right', fontSize: 12, color: colors.textSecondary, lineHeight: 1.35, flexShrink: 0 }}>
+      <Box
+        sx={{
+          textAlign: 'right',
+          fontSize: 12,
+          color: colors.textSecondary,
+          lineHeight: 1.35,
+          flexShrink: 0,
+        }}
+      >
         {alerta.data}
         <br />
         {alerta.hora}
@@ -94,7 +156,7 @@ function UnavailableValue({ children }: { children: string }) {
 export function PainelPage() {
   const { data, error, isError, isPending } = usePainelResumo()
   if (isPending) return <PageSkeleton title="Painel Principal" />
-  if (isError || !data) {
+  if (isError) {
     return (
       <>
         <PageHeader
@@ -110,7 +172,11 @@ export function PainelPage() {
 
   return (
     <>
-      <PageHeader title="Painel Principal" subtitle="Visão geral dos indicadores e da qualidade dos dados do e-SUS PEC." lastUpdate />
+      <PageHeader
+        title="Painel Principal"
+        subtitle="Visão geral dos indicadores e da qualidade dos dados do e-SUS PEC."
+        lastUpdate
+      />
 
       <Grid container spacing={1.5}>
         {data.kpis.map((k) => {
@@ -118,11 +184,19 @@ export function PainelPage() {
           return (
             <Grid key={k.id} size={{ xs: 6, md: 3 }}>
               <KpiCard
-                icon={<Icon size={24} color={k.tomValor === 'error' ? colors.error : colors.primary} fill={k.icone === 'pendencias' ? colors.error : 'none'} />}
+                icon={
+                  <Icon
+                    size={24}
+                    color={k.tomValor === 'error' ? colors.error : colors.primary}
+                    fill={k.icone === 'pendencias' ? colors.error : 'none'}
+                  />
+                }
                 label={k.label}
                 value={k.valor}
                 valueColor={k.tomValor === 'error' ? colors.error : colors.navy}
-                chip={k.chip ? { label: k.chip.label || undefined, value: k.chip.valor } : undefined}
+                chip={
+                  k.chip ? { label: k.chip.label || undefined, value: k.chip.valor } : undefined
+                }
                 trend={k.tendencia ? { text: k.tendencia.texto, tone: k.tendencia.tom } : undefined}
               />
             </Grid>
@@ -133,7 +207,13 @@ export function PainelPage() {
           <SectionCard
             title="Evolução mensal de indicadores principais"
             subtitle="Acompanhe a evolução dos principais indicadores ao longo dos últimos meses."
-            action={<FilterSelect value="Últimos 8 meses" options={['Últimos 8 meses', 'Últimos 12 meses']} size="sm" />}
+            action={
+              <FilterSelect
+                value="Últimos 8 meses"
+                options={['Últimos 8 meses', 'Últimos 12 meses']}
+                size="sm"
+              />
+            }
             sx={{ height: '100%' }}
           >
             {data.evolucao.pontos.length > 0 && data.evolucao.series.length > 0 ? (
@@ -150,7 +230,11 @@ export function PainelPage() {
         </Grid>
 
         <Grid size={{ xs: 12, md: 4.5, lg: 2.75 }}>
-          <SectionCard title="Qualidade dos dados" subtitle="Índice geral de consistência e completude." sx={{ height: '100%' }}>
+          <SectionCard
+            title="Qualidade dos dados"
+            subtitle="Índice geral de consistência e completude."
+            sx={{ height: '100%' }}
+          >
             <Box sx={{ mt: 0.5 }}>
               {data.qualidade.percentual === null ? (
                 <UnavailableValue>Qualidade indisponível na API atual.</UnavailableValue>
@@ -174,7 +258,12 @@ export function PainelPage() {
               )}
             </Box>
             <Box sx={{ mt: 2 }}>
-              <Callout variant="success" dense title={data.qualidade.titulo} action={<ChevronRight size={18} color={colors.success} />}>
+              <Callout
+                variant="success"
+                dense
+                title={data.qualidade.titulo}
+                action={<ChevronRight size={18} color={colors.success} />}
+              >
                 {data.qualidade.descricao}
               </Callout>
             </Box>
@@ -182,13 +271,33 @@ export function PainelPage() {
         </Grid>
 
         <Grid size={{ xs: 12, md: 12, lg: 2.75 }}>
-          <SectionCard title="Verificações de integridade" subtitle="Status dos principais itens de consistência." sx={{ height: '100%' }}>
+          <SectionCard
+            title="Verificações de integridade"
+            subtitle="Status dos principais itens de consistência."
+            sx={{ height: '100%' }}
+          >
             {data.integridade.length > 0 ? (
-              <Checklist items={data.integridade.map((i) => ({ label: i.label, value: i.valor, ok: i.ok }))} divided />
+              <Checklist
+                items={data.integridade.map((i) => ({ label: i.label, value: i.valor, ok: i.ok }))}
+                divided
+              />
             ) : (
               <UnavailableValue>Verificações indisponíveis na API atual.</UnavailableValue>
             )}
-            <Button variant="outlined" color="primary" fullWidth startIcon={<ExternalLink size={16} />} endIcon={<ChevronRight size={16} />} sx={{ mt: 1.5, fontSize: 12, justifyContent: 'space-between', whiteSpace: 'nowrap', px: 1.25 }}>
+            <Button
+              variant="outlined"
+              color="primary"
+              fullWidth
+              startIcon={<ExternalLink size={16} />}
+              endIcon={<ChevronRight size={16} />}
+              sx={{
+                mt: 1.5,
+                fontSize: 12,
+                justifyContent: 'space-between',
+                whiteSpace: 'nowrap',
+                px: 1.25,
+              }}
+            >
               Ver detalhes da qualidade dos dados
             </Button>
           </SectionCard>
@@ -219,7 +328,13 @@ export function PainelPage() {
             sx={{ height: '100%' }}
           >
             {data.maiorPendencia.length > 0 ? (
-              <DataTable columns={pendenciaColumns} rows={data.maiorPendencia} getRowKey={(r) => r.indicador} dense sx={{ '& td': { py: 0.55, fontSize: 12.5 }, '& th': { py: 0.9 } }} />
+              <DataTable
+                columns={pendenciaColumns}
+                rows={data.maiorPendencia}
+                getRowKey={(r) => r.indicador}
+                dense
+                sx={{ '& td': { py: 0.55, fontSize: 12.5 }, '& th': { py: 0.9 } }}
+              />
             ) : (
               <UnavailableValue>Pendências detalhadas indisponíveis.</UnavailableValue>
             )}
@@ -235,7 +350,16 @@ export function PainelPage() {
             sx={{ height: '100%' }}
           >
             {data.ultimasExecucoes.length > 0 ? (
-              <DataTable columns={execucaoColumns} rows={data.ultimasExecucoes} getRowKey={(r) => r.dataHora} dense sx={{ '& td': { py: 0.6, fontSize: 12.5, whiteSpace: 'nowrap' }, '& th': { py: 0.9 } }} />
+              <DataTable
+                columns={execucaoColumns}
+                rows={data.ultimasExecucoes}
+                getRowKey={(r) => r.dataHora}
+                dense
+                sx={{
+                  '& td': { py: 0.6, fontSize: 12.5, whiteSpace: 'nowrap' },
+                  '& th': { py: 0.9 },
+                }}
+              />
             ) : (
               <UnavailableValue>Execuções indisponíveis na API atual.</UnavailableValue>
             )}
@@ -244,12 +368,28 @@ export function PainelPage() {
               variant="outlined"
               color="primary"
               startIcon={
-                <Box sx={{ width: 26, height: 26, borderRadius: '50%', bgcolor: colors.primary, color: '#fff', display: 'grid', placeItems: 'center' }}>
+                <Box
+                  sx={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: '50%',
+                    bgcolor: colors.primary,
+                    color: '#fff',
+                    display: 'grid',
+                    placeItems: 'center',
+                  }}
+                >
                   <Play size={12} fill="#fff" />
                 </Box>
               }
               endIcon={<ChevronRight size={18} />}
-              sx={{ mt: 1.5, bgcolor: colors.primarySoft, justifyContent: 'space-between', fontSize: 13.5, minHeight: 46 }}
+              sx={{
+                mt: 1.5,
+                bgcolor: colors.primarySoft,
+                justifyContent: 'space-between',
+                fontSize: 13.5,
+                minHeight: 46,
+              }}
             >
               Executar nova importação de dados
             </Button>

@@ -28,7 +28,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
       <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <TopBar compact={compact} phone={phone} onOpenMenu={() => setOpen(true)} />
-        <Box component="main" sx={{ flex: 1, overflow: 'auto', px: { xs: 2, md: 3 }, py: { xs: 2, md: 2 } }}>
+        <Box
+          component="main"
+          sx={{ flex: 1, overflow: 'auto', px: { xs: 2, md: 3 }, py: { xs: 2, md: 2 } }}
+        >
           {children}
         </Box>
         {compact && <BottomNavBar />}

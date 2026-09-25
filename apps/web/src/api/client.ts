@@ -22,14 +22,12 @@ function xsrfToken(): string | null {
 
 /** Obtains the CSRF cookie before the first state-changing API request. */
 export function ensureApiReady(): Promise<void> {
-  if (!apiReady) {
-    apiReady = apiFetch<{ status: string }>('/ready')
-      .then(() => undefined)
-      .catch((error) => {
-        apiReady = null
-        throw error
-      })
-  }
+  apiReady ??= apiFetch<{ status: string }>('/ready')
+    .then(() => undefined)
+    .catch((error: unknown) => {
+      apiReady = null
+      throw error
+    })
   return apiReady
 }
 

@@ -26,7 +26,20 @@ const tabs = [
 function RuleIcon({ resultado }: { resultado: RegraValidacao['resultado'] }) {
   if (resultado === 'conforme') return <CheckIcon size={26} />
   return (
-    <Box sx={{ width: 26, height: 26, borderRadius: '50%', bgcolor: colors.primary, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 700, flexShrink: 0 }}>
+    <Box
+      sx={{
+        width: 26,
+        height: 26,
+        borderRadius: '50%',
+        bgcolor: colors.primary,
+        color: '#fff',
+        display: 'grid',
+        placeItems: 'center',
+        fontSize: 14,
+        fontWeight: 700,
+        flexShrink: 0,
+      }}
+    >
       i
     </Box>
   )
@@ -43,8 +56,23 @@ const columns: Column<RegraValidacao>[] = [
       </Box>
     ),
   },
-  { key: 'desc', header: 'Descrição', render: (r) => <Typography sx={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.4, maxWidth: 300 }}>{r.descricao}</Typography> },
-  { key: 'resultado', header: 'Resultado', align: 'center', render: (r) => <StatusChip status={r.resultado} withIcon={false} /> },
+  {
+    key: 'desc',
+    header: 'Descrição',
+    render: (r) => (
+      <Typography
+        sx={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.4, maxWidth: 300 }}
+      >
+        {r.descricao}
+      </Typography>
+    ),
+  },
+  {
+    key: 'resultado',
+    header: 'Resultado',
+    align: 'center',
+    render: (r) => <StatusChip status={r.resultado} withIcon={false} />,
+  },
   {
     key: 'detalhes',
     header: 'Detalhes',
@@ -61,7 +89,7 @@ export function IsolamentoPage() {
   const { data, error, isError, isPending } = useIsolamento()
   const [tab, setTab] = useState('validacao')
   if (isPending) return <PageSkeleton title="Isolamento Municipal" />
-  if (isError || !data) {
+  if (isError) {
     return (
       <PageUnavailable
         title="Isolamento Municipal"
@@ -73,21 +101,56 @@ export function IsolamentoPage() {
 
   return (
     <>
-      <PageHeader title="Isolamento Municipal" subtitle="Garanta que os dados utilizados são apenas do município selecionado." lastUpdate />
+      <PageHeader
+        title="Isolamento Municipal"
+        subtitle="Garanta que os dados utilizados são apenas do município selecionado."
+        lastUpdate
+      />
 
       <UnderlineTabs items={tabs} value={tab} onChange={setTab} sx={{ mb: 2 }} />
 
-      <Box sx={{ bgcolor: '#f4fbf6', border: `1px solid ${colors.successBorder}`, borderRadius: '14px', p: 2.5, mb: 2 }}>
+      <Box
+        sx={{
+          bgcolor: '#f4fbf6',
+          border: `1px solid ${colors.successBorder}`,
+          borderRadius: '14px',
+          p: 2.5,
+          mb: 2,
+        }}
+      >
         <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
-          <Box sx={{ width: 100, height: 100, borderRadius: '50%', bgcolor: '#dff5e6', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-            <Box sx={{ width: 60, height: 60, borderRadius: '50%', bgcolor: colors.success, color: '#fff', display: 'grid', placeItems: 'center' }}>
+          <Box
+            sx={{
+              width: 100,
+              height: 100,
+              borderRadius: '50%',
+              bgcolor: '#dff5e6',
+              display: 'grid',
+              placeItems: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Box
+              sx={{
+                width: 60,
+                height: 60,
+                borderRadius: '50%',
+                bgcolor: colors.success,
+                color: '#fff',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
               <Check size={32} strokeWidth={3.5} />
             </Box>
           </Box>
           <Box sx={{ flex: 1 }}>
-            <Typography sx={{ fontSize: 22, fontWeight: 700, color: colors.navy }}>Recorte municipal validado</Typography>
+            <Typography sx={{ fontSize: 22, fontWeight: 700, color: colors.navy }}>
+              Recorte municipal validado
+            </Typography>
             <Typography sx={{ fontSize: 15, color: colors.textSecondary, mt: 0.5 }}>
-              A base de dados está filtrada e contém apenas registros do município de <strong style={{ color: colors.navy }}>{data.municipioUf}</strong>.
+              A base de dados está filtrada e contém apenas registros do município de{' '}
+              <strong style={{ color: colors.navy }}>{data.municipioUf}</strong>.
             </Typography>
             <Box sx={{ mt: 2 }}>
               <StatColumns
@@ -101,8 +164,20 @@ export function IsolamentoPage() {
             </Box>
           </Box>
         </Box>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '340px 1fr' }, gap: 2.5, mt: 2.5 }}>
-          <Button variant="outlined" size="large" startIcon={<RefreshCw size={22} />} sx={{ minHeight: 60, fontSize: 17, fontWeight: 500, borderWidth: 1.5 }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: '340px 1fr' },
+            gap: 2.5,
+            mt: 2.5,
+          }}
+        >
+          <Button
+            variant="outlined"
+            size="large"
+            startIcon={<RefreshCw size={22} />}
+            sx={{ minHeight: 60, fontSize: 17, fontWeight: 500, borderWidth: 1.5 }}
+          >
             Validar novamente
           </Button>
           <Callout variant="info" title="Importante">
@@ -123,13 +198,21 @@ export function IsolamentoPage() {
         }
         sx={{ mb: 2 }}
       >
-        <DataTable columns={columns} rows={data.regras} getRowKey={(r) => r.nome} bordered sx={{ '& th': { fontSize: 13.5, py: 1 }, '& td': { py: 0.9 } }} />
+        <DataTable
+          columns={columns}
+          rows={data.regras}
+          getRowKey={(r) => r.nome}
+          bordered
+          sx={{ '& th': { fontSize: 13.5, py: 1 }, '& td': { py: 0.9 } }}
+        />
       </SectionCard>
 
       <Callout variant="info" iconStyle="filled" title="Sobre o isolamento municipal">
-        Esta validação garante que os indicadores, relatórios e análises utilizarão apenas os registros do município selecionado.
+        Esta validação garante que os indicadores, relatórios e análises utilizarão apenas os
+        registros do município selecionado.
         <br />
-        Para alterações de município, utilize o seletor no topo da página e valide novamente o recorte.
+        Para alterações de município, utilize o seletor no topo da página e valide novamente o
+        recorte.
       </Callout>
     </>
   )

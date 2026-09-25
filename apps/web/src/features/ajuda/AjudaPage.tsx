@@ -7,7 +7,9 @@ export function AjudaPage() {
     <>
       <PageHeader title="Ajuda" subtitle="Documentação, suporte e perguntas frequentes." />
       <SectionCard title="Em breve">
-        <Typography sx={{ fontSize: 14 }}>A central de ajuda será disponibilizada nas próximas versões.</Typography>
+        <Typography sx={{ fontSize: 14 }}>
+          A central de ajuda será disponibilizada nas próximas versões.
+        </Typography>
       </SectionCard>
     </>
   )

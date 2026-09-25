@@ -23,12 +23,41 @@ const tabs = [
   { key: 'isolamento', label: 'Isolamento Municipal', icon: Building },
 ]
 
-function InfoCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+function InfoCard({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode
+  title: string
+  children: React.ReactNode
+}) {
   return (
-    <Box sx={{ bgcolor: colors.primarySoft, border: `1px solid ${colors.infoBorder}`, borderRadius: '14px', p: 2.5 }}>
+    <Box
+      sx={{
+        bgcolor: colors.primarySoft,
+        border: `1px solid ${colors.infoBorder}`,
+        borderRadius: '14px',
+        p: 2.5,
+      }}
+    >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-        <Box sx={{ width: 36, height: 36, borderRadius: '50%', bgcolor: colors.primary, color: '#fff', display: 'grid', placeItems: 'center' }}>{icon}</Box>
-        <Typography sx={{ fontSize: 20, fontWeight: 700, color: colors.primary }}>{title}</Typography>
+        <Box
+          sx={{
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            bgcolor: colors.primary,
+            color: '#fff',
+            display: 'grid',
+            placeItems: 'center',
+          }}
+        >
+          {icon}
+        </Box>
+        <Typography sx={{ fontSize: 20, fontWeight: 700, color: colors.primary }}>
+          {title}
+        </Typography>
       </Box>
       {children}
     </Box>
@@ -37,13 +66,17 @@ function InfoCard({ icon, title, children }: { icon: React.ReactNode; title: str
 
 export function FonteDeDadosPage() {
   const { data, error, isError, isPending } = useFonte()
-  const { data: requisitos, error: requisitosErrorValue, isError: requisitosError } = useRequisitosFonte()
+  const {
+    data: requisitos,
+    error: requisitosErrorValue,
+    isError: requisitosError,
+  } = useRequisitosFonte()
   const navigate = useNavigate()
   const [tab, setTab] = useState('conexao')
   const [form, setForm] = useState<Record<string, string> | null>(null)
 
   if (isPending) return <PageSkeleton title="Configuração da Fonte de Dados" />
-  if (isError || !data) {
+  if (isError) {
     return (
       <PageUnavailable
         title="Configuração da Fonte de Dados"
@@ -52,24 +85,47 @@ export function FonteDeDadosPage() {
       />
     )
   }
-  const values = form ?? { host: data.host, porta: data.porta, nomeBanco: data.nomeBanco, usuario: data.usuario, senha: data.senha }
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...values, [k]: e.target.value })
+  const values = form ?? {
+    host: data.host,
+    porta: data.porta,
+    nomeBanco: data.nomeBanco,
+    usuario: data.usuario,
+    senha: data.senha,
+  }
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm({ ...values, [k]: e.target.value })
 
   return (
     <>
-      <PageHeader title="Configuração da Fonte de Dados" subtitle="Configure a fonte de dados do município." />
+      <PageHeader
+        title="Configuração da Fonte de Dados"
+        subtitle="Configure a fonte de dados do município."
+      />
 
       <UnderlineTabs
         items={tabs}
         value={tab}
-        onChange={(k) => (k === 'isolamento' ? navigate('/configuracoes/isolamento-municipal') : setTab(k))}
+        onChange={(k) => {
+          if (k === 'isolamento') void navigate('/configuracoes/isolamento-municipal')
+          else setTab(k)
+        }}
         sx={{ mb: 2 }}
       />
 
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, md: 7.2 }}>
-          <SectionCard title="Dados da fonte" subtitle="Informe os parâmetros da fonte cadastrada." padding={3} headerSx={{ pb: 2.5 }} sx={{ height: '100%' }}>
-            <Box component="form" onSubmit={(e) => e.preventDefault()} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          <SectionCard
+            title="Dados da fonte"
+            subtitle="Informe os parâmetros da fonte cadastrada."
+            padding={3}
+            headerSx={{ pb: 2.5 }}
+            sx={{ height: '100%' }}
+          >
+            <Box
+              component="form"
+              onSubmit={(e) => e.preventDefault()}
+              sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}
+            >
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                 <Typography sx={{ fontSize: 15, fontWeight: 600 }}>Família da fonte</Typography>
                 <FilterSelect value={data.tipo} options={[data.tipo]} icon={Database} fullWidth />
@@ -78,16 +134,71 @@ export function FonteDeDadosPage() {
                 <Field label="Host" value={values.host} onChange={set('host')} />
                 <Field label="Porta" value={values.porta} onChange={set('porta')} />
               </Box>
-              <Field label="Nome do banco de dados" value={values.nomeBanco} onChange={set('nomeBanco')} />
-              <Field label="Usuário" value={values.usuario} onChange={set('usuario')} autoComplete="off" />
-              <PasswordField label="Senha" value={values.senha} onChange={set('senha')} autoComplete="new-password" />
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'auto 1fr' }, gap: 2, alignItems: 'stretch', mt: 1 }}>
-                <Button type="submit" variant="contained" size="large" startIcon={<Radio size={22} />} sx={{ minHeight: 58, px: 3, fontSize: 17, fontWeight: 500 }}>
+              <Field
+                label="Nome do banco de dados"
+                value={values.nomeBanco}
+                onChange={set('nomeBanco')}
+              />
+              <Field
+                label="Usuário"
+                value={values.usuario}
+                onChange={set('usuario')}
+                autoComplete="off"
+              />
+              <PasswordField
+                label="Senha"
+                value={values.senha}
+                onChange={set('senha')}
+                autoComplete="new-password"
+              />
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: 'auto 1fr' },
+                  gap: 2,
+                  alignItems: 'stretch',
+                  mt: 1,
+                }}
+              >
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  startIcon={<Radio size={22} />}
+                  sx={{ minHeight: 58, px: 3, fontSize: 17, fontWeight: 500 }}
+                >
                   Testar fonte
                 </Button>
                 {data.ultimoTeste && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, bgcolor: colors.successBg, border: `1px solid ${colors.successBorder}`, borderRadius: '10px', color: colors.success, fontSize: 15, fontWeight: 600 }}>
-                    <Box sx={{ width: 26, height: 26, borderRadius: '50%', bgcolor: colors.success, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 14, flexShrink: 0 }}>✓</Box>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      px: 2,
+                      bgcolor: colors.successBg,
+                      border: `1px solid ${colors.successBorder}`,
+                      borderRadius: '10px',
+                      color: colors.success,
+                      fontSize: 15,
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: '50%',
+                        bgcolor: colors.success,
+                        color: '#fff',
+                        display: 'grid',
+                        placeItems: 'center',
+                        fontSize: 14,
+                        flexShrink: 0,
+                      }}
+                    >
+                      ✓
+                    </Box>
                     {data.ultimoTeste.mensagem}
                   </Box>
                 )}
@@ -98,7 +209,12 @@ export function FonteDeDadosPage() {
 
         <Grid size={{ xs: 12, md: 4.8 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            <InfoCard icon={<Typography sx={{ fontWeight: 700, fontSize: 18, lineHeight: 1 }}>i</Typography>} title="Requisitos">
+            <InfoCard
+              icon={
+                <Typography sx={{ fontWeight: 700, fontSize: 18, lineHeight: 1 }}>i</Typography>
+              }
+              title="Requisitos"
+            >
               {requisitosError ? (
                 <Callout variant="warning" title="Requisitos indisponíveis" dense>
                   {requisitosErrorValue instanceof Error
@@ -106,16 +222,28 @@ export function FonteDeDadosPage() {
                     : 'A API não fornece os requisitos da fonte neste momento.'}
                 </Callout>
               ) : (
-                <Checklist items={(requisitos ?? []).map((r) => ({ label: r.label, ok: r.ok }))} size="lg" />
+                <Checklist
+                  items={(requisitos ?? []).map((r) => ({ label: r.label, ok: r.ok }))}
+                  size="lg"
+                />
               )}
             </InfoCard>
             <InfoCard icon={<Shield size={18} fill="#fff" />} title="Segurança">
               <Typography sx={{ fontSize: 15, color: colors.navy, lineHeight: 1.6, mb: 2.5 }}>
-                As credenciais da fonte são armazenadas de forma segura e criptografada no sistema. A leitura é somente de consulta, sem alterações nos dados de origem.
+                As credenciais da fonte são armazenadas de forma segura e criptografada no sistema.
+                A leitura é somente de consulta, sem alterações nos dados de origem.
               </Typography>
-              <Box sx={{ bgcolor: '#fff', borderRadius: '12px', border: `1px solid ${colors.infoBorder}`, p: 2 }}>
+              <Box
+                sx={{
+                  bgcolor: '#fff',
+                  borderRadius: '12px',
+                  border: `1px solid ${colors.infoBorder}`,
+                  p: 2,
+                }}
+              >
                 <Callout variant="info" title="Seus dados estão protegidos" dense>
-                  Utilizamos criptografia e boas práticas de segurança para manter suas informações seguras.
+                  Utilizamos criptografia e boas práticas de segurança para manter suas informações
+                  seguras.
                 </Callout>
               </Box>
             </InfoCard>

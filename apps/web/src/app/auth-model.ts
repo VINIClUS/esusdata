@@ -31,6 +31,9 @@ export function sessionUserFromLogin(response: AuthLoginResponse): SessionUser {
   }
 }
 
-export function sessionUserFromMe(response: AuthMeResponse, previous: SessionUser | null): SessionUser {
+export function sessionUserFromMe(
+  response: AuthMeResponse,
+  previous: SessionUser | null,
+): SessionUser {
   return previous ?? sessionUserFromLogin({ userId: response.userId, displayName: response.userId })
 }

@@ -1,9 +1,5 @@
 export type DetailTabContent =
-  | 'resultados'
-  | 'metodologia'
-  | 'populacao'
-  | 'evidencias'
-  | 'historico'
+  'resultados' | 'metodologia' | 'populacao' | 'evidencias' | 'historico'
 
 export function detailTabContent(tab: string): DetailTabContent {
   if (tab === 'metodologia') return 'metodologia'

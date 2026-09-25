@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import { Eye, EyeOff, Search, type LucideIcon } from 'lucide-react'
 import { colors } from '@/theme/tokens'
+import { mergeSx } from '@/theme/sx'
 
 interface FieldProps extends Omit<TextFieldProps, 'label'> {
   label?: string
@@ -17,7 +18,11 @@ interface FieldProps extends Omit<TextFieldProps, 'label'> {
 export function Field({ label, icon: Icon, large, slotProps, sx, ...rest }: FieldProps) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, width: '100%' }}>
-      {label && <Typography sx={{ fontSize: large ? 17 : 15, fontWeight: 600, color: colors.navy }}>{label}</Typography>}
+      {label && (
+        <Typography sx={{ fontSize: large ? 17 : 15, fontWeight: 600, color: colors.navy }}>
+          {label}
+        </Typography>
+      )}
       <TextField
         fullWidth
         {...rest}
@@ -32,7 +37,10 @@ export function Field({ label, icon: Icon, large, slotProps, sx, ...rest }: Fiel
             ) : undefined,
           },
         }}
-        sx={{ '& .MuiOutlinedInput-root': { height: large ? 62 : 50, fontSize: large ? 17 : 15 }, ...sx }}
+        sx={mergeSx(
+          { '& .MuiOutlinedInput-root': { height: large ? 62 : 50, fontSize: large ? 17 : 15 } },
+          sx,
+        )}
       />
     </Box>
   )
@@ -42,7 +50,11 @@ export function PasswordField({ label, icon, large, ...rest }: FieldProps) {
   const [show, setShow] = useState(false)
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, width: '100%' }}>
-      {label && <Typography sx={{ fontSize: large ? 17 : 15, fontWeight: 600, color: colors.navy }}>{label}</Typography>}
+      {label && (
+        <Typography sx={{ fontSize: large ? 17 : 15, fontWeight: 600, color: colors.navy }}>
+          {label}
+        </Typography>
+      )}
       <TextField
         fullWidth
         type={show ? 'text' : 'password'}
@@ -59,14 +71,28 @@ export function PasswordField({ label, icon, large, ...rest }: FieldProps) {
             ) : undefined,
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton aria-label={show ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShow((s) => !s)} edge="end">
-                  {show ? <EyeOff size={22} color={colors.primary} /> : <Eye size={22} color={colors.primary} />}
+                <IconButton
+                  aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}
+                  onClick={() => setShow((s) => !s)}
+                  edge="end"
+                >
+                  {show ? (
+                    <EyeOff size={22} color={colors.primary} />
+                  ) : (
+                    <Eye size={22} color={colors.primary} />
+                  )}
                 </IconButton>
               </InputAdornment>
             ),
           },
         }}
-        sx={{ '& .MuiOutlinedInput-root': { height: large ? 62 : 50, fontSize: large ? 17 : 15, letterSpacing: show ? 0 : 2 } }}
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            height: large ? 62 : 50,
+            fontSize: large ? 17 : 15,
+            letterSpacing: show ? 0 : 2,
+          },
+        }}
       />
     </Box>
   )

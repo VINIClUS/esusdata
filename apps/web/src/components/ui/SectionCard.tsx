@@ -16,11 +16,32 @@ interface SectionCardProps {
   bodySx?: object
 }
 
-export function SectionCard({ title, subtitle, icon, action, children, padding = 2, sx, headerSx, bodySx }: SectionCardProps) {
+export function SectionCard({
+  title,
+  subtitle,
+  icon,
+  action,
+  children,
+  padding = 2,
+  sx,
+  headerSx,
+  bodySx,
+}: SectionCardProps) {
   return (
     <Paper sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, ...sx }}>
       {(title || action) && (
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, px: padding, pt: padding, pb: 1, ...headerSx }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 2,
+            px: padding,
+            pt: padding,
+            pb: 1,
+            ...headerSx,
+          }}
+        >
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, minWidth: 0 }}>
             {icon && <Box sx={{ color: colors.primary, display: 'flex', mt: 0.25 }}>{icon}</Box>}
             <Box sx={{ minWidth: 0 }}>
@@ -30,14 +51,20 @@ export function SectionCard({ title, subtitle, icon, action, children, padding =
                 </Typography>
               )}
               {subtitle && (
-                <Typography sx={{ fontSize: 13, color: colors.textSecondary, mt: 0.25 }}>{subtitle}</Typography>
+                <Typography sx={{ fontSize: 13, color: colors.textSecondary, mt: 0.25 }}>
+                  {subtitle}
+                </Typography>
               )}
             </Box>
           </Box>
           {action && <Box sx={{ flexShrink: 0 }}>{action}</Box>}
         </Box>
       )}
-      <Box sx={{ px: padding, pb: padding, pt: title ? 0 : padding, flex: 1, minWidth: 0, ...bodySx }}>{children}</Box>
+      <Box
+        sx={{ px: padding, pb: padding, pt: title ? 0 : padding, flex: 1, minWidth: 0, ...bodySx }}
+      >
+        {children}
+      </Box>
     </Paper>
   )
 }
