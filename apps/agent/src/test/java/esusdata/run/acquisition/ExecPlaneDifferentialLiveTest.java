@@ -229,6 +229,7 @@ class ExecPlaneDifferentialLiveTest {
                 List.of(realBinary),
                 secretRef -> password.toCharArray(),
                 allowedDestinations,
+                ExecPlaneTransport.PLAINTEXT,
                 matrix,
                 extractsDir,
                 Clock.systemUTC(),

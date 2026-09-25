@@ -43,6 +43,10 @@ pub struct AcquireEnvelope {
     )]
     pub query_checksum: String,
     pub adapter_version: String,
+    /// PEM root(s) the source's certificate must chain to (ADR 0022); absent or `null` means a
+    /// plaintext session, which Java only sends for loopback destinations.
+    #[serde(default)]
+    pub tls_root_cert: Option<String>,
     pub budget: Budget,
 }
 
@@ -110,6 +114,9 @@ pub struct DiagnoseEnvelope {
     pub database: String,
     pub user: String,
     pub password: String,
+    /// Same meaning as `AcquireEnvelope::tls_root_cert`.
+    #[serde(default)]
+    pub tls_root_cert: Option<String>,
     pub budget: SessionBudget,
 }
 
@@ -130,6 +137,22 @@ mod tests {
         assert_eq!(envelope.port, 5432);
         assert_eq!(envelope.budget.idle_in_transaction_timeout_ms, 3);
         assert_eq!(envelope.budget.max_duration_ms, 4);
+        assert_eq!(envelope.tls_root_cert, None);
+    }
+
+    #[test]
+    fn diagnose_envelope_carries_the_tls_root_certificate_path() {
+        let envelope: DiagnoseEnvelope = serde_json::from_str(
+            r#"{"type":"diagnose","source_id":"s","host":"192.0.2.1","port":5433,"database":"esus",
+                "user":"u","password":"p","tls_root_cert":"/etc/observatorio-aps/pec-ca.pem",
+                "budget":{"connect_timeout_ms":5000,"statement_timeout_ms":1,
+                "lock_timeout_ms":2,"idle_in_transaction_timeout_ms":3,"max_duration_ms":4}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            envelope.tls_root_cert.as_deref(),
+            Some("/etc/observatorio-aps/pec-ca.pem")
+        );
     }
 
     #[test]

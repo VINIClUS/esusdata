@@ -41,11 +41,19 @@ public final class ExecPlaneConnectivityCheck implements SourceConnectivityCheck
 
     private final List<String> command;
     private final PecSecretResolver secretResolver;
+    private final ExecPlaneTransport transport;
     private final Duration exitGrace;
 
+    /** Plaintext sessions: loopback destinations only (ADR 0022). */
     public ExecPlaneConnectivityCheck(List<String> command, PecSecretResolver secretResolver, Duration exitGrace) {
+        this(command, secretResolver, ExecPlaneTransport.PLAINTEXT, exitGrace);
+    }
+
+    public ExecPlaneConnectivityCheck(
+            List<String> command, PecSecretResolver secretResolver, ExecPlaneTransport transport, Duration exitGrace) {
         this.command = command;
         this.secretResolver = secretResolver;
+        this.transport = transport;
         this.exitGrace = exitGrace;
     }
 
@@ -157,6 +165,7 @@ public final class ExecPlaneConnectivityCheck implements SourceConnectivityCheck
             envelope.put("user", properties.user());
             // Same rule as the acquire envelope: stdin only, never argv nor the environment.
             envelope.put("password", new String(password));
+            envelope.put("tls_root_cert", transport.rootCertificate());
             envelope.put("budget", budgetFields);
             ExecPlaneProcess.writeLine(stdin, envelope);
         } finally {

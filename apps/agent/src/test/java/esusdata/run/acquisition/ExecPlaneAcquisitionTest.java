@@ -108,6 +108,7 @@ class ExecPlaneAcquisitionTest {
                 command,
                 secretRef -> "fixture-password".toCharArray(),
                 allowedDestinations,
+                ExecPlaneTransport.PLAINTEXT,
                 matrix,
                 extractsDir,
                 Clock.systemUTC(),

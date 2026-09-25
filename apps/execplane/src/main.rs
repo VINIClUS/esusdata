@@ -3,9 +3,10 @@ mod extract;
 mod matrix;
 mod probe;
 mod stream;
+mod tls;
 
 use envelope::{AcquireEnvelope, DiagnoseEnvelope, SessionBudget};
-use postgres::{Client, Config, IsolationLevel, NoTls};
+use postgres::{Client, Config, IsolationLevel};
 use serde_json::{json, Map};
 use sha2::{Digest, Sha256};
 use std::error::Error;
@@ -60,6 +61,7 @@ fn connect_session(
     database: &str,
     user: &str,
     password: &mut String,
+    session_tls: &tls::SessionTls,
     budget: &SessionBudget,
 ) -> Result<Option<Client>, Box<dyn Error>> {
     let mut config = Config::new();
@@ -75,7 +77,7 @@ fn connect_session(
         // connection leaves a blocking socket read waiting indefinitely, and neither
         // max_duration_ms nor cooperative cancellation can free the sole acquisition worker.
         .tcp_user_timeout(Duration::from_millis(budget.max_duration_ms.max(0).unsigned_abs()));
-    let connect_result = config.connect(NoTls);
+    let connect_result = session_tls.connect(&mut config);
     // Zeroed regardless of outcome — mirrors the Java side's own finally-block zeroing of this
     // same secret right after writing the envelope.
     password.zeroize();
@@ -114,16 +116,42 @@ fn connect_session(
     Ok(Some(client))
 }
 
+/// Builds the session's TLS mode before any connection attempt. A bad `tls_root_cert` is reported
+/// like a connection that never opened (`08001`, not uncertain): no session existed, and falling
+/// back to plaintext would drop the protection the deployment asked for.
+fn session_tls_or_report(
+    root_cert: Option<&str>,
+    password: &mut String,
+) -> Result<Option<tls::SessionTls>, Box<dyn Error>> {
+    match tls::SessionTls::from_root_cert(root_cert) {
+        Ok(session_tls) => Ok(Some(session_tls)),
+        Err(err) => {
+            password.zeroize();
+            write_line(&json!({
+                "type": "error", "code": "SQL_ERROR", "sqlstate": "08001",
+                "detail": format!("invalid tls_root_cert: {err}"), "uncertain": false,
+            }))?;
+            Ok(None)
+        }
+    }
+}
+
 /// `POST /sources/{id}/test` (ADR 0017): the same session an acquisition would open, then
 /// `SELECT 1` in a read-only transaction. Success is `diagnosed` **and** exit 0; failures reuse the
 /// pre-probe `error` shapes, so the SQLSTATE reaches Java the same way it does for an acquisition.
 fn diagnose(mut envelope: DiagnoseEnvelope) -> Result<i32, Box<dyn Error>> {
+    let Some(session_tls) =
+        session_tls_or_report(envelope.tls_root_cert.as_deref(), &mut envelope.password)?
+    else {
+        return Ok(1);
+    };
     let Some(mut client) = connect_session(
         &envelope.host,
         envelope.port,
         &envelope.database,
         &envelope.user,
         &mut envelope.password,
+        &session_tls,
         &envelope.budget,
     )?
     else {
@@ -153,12 +181,18 @@ fn acquire(
     mut lines: io::Lines<io::StdinLock<'static>>,
 ) -> Result<i32, Box<dyn Error>> {
     let session_budget = envelope.budget.session();
+    let Some(session_tls) =
+        session_tls_or_report(envelope.tls_root_cert.as_deref(), &mut envelope.password)?
+    else {
+        return Ok(1);
+    };
     let Some(mut client) = connect_session(
         &envelope.host,
         envelope.port,
         &envelope.database,
         &envelope.user,
         &mut envelope.password,
+        &session_tls,
         &session_budget,
     )?
     else {
@@ -167,7 +201,7 @@ fn acquire(
     // Captured before any &mut borrow of client (e.g. build_transaction()) makes that
     // impossible — CancelToken is independent of the connection it was derived from and stays
     // usable from another thread for as long as the process runs (plan §2.7's cancellation path).
-    let cancel_token = client.cancel_token();
+    let canceller = tls::Canceller::new(client.cancel_token(), session_tls);
 
     // ENG-43: the probe and (in the next slice) the frozen query itself run inside one
     // read-only repeatable-read transaction — the same snapshot, never reopened. This
@@ -265,7 +299,7 @@ fn acquire(
 
     let outcome = stream::stream_query(
         &mut txn,
-        cancel_token,
+        canceller,
         QUERY_TEXT,
         &envelope.source_id,
         &envelope.municipality_ibge,
@@ -466,6 +500,62 @@ fn check_probe_duration(start: &Instant, budget: &stream::Budget) -> Result<(), 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const BUDGET: &str = r#""connect_timeout_ms":2000,"statement_timeout_ms":1,"lock_timeout_ms":2,
+        "idle_in_transaction_timeout_ms":3,"max_duration_ms":4"#;
+
+    fn diagnose_envelope(tls_root_cert: &str) -> DiagnoseEnvelope {
+        serde_json::from_str(&format!(
+            r#"{{"type":"diagnose","source_id":"s","host":"127.0.0.1","port":1,"database":"d",
+                "user":"u","password":"p",{tls_root_cert}"budget":{{{BUDGET}}}}}"#
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn no_root_certificate_keeps_the_session_plaintext_and_the_password() {
+        let mut password = String::from("secret");
+        let session_tls = session_tls_or_report(None, &mut password).unwrap();
+        assert!(matches!(session_tls, Some(tls::SessionTls::Plain)));
+        assert_eq!(password, "secret");
+    }
+
+    #[test]
+    fn an_unusable_root_certificate_is_reported_and_zeroes_the_password() {
+        let mut password = String::from("secret");
+        let session_tls =
+            session_tls_or_report(Some("/nonexistent/execplane-root.pem"), &mut password).unwrap();
+        assert!(session_tls.is_none());
+        assert!(password.is_empty());
+    }
+
+    #[test]
+    fn a_diagnostic_with_an_unusable_root_certificate_fails_before_connecting() {
+        let envelope = diagnose_envelope(r#""tls_root_cert":"/nonexistent/execplane-root.pem","#);
+        assert_eq!(diagnose(envelope).unwrap(), 1);
+    }
+
+    #[test]
+    fn a_plaintext_diagnostic_of_an_unreachable_server_fails() {
+        assert_eq!(diagnose(diagnose_envelope("")).unwrap(), 1);
+    }
+
+    #[test]
+    fn an_acquisition_with_an_unusable_root_certificate_fails_before_connecting() {
+        let envelope: AcquireEnvelope = serde_json::from_str(&format!(
+            r#"{{"type":"acquire","source_id":"s","host":"127.0.0.1","port":1,"database":"d",
+                "user":"u","password":"p","municipality_ibge":"1100015","pec_version":"5.5.28",
+                "read_model":"r","installation_role":"i","extraction_id":"e",
+                "period_start":"2026-01-01","period_end_exclusive":"2026-02-01",
+                "source_zone_id":"z","extract_temp_path":"/nonexistent/extract",
+                "query_checksum":"c","adapter_version":"a",
+                "tls_root_cert":"/nonexistent/execplane-root.pem",
+                "budget":{{{BUDGET},"acquisition_timeout_ms":5,"max_rows":6,
+                "max_payload_bytes":7,"max_temp_file_bytes":8}}}}"#
+        ))
+        .unwrap();
+        assert_eq!(acquire(envelope, io::stdin().lock().lines()).unwrap(), 1);
+    }
 
     /// The handshake's query checksum must equal the matrix's on every build host. A CRLF
     /// checkout (Git on Windows before .gitattributes pinned contracts/ to LF) changed these bytes

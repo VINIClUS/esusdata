@@ -72,6 +72,22 @@ public final class AllowedDestinations {
     }
 
     public record HostPort(String host, int port) {
+
+        /**
+         * One {@code observatorio.source.allowed-destinations} entry, {@code "host:port"}. Every
+         * decision about an entry parses it here, so all of them see the same normalized host.
+         */
+        public static HostPort parse(String entry) {
+            int colon = entry.lastIndexOf(':');
+            if (colon <= 0 || colon == entry.length() - 1) {
+                throw new IllegalArgumentException(
+                        "observatorio.source.allowed-destinations entry must be host:port, got: " + entry);
+            }
+            return new HostPort(
+                    entry.substring(0, colon),
+                    Integer.parseInt(entry.substring(colon + 1).trim()));
+        }
+
         public HostPort {
             if (host == null || host.isBlank()) {
                 throw new IllegalArgumentException("allowlist host is required");
