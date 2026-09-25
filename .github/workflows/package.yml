@@ -38,6 +38,10 @@ env:
 jobs:
   linux:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # check-latest: the runner's cached JDK may trail the newest Temurin update.
@@ -80,9 +84,33 @@ jobs:
           name: sbom-linux
           path: target/sbom/*.cdx.json
           if-no-files-found: error
+      # Provenance where the artifacts are built (ADR 0021): the attestation binds each file to
+      # this job's run, runner and workflow, which pins the toolchains. Tags only.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        id: provenance
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          subject-path: |
+            target/jpackage/*.deb
+            target/sbom/*.cdx.json
+      - name: Provenance bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: mkdir -p target/provenance && cp -- "$BUNDLE" target/provenance/linux.jsonl
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: provenance-linux
+          path: target/provenance/linux.jsonl
+          if-no-files-found: error
 
   windows:
     runs-on: windows-2022
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
@@ -134,6 +162,29 @@ jobs:
         with:
           name: sbom-windows
           path: target/sbom/*.cdx.json
+          if-no-files-found: error
+      # Provenance where the artifacts are built (ADR 0021): the attestation binds each file to
+      # this job's run, runner and workflow, which pins the toolchains. Tags only.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        id: provenance
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          subject-path: |
+            target/jpackage/*.msi
+            target/sbom/*.cdx.json
+      - name: Provenance bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          New-Item -ItemType Directory -Force target/provenance | Out-Null
+          Copy-Item -LiteralPath $env:BUNDLE target/provenance/windows.jsonl
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: provenance-windows
+          path: target/provenance/windows.jsonl
           if-no-files-found: error
 
   # The runner is a disposable VM with systemd and passwordless sudo: install for real.
@@ -216,8 +267,6 @@ jobs:
     environment: release
     permissions:
       contents: write
-      id-token: write
-      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Tag matches the project version
@@ -246,22 +295,21 @@ jobs:
           for f in sbom/*.cdx.json; do
             cp -- "$f" "dist/observatorio-aps-$VERSION-$(basename "$f")"
           done
-      # SLSA build provenance for every distributed file: commit, tag, workflow and runner, signed
-      # through Sigstore and recorded in GitHub's attestation store. The toolchains reach it
-      # through the pinned workflow (RUST_TOOLCHAIN, setup-java); no SLSA level is claimed.
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        id: provenance
+      # The linux and windows jobs attested what each built (Sigstore, GitHub's attestation
+      # store); their bundles ship as one JSON Lines file, so `gh attestation verify --bundle`
+      # works offline. No SLSA level is claimed.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          subject-path: |
-            dist/*.deb
-            dist/*.msi
-            dist/*.cdx.json
-      # The bundle ships too, so `gh attestation verify --bundle` works offline.
+          pattern: provenance-*
+          merge-multiple: true
+          path: provenance
       - name: Provenance bundle
         env:
-          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
           VERSION: ${{ steps.version.outputs.version }}
-        run: cp -- "$BUNDLE" "dist/observatorio-aps-$VERSION.intoto.jsonl"
+        run: |
+          test -s provenance/linux.jsonl && test -s provenance/windows.jsonl
+          jq -c . provenance/linux.jsonl provenance/windows.jsonl \
+            >"dist/observatorio-aps-$VERSION.intoto.jsonl"
       # §1.12.8: the manifest covers every distributed file, inventories and attestation included.
       - name: Checksums
         working-directory: dist

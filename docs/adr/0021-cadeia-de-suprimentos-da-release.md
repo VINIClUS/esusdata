@@ -44,9 +44,12 @@ segredos de assinatura ficam fora do alcance de builds não confiáveis.
     - `cyclonedx-core-java` 11.0.1, uma major acima da do plugin. O SBOM do backend que o plugin
       gera com ela foi conferido idêntico e válido.
 - **Proveniência.**
-  - O `actions/attest-build-provenance` atesta cada `.deb`, `.msi` e `.cdx.json`: commit, tag,
-    workflow e runner, assinados via Sigstore e registrados no GitHub.
-  - O bundle é publicado como `observatorio-aps-<versão>.intoto.jsonl`, para verificação offline.
+  - O `actions/attest-build-provenance` roda no job que produz cada artefato: o `linux` atesta o
+    `.deb` e os SBOMs dele, e o `windows` atesta o `.msi` e o SBOM do runtime Windows. Cada
+    atestado vincula o arquivo ao commit, à tag, ao workflow e à execução do job que o gerou,
+    assinado via Sigstore e registrado no GitHub. Isso só acontece em tags.
+  - O job `release` junta os dois bundles em `observatorio-aps-<versão>.intoto.jsonl`, publicado
+    para verificação offline.
   - Não se alega nível SLSA.
 - **Toolchains.** O rustc/cargo e o JDK de build entram na proveniência pelo workflow atestado,
   que os fixa (`RUST_TOOLCHAIN`, `setup-java`), e não como componentes de SBOM. Os SBOMs do plano
