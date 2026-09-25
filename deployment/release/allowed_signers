@@ -1,0 +1,4 @@
+# Release signing trust store (ADR 0021, Tech Spec §1.12.8): ssh-keygen -Y verify -f allowed_signers
+# -I release@observatorio-aps -n file -s SHA256SUMS.sig < SHA256SUMS
+# ED25519 SHA256:3hEgZjgEAOSxIqmjY6NoZ+1nViyKrRyymNq/zppeXrA
+release@observatorio-aps namespaces="file" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPO8idi+sUZof5UFgdptQzEA8uWXHJmwqQh656Bapi30

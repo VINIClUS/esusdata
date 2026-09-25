@@ -4,14 +4,15 @@
 #
 #   deployment/sbom/generate-sboms.sh linux|windows <out-dir>
 #
-# linux:   backend (Maven runtime graph, from the jar build), frontend-runtime (what Vite bundles),
-#          frontend-build (the whole npm graph; dev tooling has scope "optional"), execplane-runtime
-#          and execplane-build (Cargo graph without/with build dependencies, every target) and
-#          runtime-linux (the JDK that jlink cuts the runtime from).
+# linux:   backend (Maven runtime graph, from the jar build), backend-build (the Maven plugins the
+#          -Pweb build resolves and their dependencies, scope "optional"), frontend-runtime (what
+#          Vite bundles), frontend-build (the whole npm graph; dev tooling has scope "optional"),
+#          execplane-runtime and execplane-build (Cargo graph without/with build dependencies,
+#          every target) and runtime-linux (the JDK that jlink cuts the runtime from).
 # windows: runtime-windows (the same JDK, plus WinSW as the service wrapper).
 #
 # Schema 1.5 is the newest one that npm sbom and cargo-cyclonedx emit. Needs jq; linux also needs
-# cargo-cyclonedx on PATH and the Node that -Pweb pinned under apps/agent/target/node.
+# mvn and cargo-cyclonedx on PATH and the Node that -Pweb pinned under apps/agent/target/node.
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -52,9 +53,48 @@ runtime_sbom() { # platform extra-components-json
     }'
 }
 
+# The cyclonedx-maven-plugin inventories what the jar ships, not what built it. Plugins as
+# dependency:resolve-plugins lists them: a plugin three spaces in, its artifacts
+# (group:artifact:type[:classifier]:version) six spaces in. Annotation processors on the compiler's
+# processor path (Error Prone) and Maven itself are not in that list. The release builds run
+# package or verify only: the clean, install, deploy and site plugins the listing also names never
+# run, so they are left out.
+build_plugins_sbom() {
+  local listing
+  listing="$(mktemp)"
+  mvn -B -q -f "$root/apps/agent/pom.xml" -Pweb dependency:resolve-plugins \
+    -DoutputFile="$listing" -DexcludeTransitive=false
+  awk '/^   [^ ]/ { plugin = $1; skip = ($1 ~ /^org\.apache\.maven\.plugins:maven-(clean|install|deploy|site)-plugin:/); next }
+       /^      [^ ]/ && !skip { print plugin "\t" $1 }' "$listing" \
+    | jq -R -s --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+      def purl: split(":") as $c
+        | "pkg:maven/\($c[0])/\($c[1])@\($c[-1])?type=\($c[2])"
+          + (if ($c | length) == 5 then "&classifier=\($c[3])" else "" end);
+      def component: split(":") as $c
+        | {type: "library", "bom-ref": purl, group: $c[0], name: $c[1], version: $c[-1],
+           scope: "optional", purl: purl};
+      [split("\n")[] | select(length > 0) | split("\t") | {plugin: .[0], artifact: .[1]}] as $rows
+      | {
+          bomFormat: "CycloneDX",
+          specVersion: "1.5",
+          version: 1,
+          metadata: {
+            timestamp: $timestamp,
+            component: {type: "application", name: "observatorio-aps-backend-build"}
+          },
+          components: ([$rows[] | .plugin, .artifact] | unique | map(component)),
+          dependencies: ($rows | group_by(.plugin) | map({
+            ref: (.[0].plugin | purl),
+            dependsOn: (map(.artifact | purl) - [.[0].plugin | purl] | unique)
+          }))
+        }'
+  rm -f "$listing"
+}
+
 case "$platform" in
   linux)
     cp "$root/apps/agent/target/classes/META-INF/sbom/application.cdx.json" "$out/backend.cdx.json"
+    build_plugins_sbom >"$out/backend-build.cdx.json"
 
     node_dir="$root/apps/agent/target/node"
     npm=("$node_dir/node" "$node_dir/node_modules/npm/bin/npm-cli.js")

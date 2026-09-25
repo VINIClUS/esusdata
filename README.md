@@ -96,7 +96,8 @@ Testes com sufixo `LiveTest` exigem um PEC acessível e são pulados sem ele (AD
 
 ## Qualidade e segurança (ADR 0019)
 
-- `ci.yml`: `java` e `rust` rodam análise estática, testes e pisos de cobertura. `sonar` envia
+- `ci.yml`: `java` e `rust` rodam análise estática, testes e pisos de cobertura; `web` roda
+  typecheck, oxlint, ESLint, Prettier, o teste de dados e o build (ADR 0020). `sonar` envia
   tudo ao SonarQube Cloud (`viniclus` / `VINIClUS_esusdata`) e falha com o quality gate ou com
   qualquer issue aberta (`.github/scripts/sonar-strict-gate.sh`). Exceção só no código:
   `@SuppressWarnings("java:Sxxxx")` com o motivo ao lado, nunca "aceitar" na interface do Sonar.
@@ -104,8 +105,10 @@ Testes com sufixo `LiveTest` exigem um PEC acessível e são pulados sem ele (AD
   todo PR, em todo push e diariamente. O SARIF vai para a aba Security, e qualquer achado HIGH ou
   CRITICAL bloqueia. Um achado aceito entra em `.trivyignore.yaml` com `statement` e `expired_at`,
   no máximo 90 dias.
-- `package.yml`: gera, valida (CycloneDX 1.5) e verifica os SBOMs de cada build. A release os
-  publica ao lado dos instaladores, cobertos pelo `SHA256SUMS`.
+- `package.yml`: exige o JDK Temurin mais recente e gera, valida (CycloneDX 1.5) e verifica os
+  SBOMs de cada build, inclusive o dos plugins Maven (ADR 0021). A release os publica ao lado dos
+  instaladores e do atestado de proveniência, todos cobertos pelo `SHA256SUMS`, que é assinado
+  (`SHA256SUMS.sig`, chave em `deployment/release/allowed_signers`).
 
 ```bash
 # o mesmo portão do Trivy, local (binário fixado e verificado por hash, em target/tools/)
@@ -149,4 +152,6 @@ instala num runner com systemd e percorre o ciclo de vida com `deployment/jpacka
    faça o merge em `main`.
 2. `git tag vX.Y.Z && git push origin vX.Y.Z` — a tag precisa ser igual à versão do pom.
 3. O workflow `package` gera o `.deb` e o `.msi`, testa o ciclo de vida dos dois e cria um
-   **draft** de GitHub Release com os instaladores e o `SHA256SUMS`. Revise e publique.
+   **draft** de GitHub Release com os instaladores, os SBOMs, a proveniência e o `SHA256SUMS`
+   assinado. O job `release` roda no Environment `release`, o único que lê a chave de assinatura.
+   Revise e publique.

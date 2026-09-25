@@ -85,7 +85,7 @@ Todos os portões bloqueiam, e cada ferramenta tem versão fixada (§1.12.8).
   - Cinco receberam supressão justificada no lugar: o lock no stdin do processo, o `PRAGMA` sem
     parâmetro, o cookie XSRF legível pelo cliente, o CSRF desligado só na cadeia estática e o
     `UserDetailsService` que nunca é consultado.
-- Verificações conhecidas que continuam de fora:
+- Verificações conhecidas que continuam de fora (o ADR 0021 trata das quatro):
   - O Trivy não conhece o JDK como componente `pkg:generic`. CVEs do runtime Java seguem pelos
     avisos da Temurin, e o JDK sobe com a imagem do runner e com o `setup-java`.
   - Os plugins de build do Maven e o toolchain Rust não são inventariados.

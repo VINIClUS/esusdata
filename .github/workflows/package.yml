@@ -1,7 +1,7 @@
 # Builds the jpackage installers (ADR 0014, Tech Spec §1.12.5): each package is built on its own
 # OS, the .deb is installed and taken through its lifecycle on a real systemd runner, the CycloneDX
 # inventories of what ships are validated and scanned (ADR 0019, §1.12.8), and a v* tag turns the
-# result into a draft GitHub Release. Actions are pinned by commit SHA, tools by version and hash,
+# result into a draft GitHub Release with build provenance and a signed manifest (ADR 0021). Actions are pinned by commit SHA, tools by version and hash,
 # and the Rust toolchain by version (§1.12.8).
 name: package
 
@@ -38,13 +38,22 @@ env:
 jobs:
   linux:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # check-latest: the runner's cached JDK may trail the newest Temurin update.
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21'
+          check-latest: true
           cache: maven
+      # The runtime ships cut from this JDK; Trivy cannot match it, so it must be the newest update.
+      - name: JDK is current
+        run: deployment/sbom/check-jdk-current.sh linux
       - name: Rust toolchain
         run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal && rustup default "$RUST_TOOLCHAIN"
       - name: Execution plane tests
@@ -64,7 +73,8 @@ jobs:
           name: observatorio-aps-linux-deb
           path: target/jpackage/*.deb
           if-no-files-found: error
-      # Inventories of the build above: backend, frontend, execution plane and runtime.
+      # Inventories of the build above: backend (runtime and build plugins), frontend, execution
+      # plane and runtime.
       - name: SBOMs
         run: |
           deployment/sbom/install-tool.sh cargo-cyclonedx "$RUNNER_TEMP/bin"
@@ -74,16 +84,44 @@ jobs:
           name: sbom-linux
           path: target/sbom/*.cdx.json
           if-no-files-found: error
+      # Provenance where the artifacts are built (ADR 0021): the attestation binds each file to
+      # this job's run, runner and workflow, which pins the toolchains. Tags only.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        id: provenance
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          subject-path: |
+            target/jpackage/*.deb
+            target/sbom/*.cdx.json
+      - name: Provenance bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: mkdir -p target/provenance && cp -- "$BUNDLE" target/provenance/linux.jsonl
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: provenance-linux
+          path: target/provenance/linux.jsonl
+          if-no-files-found: error
 
   windows:
     runs-on: windows-2022
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21'
+          check-latest: true
           cache: maven
+      - name: JDK is current
+        shell: bash
+        run: deployment/sbom/check-jdk-current.sh windows
       - name: Rust toolchain
         shell: pwsh
         run: |
@@ -124,6 +162,29 @@ jobs:
         with:
           name: sbom-windows
           path: target/sbom/*.cdx.json
+          if-no-files-found: error
+      # Provenance where the artifacts are built (ADR 0021): the attestation binds each file to
+      # this job's run, runner and workflow, which pins the toolchains. Tags only.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        id: provenance
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          subject-path: |
+            target/jpackage/*.msi
+            target/sbom/*.cdx.json
+      - name: Provenance bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          New-Item -ItemType Directory -Force target/provenance | Out-Null
+          Copy-Item -LiteralPath $env:BUNDLE target/provenance/windows.jsonl
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: provenance-windows
+          path: target/provenance/windows.jsonl
           if-no-files-found: error
 
   # The runner is a disposable VM with systemd and passwordless sudo: install for real.
@@ -176,8 +237,8 @@ jobs:
       - name: Expected inventories
         working-directory: sbom
         run: |
-          for part in backend frontend-runtime frontend-build execplane-runtime execplane-build \
-            runtime-linux runtime-windows; do
+          for part in backend backend-build frontend-runtime frontend-build execplane-runtime \
+            execplane-build runtime-linux runtime-windows; do
             test -s "$part.cdx.json" || { echo "missing SBOM: $part" >&2; exit 1; }
           done
       - name: Validate
@@ -196,10 +257,14 @@ jobs:
 
   # Draft only: live acquisition on Windows is tested only against a test PEC by hand (ADR 0014),
   # so a person reviews the notes before publishing.
+  #
+  # The signing key lives only in the "release" environment, which admits v* tags alone: no pull
+  # request or branch build can read it (§1.12.8).
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [linux, windows, deb-lifecycle, msi-lifecycle, sbom]
     runs-on: ubuntu-24.04
+    environment: release
     permissions:
       contents: write
     steps:
@@ -230,12 +295,41 @@ jobs:
           for f in sbom/*.cdx.json; do
             cp -- "$f" "dist/observatorio-aps-$VERSION-$(basename "$f")"
           done
-      # §1.12.8 L558: the manifest covers every distributed file, inventories included.
+      # The linux and windows jobs attested what each built (Sigstore, GitHub's attestation
+      # store); their bundles ship as one JSON Lines file, so `gh attestation verify --bundle`
+      # works offline. No SLSA level is claimed.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: provenance-*
+          merge-multiple: true
+          path: provenance
+      - name: Provenance bundle
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          test -s provenance/linux.jsonl && test -s provenance/windows.jsonl
+          jq -c . provenance/linux.jsonl provenance/windows.jsonl \
+            >"dist/observatorio-aps-$VERSION.intoto.jsonl"
+      # §1.12.8: the manifest covers every distributed file, inventories and attestation included.
       - name: Checksums
         working-directory: dist
         run: |
-          sha256sum -- *.deb *.msi *.cdx.json >SHA256SUMS
+          sha256sum -- *.deb *.msi *.cdx.json *.intoto.jsonl >SHA256SUMS
           cat SHA256SUMS
+      # §1.12.8: a signature of the manifest that verifies offline against a trusted fingerprint
+      # (deployment/release/allowed_signers). Checked here against the committed trust store
+      # before anything is published.
+      - name: Sign the manifest
+        working-directory: dist
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          key="$(mktemp)"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$RELEASE_SIGNING_KEY" >"$key"
+          ssh-keygen -Y sign -q -f "$key" -n file SHA256SUMS
+          ssh-keygen -Y verify -f ../deployment/release/allowed_signers -I release@observatorio-aps \
+            -n file -s SHA256SUMS.sig <SHA256SUMS
       - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -253,15 +347,29 @@ jobs:
             `C:\ProgramData\ObservatorioAPS\config\application.yml` e atalho "Observatorio APS"
             no Menu Iniciar para o cliente web.
 
-          Confira os downloads com `sha256sum -c SHA256SUMS`.
+          ## Verificação
+
+          1. Assinatura do manifesto, com o `allowed_signers` obtido do repositório
+             (`deployment/release/allowed_signers`, chave `ED25519 SHA256:3hEgZjgEAOSxIqmjY6NoZ+1nViyKrRyymNq/zppeXrA`, nunca de um download
+             ao lado do instalador); `ssh-keygen` vem no Linux e no Windows 10+:
+
+             ```
+             ssh-keygen -Y verify -f allowed_signers -I release@observatorio-aps -n file -s SHA256SUMS.sig < SHA256SUMS
+             ```
+          2. Os arquivos contra o manifesto: `sha256sum -c SHA256SUMS`.
+          3. Proveniência do build (commit, tag e workflow):
+             `gh attestation verify <arquivo> -R VINIClUS/esusdata`, ou offline com
+             `--bundle observatorio-aps-*.intoto.jsonl`.
 
           ## Inventário (SBOM)
 
           Arquivos `*.cdx.json` em CycloneDX 1.5, validados e verificados contra vulnerabilidades
-          HIGH/CRITICAL no build: backend, frontend (runtime e build), plano de execução (runtime e
-          build) e runtime Java de cada plataforma (Windows inclui o WinSW).
+          HIGH/CRITICAL no build: backend (runtime e plugins de build), frontend (runtime e build),
+          plano de execução (runtime e build) e runtime Java de cada plataforma (Windows inclui o
+          WinSW; o JDK é o update Temurin mais recente na data do build).
           MD
-          assets=(dist/*.deb dist/*.msi dist/*.cdx.json dist/SHA256SUMS)
+          assets=(dist/*.deb dist/*.msi dist/*.cdx.json dist/*.intoto.jsonl dist/SHA256SUMS
+            dist/SHA256SUMS.sig)
           # gh creates the draft and uploads the assets in separate calls, so a re-run may find
           # the draft already there: refresh its assets, but never touch a published release.
           if draft="$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null)"; then
