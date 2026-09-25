@@ -42,6 +42,17 @@
          0.6880), rounded down: raise it, never lower it -->
     <jacoco.minimum.line>0.88</jacoco.minimum.line>
     <jacoco.minimum.branch>0.68</jacoco.minimum.branch>
+    <!-- Build-plugin floors (ADR 0021, see pluginManagement): plexus-utils CVE-2025-67030,
+         commons-io CVE-2024-47554, commons-beanutils CVE-2019-10086/CVE-2025-48734, jackson
+         CVE-2026-54512/CVE-2026-54513/GHSA-r7wm-3cxj-wff9, cyclonedx-core-java CVE-2025-64518.
+         cyclonedx-core-java is a major above the plugin's 9.0.5; the backend SBOM it writes was
+         checked identical and valid (ADR 0021). -->
+    <build.plexus-utils3.version>3.6.1</build.plexus-utils3.version>
+    <build.plexus-utils4.version>4.0.3</build.plexus-utils4.version>
+    <build.commons-io.version>2.22.0</build.commons-io.version>
+    <build.commons-beanutils.version>1.11.0</build.commons-beanutils.version>
+    <build.jackson2.version>2.21.7</build.jackson2.version>
+    <build.cyclonedx-core.version>11.0.1</build.cyclonedx-core.version>
   </properties>
 
   <dependencies>
@@ -163,6 +174,99 @@
         <targetPath>compatibility</targetPath>
       </resource>
     </resources>
+    <!-- Build-plugin floors (ADR 0021): the backend-build SBOM is scanned like what ships, and
+         these plugins, already at their newest release, still pull libraries with HIGH CVEs. Each
+         floor is the fixed release nearest to what the plugin was built against. -->
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <dependencies>
+            <dependency>
+              <groupId>org.codehaus.plexus</groupId>
+              <artifactId>plexus-utils</artifactId>
+              <version>${build.plexus-utils4.version}</version>
+            </dependency>
+            <dependency>
+              <groupId>commons-io</groupId>
+              <artifactId>commons-io</artifactId>
+              <version>${build.commons-io.version}</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-pmd-plugin</artifactId>
+          <dependencies>
+            <dependency>
+              <groupId>org.codehaus.plexus</groupId>
+              <artifactId>plexus-utils</artifactId>
+              <version>${build.plexus-utils4.version}</version>
+            </dependency>
+            <dependency>
+              <groupId>commons-beanutils</groupId>
+              <artifactId>commons-beanutils</artifactId>
+              <version>${build.commons-beanutils.version}</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-resources-plugin</artifactId>
+          <dependencies>
+            <dependency>
+              <groupId>org.codehaus.plexus</groupId>
+              <artifactId>plexus-utils</artifactId>
+              <version>${build.plexus-utils3.version}</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <dependencies>
+            <dependency>
+              <groupId>org.codehaus.plexus</groupId>
+              <artifactId>plexus-utils</artifactId>
+              <version>${build.plexus-utils3.version}</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <dependencies>
+            <dependency>
+              <groupId>org.codehaus.plexus</groupId>
+              <artifactId>plexus-utils</artifactId>
+              <version>${build.plexus-utils3.version}</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+        <plugin>
+          <groupId>org.cyclonedx</groupId>
+          <artifactId>cyclonedx-maven-plugin</artifactId>
+          <dependencies>
+            <dependency>
+              <groupId>com.fasterxml.jackson.core</groupId>
+              <artifactId>jackson-databind</artifactId>
+              <version>${build.jackson2.version}</version>
+            </dependency>
+            <dependency>
+              <groupId>com.fasterxml.jackson.core</groupId>
+              <artifactId>jackson-core</artifactId>
+              <version>${build.jackson2.version}</version>
+            </dependency>
+            <dependency>
+              <groupId>org.cyclonedx</groupId>
+              <artifactId>cyclonedx-core-java</artifactId>
+              <version>${build.cyclonedx-core.version}</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+      </plugins>
+    </pluginManagement>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
