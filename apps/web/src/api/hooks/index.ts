@@ -6,7 +6,7 @@ import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadore
 import { isolamentoFixture } from '../fixtures/isolamento'
 import { painelFixture } from '../fixtures/painel'
 import { relatoriosFixture } from '../fixtures/relatorios'
-import { useScope } from '@/app/scope'
+import { useScope } from '@/app/scope-context'
 import {
   indicatorResultsPath,
   normalizeIndicatorPacks,

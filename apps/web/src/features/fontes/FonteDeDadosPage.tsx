@@ -76,7 +76,7 @@ export function FonteDeDadosPage() {
   const [form, setForm] = useState<Record<string, string> | null>(null)
 
   if (isPending) return <PageSkeleton title="Configuração da Fonte de Dados" />
-  if (isError || !data) {
+  if (isError) {
     return (
       <PageUnavailable
         title="Configuração da Fonte de Dados"
@@ -105,9 +105,10 @@ export function FonteDeDadosPage() {
       <UnderlineTabs
         items={tabs}
         value={tab}
-        onChange={(k) =>
-          k === 'isolamento' ? navigate('/configuracoes/isolamento-municipal') : setTab(k)
-        }
+        onChange={(k) => {
+          if (k === 'isolamento') void navigate('/configuracoes/isolamento-municipal')
+          else setTab(k)
+        }}
         sx={{ mb: 2 }}
       />
 

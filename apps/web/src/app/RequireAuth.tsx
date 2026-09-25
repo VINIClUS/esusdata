@@ -2,7 +2,7 @@ import Box from '@mui/material/Box'
 import CircularProgress from '@mui/material/CircularProgress'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
-import { useAuth } from './auth'
+import { useAuth } from './auth-context'
 import { ScopeProvider } from './scope'
 
 export function RequireAuth() {

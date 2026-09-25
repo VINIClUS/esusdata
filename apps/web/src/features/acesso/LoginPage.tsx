@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SubmitEvent } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Checkbox from '@mui/material/Checkbox'
@@ -9,7 +9,7 @@ import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import { ChartColumn, FileText, Lock, Settings, User, Users, type LucideIcon } from 'lucide-react'
 import { Navigate, useNavigate } from 'react-router'
-import { useAuth } from '@/app/auth'
+import { useAuth } from '@/app/auth-context'
 import { demoContext } from '@/api/fixtures/context'
 import { Logo } from '@/components/layout/Logo'
 import { WaveDecoration } from '@/components/layout/WaveDecoration'
@@ -50,13 +50,13 @@ export function LoginPage() {
 
   if (user) return <Navigate to="/painel" replace />
 
-  async function onSubmit(e: FormEvent) {
+  async function onSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault()
     setErro(null)
     setLoading(true)
     try {
       await login(usuario, senha)
-      navigate('/painel', { replace: true })
+      await navigate('/painel', { replace: true })
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Falha ao entrar.')
     } finally {
@@ -164,7 +164,7 @@ export function LoginPage() {
 
       <Paper
         component="form"
-        onSubmit={onSubmit}
+        onSubmit={(e) => void onSubmit(e)}
         sx={{
           position: 'relative',
           zIndex: 1,

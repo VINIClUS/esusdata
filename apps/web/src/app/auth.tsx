@@ -1,12 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { USE_MOCKS, apiFetch, ensureApiReady } from '@/api/client'
 import { demoUser } from '@/api/fixtures/context'
@@ -17,17 +9,9 @@ import {
   type AuthLoginResponse,
   type AuthMeResponse,
 } from './auth-model'
+import { AuthContext } from './auth-context'
 
 const STORAGE_KEY = 'esusdata.session'
-
-interface AuthState {
-  user: SessionUser | null
-  isLoading: boolean
-  login: (usuario: string, senha: string) => Promise<void>
-  logout: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthState | null>(null)
 
 function readSession(): SessionUser | null {
   if (USE_MOCKS && new URLSearchParams(window.location.search).get('mock-login') === '1') {
@@ -50,25 +34,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (USE_MOCKS) return
-    let active = true
+    const unmounted = new AbortController()
+    const { signal } = unmounted
 
     void (async () => {
       try {
         await ensureApiReady()
-        const me = await apiFetch<AuthMeResponse>('/auth/me')
-        if (active) setUser((previous) => sessionUserFromMe(me, previous))
+        const me = await apiFetch<AuthMeResponse>('/auth/me', { signal })
+        if (!signal.aborted) setUser((previous) => sessionUserFromMe(me, previous))
       } catch {
-        if (active) {
+        if (!signal.aborted) {
           sessionStorage.removeItem(STORAGE_KEY)
           setUser(null)
         }
       } finally {
-        if (active) setIsLoading(false)
+        if (!signal.aborted) setIsLoading(false)
       }
     })()
 
     return () => {
-      active = false
+      unmounted.abort()
     }
   }, [])
 
@@ -95,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (!USE_MOCKS) {
         await ensureApiReady()
-        await apiFetch<void>('/auth/logout', { method: 'POST' })
+        await apiFetch<undefined>('/auth/logout', { method: 'POST' })
       }
     } finally {
       sessionStorage.removeItem(STORAGE_KEY)
@@ -109,10 +94,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, isLoading, login, logout],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth(): AuthState {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
-  return ctx
 }

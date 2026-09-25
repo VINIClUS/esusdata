@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import { Eye, EyeOff, Search, type LucideIcon } from 'lucide-react'
 import { colors } from '@/theme/tokens'
+import { mergeSx } from '@/theme/sx'
 
 interface FieldProps extends Omit<TextFieldProps, 'label'> {
   label?: string
@@ -36,10 +37,10 @@ export function Field({ label, icon: Icon, large, slotProps, sx, ...rest }: Fiel
             ) : undefined,
           },
         }}
-        sx={{
-          '& .MuiOutlinedInput-root': { height: large ? 62 : 50, fontSize: large ? 17 : 15 },
-          ...sx,
-        }}
+        sx={mergeSx(
+          { '& .MuiOutlinedInput-root': { height: large ? 62 : 50, fontSize: large ? 17 : 15 } },
+          sx,
+        )}
       />
     </Box>
   )

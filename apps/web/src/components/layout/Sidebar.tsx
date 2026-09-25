@@ -3,7 +3,7 @@ import Typography from '@mui/material/Typography'
 import { CircleQuestionMark, LogOut, type LucideIcon } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router'
 import { navItems } from '@/app/navigation'
-import { useAuth } from '@/app/auth'
+import { useAuth } from '@/app/auth-context'
 import { demoContext } from '@/api/fixtures/context'
 import { colors, layout } from '@/theme/tokens'
 import { Logo } from './Logo'
@@ -132,10 +132,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         <NavRow
           label="Sair"
           icon={LogOut}
-          onClick={async () => {
-            await logout()
-            navigate('/login')
-          }}
+          onClick={() => void logout().then(() => navigate('/login'))}
         />
       </Box>
 

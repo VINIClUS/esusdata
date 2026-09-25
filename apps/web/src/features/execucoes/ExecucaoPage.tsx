@@ -40,7 +40,7 @@ export function ExecucaoPage() {
     useState<typeof data extends undefined ? never : NonNullable<typeof data>['log'] | null>(null)
 
   if (isPending) return <PageSkeleton title="Execução de Dados" />
-  if (isError || !data) {
+  if (isError) {
     return (
       <PageUnavailable
         title="Execução de Dados"

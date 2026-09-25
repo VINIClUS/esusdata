@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
-import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
+import { Pie, PieChart, ResponsiveContainer } from 'recharts'
 import { colors } from '@/theme/tokens'
 
 interface DonutSlice {
@@ -29,8 +29,9 @@ export function DonutChart({
     <Box sx={{ position: 'relative', width: size, height: size, mx: 'auto' }}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
+          {/* Pie colours each sector from the entry's own fill (Cell is deprecated). */}
           <Pie
-            data={data}
+            data={data.map((d) => ({ ...d, fill: d.color }))}
             dataKey="value"
             innerRadius={size / 2 - thickness}
             outerRadius={size / 2}
@@ -39,11 +40,7 @@ export function DonutChart({
             paddingAngle={data.length > 1 ? 1.5 : 0}
             stroke="none"
             isAnimationActive={false}
-          >
-            {data.map((d) => (
-              <Cell key={d.name} fill={d.color} />
-            ))}
-          </Pie>
+          />
         </PieChart>
       </ResponsiveContainer>
       <Box

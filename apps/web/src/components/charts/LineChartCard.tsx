@@ -94,7 +94,7 @@ export function LineChartCard({
               tickLine={false}
             />
             <Tooltip
-              formatter={(v) => `${v}%`}
+              formatter={(v) => `${String(v)}%`}
               contentStyle={{ borderRadius: 10, borderColor: colors.border, fontSize: 12 }}
             />
             {referenceLine && (

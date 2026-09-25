@@ -156,7 +156,7 @@ function UnavailableValue({ children }: { children: string }) {
 export function PainelPage() {
   const { data, error, isError, isPending } = usePainelResumo()
   if (isPending) return <PageSkeleton title="Painel Principal" />
-  if (isError || !data) {
+  if (isError) {
     return (
       <>
         <PageHeader

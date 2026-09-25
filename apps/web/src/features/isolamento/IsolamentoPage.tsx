@@ -89,7 +89,7 @@ export function IsolamentoPage() {
   const { data, error, isError, isPending } = useIsolamento()
   const [tab, setTab] = useState('validacao')
   if (isPending) return <PageSkeleton title="Isolamento Municipal" />
-  if (isError || !data) {
+  if (isError) {
     return (
       <PageUnavailable
         title="Isolamento Municipal"

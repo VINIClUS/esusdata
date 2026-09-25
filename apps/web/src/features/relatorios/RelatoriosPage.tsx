@@ -123,7 +123,7 @@ export function RelatoriosPage() {
   const { data, error, isError, isPending } = useRelatoriosRecentes()
   const [tab, setTab] = useState('indicadores')
   if (isPending) return <PageSkeleton title="Relatórios" />
-  if (isError || !data) {
+  if (isError) {
     return (
       <PageUnavailable
         title="Relatórios"

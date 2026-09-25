@@ -9,7 +9,7 @@ import type {
 } from './types'
 import type { ExecucaoAtual, RunResponse } from './types'
 
-type CategoryDefinition = {
+interface CategoryDefinition {
   key: string
   label: CategoriaIndicador
   matches: (family: string) => boolean
@@ -235,7 +235,7 @@ function runLog(response: RunResponse): ExecucaoAtual['log'] {
 }
 
 export function normalizeRunResponse(response: RunResponse): ExecucaoAtual {
-  const stages: Array<{ titulo: string; timestamp: string | null; descricao: string }> = [
+  const stages: { titulo: string; timestamp: string | null; descricao: string }[] = [
     {
       titulo: 'Enfileiramento',
       timestamp: response.createdAt,

@@ -6,7 +6,7 @@ import { Ellipsis } from 'lucide-react'
 import { useState, type MouseEvent } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router'
 import { navItems } from '@/app/navigation'
-import { useAuth } from '@/app/auth'
+import { useAuth } from '@/app/auth-context'
 import { CircleQuestionMark, LogOut } from 'lucide-react'
 import { colors, layout } from '@/theme/tokens'
 
@@ -88,7 +88,7 @@ export function BottomNavBar() {
               key={item.to}
               onClick={() => {
                 close()
-                navigate(item.to)
+                void navigate(item.to)
               }}
             >
               <ListItemIcon>
@@ -101,7 +101,7 @@ export function BottomNavBar() {
         <MenuItem
           onClick={() => {
             close()
-            navigate('/ajuda')
+            void navigate('/ajuda')
           }}
         >
           <ListItemIcon>
@@ -110,10 +110,9 @@ export function BottomNavBar() {
           Ajuda
         </MenuItem>
         <MenuItem
-          onClick={async () => {
+          onClick={() => {
             close()
-            await logout()
-            navigate('/login')
+            void logout().then(() => navigate('/login'))
           }}
         >
           <ListItemIcon>

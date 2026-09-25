@@ -234,7 +234,7 @@ export function IndicadorDetailPage() {
 
   if (isPending) return <PageSkeleton title={codigo} />
 
-  if (isError || !data) {
+  if (isError) {
     return (
       <>
         <PageHeader
@@ -249,7 +249,7 @@ export function IndicadorDetailPage() {
             variant="outlined"
             startIcon={<ArrowLeft size={18} />}
             sx={{ mt: 2 }}
-            onClick={() => navigate('/indicadores')}
+            onClick={() => void navigate('/indicadores')}
           >
             Voltar aos indicadores
           </Button>
@@ -293,7 +293,7 @@ export function IndicadorDetailPage() {
               size="large"
               startIcon={<RefreshCw size={20} />}
               sx={{ minHeight: 52, px: 3, fontSize: 16 }}
-              onClick={() => navigate('/execucao')}
+              onClick={() => void navigate('/execucao')}
             >
               Executar novamente
             </Button>
