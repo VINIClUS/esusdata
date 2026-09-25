@@ -56,7 +56,8 @@ segredos de assinatura ficam fora do alcance de builds não confiáveis.
   - `ssh-keygen -Y sign -n file` gera o `SHA256SUMS.sig` com uma chave ed25519. A privada fica só
     no secret `RELEASE_SIGNING_KEY` do Environment `release`, que admite apenas tags `v*`.
   - A trust store é `deployment/release/allowed_signers` (principal `release@observatorio-aps`,
-    namespace `file`).
+    namespace `file`). Fingerprint da chave: `ED25519 SHA256:3hEgZjgEAOSxIqmjY6NoZ+1nViyKrRyymNq/zppeXrA`. Ela não é publicada junto dos
+    instaladores: quem verifica a obtém do repositório e confere o fingerprint.
   - O job verifica a assinatura contra ela antes de criar a release.
   - O `ssh-keygen` vem no Linux e no Windows 10+, então a verificação offline não exige
     ferramenta extra.

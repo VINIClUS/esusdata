@@ -301,8 +301,9 @@ jobs:
 
           ## Verificação
 
-          1. Assinatura do manifesto, contra a chave de `deployment/release/allowed_signers`
-             (fingerprint no ADR 0021); `ssh-keygen` vem no Linux e no Windows 10+:
+          1. Assinatura do manifesto, com o `allowed_signers` obtido do repositório
+             (`deployment/release/allowed_signers`, chave `ED25519 SHA256:3hEgZjgEAOSxIqmjY6NoZ+1nViyKrRyymNq/zppeXrA`, nunca de um download
+             ao lado do instalador); `ssh-keygen` vem no Linux e no Windows 10+:
 
              ```
              ssh-keygen -Y verify -f allowed_signers -I release@observatorio-aps -n file -s SHA256SUMS.sig < SHA256SUMS
