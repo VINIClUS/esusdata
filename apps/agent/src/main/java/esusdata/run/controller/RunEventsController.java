@@ -112,11 +112,11 @@ public class RunEventsController {
         AtomicReference<ScheduledFuture<?>> reauthFutureHolder = new AtomicReference<>();
         AtomicReference<Instant> terminalAttemptFirstObservedAt = new AtomicReference<>();
         AtomicReference<JobSnapshot> lastSent = new AtomicReference<>();
-        Object emitterLock = new Object();
         // Guards against completion callbacks running more than once for the same connection —
         // Spring runs onCompletion after onTimeout/onError too, and a double release would drift
         // SseConnectionLimiter's counters below the true number of open connections.
         AtomicBoolean stopped = new AtomicBoolean();
+        GuardedEmitter guarded = new GuardedEmitter(emitter, stopped);
 
         Runnable onDone = () -> {
             if (!stopped.compareAndSet(false, true)) {
@@ -135,14 +135,14 @@ public class RunEventsController {
         emitter.onCompletion(onDone);
         emitter.onTimeout(() -> {
             onDone.run();
-            complete(emitter, emitterLock);
+            guarded.complete();
         });
         emitter.onError(e -> onDone.run());
 
         // scheduleWithFixedDelay, not scheduleAtFixedRate: a poll blocking on SQLite's
         // busy_timeout=5000 must not queue up catch-up executions back-to-back once it returns.
         ScheduledFuture<?> pollFuture = scheduler.scheduleWithFixedDelay(
-                () -> poll(id, terminalAttemptFirstObservedAt, lastSent, emitter, emitterLock, stopped, onDone),
+                () -> poll(id, terminalAttemptFirstObservedAt, lastSent, guarded, onDone),
                 0,
                 pollIntervalMs,
                 TimeUnit.MILLISECONDS);
@@ -155,7 +155,7 @@ public class RunEventsController {
         }
 
         ScheduledFuture<?> reauthFuture = reauthScheduler.scheduleAtFixedRate(
-                () -> reauthorize(session, sessionId, userId, municipalityIbge, emitter, emitterLock, stopped, onDone),
+                () -> reauthorize(session, sessionId, userId, municipalityIbge, guarded, onDone),
                 authorizationRevalidationIntervalMs,
                 authorizationRevalidationIntervalMs,
                 TimeUnit.MILLISECONDS);
@@ -171,19 +171,16 @@ public class RunEventsController {
             String jobId,
             AtomicReference<Instant> terminalAttemptFirstObservedAt,
             AtomicReference<JobSnapshot> lastSent,
-            SseEmitter emitter,
-            Object emitterLock,
-            AtomicBoolean stopped,
+            GuardedEmitter guarded,
             Runnable onDone) {
-        if (stopped.get()) {
+        if (guarded.stopped()) {
             return;
         }
         try {
             Job current = jobRepository.findById(jobId).orElse(null);
             if (current == null) {
                 onDone.run();
-                completeWithError(
-                        emitter, emitterLock, new IllegalStateException("job " + jobId + " no longer exists"));
+                guarded.completeWithError(new IllegalStateException("job " + jobId + " no longer exists"));
                 return;
             }
 
@@ -207,20 +204,19 @@ public class RunEventsController {
                 }
                 terminalAttemptWaitExpired = true;
             }
-            if (!sendIfChanged(
-                    jobId, snapshot, response, terminalAttemptWaitExpired, lastSent, emitter, emitterLock, stopped)) {
+            if (!sendIfChanged(jobId, snapshot, response, terminalAttemptWaitExpired, lastSent, guarded)) {
                 return;
             }
             if (terminal) {
                 onDone.run();
-                complete(emitter, emitterLock);
+                guarded.complete();
             }
         } catch (java.io.IOException e) {
             onDone.run();
-            completeWithError(emitter, emitterLock, e);
+            guarded.completeWithError(e);
         } catch (RuntimeException e) { // NOPMD - an SSE poll must always release and complete the emitter
             onDone.run();
-            completeWithError(emitter, emitterLock, e);
+            guarded.completeWithError(e);
         }
     }
 
@@ -251,14 +247,9 @@ public class RunEventsController {
             RunResponse response,
             boolean terminalAttemptWaitExpired,
             AtomicReference<JobSnapshot> lastSent,
-            SseEmitter emitter,
-            Object emitterLock,
-            AtomicBoolean stopped)
+            GuardedEmitter guarded)
             throws java.io.IOException {
-        synchronized (emitterLock) {
-            if (stopped.get()) {
-                return false;
-            }
+        return guarded.sendUnlessStopped(emitter -> {
             if (!snapshot.equals(lastSent.get())) {
                 if (terminalAttemptWaitExpired) {
                     log.warn("closing terminal SSE stream for job {} without final attempt history", jobId);
@@ -266,8 +257,7 @@ public class RunEventsController {
                 emitter.send(SseEmitter.event().name("run").data(response, MediaType.APPLICATION_JSON));
                 lastSent.set(snapshot);
             }
-        }
-        return true;
+        });
     }
 
     private void reauthorize(
@@ -275,11 +265,9 @@ public class RunEventsController {
             String sessionId,
             String userId,
             String municipalityIbge,
-            SseEmitter emitter,
-            Object emitterLock,
-            AtomicBoolean stopped,
+            GuardedEmitter guarded,
             Runnable onDone) {
-        if (stopped.get()) {
+        if (guarded.stopped()) {
             return;
         }
         try {
@@ -289,13 +277,13 @@ public class RunEventsController {
                 // lets the client learn it lost access ("o cliente o confirma por GET",
                 // §1.10 L397), rather than surfacing as a dispatcher-level error.
                 onDone.run();
-                complete(emitter, emitterLock);
+                guarded.complete();
                 return;
             }
             if (!scopeResolver.hasPermission(userId, Permission.RUN_INDICATOR, municipalityIbge, null, null)) {
                 authorization.auditDenied(session, Permission.RUN_INDICATOR, municipalityIbge);
                 onDone.run();
-                complete(emitter, emitterLock);
+                guarded.complete();
                 return;
             }
             // A heartbeat on every revalidation tick, not only on change: without it, a
@@ -304,30 +292,61 @@ public class RunEventsController {
             // broken pipe never surfaces, and the scheduled task/limiter slot leak until the
             // 30-minute emitter timeout. ENG-44's own wording ("polling, SSE e heartbeat não
             // contam") anticipates exactly this heartbeat.
-            synchronized (emitterLock) {
-                if (!stopped.get()) {
-                    emitter.send(SseEmitter.event().comment("keep-alive"));
-                }
-            }
+            guarded.sendUnlessStopped(emitter -> emitter.send(SseEmitter.event().comment("keep-alive")));
         } catch (java.io.IOException e) {
             onDone.run();
-            completeWithError(emitter, emitterLock, e);
+            guarded.completeWithError(e);
         } catch (RuntimeException e) { // NOPMD - an SSE poll must always release and complete the emitter
             onDone.run();
-            completeWithError(emitter, emitterLock, e);
+            guarded.completeWithError(e);
         }
     }
 
-    private static void complete(SseEmitter emitter, Object emitterLock) {
-        synchronized (emitterLock) {
-            emitter.complete();
+    /**
+     * One connection's emitter with every operation serialized on a lock it owns: the poll and
+     * reauthorization tasks can legitimately reach the same emitter concurrently.
+     */
+    private static final class GuardedEmitter {
+        private final SseEmitter emitter;
+        private final AtomicBoolean stopped;
+        private final Object lock = new Object();
+
+        GuardedEmitter(SseEmitter emitter, AtomicBoolean stopped) {
+            this.emitter = emitter;
+            this.stopped = stopped;
+        }
+
+        boolean stopped() {
+            return stopped.get();
+        }
+
+        /** Runs {@code send} under the lock unless the stream stopped; false if it had. */
+        boolean sendUnlessStopped(EmitterSend send) throws java.io.IOException {
+            synchronized (lock) {
+                if (stopped.get()) {
+                    return false;
+                }
+                send.sendTo(emitter);
+                return true;
+            }
+        }
+
+        void complete() {
+            synchronized (lock) {
+                emitter.complete();
+            }
+        }
+
+        void completeWithError(Throwable error) {
+            synchronized (lock) {
+                emitter.completeWithError(error);
+            }
         }
     }
 
-    private static void completeWithError(SseEmitter emitter, Object emitterLock, Throwable error) {
-        synchronized (emitterLock) {
-            emitter.completeWithError(error);
-        }
+    @FunctionalInterface
+    private interface EmitterSend {
+        void sendTo(SseEmitter emitter) throws java.io.IOException;
     }
 
     private record JobSnapshot(

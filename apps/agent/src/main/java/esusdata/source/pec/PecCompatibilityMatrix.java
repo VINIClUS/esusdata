@@ -135,7 +135,7 @@ public final class PecCompatibilityMatrix {
     }
 
     private static String text(JsonNode node, String field) {
-        JsonNode value = node == null ? null : node.get(field);
+        JsonNode value = node.get(field);
         return value == null || value.isNull() ? null : value.asString();
     }
 

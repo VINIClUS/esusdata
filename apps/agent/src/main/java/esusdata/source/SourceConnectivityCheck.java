@@ -21,7 +21,7 @@ public interface SourceConnectivityCheck {
 
     /** {@code sqlState} is null only on success; any failure without one is reported as {@code 08001}. */
     record Result(String sqlState) {
-        public static final Result CONNECTED = new Result(null);
+        public static final Result OK = new Result(null);
 
         public boolean connected() {
             return sqlState == null;

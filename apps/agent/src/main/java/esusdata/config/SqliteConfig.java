@@ -121,6 +121,8 @@ public class SqliteConfig {
         return new SqliteRuntimeAssertion();
     }
 
+    // PRAGMA names cannot be bound as parameters; the only callers pass the literals above.
+    @SuppressWarnings("java:S2077")
     private static void assertPragma(Statement st, String pragma, String expected) throws SQLException {
         try (ResultSet rs = st.executeQuery("PRAGMA " + pragma)) {
             if (!rs.next()) {

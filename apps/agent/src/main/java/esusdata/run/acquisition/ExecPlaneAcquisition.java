@@ -613,12 +613,18 @@ public final class ExecPlaneAcquisition implements Acquisition {
      * this is a short, bounded drain, not an open-ended wait.
      */
     private static void awaitTermination(Process process) {
+        boolean interrupted = false;
         while (process.isAlive()) {
             try {
                 process.waitFor(100, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException ignored) {
-                // Already recorded on the caller's thread via Thread.currentThread().interrupt().
+            } catch (InterruptedException e) {
+                // Restored after the loop: re-interrupting here would make every waitFor throw at
+                // once and turn the drain into a busy loop.
+                interrupted = true;
             }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
     }
 }
