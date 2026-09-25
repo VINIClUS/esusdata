@@ -24,8 +24,8 @@ Todos os portões bloqueiam, e cada ferramenta tem versão fixada (§1.12.8).
   deixava os testes no `package.yml`.
   - O job `java` compila o plano de execução e roda o `verify` completo, com os testes `docker`
     e os diferenciais.
-  - O **JaCoCo** 0.8.15 falha abaixo do piso do bundle: linha 0,88 e branch 0,68. O CI mediu
-    0,8892 e 0,6880 em 2026-09-25 e o valor foi arredondado para baixo.
+  - O **JaCoCo** 0.8.15 falha abaixo do piso do bundle: linha 0,88 e branch 0,68. Em 2026-09-25,
+    sem PEC como no CI, a medida foi 0,8892 e 0,6880, arredondada para baixo.
   - O job `rust` roda o **cargo-llvm-cov** 0.9.1 com piso de linha de 40%, medido em 40,11%.
   - Os pisos só sobem. Nenhuma exclusão entra para inflar o número.
   - Os `LiveTest` continuam pulados no CI, que não alcança um PEC, e o piso é medido assim.

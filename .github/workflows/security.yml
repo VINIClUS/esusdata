@@ -1,5 +1,6 @@
 # Vulnerability gate (ADR 0019, Tech Spec §1.12.8): Trivy over the repository's dependency graphs
-# (pom.xml, package-lock.json, Cargo.lock), secrets and configuration. Every finding goes to code
+# (pom.xml, package-lock.json with its build tooling, Cargo.lock), secrets and configuration: the
+# same graphs the release SBOM scan in package.yml sees. Every finding goes to code
 # scanning as SARIF; any HIGH or CRITICAL, fixed upstream or not, fails the check unless
 # .trivyignore.yaml carries it with a reason and an expiry date. Also runs daily, because new CVEs
 # land on dependencies that have not changed. Trivy is a pinned, hash-checked binary, not an action.
@@ -65,7 +66,7 @@ jobs:
       - name: Scan (report)
         run: >-
           trivy fs . --skip-db-update --skip-java-db-update --skip-dirs .trivy-cache
-          --scanners vuln,secret,misconfig --format sarif --output trivy.sarif --exit-code 0
+          --scanners vuln,secret,misconfig --include-dev-deps --format sarif --output trivy.sarif --exit-code 0
       - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         if: always() && hashFiles('trivy.sarif') != ''
         with:
@@ -74,5 +75,5 @@ jobs:
       - name: Scan (gate)
         run: >-
           trivy fs . --skip-db-update --skip-java-db-update --skip-dirs .trivy-cache
-          --scanners vuln,secret,misconfig --severity HIGH,CRITICAL
+          --scanners vuln,secret,misconfig --include-dev-deps --severity HIGH,CRITICAL
           --ignorefile .trivyignore.yaml --exit-code 1

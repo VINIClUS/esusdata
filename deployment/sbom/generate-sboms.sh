@@ -23,14 +23,15 @@ mkdir -p "$out"
 java_home="${JAVA_HOME:-$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")}"
 
 # The JDK is not a Maven, npm or Cargo package: its document is written here, from the JDK's own
-# release file. Extra components (WinSW) arrive as JSON objects on stdin.
-runtime_sbom() { # platform
+# release file. Extra components (WinSW) arrive as a JSON array: an argument, not a file, because
+# the Windows jq.exe cannot open Git Bash's /dev/stdin.
+runtime_sbom() { # platform extra-components-json
   release_value() { sed -n "s/^$1=\"\(.*\)\"\$/\1/p" "$java_home/release" | tr -d '\r'; }
   local jdk_version implementor
   jdk_version="$(release_value JAVA_RUNTIME_VERSION)"
   implementor="$(release_value IMPLEMENTOR)"
   jq -n --arg os "$1" --arg version "$jdk_version" --arg implementor "$implementor" \
-    --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --slurpfile extra /dev/stdin '{
+    --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson extra "$2" '{
       bomFormat: "CycloneDX",
       specVersion: "1.5",
       version: 1,
@@ -71,7 +72,7 @@ case "$platform" in
     mv "$execplane/execplane-runtime.json" "$out/execplane-runtime.cdx.json"
     mv "$execplane/execplane-build.json" "$out/execplane-build.cdx.json"
 
-    echo '' | runtime_sbom linux >"$out/runtime-linux.cdx.json"
+    runtime_sbom linux '[]' >"$out/runtime-linux.cdx.json"
     ;;
   windows)
     # The hash package-windows.ps1 verifies the download against: one source for both.
@@ -83,7 +84,7 @@ case "$platform" in
       echo "could not read the WinSW pin from $ps1" >&2
       exit 1
     fi
-    jq -n --arg version "$winsw_version" --arg sha256 "$winsw_sha256" --arg url "$winsw_url" '{
+    winsw="$(jq -n --arg version "$winsw_version" --arg sha256 "$winsw_sha256" --arg url "$winsw_url" '[{
         type: "application",
         "bom-ref": "winsw",
         name: "winsw",
@@ -93,7 +94,8 @@ case "$platform" in
         licenses: [{license: {id: "MIT"}}],
         purl: ("pkg:github/winsw/winsw@v" + $version),
         externalReferences: [{type: "distribution", url: $url}]
-      }' | runtime_sbom windows >"$out/runtime-windows.cdx.json"
+      }]')"
+    runtime_sbom windows "$winsw" >"$out/runtime-windows.cdx.json"
     ;;
   *)
     echo "unknown platform: $platform" >&2
