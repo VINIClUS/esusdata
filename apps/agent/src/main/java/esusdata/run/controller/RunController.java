@@ -118,7 +118,7 @@ public class RunController {
                 session.userId(),
                 idempotencyKey,
                 requestHash,
-                idempotencyKey == null ? null : now.plus(IDEMPOTENCY_KEY_TTL),
+                now.plus(IDEMPOTENCY_KEY_TTL), // requireIdempotencyKey already rejected a missing key
                 requestedScopeJson(request.municipalityIbge()),
                 now);
 
