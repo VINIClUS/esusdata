@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -387,6 +388,116 @@ class RunEventsControllerTest {
 
         pollTask.get().run();
         verify(pollFuture).cancel(false);
+    }
+
+    @Test
+    void jobDeletedMidStreamEndsTheStream() {
+        Instant now = Instant.parse("2026-09-20T12:00:00Z");
+        JobRepository jobRepository = mock(JobRepository.class);
+        when(jobRepository.findById("job-1"))
+                .thenReturn(Optional.of(runningJob(now)))
+                .thenReturn(Optional.empty());
+        StreamHarness harness = new StreamHarness(jobRepository, mock(SessionService.class), now);
+
+        harness.open();
+        harness.pollTask.get().run();
+
+        verify(harness.pollFuture).cancel(false);
+        verify(harness.reauthFuture).cancel(false);
+    }
+
+    @Test
+    void failingPollEndsTheStream() {
+        Instant now = Instant.parse("2026-09-20T12:00:00Z");
+        JobRepository jobRepository = mock(JobRepository.class);
+        when(jobRepository.findById("job-1")).thenReturn(Optional.of(runningJob(now)));
+        when(jobRepository.findAttempts("job-1")).thenThrow(new IllegalStateException("database is locked"));
+        StreamHarness harness = new StreamHarness(jobRepository, mock(SessionService.class), now);
+
+        harness.open();
+        harness.pollTask.get().run();
+
+        verify(harness.pollFuture).cancel(false);
+    }
+
+    @Test
+    void revokedSessionEndsTheStreamWithoutAnAudit() {
+        Instant now = Instant.parse("2026-09-20T12:00:00Z");
+        JobRepository jobRepository = mock(JobRepository.class);
+        when(jobRepository.findById("job-1")).thenReturn(Optional.of(runningJob(now)));
+        SessionService sessionService = mock(SessionService.class);
+        when(sessionService.revalidate("session-1", now)).thenReturn(false);
+        StreamHarness harness = new StreamHarness(jobRepository, sessionService, now);
+
+        harness.open();
+        harness.reauthTask.get().run();
+
+        verify(harness.pollFuture).cancel(false);
+        verify(harness.authorization, never()).auditDenied(any(), any(), any());
+    }
+
+    @Test
+    void stoppedStreamIgnoresLateTasks() {
+        Instant now = Instant.parse("2026-09-20T12:00:00Z");
+        JobRepository jobRepository = mock(JobRepository.class);
+        when(jobRepository.findById("job-1"))
+                .thenReturn(Optional.of(runningJob(now)))
+                .thenReturn(Optional.empty());
+        SessionService sessionService = mock(SessionService.class);
+        StreamHarness harness = new StreamHarness(jobRepository, sessionService, now);
+
+        harness.open();
+        harness.pollTask.get().run();
+        harness.pollTask.get().run();
+        harness.reauthTask.get().run();
+
+        verify(jobRepository, times(2)).findById("job-1");
+        verify(sessionService, never()).revalidate(any(), any());
+    }
+
+    /** A controller whose poll and reauthorization tasks the test runs by hand. */
+    private static final class StreamHarness {
+        final AtomicReference<Runnable> pollTask = new AtomicReference<>();
+        final AtomicReference<Runnable> reauthTask = new AtomicReference<>();
+        final ScheduledFuture<?> pollFuture = mock(ScheduledFuture.class);
+        final ScheduledFuture<?> reauthFuture = mock(ScheduledFuture.class);
+        final ApiAuthorization authorization = mock(ApiAuthorization.class);
+        private final RunEventsController controller;
+        private final Instant now;
+
+        StreamHarness(JobRepository jobRepository, SessionService sessionService, Instant now) {
+            this.now = now;
+            ScheduledExecutorService pollScheduler = mock(ScheduledExecutorService.class);
+            ScheduledExecutorService reauthScheduler = mock(ScheduledExecutorService.class);
+            when(pollScheduler.scheduleWithFixedDelay(
+                            any(Runnable.class), eq(0L), eq(1000L), eq(TimeUnit.MILLISECONDS)))
+                    .thenAnswer(invocation -> {
+                        pollTask.set(invocation.getArgument(0));
+                        return pollFuture;
+                    });
+            when(reauthScheduler.scheduleAtFixedRate(
+                            any(Runnable.class), eq(30_000L), eq(30_000L), eq(TimeUnit.MILLISECONDS)))
+                    .thenAnswer(invocation -> {
+                        reauthTask.set(invocation.getArgument(0));
+                        return reauthFuture;
+                    });
+            controller = new RunEventsController(
+                    jobRepository,
+                    mock(RunResponseFactory.class),
+                    authorization,
+                    mock(ScopeResolver.class),
+                    sessionService,
+                    new SseConnectionLimiter(),
+                    pollScheduler,
+                    reauthScheduler,
+                    Clock.fixed(now, ZoneOffset.UTC),
+                    1000,
+                    30);
+        }
+
+        void open() {
+            controller.events(sessionAt(now), "job-1");
+        }
     }
 
     private static AuthenticatedSession sessionAt(Instant now) {

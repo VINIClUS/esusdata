@@ -27,7 +27,7 @@ failed=0
 report() { # description json total-jq list-jq
   local total
   total="$(jq -r "$3" <<<"$2")"
-  if [ "$total" != 0 ]; then
+  if [[ "$total" != 0 ]]; then
     echo "::error::$1: $total"
     jq -r "$4" <<<"$2"
     failed=1

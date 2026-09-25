@@ -80,7 +80,7 @@ case "$platform" in
     winsw_url="$(sed -n "s/^\$winswUrl = '\(.*\)'.*/\1/p" "$ps1" | tr -d '\r')"
     winsw_sha256="$(sed -n "s/^\$winswSha256 = '\(.*\)'.*/\1/p" "$ps1" | tr -d '\r')"
     winsw_version="$(sed -n 's:.*/download/v\([^/]*\)/.*:\1:p' <<<"$winsw_url")"
-    if [ -z "$winsw_sha256" ] || [ -z "$winsw_version" ]; then
+    if [[ -z "$winsw_sha256" || -z "$winsw_version" ]]; then
       echo "could not read the WinSW pin from $ps1" >&2
       exit 1
     fi
