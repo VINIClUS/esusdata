@@ -57,6 +57,8 @@ public class SecurityConfig {
      * {@link SessionService}, never through a {@code DaoAuthenticationProvider}.
      */
     @Bean
+    // Nothing to enumerate: the service never looks a user up and says the same for every name.
+    @SuppressWarnings("java:S5804")
     public UserDetailsService userDetailsService() {
         return username -> {
             throw new UsernameNotFoundException(
@@ -66,6 +68,9 @@ public class SecurityConfig {
 
     @Bean
     @Order(1)
+    // S3330: the web client reads the XSRF-TOKEN cookie to echo it in X-XSRF-TOKEN (double submit),
+    // so it cannot be HttpOnly; the session cookie is (AuthController).
+    @SuppressWarnings("java:S3330")
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http, SessionService sessionService, Clock clock, WebSecurityProperties webProperties)
             throws Exception { // NOPMD - SignatureDeclareThrowsException: HttpSecurity#build() declares it
@@ -131,6 +136,9 @@ public class SecurityConfig {
      */
     @Bean
     @Order(2)
+    // S4502: this chain serves only static files with no session; every state-changing request is
+    // under /api/**, where the chain above enforces CSRF.
+    @SuppressWarnings("java:S4502")
     public SecurityFilterChain webClientFilterChain(HttpSecurity http)
             throws Exception { // NOPMD - SignatureDeclareThrowsException: HttpSecurity#build() declares it
         http.csrf(AbstractHttpConfigurer::disable)

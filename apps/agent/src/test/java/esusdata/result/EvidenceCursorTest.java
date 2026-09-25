@@ -26,7 +26,9 @@ class EvidenceCursorTest {
     void isOpaqueNotARawNumber() {
         String token = EvidenceCursor.of("result-1", "seq_asc", "3541307", 42L).encode();
 
-        assertThat(token).doesNotContain("42");
+        // Only the payload: the MAC comes from a per-process random key and contains "42" in
+        // roughly one run in a hundred.
+        assertThat(token.substring(0, token.indexOf('.'))).doesNotContain("42");
     }
 
     @Test

@@ -42,9 +42,8 @@ class PecDataSourceFactoryTest {
     @Test
     void sourceConnectionCreatesAnImmutablePeriodBoundAcquisition() {
         assertThat(Arrays.stream(PecSourceConnection.class.getDeclaredMethods())
-                        .anyMatch(method -> "acquire".equals(method.getName())
-                                && "esusdata.source.pec.PecAcquisition"
-                                        .equals(method.getReturnType().getName())))
+                        .anyMatch(method ->
+                                "acquire".equals(method.getName()) && method.getReturnType() == PecAcquisition.class))
                 .isTrue();
     }
 

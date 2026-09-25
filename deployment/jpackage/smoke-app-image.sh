@@ -11,7 +11,7 @@ image="${1:-$here/../../target/jpackage/observatorio-aps}"
 port=18080
 work="$(mktemp -d)"
 
-if [ -x "$image/bin/observatorio-aps" ]; then
+if [[ -x "$image/bin/observatorio-aps" ]]; then
   launcher="$image/bin/observatorio-aps"
 else
   launcher="$image/observatorio-aps.exe"

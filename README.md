@@ -49,12 +49,15 @@ indicador é Java puro; driver Postgres só em `source.pec` e `run.acquisition`;
 
 ```bash
 # backend (testes incluem ArchUnit e o contrato OpenAPI; o verify também roda Spotless, Error
-# Prone e PMD, ADR 0018 — mvn spotless:apply corrige a formatação)
+# Prone e PMD, ADR 0018, e o piso de cobertura do JaCoCo, ADR 0019 — relatório em
+# target/site/jacoco/; mvn spotless:apply corrige a formatação)
 cd apps/agent && mvn verify -Dsurefire.reuseForks=false
 cd apps/agent && mvn spotless:apply
 
-# plano de execução: o mesmo portão do CI (ADR 0018)
+# plano de execução: o mesmo portão do CI (ADR 0018), mais o piso de cobertura (ADR 0019, exige
+# cargo-llvm-cov e o componente llvm-tools-preview)
 cd apps/execplane && cargo fmt && cargo clippy --locked --all-targets -- -D warnings
+cd apps/execplane && cargo llvm-cov --locked --fail-under-lines 40
 
 # frontend (dados mockados por padrão: VITE_USE_MOCKS; com VITE_USE_MOCKS=false fala com o
 # backend em :8080 pelo proxy do Vite — município e competência vêm da API, ADR 0015)
@@ -90,6 +93,26 @@ cd apps/agent && mvn verify -Dsurefire.reuseForks=false \
 ```
 
 Testes com sufixo `LiveTest` exigem um PEC acessível e são pulados sem ele (ADR 0002, ADR 0003).
+
+## Qualidade e segurança (ADR 0019)
+
+- `ci.yml`: `java` e `rust` rodam análise estática, testes e pisos de cobertura. `sonar` envia
+  tudo ao SonarQube Cloud (`viniclus` / `VINIClUS_esusdata`) e falha com o quality gate ou com
+  qualquer issue aberta (`.github/scripts/sonar-strict-gate.sh`). Exceção só no código:
+  `@SuppressWarnings("java:Sxxxx")` com o motivo ao lado, nunca "aceitar" na interface do Sonar.
+- `security.yml`: Trivy sobre `pom.xml`, `package-lock.json` e `Cargo.lock`, mais segredos, em
+  todo PR, em todo push e diariamente. O SARIF vai para a aba Security, e qualquer achado HIGH ou
+  CRITICAL bloqueia. Um achado aceito entra em `.trivyignore.yaml` com `statement` e `expired_at`,
+  no máximo 90 dias.
+- `package.yml`: gera, valida (CycloneDX 1.5) e verifica os SBOMs de cada build. A release os
+  publica ao lado dos instaladores, cobertos pelo `SHA256SUMS`.
+
+```bash
+# o mesmo portão do Trivy, local (binário fixado e verificado por hash, em target/tools/)
+deployment/sbom/install-tool.sh trivy target/tools
+target/tools/trivy fs . --skip-dirs target --scanners vuln,secret,misconfig --severity HIGH,CRITICAL \
+  --ignorefile .trivyignore.yaml --exit-code 1
+```
 
 ## Empacotar (ADR 0014)
 

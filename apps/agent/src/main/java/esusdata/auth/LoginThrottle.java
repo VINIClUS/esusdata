@@ -32,12 +32,13 @@ public final class LoginThrottle {
         Duration window = Duration.ofMinutes(properties.throttleWindowMinutes());
         Instant windowStart = now.minus(window);
 
-        Optional<Instant> accountDelay = delayUntil("username", username, windowStart, properties.maxLoginAttempts());
+        Optional<Instant> accountDelay =
+                delayUntil(ThrottleKey.USERNAME, username, windowStart, properties.maxLoginAttempts());
         if (accountDelay.isPresent() && accountDelay.get().isAfter(now)) {
             throw new LoginThrottledException(accountDelay.get());
         }
-        Optional<Instant> originDelay =
-                delayUntil("origin", origin, windowStart, properties.maxLoginAttempts() * ORIGIN_FAILURE_MULTIPLIER);
+        Optional<Instant> originDelay = delayUntil(
+                ThrottleKey.ORIGIN, origin, windowStart, properties.maxLoginAttempts() * ORIGIN_FAILURE_MULTIPLIER);
         if (originDelay.isPresent() && originDelay.get().isAfter(now)) {
             throw new LoginThrottledException(originDelay.get());
         }
@@ -58,23 +59,15 @@ public final class LoginThrottle {
                 """, "attempt-" + java.util.UUID.randomUUID(), username, origin, now.toString(), outcome);
     }
 
-    private Optional<Instant> delayUntil(String column, String value, Instant windowStart, int threshold) {
+    private Optional<Instant> delayUntil(ThrottleKey key, String value, Instant windowStart, int threshold) {
         if (value == null) {
             return Optional.empty();
         }
-        Integer count = jdbc.queryForObject(
-                "select count(*) from login_attempts where " + column + " = ? "
-                        + "and outcome = 'FAILED' and attempted_at >= ?",
-                Integer.class,
-                value,
-                windowStart.toString());
+        Integer count = jdbc.queryForObject(key.countFailuresSince, Integer.class, value, windowStart.toString());
         if (count == null || count < threshold) {
             return Optional.empty();
         }
-        String lastFailureAt = jdbc.queryForObject(
-                "select max(attempted_at) from login_attempts where " + column + " = ? and outcome = 'FAILED'",
-                String.class,
-                value);
+        String lastFailureAt = jdbc.queryForObject(key.lastFailure, String.class, value);
         if (lastFailureAt == null) {
             return Optional.empty();
         }
@@ -96,6 +89,24 @@ public final class LoginThrottle {
 
         public Instant retryAfter() {
             return retryAfter;
+        }
+    }
+
+    /** The two throttling keys, each with its complete SQL: no statement is assembled at runtime. */
+    private enum ThrottleKey {
+        USERNAME(
+                "select count(*) from login_attempts where username = ? and outcome = 'FAILED' and attempted_at >= ?",
+                "select max(attempted_at) from login_attempts where username = ? and outcome = 'FAILED'"),
+        ORIGIN(
+                "select count(*) from login_attempts where origin = ? and outcome = 'FAILED' and attempted_at >= ?",
+                "select max(attempted_at) from login_attempts where origin = ? and outcome = 'FAILED'");
+
+        private final String countFailuresSince;
+        private final String lastFailure;
+
+        ThrottleKey(String countFailuresSince, String lastFailure) {
+            this.countFailuresSince = countFailuresSince;
+            this.lastFailure = lastFailure;
         }
     }
 }

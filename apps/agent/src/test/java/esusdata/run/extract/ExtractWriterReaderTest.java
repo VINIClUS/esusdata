@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import esusdata.indicator.model.CanonicalEncounter;
 import esusdata.indicator.model.CanonicalModality;
 import esusdata.indicator.model.SourceRef;
+import esusdata.run.acquisition.AcquisitionCommand;
 import esusdata.source.pec.PecAcquisition;
 import esusdata.source.pec.PecConnectionProperties;
 import esusdata.source.pec.PecSourceConnectionTestSupport;
@@ -34,7 +35,7 @@ class ExtractWriterReaderTest {
     void publicWriterApiRequiresAnAcquisitionBoundScope() {
         assertThat(Arrays.stream(ExtractWriter.class.getConstructors())
                         .anyMatch(constructor -> Arrays.stream(constructor.getParameterTypes())
-                                .anyMatch(type -> "esusdata.source.pec.PecAcquisition".equals(type.getName()))))
+                                .anyMatch(type -> type == PecAcquisition.class)))
                 .isTrue();
         assertThat(Arrays.stream(ExtractWriter.class.getConstructors())
                         .noneMatch(constructor ->
@@ -60,8 +61,7 @@ class ExtractWriterReaderTest {
     void publicDelegatedExtractPublicationApiAlsoRequiresAnAcquisitionBoundScope() {
         assertThat(Arrays.stream(DelegatedExtractPublication.class.getConstructors())
                         .anyMatch(constructor -> Arrays.stream(constructor.getParameterTypes())
-                                .anyMatch(
-                                        type -> "esusdata.run.acquisition.AcquisitionCommand".equals(type.getName()))))
+                                .anyMatch(type -> type == AcquisitionCommand.class)))
                 .isTrue();
         assertThat(Arrays.stream(DelegatedExtractPublication.class.getConstructors())
                         .noneMatch(constructor ->
@@ -233,23 +233,21 @@ class ExtractWriterReaderTest {
         byte[] originalData = Files.readAllBytes(dir.resolve(extractionId + ".jsonl.gz"));
         byte[] originalManifest = Files.readAllBytes(dir.resolve(extractionId + ".manifest.json"));
 
-        assertThatThrownBy(() -> {
-                    try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
-                        writer.write(encounter("replacement", CanonicalModality.ESPONTANEO));
-                        writer.finalizeExtract(
-                                "pec-ct133-dev",
-                                "3541307",
-                                "2026-03-01",
-                                "2026-04-01",
-                                Instant.parse("2026-09-19T20:00:00Z"),
-                                "America/Sao_Paulo",
-                                TEST_QUERY_CHECKSUM,
-                                "0.1.0",
-                                "COMPLETE",
-                                "SNAPSHOT");
-                    }
-                })
-                .isInstanceOf(IOException.class);
+        try (ExtractWriter writer = new ExtractWriter(dir, extractionId)) {
+            writer.write(encounter("replacement", CanonicalModality.ESPONTANEO));
+            assertThatThrownBy(() -> writer.finalizeExtract(
+                            "pec-ct133-dev",
+                            "3541307",
+                            "2026-03-01",
+                            "2026-04-01",
+                            Instant.parse("2026-09-19T20:00:00Z"),
+                            "America/Sao_Paulo",
+                            TEST_QUERY_CHECKSUM,
+                            "0.1.0",
+                            "COMPLETE",
+                            "SNAPSHOT"))
+                    .isInstanceOf(IOException.class);
+        }
 
         assertThat(Files.readAllBytes(dir.resolve(extractionId + ".jsonl.gz"))).isEqualTo(originalData);
         assertThat(Files.readAllBytes(dir.resolve(extractionId + ".manifest.json")))

@@ -42,11 +42,12 @@ $execplane = Join-Path $root 'apps\execplane\target\release\observatorio-execpla
 
 # 2. Backend jar, with the web client under static/ (-Pweb). Tests tagged "docker" need Linux
 #    containers (Testcontainers), which Windows runners cannot start; the Linux job runs them.
+#    Without them coverage is not comparable, so the JaCoCo floor is enforced on Linux (ADR 0019).
 $pom = Join-Path $root 'apps\agent\pom.xml'
 if ($SkipTests) {
     mvn -B -f $pom -Pweb package '-DskipTests'
 } else {
-    mvn -B -f $pom -Pweb verify '-Dsurefire.reuseForks=false' '-DexcludedGroups=docker' `
+    mvn -B -f $pom -Pweb verify '-Dsurefire.reuseForks=false' '-DexcludedGroups=docker' '-Djacoco.skip=true' `
         "-Dobservatorio.execution-plane.binary=$execplane"
 }
 $version = (mvn -B -f $pom -q help:evaluate '-Dexpression=project.version' '-DforceStdout').Trim()

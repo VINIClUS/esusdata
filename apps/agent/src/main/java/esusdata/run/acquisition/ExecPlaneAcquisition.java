@@ -602,23 +602,10 @@ public final class ExecPlaneAcquisition implements Acquisition {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             ExecPlaneProcess.killProcess(process);
-            awaitTermination(process);
+            // Not interruptible, unlike waitFor: the interrupt stays recorded for the caller, and
+            // killProcess already sent SIGKILL, so this is a short, bounded wait before exitValue().
+            process.onExit().join();
         }
         return process.exitValue();
-    }
-
-    /**
-     * Blocks past a second interrupt so {@link #waitForExit} can safely call {@code
-     * exitValue()} afterward — {@code killProcess} already sent {@code SIGKILL} by this point, so
-     * this is a short, bounded drain, not an open-ended wait.
-     */
-    private static void awaitTermination(Process process) {
-        while (process.isAlive()) {
-            try {
-                process.waitFor(100, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException ignored) {
-                // Already recorded on the caller's thread via Thread.currentThread().interrupt().
-            }
-        }
     }
 }

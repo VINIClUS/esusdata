@@ -102,7 +102,7 @@ public final class ExecPlaneConnectivityCheck implements SourceConnectivityCheck
             if (exitValue != 0) {
                 return protocolFailure(properties, process, timedOut, "reported diagnosed but exited " + exitValue);
             }
-            return Result.CONNECTED;
+            return Result.OK;
         } catch (IOException | RuntimeException e) { // NOPMD - any failure talking to the child is a failed check
             return protocolFailure(properties, process, timedOut, e.getMessage());
         } finally {

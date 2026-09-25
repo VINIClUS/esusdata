@@ -38,6 +38,9 @@ final class ExecPlaneProcess {
         }
     }
 
+    // The lock is the process's stdin itself: Process.getOutputStream() returns the same object to
+    // every writer (the acquisition thread and a cancelling one), so this serializes whole lines.
+    @SuppressWarnings("java:S2445")
     static void writeLine(OutputStream stdin, Object payload) {
         String json;
         try {

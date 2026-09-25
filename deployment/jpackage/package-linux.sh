@@ -23,7 +23,7 @@ for arg in "$@"; do
 done
 
 java_home="${JAVA_HOME:-$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")}"
-if [ ! -d "$java_home/jmods" ]; then
+if [[ ! -d "$java_home/jmods" ]]; then
   echo "JDK at $java_home has no jmods/ — jlink needs a full JDK" >&2
   exit 1
 fi

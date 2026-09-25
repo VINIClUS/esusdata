@@ -1,7 +1,7 @@
-# Static-analysis gate (ADR 0018): formatting, Error Prone, PMD, rustfmt and Clippy on every push
-# and pull request. No branch or path filters, so a required check never waits on a run that was
-# filtered out. Tests stay in package.yml, which runs them against the binary it packages. Actions
-# are pinned by commit SHA and the Rust toolchain by version (§1.12.8).
+# Quality gate (ADR 0018, ADR 0019): formatting, Error Prone, PMD, rustfmt and Clippy, the test
+# suites with their coverage floors (JaCoCo, cargo-llvm-cov), and SonarQube Cloud on every push and
+# pull request. No branch or path filters, so a required check never waits on a run that was
+# filtered out. Actions are pinned by commit SHA and the Rust toolchain by version (§1.12.8).
 name: ci
 
 on:
@@ -30,10 +30,31 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      # verify without tests still compiles main and test sources, so Error Prone and javac's
-      # -Werror cover both; Spotless and PMD are bound to verify.
-      - name: Spotless, Error Prone, PMD
-        run: mvn -B -f apps/agent/pom.xml verify -DskipTests
+      - name: Rust toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal && rustup default "$RUST_TOOLCHAIN"
+      # The binary turns on the differential tests (JDBC vs. Rust on the same fixture); without it
+      # they skip and the code they cover reads as untested.
+      - name: Execution plane
+        run: cargo build --release --locked --manifest-path apps/execplane/Cargo.toml
+      # Spotless, Error Prone, PMD, the whole suite (the "docker" tests use the runner's Docker)
+      # and the JaCoCo floor. The live-PEC tests skip: no runner reaches a PEC.
+      - name: Verify
+        run: >-
+          mvn -B -f apps/agent/pom.xml verify -Dsurefire.reuseForks=false
+          -Dobservatorio.execution-plane.binary="$PWD/apps/execplane/target/release/observatorio-execplane"
+      # jacoco:check passes when there is no execution data at all (an argLine that dropped the
+      # agent, say): a missing report must fail here instead.
+      - name: Coverage report exists
+        run: test -s apps/agent/target/site/jacoco/jacoco.xml
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: java-analysis
+          path: |
+            apps/agent/target/classes
+            apps/agent/target/test-classes
+            apps/agent/target/site/jacoco/jacoco.xml
+            apps/agent/target/surefire-reports
+          if-no-files-found: error
 
   rust:
     runs-on: ubuntu-24.04
@@ -41,9 +62,91 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Rust toolchain
         run: |
-          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt,clippy
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt,clippy,llvm-tools-preview
           rustup default "$RUST_TOOLCHAIN"
       - name: rustfmt
         run: cargo fmt --manifest-path apps/execplane/Cargo.toml --check
       - name: Clippy
         run: cargo clippy --manifest-path apps/execplane/Cargo.toml --locked --all-targets -- -D warnings
+      # Same lint set as JSON for SonarQube Cloud. Cargo reports paths relative to the crate;
+      # Sonar resolves them from the repository root.
+      - name: Clippy report
+        run: |
+          cargo clippy --manifest-path apps/execplane/Cargo.toml --locked --all-targets --message-format=json \
+            | jq -c 'if .reason == "compiler-message"
+                     then .message.spans[].file_name |= "apps/execplane/" + .
+                     else . end' >clippy-report.json
+      - uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        with:
+          tool: cargo-llvm-cov@0.9.1
+      # Line floor measured on 2026-09-25 (40.11%) and rounded down (ADR 0019): raise it, never
+      # lower it.
+      - name: Tests and coverage
+        run: >-
+          cargo llvm-cov --manifest-path apps/execplane/Cargo.toml --locked
+          --lcov --output-path lcov.info --fail-under-lines 40
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rust-analysis
+          path: |
+            clippy-report.json
+            lcov.info
+          if-no-files-found: error
+
+  # Fail-closed: without SONAR_TOKEN (a pull request from a fork) the check fails instead of being
+  # skipped, because a skipped required check counts as passed. A maintainer re-runs such a change
+  # from a branch of this repository.
+  sonar:
+    needs: [java, rust]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: SONAR_TOKEN present
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "::error::SONAR_TOKEN is not available to this run (pull request from a fork?)"
+            exit 1
+          fi
+      # Full history: Sonar attributes new code and blame from it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: java-analysis
+          path: apps/agent/target
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rust-analysis
+      # The dependency jars Java analysis resolves types against, test scope included.
+      - name: Classpath
+        id: classpath
+        run: |
+          mvn -B -q -f apps/agent/pom.xml dependency:build-classpath \
+            -Dmdep.outputFile="$RUNNER_TEMP/classpath" -Dmdep.pathSeparator=,
+          echo "libraries=$(cat "$RUNNER_TEMP/classpath")" >>"$GITHUB_OUTPUT"
+      # sonar.qualitygate.wait: a failed quality gate fails this step, not only the PR decoration.
+      - uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.java.libraries=${{ steps.classpath.outputs.libraries }}
+            -Dsonar.java.test.libraries=${{ steps.classpath.outputs.libraries }}
+      - name: Strict gate
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            .github/scripts/sonar-strict-gate.sh pr "$PR_NUMBER"
+          else
+            .github/scripts/sonar-strict-gate.sh branch "$GITHUB_REF_NAME"
+          fi

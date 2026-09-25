@@ -26,7 +26,7 @@ fail() {
   exit 1
 }
 
-[ "$(id -u)" -eq 0 ] || { echo "must run as root" >&2; exit 2; }
+[[ "$(id -u)" -eq 0 ]] || { echo "must run as root" >&2; exit 2; }
 if dpkg -s "$pkg" >/dev/null 2>&1; then
   echo "$pkg is already installed; run this on a clean host" >&2
   exit 2
@@ -38,7 +38,7 @@ perms() { stat -c '%U:%G %a' "$1"; }
 expect_perms() {
   local got
   got="$(perms "$1")"
-  [ "$got" = "$2" ] || fail "$1 is $got, expected $2"
+  [[ "$got" = "$2" ]] || fail "$1 is $got, expected $2"
 }
 
 # Host must match observatorio.web.allowed-hosts (ENG-49), as in smoke-app-image.sh.
@@ -56,9 +56,9 @@ expect_running_as_user() {
   local pid owner
   systemctl is-active --quiet "$service" || fail "$service is not active"
   pid="$(systemctl show -p MainPID --value "$service")"
-  [ "$pid" -gt 0 ] || fail "$service has no main process"
+  [[ "$pid" -gt 0 ]] || fail "$service has no main process"
   owner="$(ps -o user= -p "$pid" | tr -d ' ')"
-  [ "$owner" = "$user" ] || fail "$service runs as $owner, expected $user"
+  [[ "$owner" = "$user" ]] || fail "$service runs as $owner, expected $user"
 }
 
 expect_stopped_cleanly() {
@@ -66,14 +66,14 @@ expect_stopped_cleanly() {
   systemctl stop "$service"
   result="$(systemctl show -p Result --value "$service")"
   # SuccessExitStatus=143 makes the JVM's SIGTERM exit a clean stop.
-  [ "$result" = success ] || fail "$service stopped with Result=$result"
+  [[ "$result" = success ]] || fail "$service stopped with Result=$result"
 }
 
 expect_state_kept() {
   getent passwd "$user" >/dev/null || fail "user $user was removed"
   getent group "$user" >/dev/null || fail "group $user was removed"
-  [ -d "$data" ] || fail "$data was removed"
-  [ -f "$data/lifecycle-marker" ] || fail "data in $data was removed"
+  [[ -d "$data" ]] || fail "$data was removed"
+  [[ -f "$data/lifecycle-marker" ]] || fail "data in $data was removed"
   grep -qF "$marker" "$etc/application.yml" || fail "$etc/application.yml lost the local edit"
 }
 
@@ -82,7 +82,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y "$deb"
 
 step "postinst created the user and directories"
 getent passwd "$user" >/dev/null || fail "no user $user"
-[ "$(getent passwd "$user" | cut -d: -f7)" = /usr/sbin/nologin ] || fail "$user has a login shell"
+[[ "$(getent passwd "$user" | cut -d: -f7)" = /usr/sbin/nologin ]] || fail "$user has a login shell"
 expect_perms "$data" "$user:$user 700"
 expect_perms "$etc" "root:$user 750"
 expect_perms "$etc/application.yml" "root:$user 640"
@@ -92,7 +92,7 @@ systemctl is-enabled --quiet "$service" || fail "$service is not enabled"
 wait_ready
 expect_running_as_user
 # ProtectSystem=strict + ReadWritePaths: the service could create its database here.
-[ -n "$(find "$data" -type f -user "$user" -print -quit)" ] || fail "service wrote nothing to $data"
+[[ -n "$(find "$data" -type f -user "$user" -print -quit)" ]] || fail "service wrote nothing to $data"
 
 step "restart"
 systemctl restart "$service"
@@ -113,7 +113,7 @@ expect_state_kept
 expect_perms "$etc/application.yml" "root:$user 640"
 # prerm stops the old unit and postinst starts it again: /ready must come from the new JVM.
 new_pid="$(systemctl show -p MainPID --value "$service")"
-[ "$new_pid" != "$old_pid" ] || fail "$service was not restarted by the reinstall"
+[[ "$new_pid" != "$old_pid" ]] || fail "$service was not restarted by the reinstall"
 wait_ready
 expect_running_as_user
 
@@ -122,8 +122,8 @@ DEBIAN_FRONTEND=noninteractive apt-get remove -y "$pkg"
 # The alias goes away with disable, so ask about the real unit and look for the JVM itself.
 if systemctl is-active --quiet "$pkg-$service"; then fail "$pkg-$service still active after remove"; fi
 if pgrep -u "$user" >/dev/null; then fail "processes of $user still running after remove"; fi
-[ ! -e /opt/observatorio-aps ] || fail "/opt/observatorio-aps left after remove"
-[ ! -e "/lib/systemd/system/$pkg-$service.service" ] || fail "unit file left after remove"
+[[ ! -e /opt/observatorio-aps ]] || fail "/opt/observatorio-aps left after remove"
+[[ ! -e "/lib/systemd/system/$pkg-$service.service" ]] || fail "unit file left after remove"
 expect_state_kept
 
 step "purge keeps data, configuration and user"

@@ -26,6 +26,8 @@ import javax.crypto.spec.SecretKeySpec;
 public final class EvidenceCursor {
 
     private static final String HMAC_ALGO = "HmacSHA256";
+    // Declared before PROCESS_KEY: static initializers run in textual order.
+    private static final SecureRandom RANDOM = new SecureRandom();
     private static final byte[] PROCESS_KEY = randomKey();
     private static final char FIELD_SEPARATOR = '\u0001';
 
@@ -118,7 +120,7 @@ public final class EvidenceCursor {
 
     private static byte[] randomKey() {
         byte[] key = new byte[32];
-        new SecureRandom().nextBytes(key);
+        RANDOM.nextBytes(key);
         return key;
     }
 }
