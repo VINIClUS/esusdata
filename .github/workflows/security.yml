@@ -71,11 +71,13 @@ jobs:
       - name: Update databases
         run: trivy fs --download-db-only && trivy fs --download-java-db-only
       # Every severity, never failing: the report must reach code scanning even when the gate
-      # below fails.
+      # below fails. Same ignore file as the gate, so an accepted finding does not stay open as an
+      # alert that the ruleset's code-scanning rule would block on.
       - name: Scan (report)
         run: >-
           trivy fs . --skip-db-update --skip-java-db-update --skip-dirs .trivy-cache
-          --scanners vuln,secret,misconfig --include-dev-deps --format sarif --output trivy.sarif --exit-code 0
+          --scanners vuln,secret,misconfig --include-dev-deps --ignorefile .trivyignore.yaml
+          --format sarif --output trivy.sarif --exit-code 0
       - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         if: always() && hashFiles('trivy.sarif') != ''
         with:
