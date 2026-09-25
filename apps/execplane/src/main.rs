@@ -501,6 +501,62 @@ fn check_probe_duration(start: &Instant, budget: &stream::Budget) -> Result<(), 
 mod tests {
     use super::*;
 
+    const BUDGET: &str = r#""connect_timeout_ms":2000,"statement_timeout_ms":1,"lock_timeout_ms":2,
+        "idle_in_transaction_timeout_ms":3,"max_duration_ms":4"#;
+
+    fn diagnose_envelope(tls_root_cert: &str) -> DiagnoseEnvelope {
+        serde_json::from_str(&format!(
+            r#"{{"type":"diagnose","source_id":"s","host":"127.0.0.1","port":1,"database":"d",
+                "user":"u","password":"p",{tls_root_cert}"budget":{{{BUDGET}}}}}"#
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn no_root_certificate_keeps_the_session_plaintext_and_the_password() {
+        let mut password = String::from("secret");
+        let session_tls = session_tls_or_report(None, &mut password).unwrap();
+        assert!(matches!(session_tls, Some(tls::SessionTls::Plain)));
+        assert_eq!(password, "secret");
+    }
+
+    #[test]
+    fn an_unusable_root_certificate_is_reported_and_zeroes_the_password() {
+        let mut password = String::from("secret");
+        let session_tls =
+            session_tls_or_report(Some("/nonexistent/execplane-root.pem"), &mut password).unwrap();
+        assert!(session_tls.is_none());
+        assert!(password.is_empty());
+    }
+
+    #[test]
+    fn a_diagnostic_with_an_unusable_root_certificate_fails_before_connecting() {
+        let envelope = diagnose_envelope(r#""tls_root_cert":"/nonexistent/execplane-root.pem","#);
+        assert_eq!(diagnose(envelope).unwrap(), 1);
+    }
+
+    #[test]
+    fn a_plaintext_diagnostic_of_an_unreachable_server_fails() {
+        assert_eq!(diagnose(diagnose_envelope("")).unwrap(), 1);
+    }
+
+    #[test]
+    fn an_acquisition_with_an_unusable_root_certificate_fails_before_connecting() {
+        let envelope: AcquireEnvelope = serde_json::from_str(&format!(
+            r#"{{"type":"acquire","source_id":"s","host":"127.0.0.1","port":1,"database":"d",
+                "user":"u","password":"p","municipality_ibge":"1100015","pec_version":"5.5.28",
+                "read_model":"r","installation_role":"i","extraction_id":"e",
+                "period_start":"2026-01-01","period_end_exclusive":"2026-02-01",
+                "source_zone_id":"z","extract_temp_path":"/nonexistent/extract",
+                "query_checksum":"c","adapter_version":"a",
+                "tls_root_cert":"/nonexistent/execplane-root.pem",
+                "budget":{{{BUDGET},"acquisition_timeout_ms":5,"max_rows":6,
+                "max_payload_bytes":7,"max_temp_file_bytes":8}}}}"#
+        ))
+        .unwrap();
+        assert_eq!(acquire(envelope, io::stdin().lock().lines()).unwrap(), 1);
+    }
+
     /// The handshake's query checksum must equal the matrix's on every build host. A CRLF
     /// checkout (Git on Windows before .gitattributes pinned contracts/ to LF) changed these bytes
     /// and made every live acquisition fail closed with "query checksum mismatch" (ADR 0014).
