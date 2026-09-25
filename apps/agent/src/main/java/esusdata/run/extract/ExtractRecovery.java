@@ -113,6 +113,9 @@ public final class ExtractRecovery {
         return lock;
     }
 
+    // S2095: the finally below closes the channel on every path that does not hand it to the
+    // WriterLock, which then owns it; Sonar does not follow the handedOff flag.
+    @SuppressWarnings("java:S2095")
     private static WriterLock tryAcquireLock(Path baseDir, String extractionId) throws IOException {
         Path lockPath = baseDir.resolve(extractionId + LOCK_SUFFIX);
         ExtractValidation.rejectSymbolicLink(lockPath, "extract writer lock");
