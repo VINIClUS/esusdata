@@ -1,0 +1,11 @@
+# Accepted findings for the Trivy gate (ADR 0019, Tech Spec §1.12.8: "supressões precisam de
+# justificativa e validade"). Used by .github/workflows/security.yml and by the release SBOM scan in
+# package.yml. Every entry needs:
+#   id          the CVE, secret rule or misconfiguration ID
+#   statement   why it does not apply, or the mitigation and who approved it
+#   expired_at  a date (YYYY-MM-DD) at most 90 days out; afterwards the finding blocks again
+# and, where it applies, `paths` or `purls` to narrow it to the affected file or package. The
+# security workflow fails on an entry that lacks either field or expires more than 90 days out.
+vulnerabilities: []
+secrets: []
+misconfigurations: []

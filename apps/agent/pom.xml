@@ -27,12 +27,21 @@
     <networknt-json-schema.version>3.0.7</networknt-json-schema.version>
     <!-- sqlite-jdbc pinned above the BOM's 3.53.2.1: asserts the WAL-reset floor (>=3.51.3, §1.12.1) -->
     <sqlite-jdbc.version>3.53.2.1</sqlite-jdbc.version>
+    <!-- Tomcat pinned above the BOM's 11.0.24: CVE-2026-65182, CVE-2026-65905 and CVE-2026-68525
+         (CRITICAL, fixed in 11.0.25), found by the Trivy gate (ADR 0019) -->
+    <tomcat.version>11.0.26</tomcat.version>
     <!-- Static-analysis gate (ADR 0018): outside the BOM, pinned exactly (§1.12.8) -->
     <spotless.version>3.10.2</spotless.version>
     <palantir-java-format.version>2.99.0</palantir-java-format.version>
     <error-prone.version>2.50.0</error-prone.version>
     <pmd-plugin.version>3.28.0</pmd-plugin.version>
     <pmd.version>7.27.0</pmd.version>
+    <!-- Quality and security gate (ADR 0019), pinned exactly (§1.12.8) -->
+    <jacoco.version>0.8.15</jacoco.version>
+    <!-- Coverage floor as measured with no live PEC, as in CI (2026-09-25: line 0.8892, branch
+         0.6880), rounded down: raise it, never lower it -->
+    <jacoco.minimum.line>0.88</jacoco.minimum.line>
+    <jacoco.minimum.branch>0.68</jacoco.minimum.branch>
   </properties>
 
   <dependencies>
@@ -283,6 +292,73 @@
             </goals>
           </execution>
         </executions>
+      </plugin>
+      <!-- Quality and security gate (ADR 0019): coverage of the whole bundle may not fall below the
+           floor measured in CI. The XML report feeds SonarQube Cloud. -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <executions>
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <configuration>
+              <formats>
+                <format>XML</format>
+                <format>HTML</format>
+              </formats>
+            </configuration>
+          </execution>
+          <execution>
+            <id>check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <haltOnFailure>true</haltOnFailure>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.minimum.line}</minimum>
+                    </limit>
+                    <limit>
+                      <counter>BRANCH</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.minimum.branch}</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Release SBOM (ADR 0019, §1.12.8): activates the makeAggregateBom execution that the Boot
+           parent already configures (META-INF/sbom/application.cdx.json in the jar). The schema is
+           pinned to 1.5, the newest one every SBOM generator of the release emits. Runtime scopes
+           only: test dependencies never ship. -->
+      <plugin>
+        <groupId>org.cyclonedx</groupId>
+        <artifactId>cyclonedx-maven-plugin</artifactId>
+        <configuration>
+          <schemaVersion>1.5</schemaVersion>
+          <includeTestScope>false</includeTestScope>
+        </configuration>
       </plugin>
     </plugins>
   </build>

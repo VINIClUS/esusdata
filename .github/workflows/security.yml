@@ -1,0 +1,78 @@
+# Vulnerability gate (ADR 0019, Tech Spec §1.12.8): Trivy over the repository's dependency graphs
+# (pom.xml, package-lock.json, Cargo.lock), secrets and configuration. Every finding goes to code
+# scanning as SARIF; any HIGH or CRITICAL, fixed upstream or not, fails the check unless
+# .trivyignore.yaml carries it with a reason and an expiry date. Also runs daily, because new CVEs
+# land on dependencies that have not changed. Trivy is a pinned, hash-checked binary, not an action.
+name: security
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 9 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # mirror.gcr.io first: ghcr.io rate-limits the anonymous database pulls of shared runners.
+  TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+  TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1,ghcr.io/aquasecurity/trivy-java-db:1
+  TRIVY_CACHE_DIR: ${{ github.workspace }}/.trivy-cache
+
+jobs:
+  trivy:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # §1.12.8: every suppression has a reason and an expiry; the 90-day cap forces a re-review.
+      - name: Suppressions are justified and expire
+        run: |
+          limit="$(date -u -d '+90 days' +%F)"
+          yq -o=json '.' .trivyignore.yaml | jq -e --arg limit "$limit" '
+            [(.vulnerabilities, .secrets, .misconfigurations, .licenses) // [] | .[]]
+            | map(select((.statement // "" | length) < 10
+                         or (.expired_at // "" | test("^\\d{4}-\\d{2}-\\d{2}$") | not)
+                         or .expired_at > $limit))
+            | if length == 0 then true
+              else ("entries without a statement or a valid expired_at within 90 days: \(map(.id))" | halt_error)
+              end'
+      - name: Install Trivy
+        run: |
+          deployment/sbom/install-tool.sh trivy "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >>"$GITHUB_PATH"
+      - name: Database date
+        id: date
+        run: echo "day=$(date -u +%F)" >>"$GITHUB_OUTPUT"
+      # One download per day; the scans below never update it again.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .trivy-cache
+          key: trivy-db-${{ steps.date.outputs.day }}
+      - name: Update databases
+        run: trivy fs --download-db-only && trivy fs --download-java-db-only
+      # Every severity, never failing: the report must reach code scanning even when the gate
+      # below fails.
+      - name: Scan (report)
+        run: >-
+          trivy fs . --skip-db-update --skip-java-db-update --skip-dirs .trivy-cache
+          --scanners vuln,secret,misconfig --format sarif --output trivy.sarif --exit-code 0
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        if: always() && hashFiles('trivy.sarif') != ''
+        with:
+          sarif_file: trivy.sarif
+          category: trivy-fs
+      - name: Scan (gate)
+        run: >-
+          trivy fs . --skip-db-update --skip-java-db-update --skip-dirs .trivy-cache
+          --scanners vuln,secret,misconfig --severity HIGH,CRITICAL
+          --ignorefile .trivyignore.yaml --exit-code 1
