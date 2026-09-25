@@ -280,7 +280,7 @@ export function IndicadorDetailPage() {
             <ArrowLeft size={18} /> Voltar aos indicadores
           </Box>
         }
-        title={phone ? `${data.codigo} – ${data.nome}` : `${data.codigo} – ${data.nome}`}
+        title={`${data.codigo} – ${data.nome}`}
         chip={<StatusChip status={data.status} withIcon={false} />}
         subtitle={data.descricao}
         actions={

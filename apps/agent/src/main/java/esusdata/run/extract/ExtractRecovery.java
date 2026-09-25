@@ -116,23 +116,23 @@ public final class ExtractRecovery {
     private static WriterLock tryAcquireLock(Path baseDir, String extractionId) throws IOException {
         Path lockPath = baseDir.resolve(extractionId + LOCK_SUFFIX);
         ExtractValidation.rejectSymbolicLink(lockPath, "extract writer lock");
-        FileChannel channel = null;
-        try {
-            channel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-            try {
-                FileLock lock = channel.tryLock();
-                if (lock == null) {
-                    closeQuietly(channel);
-                    return null;
-                }
-                return new WriterLock(channel, lock);
-            } catch (OverlappingFileLockException e) {
-                closeQuietly(channel);
+        FileChannel channel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        // Closed on every path except the one that hands it to the WriterLock, including an
+        // unchecked exception from tryLock.
+        boolean handedOff = false;
+        try { // NOPMD - UseTryWithResources: on success the channel outlives this method in the WriterLock
+            FileLock lock = channel.tryLock();
+            if (lock == null) {
                 return null;
             }
-        } catch (IOException e) {
-            closeQuietly(channel);
-            throw e;
+            handedOff = true;
+            return new WriterLock(channel, lock);
+        } catch (OverlappingFileLockException e) {
+            return null;
+        } finally {
+            if (!handedOff) {
+                closeQuietly(channel);
+            }
         }
     }
 
