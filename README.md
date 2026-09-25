@@ -155,3 +155,12 @@ instala num runner com systemd e percorre o ciclo de vida com `deployment/jpacka
    **draft** de GitHub Release com os instaladores, os SBOMs, a proveniência e o `SHA256SUMS`
    assinado. O job `release` roda no Environment `release`, o único que lê a chave de assinatura.
    Revise e publique.
+
+### Implantação (ADR 0022)
+
+Publicar a release basta: o workflow `Deploy esusdata` do `infra-ansible` verifica a cada 15
+minutos a última release publicada e, se ela for nova, a instala no CT 170 (`esusdata-lxc`). A
+instalação confere a assinatura do `SHA256SUMS` e o checksum do `.deb`, gera o `application.yml`,
+espera o `/ready` e, se algo falhar, volta para a release anterior. O serviço fica em
+`https://pe.esusdata.com`. Para implantar uma tag específica, ou voltar a uma anterior, dispare
+`Deploy esusdata` no `infra-ansible` com `tag=vX.Y.Z`.
