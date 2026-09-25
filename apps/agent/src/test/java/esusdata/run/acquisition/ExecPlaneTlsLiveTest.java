@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -32,6 +33,8 @@ import org.testcontainers.images.builder.Transferable;
  * <p>Needs {@code -Dobservatorio.execution-plane.binary}, Docker and {@code openssl}; skipped
  * otherwise, like the other live execution-plane tests.
  */
+// Linux containers: excluded on Windows (package-windows.ps1).
+@Tag("docker")
 class ExecPlaneTlsLiveTest {
 
     private static final String BINARY_PROPERTY = "observatorio.execution-plane.binary";
@@ -70,6 +73,8 @@ class ExecPlaneTlsLiveTest {
         Assumptions.assumeTrue(
                 realBinary != null && !realBinary.isBlank(), "Skipping: -D" + BINARY_PROPERTY + " not set");
         Assumptions.assumeTrue(openssl("version") == 0, "Skipping: openssl is not available");
+
+        Assumptions.assumeTrue(DockerClientFactory.instance().isDockerAvailable(), "Skipping: Docker is not available");
 
         tls = Files.createTempDirectory("execplane-tls");
 

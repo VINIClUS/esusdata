@@ -92,11 +92,14 @@ ctfHPFPKLIyuncUVDk1Luih4
 -----END CERTIFICATE-----
 ";
 
+    /// One file per call: the tests run in parallel threads of one process, so the PID alone
+    /// would hand two of them the same path.
     fn file_with(content: &str) -> std::path::PathBuf {
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let path = std::env::temp_dir().join(format!(
             "execplane-tls-{}-{}.pem",
             std::process::id(),
-            content.len()
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
         std::fs::File::create(&path)
             .unwrap()
