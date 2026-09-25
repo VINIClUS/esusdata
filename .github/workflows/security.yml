@@ -47,6 +47,15 @@ jobs:
             | if length == 0 then true
               else ("entries without a statement or a valid expired_at within 90 days: \(map(.id))" | halt_error)
               end'
+      # Trivy resolves pom.xml's parents and BOMs from ~/.m2 before the network; Maven Central
+      # answers a shared runner's anonymous burst with 429 and blocks the IP for the whole scan.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Maven dependencies
+        run: mvn -B -q -f apps/agent/pom.xml dependency:resolve
       - name: Install Trivy
         run: |
           deployment/sbom/install-tool.sh trivy "$RUNNER_TEMP/bin"
