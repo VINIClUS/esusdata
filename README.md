@@ -164,3 +164,7 @@ instalação confere a assinatura do `SHA256SUMS` e o checksum do `.deb`, gera o
 espera o `/ready` e, se algo falhar, volta para a release anterior. O serviço fica em
 `https://pe.esusdata.com`. Para implantar uma tag específica, ou voltar a uma anterior, dispare
 `Deploy esusdata` no `infra-ansible` com `tag=vX.Y.Z`.
+
+Uma fonte fora do loopback exige TLS com validação de certificado: configure
+`observatorio.source.tls-root-cert` com o PEM da CA do servidor, ou o app não sobe (Tech Spec
+§1.12.6). O execplane então só abre sessões TLS para o endereço exato do certificado.

@@ -5,11 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import esusdata.config.SqliteProperties;
 import esusdata.run.acquisition.ExecPlaneAcquisition;
+import esusdata.run.acquisition.ExecPlaneTransport;
+import esusdata.source.SourceConnectionProperties;
 import esusdata.source.pec.AllowedDestinations;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -29,7 +32,8 @@ class AcquisitionWiringTest {
                         Clock.systemUTC(),
                         new ExecPlaneProperties(binary, Duration.ofSeconds(30)),
                         secretRef -> new char[0],
-                        new AllowedDestinations(Set.of()));
+                        new AllowedDestinations(Set.of()),
+                        ExecPlaneTransport.PLAINTEXT);
     }
 
     @Test
@@ -47,6 +51,14 @@ class AcquisitionWiringTest {
         assertThatThrownBy(() -> wire(notExecutable.toString()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(notExecutable.toString());
+    }
+
+    @Test
+    void aPlaintextDeploymentThatAllowsTheLanFailsStartup() {
+        assertThatThrownBy(() -> new RunConfig()
+                        .execPlaneTransport(new SourceConnectionProperties(List.of("192.168.1.253:5433"), "", "")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("observatorio.source.tls-root-cert");
     }
 
     @Test

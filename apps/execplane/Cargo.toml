@@ -22,6 +22,11 @@ flate2 = "1.1"
 # Cross-platform free-disk-space check, mirroring Files.getFileStore(dir).getUsableSpace() in
 # ExtractWriter.ensureTempSpace. Only the (default) "sync" feature is used.
 fs4 = "1.1"
+# TLS with certificate validation to a source reached over a network (ADR 0022). rustls with the
+# ring provider only — no aws-lc-rs, no OpenSSL. tls12 stays on: the PEC runs PostgreSQL 9.6.
+tokio-postgres-rustls = "0.14.0"
+rustls = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pki-types = { version = "1.15.1", features = ["std"] }
 
 [dev-dependencies]
 

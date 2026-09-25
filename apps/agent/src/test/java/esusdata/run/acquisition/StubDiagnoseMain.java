@@ -32,7 +32,8 @@ public final class StubDiagnoseMain {
         if (!"diagnose".equals(envelope.get("type").asString())
                 || !"fixture-password".equals(envelope.get("password").asString())
                 || !VALIDATED_HOST.equals(envelope.get("host").asString())
-                || envelope.get("budget").get("statement_timeout_ms") == null) {
+                || envelope.get("budget").get("statement_timeout_ms") == null
+                || !envelope.has("tls_root_cert")) {
             System.exit(3);
         }
         switch (scenario) {
@@ -53,6 +54,17 @@ public final class StubDiagnoseMain {
             case "diagnosed-then-nonzero" -> {
                 out.println("{\"type\":\"diagnosed\"}");
                 System.exit(1);
+            }
+            case "diagnosed-over-tls" -> {
+                // ADR 0022: only a session told which root to trust counts as TLS.
+                boolean tls = "/etc/observatorio-aps/pec-ca.pem"
+                        .equals(envelope.get("tls_root_cert").asString(null));
+                out.println(
+                        tls
+                                ? "{\"type\":\"diagnosed\"}"
+                                : "{\"type\":\"error\",\"code\":\"SQL_ERROR\","
+                                        + "\"sqlstate\":\"08001\",\"detail\":\"plaintext\",\"uncertain\":false}");
+                System.exit(tls ? 0 : 1);
             }
             case "hang" -> Thread.sleep(60_000);
             default -> System.exit(3);

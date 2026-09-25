@@ -76,11 +76,13 @@ public final class ExecPlaneAcquisition implements Acquisition {
     private final List<String> command;
     private final PecSecretResolver secretResolver;
     private final AllowedDestinations allowedDestinations;
+    private final ExecPlaneTransport transport;
     private final PecCompatibilityMatrix matrix;
     private final Path extractsBaseDir;
     private final Clock clock;
     private final Duration exitGrace;
 
+    /** Plaintext sessions: loopback destinations only (ADR 0022). */
     public ExecPlaneAcquisition(
             List<String> command,
             PecSecretResolver secretResolver,
@@ -92,6 +94,25 @@ public final class ExecPlaneAcquisition implements Acquisition {
                 command,
                 secretResolver,
                 allowedDestinations,
+                ExecPlaneTransport.PLAINTEXT,
+                extractsBaseDir,
+                clock,
+                exitGrace);
+    }
+
+    public ExecPlaneAcquisition(
+            List<String> command,
+            PecSecretResolver secretResolver,
+            AllowedDestinations allowedDestinations,
+            ExecPlaneTransport transport,
+            Path extractsBaseDir,
+            Clock clock,
+            Duration exitGrace) {
+        this(
+                command,
+                secretResolver,
+                allowedDestinations,
+                transport,
                 PecCompatibilityMatrix.fromClasspathResource(),
                 extractsBaseDir,
                 clock,
@@ -103,6 +124,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             List<String> command,
             PecSecretResolver secretResolver,
             AllowedDestinations allowedDestinations,
+            ExecPlaneTransport transport,
             PecCompatibilityMatrix matrix,
             Path extractsBaseDir,
             Clock clock,
@@ -110,6 +132,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
         this.command = command;
         this.secretResolver = secretResolver;
         this.allowedDestinations = allowedDestinations;
+        this.transport = transport;
         this.matrix = matrix;
         this.extractsBaseDir = extractsBaseDir;
         this.clock = clock;
@@ -583,6 +606,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             envelope.put("extract_temp_path", extractTempPath.toString());
             envelope.put("query_checksum", IndividualEncounterModalityContract.QUERY_CHECKSUM);
             envelope.put("adapter_version", IndividualEncounterModalityContract.ADAPTER_VERSION);
+            envelope.put("tls_root_cert", transport.rootCertificate());
             envelope.put("budget", budgetFields);
             ExecPlaneProcess.writeLine(stdin, envelope);
         } finally {

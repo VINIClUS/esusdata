@@ -1,6 +1,7 @@
+use crate::tls::Canceller;
 use chrono::NaiveDate;
 use postgres::fallible_iterator::FallibleIterator;
-use postgres::{CancelToken, NoTls, Transaction};
+use postgres::Transaction;
 use serde_json::json;
 use std::error::Error;
 use std::io::{self, BufRead, Write};
@@ -61,7 +62,7 @@ pub enum StreamOutcome {
 )]
 pub fn stream_query(
     txn: &mut Transaction,
-    cancel_token: CancelToken,
+    canceller: Canceller,
     query_text: &str,
     source_id: &str,
     municipality_ibge: &str,
@@ -73,9 +74,9 @@ pub fn stream_query(
 ) -> Result<StreamOutcome, Box<dyn Error>> {
     let cancel_requested = Arc::new(AtomicBool::new(false));
     let duration_exceeded = Arc::new(AtomicBool::new(false));
-    spawn_cancel_listener(cancel_token.clone(), Arc::clone(&cancel_requested));
+    spawn_cancel_listener(canceller.clone(), Arc::clone(&cancel_requested));
     spawn_duration_watchdog(
-        cancel_token,
+        canceller,
         start,
         budget.max_duration_ms,
         Arc::clone(&duration_exceeded),
@@ -251,7 +252,7 @@ fn classify_failure(
             );
         }
     }
-    // cancel_token.cancel_query() signals the backend over a separate connection — the main
+    // Canceller::cancel() signals the backend over a separate connection — the main
     // connection can observe a transport-level failure (broken pipe, reset) instead of a clean
     // 57014 if that lands awkwardly. Either background thread's cancel is still classified as
     // its own trigger regardless of what shape the resulting error takes.
@@ -332,13 +333,13 @@ fn to_positional_placeholders(query: &str) -> String {
     result
 }
 
-fn spawn_cancel_listener(cancel_token: CancelToken, cancel_requested: Arc<AtomicBool>) {
+fn spawn_cancel_listener(canceller: Canceller, cancel_requested: Arc<AtomicBool>) {
     std::thread::spawn(move || {
         let stdin = io::stdin();
         for line in stdin.lock().lines().map_while(Result::ok) {
             if line.contains("\"type\":\"cancel\"") {
                 cancel_requested.store(true, Ordering::SeqCst);
-                let _ = cancel_token.cancel_query(NoTls);
+                canceller.cancel();
                 return;
             }
         }
@@ -348,7 +349,7 @@ fn spawn_cancel_listener(cancel_token: CancelToken, cancel_requested: Arc<Atomic
         // gone" signal (plan §2.7's table: "o filho detecta EOF no stdin... e sai sozinho"), so it
         // gets exactly the same treatment as an explicit cancel.
         cancel_requested.store(true, Ordering::SeqCst);
-        let _ = cancel_token.cancel_query(NoTls);
+        canceller.cancel();
     });
 }
 
@@ -357,7 +358,7 @@ fn spawn_cancel_listener(cancel_token: CancelToken, cancel_requested: Arc<Atomic
 /// exited) before the deadline, this either finds nothing left to cancel or never gets the chance
 /// to run at all (`std::process::exit` tears down lingering threads with it).
 fn spawn_duration_watchdog(
-    cancel_token: CancelToken,
+    canceller: Canceller,
     start: Instant,
     max_duration_ms: i64,
     duration_exceeded: Arc<AtomicBool>,
@@ -368,7 +369,7 @@ fn spawn_duration_watchdog(
             std::thread::sleep(remaining);
         }
         duration_exceeded.store(true, Ordering::SeqCst);
-        let _ = cancel_token.cancel_query(NoTls);
+        canceller.cancel();
     });
 }
 

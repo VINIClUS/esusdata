@@ -42,10 +42,23 @@ não guarda credencial nenhuma dessa infraestrutura.
 - **Exposição:** `https://pe.esusdata.com` no nginx do edge, com certificado Let's Encrypt
   (role `esusdata_edge_route`). A porta 8080 do LXC só aceita o edge e o loopback (nftables). Na
   frente do app não há SSO: quem protege a interface é a autenticação do próprio app (ADR 0008).
-- **Fonte:** o PEC de produção é lido **direto pela LAN** em `192.168.1.253:5433`
-  (`observatorio.source.allowed-destinations`), com a credencial `esus_leitura` (ADR 0002). Isso
-  fecha a pendência de rede do ADR 0003 para esta implantação. O `pec.env` (`esus_leitura=<senha>`)
-  vem do ansible-vault do inventário e é gravado como `observatorio:observatorio 0600`.
+- **Fonte:** o PEC de produção é lido direto pela LAN em `192.168.1.253:5433`
+  (`observatorio.source.allowed-destinations`), com a credencial `esus_leitura` (ADR 0002), **sempre
+  por TLS com validação de certificado** (Tech Spec §1.12.6). O `pec.env` (`esus_leitura=<senha>`)
+  vem do ansible-vault do inventário e é gravado como `observatorio:observatorio 0600`. Isso fecha,
+  para esta implantação, a pendência de rede do ADR 0003:
+  - `observatorio.source.tls-root-cert` aponta para o PEM da CA que emitiu o certificado do
+    servidor. O Java repassa o caminho no envelope (`tls_root_cert`) de `acquire` e de
+    `diagnose`.
+  - O execplane abre a sessão com rustls (backend `ring`, sem OpenSSL) e `sslmode=require`. Só
+    aceita uma cadeia até essa raiz para o endereço exato do envelope (SAN de IP). O sinal de
+    cancelamento usa o mesmo conector. Um arquivo de raiz ilegível ou vazio é erro `08001`, nunca
+    queda para texto claro.
+  - O app não sobe se a allowlist tiver algum endereço fora do loopback sem `tls-root-cert`. Texto
+    claro continua possível só pelo loopback, com o túnel do ADR 0003.
+  - `ExecPlaneTlsLiveTest` prova isso contra um PostgreSQL 9.6.13 (a versão do PEC) que só aceita
+    `hostssl`: a sessão verificada conecta, um certificado de outra CA é recusado e texto claro
+    não conecta.
 
 ## Consequências
 
@@ -53,11 +66,16 @@ não guarda credencial nenhuma dessa infraestrutura.
   implantar uma tag específica (inclusive voltar a uma anterior), dispare `Deploy esusdata` com
   `tag=vX.Y.Z`. Uma release que falhou não é tentada de novo pelo agendamento, só por disparo
   explícito.
-- **Pré-requisito no PEC:** o PostgreSQL do PEC (`192.168.1.253`, Windows) escuta só em
-  `localhost:5433`. Para a leitura direta funcionar, ele precisa escutar na LAN, com
-  `pg_hba.conf` liberando `esus_leitura` só para `192.168.1.145` e o firewall do Windows restrito
-  ao mesmo endereço. É uma mudança num servidor de produção, feita pela operação do PEC. Enquanto
-  ela não existir, o app sobe e responde `/ready`, e as execuções falham no diagnóstico da fonte.
+- **Pré-requisito no PEC:** o PostgreSQL do PEC (`192.168.1.253`, Windows, 9.6.13) hoje escuta
+  só em `localhost:5433` e não tem TLS. Até a operação do PEC concluir a mudança abaixo, o app sobe
+  e responde `/ready`, e o diagnóstico da fonte falha com `08001`.
+  - Instalar `server.crt`, com SAN `IP:192.168.1.253` e emitido pela CA cujo certificado vai em
+    `tls-root-cert`, e `server.key` no diretório de dados.
+  - Configurar `ssl = on` e `listen_addresses` incluindo `192.168.1.253`.
+  - Acrescentar ao `pg_hba.conf` uma linha `hostssl esus esus_leitura 192.168.1.145/32 md5`.
+  - Abrir o firewall do Windows na 5433 só para `192.168.1.145`.
+  - Reiniciar o serviço do PostgreSQL. É uma parada do PEC em produção, feita em janela
+    combinada.
 - **Risco aceito:** o `EnvFileSecretResolver` se descreve como resolvedor de desenvolvimento; aqui
   ele vira o de produção. O arquivo só é legível pelo usuário do serviço, num LXC dedicado, e a
   origem do segredo é o vault do inventário. Trocar para um cofre do SO continua pendente

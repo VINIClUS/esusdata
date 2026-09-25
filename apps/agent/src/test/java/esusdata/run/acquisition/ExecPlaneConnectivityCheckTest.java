@@ -62,6 +62,27 @@ class ExecPlaneConnectivityCheckTest {
     }
 
     @Test
+    void thePlaintextEnvelopeCarriesANullRootCertificate() {
+        assertThat(run("diagnosed-over-tls")).isEqualTo(new Result("08001"));
+    }
+
+    @Test
+    void theConfiguredRootCertificateReachesTheChild() {
+        Result result = new ExecPlaneConnectivityCheck(
+                        List.of(
+                                System.getProperty("java.home") + File.separator + "bin" + File.separator + "java",
+                                "-cp",
+                                System.getProperty("java.class.path"),
+                                StubDiagnoseMain.class.getName(),
+                                "diagnosed-over-tls"),
+                        secretRef -> "fixture-password".toCharArray(),
+                        new ExecPlaneTransport("/etc/observatorio-aps/pec-ca.pem"),
+                        Duration.ofSeconds(5))
+                .check(PROPERTIES, "127.0.0.1", ReadBudget.initialEngineeringProposal());
+        assertThat(result.connected()).isTrue();
+    }
+
+    @Test
     void aChildThatHangsIsKilledAtTheDeadline() {
         ReadBudget shortBudget =
                 new ReadBudget(1, Duration.ofMillis(500), Duration.ofMillis(500), 500, 500, 500, 1, 1_000);

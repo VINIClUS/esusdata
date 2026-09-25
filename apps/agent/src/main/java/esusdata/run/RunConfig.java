@@ -16,6 +16,7 @@ import esusdata.result.model.ResultStagingArea;
 import esusdata.run.acquisition.Acquisition;
 import esusdata.run.acquisition.ExecPlaneAcquisition;
 import esusdata.run.acquisition.ExecPlaneConnectivityCheck;
+import esusdata.run.acquisition.ExecPlaneTransport;
 import esusdata.run.extract.ExtractStore;
 import esusdata.run.extract.FileExtractStore;
 import esusdata.run.job.AcquisitionGuardStore;
@@ -342,11 +343,13 @@ public class RunConfig {
             Clock clock,
             ExecPlaneProperties executionPlaneProperties,
             PecSecretResolver pecSecretResolver,
-            AllowedDestinations allowedDestinations) {
+            AllowedDestinations allowedDestinations,
+            ExecPlaneTransport execPlaneTransport) {
         return new ExecPlaneAcquisition(
                 executionPlaneCommand(executionPlaneProperties),
                 pecSecretResolver,
                 allowedDestinations,
+                execPlaneTransport,
                 properties.extractsDirectory(),
                 clock,
                 executionPlaneProperties.exitGrace());
@@ -355,11 +358,23 @@ public class RunConfig {
     /** ADR 0017: the source diagnostic runs through the same binary as every acquisition. */
     @Bean
     public SourceConnectivityCheck sourceConnectivityCheck(
-            ExecPlaneProperties executionPlaneProperties, PecSecretResolver pecSecretResolver) {
+            ExecPlaneProperties executionPlaneProperties,
+            PecSecretResolver pecSecretResolver,
+            ExecPlaneTransport execPlaneTransport) {
         return new ExecPlaneConnectivityCheck(
                 executionPlaneCommand(executionPlaneProperties),
                 pecSecretResolver,
+                execPlaneTransport,
                 executionPlaneProperties.exitGrace());
+    }
+
+    /**
+     * ADR 0022: TLS with certificate validation for any non-loopback destination (Tech Spec
+     * §1.12.6); a plaintext deployment that allows one fails startup here.
+     */
+    @Bean
+    public ExecPlaneTransport execPlaneTransport(SourceConnectionProperties properties) {
+        return ExecPlaneTransport.forDeployment(properties.allowedDestinations(), properties.tlsRootCert());
     }
 
     /** Whichever bean Spring creates first fails startup with this message, never a bare NPE. */
