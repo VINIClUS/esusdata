@@ -456,9 +456,7 @@ mod tests {
     fn round_trips_gzip_and_checksum_through_a_real_temp_file() {
         use std::io::Read;
 
-        let dir =
-            std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = test_dir("round-trip");
         let temp_path = dir.join(format!("rt-{}.jsonl.gz.tmp", rand_suffix()));
 
         let mut sink = ExtractSink::open(&temp_path, 1_048_576, scope()).unwrap();
@@ -496,9 +494,7 @@ mod tests {
 
     #[test]
     fn refuses_to_exceed_the_compressed_byte_ceiling() {
-        let dir =
-            std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = test_dir("ceiling");
         let temp_path = dir.join(format!("ceiling-{}.jsonl.gz.tmp", rand_suffix()));
 
         // A ceiling far too small for even the gzip header plus one line.
@@ -514,9 +510,7 @@ mod tests {
 
     #[test]
     fn refuses_to_open_over_an_existing_file() {
-        let dir =
-            std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = test_dir("exists");
         let temp_path = dir.join(format!("exists-{}.jsonl.gz.tmp", rand_suffix()));
         std::fs::write(&temp_path, b"already here").unwrap();
 
@@ -531,9 +525,7 @@ mod tests {
     #[test]
     fn creates_the_temp_file_owner_only() {
         use std::os::unix::fs::PermissionsExt;
-        let dir =
-            std::env::temp_dir().join(format!("execplane-extract-test-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = test_dir("perms");
         let temp_path = dir.join(format!("perms-{}.jsonl.gz.tmp", rand_suffix()));
 
         let sink = ExtractSink::open(&temp_path, 1_048_576, scope()).unwrap();
@@ -543,6 +535,17 @@ mod tests {
 
         std::fs::remove_file(&temp_path).ok();
         std::fs::remove_dir(&dir).ok();
+    }
+
+    /// One directory per test: tests run in parallel, and a shared one could be removed by a
+    /// finished test between another's `create_dir_all` and its open.
+    fn test_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "execplane-extract-test-{}-{name}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
     }
 
     fn rand_suffix() -> u64 {
