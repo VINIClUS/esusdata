@@ -6,9 +6,11 @@ if (USE_MOCKS && import.meta.env.DEV) {
 
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  code?: string
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -39,7 +41,10 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   if (token && !headers.has('X-XSRF-TOKEN')) headers.set('X-XSRF-TOKEN', token)
 
   const res = await fetch(`/api/v1${path}`, { ...init, credentials: 'same-origin', headers })
-  if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`)
+  if (!res.ok) {
+    const error = (await res.json().catch(() => null)) as { code?: string; message?: string } | null
+    throw new ApiError(res.status, error?.message ?? `${res.status} ${res.statusText}`, error?.code)
+  }
   if (res.status === 204) return undefined as T
   const body = await res.text()
   return (body ? JSON.parse(body) : undefined) as T

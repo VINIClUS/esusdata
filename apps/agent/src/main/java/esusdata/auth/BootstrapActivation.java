@@ -13,6 +13,7 @@ import java.io.Serial;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -78,14 +79,49 @@ public final class BootstrapActivation {
     }
 
     /**
-     * Idempotent: does nothing once any {@code TECHNICAL_ADMIN} user exists, so a restart never
-     * creates a second bootstrap account or overwrites an unconsumed token.
+     * Keeps the pending bootstrap admin's file and database code in sync. A valid code is
+     * preserved; a missing, mismatched, or expired code is replaced before startup completes.
      *
-     * @return the token file path if a new bootstrap admin was created this call, empty otherwise
+     * @return the token file path if a code was issued this call, empty otherwise
      */
     public Optional<Path> ensureBootstrapAdmin() throws IOException {
         if (userRepository.anyExistsWithRole(Role.TECHNICAL_ADMIN)) {
-            return Optional.empty();
+            UserAccount admin = userRepository.findByUsername("admin").orElse(null);
+            if (admin == null || admin.state() != UserState.PENDING_ACTIVATION) {
+                return Optional.empty();
+            }
+            Instant now = clock.instant();
+            String savedToken;
+            try {
+                savedToken = Files.exists(tokenFile)
+                        ? Files.readAllLines(tokenFile).stream()
+                                .findFirst()
+                                .orElse("")
+                                .trim()
+                        : "";
+            } catch (IOException unreadableFile) {
+                savedToken = "";
+            }
+            boolean valid = !savedToken.isBlank()
+                    && jdbc.query("""
+                    select * from activation_tokens
+                     where user_id = ? and token_hash = ? and consumed_at is null
+                    """, TOKEN_MAPPER, admin.userId(), ActivationTokens.hash(savedToken)).stream()
+                            .anyMatch(row -> row.expiresAt().isAfter(now));
+            if (valid) {
+                return Optional.empty();
+            }
+            String replacement = ActivationTokens.newOpaqueToken();
+            Instant expiresAt = now.plus(Duration.ofHours(properties.activationTokenValidityHours()));
+            writeTokenFile(replacement, expiresAt);
+            transactionTemplate.executeWithoutResult(status -> {
+                jdbc.update("delete from activation_tokens where user_id = ?", admin.userId());
+                jdbc.update("""
+                        insert into activation_tokens (token_hash, user_id, expires_at, consumed_at)
+                        values (?,?,?,null)
+                        """, ActivationTokens.hash(replacement), admin.userId(), expiresAt.toString());
+            });
+            return Optional.of(tokenFile);
         }
         Instant now = clock.instant();
         String userId = "user-" + UUID.randomUUID();
@@ -186,15 +222,19 @@ public final class BootstrapActivation {
                 + " — uso único; ver Tech Spec §1.12.7 e docs/adr/0008-superficie-http-de-autenticacao.md\n";
         PosixFileAttributeView posixView =
                 Files.getFileAttributeView(tokenFile.getParent(), PosixFileAttributeView.class);
-        if (posixView != null) {
-            Files.deleteIfExists(tokenFile);
-            Path created = Files.createFile(
-                    tokenFile,
-                    PosixFilePermissions.asFileAttribute(
-                            Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
-            Files.writeString(created, contents, StandardCharsets.UTF_8);
-        } else {
-            Files.writeString(tokenFile, contents, StandardCharsets.UTF_8);
+        Path temporary = posixView == null
+                ? Files.createTempFile(tokenFile.getParent(), "activation-", ".tmp")
+                : Files.createTempFile(
+                        tokenFile.getParent(),
+                        "activation-",
+                        ".tmp",
+                        PosixFilePermissions.asFileAttribute(
+                                Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
+        try {
+            Files.writeString(temporary, contents, StandardCharsets.UTF_8);
+            Files.move(temporary, tokenFile, StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(temporary);
         }
     }
 

@@ -180,6 +180,46 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
 
+  /api/v1/users/pending-activation:
+    get:
+      tags: [admin]
+      summary: List pending accounts and code expiration, without exposing codes. Requires installation MANAGE_ACCESS.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Pending accounts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PendingActivationUser" }
+        "404":
+          description: Caller lacks installation MANAGE_ACCESS.
+
+  /api/v1/users/{id}/activation-token:
+    post:
+      tags: [admin]
+      summary: Reissue a one-time code for a pending account. Requires installation MANAGE_ACCESS and recent reauthentication.
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "201":
+          description: New code returned once; older codes invalidated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateUserResponse" }
+        "400":
+          description: Account is not pending activation.
+        "401":
+          description: Recent reauthentication required.
+        "404":
+          description: Unknown user, or caller lacks installation MANAGE_ACCESS.
+
   /api/v1/users/{id}/grants:
     post:
       tags: [admin]
@@ -621,6 +661,7 @@ components:
       type: object
       properties:
         userId: { type: string }
+        canManageAccess: { type: boolean, description: Installation-scoped MANAGE_ACCESS capability. }
         municipalities:
           type: array
           items: { type: string }
@@ -653,6 +694,15 @@ components:
           type: string
           description: Returned exactly once, at creation.
         expiresAt: { type: string, format: date-time }
+
+    PendingActivationUser:
+      type: object
+      required: [userId, username, displayName]
+      properties:
+        userId: { type: string }
+        username: { type: string }
+        displayName: { type: string }
+        expiresAt: { type: string, format: date-time, nullable: true }
 
     CreateGrantRequest:
       type: object

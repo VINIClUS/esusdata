@@ -11,6 +11,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" scripts eslint.config.js",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" scripts eslint.config.js",
     "test:data": "node --experimental-strip-types --test scripts/data-contracts.test.mjs",
+    "test:e2e": "node scripts/login-e2e.mjs",
     "preview": "vite preview",
     "screenshot": "node scripts/screenshot.mjs"
   },

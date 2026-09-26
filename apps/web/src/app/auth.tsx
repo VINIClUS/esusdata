@@ -72,8 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ username: usuario, password: senha }),
     })
     const nextUser = sessionUserFromLogin(response)
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser))
-    setUser(nextUser)
+    const me = await apiFetch<AuthMeResponse>('/auth/me')
+    const authorizedUser = sessionUserFromMe(me, nextUser)
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(authorizedUser))
+    setUser(authorizedUser)
   }, [])
 
   const logout = useCallback(async () => {

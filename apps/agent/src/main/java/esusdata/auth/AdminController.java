@@ -9,10 +9,12 @@ import esusdata.auth.model.Grant;
 import esusdata.auth.model.Permission;
 import esusdata.auth.model.Role;
 import esusdata.auth.model.ScopeKind;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,6 +42,25 @@ public class AdminController {
         this.userProvisioning = userProvisioning;
         this.accessAdministrationService = accessAdministrationService;
         this.authorization = authorization;
+    }
+
+    @GetMapping("/api/v1/users/pending-activation")
+    public List<UserProvisioning.PendingUser> pendingActivation(@AuthenticationPrincipal AuthenticatedSession session) {
+        authorization.requireInstallationPermission(session, Permission.MANAGE_ACCESS);
+        return userProvisioning.pendingActivation();
+    }
+
+    @PostMapping("/api/v1/users/{id}/activation-token")
+    public ResponseEntity<CreateUserResponse> reissueActivationToken(
+            @AuthenticationPrincipal AuthenticatedSession session, @PathVariable("id") String userId) {
+        authorization.requireInstallationPermission(session, Permission.MANAGE_ACCESS);
+        authorization.requireRecentReauth(session);
+        UserProvisioning.ProvisionedUser issued = userProvisioning.reissue(userId, session.userId());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new CreateUserResponse(
+                        issued.userId(),
+                        issued.activationToken(),
+                        issued.expiresAt().toString()));
     }
 
     @PostMapping("/api/v1/users")

@@ -17,6 +17,7 @@ export interface SessionUser {
   sobrenome: string
   papel: string
   iniciais: string
+  canManageAccess?: boolean
 }
 
 export interface AppContext {

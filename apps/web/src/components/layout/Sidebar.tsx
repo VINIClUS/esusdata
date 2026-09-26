@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
-import { CircleQuestionMark, LogOut, type LucideIcon } from 'lucide-react'
+import { CircleQuestionMark, LogOut, KeyRound, type LucideIcon } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router'
 import { navItems } from '@/app/navigation'
 import { useAuth } from '@/app/auth-context'
@@ -72,7 +72,7 @@ function NavRow({
 
 export function Sidebar({ onNavigate }: SidebarProps) {
   const { pathname } = useLocation()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
   const navigate = useNavigate()
 
   return (
@@ -108,6 +108,15 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             onClick={onNavigate}
           />
         ))}
+        {user?.canManageAccess && (
+          <NavRow
+            to="/ativacoes-pendentes"
+            label="Ativações pendentes"
+            icon={KeyRound}
+            active={pathname.startsWith('/ativacoes-pendentes')}
+            onClick={onNavigate}
+          />
+        )}
       </Box>
 
       <Box sx={{ flex: 1 }} />

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
 import TextField, { type TextFieldProps } from '@mui/material/TextField'
@@ -16,14 +16,21 @@ interface FieldProps extends Omit<TextFieldProps, 'label'> {
 
 /** Labelled input with the label rendered above the field (mockup style). */
 export function Field({ label, icon: Icon, large, slotProps, sx, ...rest }: FieldProps) {
+  const generatedId = useId()
+  const inputId = rest.id ?? generatedId
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, width: '100%' }}>
       {label && (
-        <Typography sx={{ fontSize: large ? 17 : 15, fontWeight: 600, color: colors.navy }}>
+        <Typography
+          component="label"
+          htmlFor={inputId}
+          sx={{ fontSize: large ? 17 : 15, fontWeight: 600, color: colors.navy }}
+        >
           {label}
         </Typography>
       )}
       <TextField
+        id={inputId}
         fullWidth
         {...rest}
         slotProps={{
@@ -48,14 +55,21 @@ export function Field({ label, icon: Icon, large, slotProps, sx, ...rest }: Fiel
 
 export function PasswordField({ label, icon, large, ...rest }: FieldProps) {
   const [show, setShow] = useState(false)
+  const generatedId = useId()
+  const inputId = rest.id ?? generatedId
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, width: '100%' }}>
       {label && (
-        <Typography sx={{ fontSize: large ? 17 : 15, fontWeight: 600, color: colors.navy }}>
+        <Typography
+          component="label"
+          htmlFor={inputId}
+          sx={{ fontSize: large ? 17 : 15, fontWeight: 600, color: colors.navy }}
+        >
           {label}
         </Typography>
       )}
       <TextField
+        id={inputId}
         fullWidth
         type={show ? 'text' : 'password'}
         {...rest}

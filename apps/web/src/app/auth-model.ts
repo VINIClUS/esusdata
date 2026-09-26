@@ -7,6 +7,7 @@ export interface AuthLoginResponse {
 
 export interface AuthMeResponse {
   userId: string
+  canManageAccess: boolean
   /** Municipalities whose aggregate the user may read (READ_CLINICAL, municipality-wide). */
   municipalities?: string[]
 }
@@ -35,5 +36,9 @@ export function sessionUserFromMe(
   response: AuthMeResponse,
   previous: SessionUser | null,
 ): SessionUser {
-  return previous ?? sessionUserFromLogin({ userId: response.userId, displayName: response.userId })
+  return {
+    ...(previous ??
+      sessionUserFromLogin({ userId: response.userId, displayName: response.userId })),
+    canManageAccess: response.canManageAccess,
+  }
 }
