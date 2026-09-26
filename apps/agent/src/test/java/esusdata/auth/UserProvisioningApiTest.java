@@ -48,6 +48,10 @@ class UserProvisioningApiTest extends ApiFixtureSupport {
                 .isEqualTo(401);
         assertThat(authenticatedPost(sessionCookie(outsider), issueUri, "{}").statusCode())
                 .isEqualTo(404);
+        assertThat(authenticatedPost(
+                                reauthed, URI.create(BASE_URL + "/api/v1/users/unknown-user/activation-token"), "{}")
+                        .statusCode())
+                .isEqualTo(404);
         HttpResponse<String> replacement = authenticatedPost(reauthed, issueUri, "{}");
         assertThat(replacement.statusCode()).isEqualTo(201);
         assertThat(extractField(replacement.body(), "activationToken")).isNotEqualTo(oldCode);

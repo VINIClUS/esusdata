@@ -83,7 +83,6 @@ export function LoginPage() {
           value={usuario}
           onChange={(e) => setUsuario(e.target.value)}
           autoComplete="username"
-          required
         />
         <PasswordField
           label="Senha"
@@ -93,7 +92,6 @@ export function LoginPage() {
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
           autoComplete="current-password"
-          required
         />
       </Box>
       <FormControlLabel

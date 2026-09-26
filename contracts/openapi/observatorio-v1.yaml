@@ -184,6 +184,8 @@ paths:
     get:
       tags: [admin]
       summary: List pending accounts and code expiration, without exposing codes. Requires installation MANAGE_ACCESS.
+      security:
+        - sessionCookie: []
       responses:
         "200":
           description: Pending accounts.
@@ -216,7 +218,7 @@ paths:
         "401":
           description: Recent reauthentication required.
         "404":
-          description: Caller lacks installation MANAGE_ACCESS.
+          description: Unknown user, or caller lacks installation MANAGE_ACCESS.
 
   /api/v1/users/{id}/grants:
     post:

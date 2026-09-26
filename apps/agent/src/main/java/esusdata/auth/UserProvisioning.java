@@ -5,6 +5,7 @@ import esusdata.auth.model.AuthAuditWriter;
 import esusdata.auth.model.UserAccount;
 import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
+import esusdata.web.ApiNotFoundException;
 import java.io.Serial;
 import java.time.Clock;
 import java.time.Duration;
@@ -78,7 +79,7 @@ public final class UserProvisioning {
         Instant expiresAt = now.plus(Duration.ofHours(properties.activationTokenValidityHours()));
         return transactionTemplate.execute(status -> {
             UserAccount user =
-                    userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("user not found"));
+                    userRepository.findById(userId).orElseThrow(() -> new ApiNotFoundException("user not found"));
             if (user.state() != UserState.PENDING_ACTIVATION) {
                 throw new IllegalArgumentException("user is not pending activation");
             }

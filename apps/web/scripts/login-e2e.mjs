@@ -39,7 +39,7 @@ server.stderr.on('data', (chunk) => {
 let browser
 
 async function waitForServer() {
-  for (let attempt = 0; attempt < 100; attempt++) {
+  for (let attempt = 0; attempt < 300; attempt++) {
     if (server.exitCode !== null)
       throw new Error(`JAR stopped during startup: ${serverLog.slice(-4000)}`)
     try {
@@ -86,12 +86,13 @@ try {
     await mkdir(screenshotDir, { recursive: true })
     await page.screenshot({ path: path.join(screenshotDir, 'login-desktop.png') })
   }
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+  await page.getByRole('alert').getByText('Informe usuário e senha.').waitFor()
   await page.getByRole('link', { name: 'Ativar meu acesso' }).click()
   if (screenshotDir)
     await page.screenshot({ path: path.join(screenshotDir, 'activation-desktop.png') })
   await page.getByRole('button', { name: 'Ativar meu acesso' }).click()
-  assert.equal(await page.getByLabel('Código de ativação').inputValue(), '')
-  assert.equal(await page.getByLabel('Código de ativação').evaluate((input) => input.validity.valueMissing), true)
+  await page.getByRole('alert').getByText('Informe o código e as duas senhas.').waitFor()
   await page.getByLabel('Código de ativação').fill(bootstrapCode)
   await page.getByLabel('Nova senha', { exact: true }).fill('very-strong-admin-password-1')
   await page.getByLabel('Confirmar nova senha').fill('different-password-2')

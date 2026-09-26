@@ -24,6 +24,10 @@ export function ActivationPage() {
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!token.trim() || !password || !confirmation) {
+      setError('Informe o código e as duas senhas.')
+      return
+    }
     if (password !== confirmation) {
       setError('As senhas não coincidem.')
       return
@@ -68,7 +72,6 @@ export function ActivationPage() {
           value={token}
           onChange={(e) => setToken(e.target.value)}
           autoComplete="off"
-          required
         />
         <PasswordField
           label="Nova senha"
@@ -77,7 +80,6 @@ export function ActivationPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="new-password"
-          required
         />
         <PasswordField
           label="Confirmar nova senha"
@@ -86,7 +88,6 @@ export function ActivationPage() {
           value={confirmation}
           onChange={(e) => setConfirmation(e.target.value)}
           autoComplete="new-password"
-          required
         />
       </Box>
       {error && (
