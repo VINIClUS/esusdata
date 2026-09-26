@@ -74,7 +74,8 @@ public class AuthController {
     public MeResponse me(@AuthenticationPrincipal esusdata.auth.model.AuthenticatedSession session) {
         return new MeResponse(
                 session.userId(),
-                scopeResolver.municipalitiesWithAggregateAccess(session.userId(), Permission.READ_CLINICAL));
+                scopeResolver.municipalitiesWithAggregateAccess(session.userId(), Permission.READ_CLINICAL),
+                scopeResolver.hasInstallationPermission(session.userId(), Permission.MANAGE_ACCESS));
     }
 
     @PostMapping("/api/v1/auth/activate")

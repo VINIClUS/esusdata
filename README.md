@@ -47,6 +47,24 @@ indicador é Java puro; driver Postgres só em `source.pec` e `run.acquisition`;
 
 ## Rodar
 
+### Primeiro acesso e códigos de ativação
+
+No primeiro início, o serviço grava o código do administrador em
+`~/.local/share/observatorio-aps/bootstrap-activation.token` (ou no diretório definido por
+`observatorio.data.directory`). O arquivo deve ser lido apenas pela conta do serviço. Entregue o
+código ao administrador por um canal seguro; ele abre `/ativar-acesso`, define a senha e depois
+entra como `admin`.
+
+Se a conta inicial ainda estiver pendente e o código vencer, o arquivo desaparecer ou deixar de
+corresponder ao banco, reinicie o serviço. O início reemite um código, invalida o anterior e grava
+o mesmo arquivo com acesso restrito. Se a gravação falhar, o serviço não inicia. Uma conta já ativa
+não recebe outro código nesse processo.
+
+Administradores com `manage_access` na instalação podem abrir **Ativações pendentes**, consultar a
+validade do código de cada conta pendente e reemiti-lo após informar a própria senha. O novo código
+aparece uma única vez; copie e entregue ao usuário por um canal seguro. A recuperação de senha de
+contas já ativas depende do suporte local.
+
 ```bash
 # backend (testes incluem ArchUnit e o contrato OpenAPI; o verify também roda Spotless, Error
 # Prone e PMD, ADR 0018, e o piso de cobertura do JaCoCo, ADR 0019 — relatório em

@@ -22,6 +22,56 @@ import org.springframework.test.annotation.DirtiesContext;
 class UserProvisioningApiTest extends ApiFixtureSupport {
 
     @Test
+    void pendingListAndReissueRequireManageAccessAndRecentReauthentication() throws Exception {
+        String admin = createUser("admin-reissue-" + System.nanoTime());
+        grantInstallation(admin, Role.TECHNICAL_ADMIN);
+        String reauthed = reauthenticatedSessionCookie(admin);
+        HttpResponse<String> created = authenticatedPost(
+                reauthed,
+                URI.create(BASE_URL + "/api/v1/users"),
+                "{\"username\":\"pending-" + System.nanoTime() + "\",\"displayName\":\"Pending\"}");
+        String userId = extractField(created.body(), "userId");
+        String oldCode = extractField(created.body(), "activationToken");
+
+        String outsider = createUser("outsider-" + System.nanoTime());
+        assertThat(getWithCookie(reauthed, "/api/v1/auth/me").body()).contains("\"canManageAccess\":true");
+        assertThat(getWithCookie(sessionCookie(outsider), "/api/v1/auth/me").body())
+                .contains("\"canManageAccess\":false");
+        HttpResponse<String> forbiddenList = getWithCookie(sessionCookie(outsider), "/api/v1/users/pending-activation");
+        assertThat(forbiddenList.statusCode()).isEqualTo(404);
+        HttpResponse<String> listing = getWithCookie(reauthed, "/api/v1/users/pending-activation");
+        assertThat(listing.statusCode()).isEqualTo(200);
+        assertThat(listing.body()).contains(userId).doesNotContain(oldCode);
+
+        URI issueUri = URI.create(BASE_URL + "/api/v1/users/" + userId + "/activation-token");
+        assertThat(authenticatedPost(sessionCookie(admin), issueUri, "{}").statusCode())
+                .isEqualTo(401);
+        assertThat(authenticatedPost(sessionCookie(outsider), issueUri, "{}").statusCode())
+                .isEqualTo(404);
+        HttpResponse<String> replacement = authenticatedPost(reauthed, issueUri, "{}");
+        assertThat(replacement.statusCode()).isEqualTo(201);
+        assertThat(extractField(replacement.body(), "activationToken")).isNotEqualTo(oldCode);
+        assertThat(jdbc.queryForObject(
+                        "select count(*) from activation_tokens where user_id = ?", Integer.class, userId))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                        "select count(*) from auth_audit where event_type = 'ACTIVATION_TOKEN_REISSUED' and target = ?",
+                        Integer.class,
+                        userId))
+                .isEqualTo(1);
+    }
+
+    private static HttpResponse<String> getWithCookie(String cookie, String path) throws Exception {
+        return HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create(BASE_URL + path))
+                                .header("Cookie", cookie)
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+    }
+
+    @Test
     void anAdminCanProvisionAUserAndTheReturnedTokenActivatesItThroughTheRealRoute() throws Exception {
         String admin = createUser("admin-" + System.nanoTime());
         grantInstallation(admin, Role.TECHNICAL_ADMIN);

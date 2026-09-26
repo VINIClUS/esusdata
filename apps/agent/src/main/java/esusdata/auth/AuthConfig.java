@@ -114,8 +114,10 @@ public class AuthConfig {
             JdbcTemplate sqliteJdbcTemplate,
             TransactionTemplate sqliteTransactionTemplate,
             Clock clock,
-            SecurityProperties properties) {
-        return new UserProvisioning(userRepository, sqliteJdbcTemplate, sqliteTransactionTemplate, clock, properties);
+            SecurityProperties properties,
+            AuthAuditWriter authAuditWriter) {
+        return new UserProvisioning(
+                userRepository, sqliteJdbcTemplate, sqliteTransactionTemplate, clock, properties, authAuditWriter);
     }
 
     @Bean
@@ -157,8 +159,8 @@ public class AuthConfig {
     /**
      * Runs at boot, like {@code jobRecoveryReport} — eager {@code @Bean} factories execute during
      * {@code finishBeanFactoryInitialization}, strictly before Tomcat's own {@code SmartLifecycle}
-     * starts accepting connections. Idempotent: does nothing once a TECHNICAL_ADMIN already
-     * exists. Logs only the activation token's file path — never its contents.
+     * starts accepting connections. Reissues an expired or missing pending bootstrap token and
+     * leaves active accounts untouched. Logs only the activation token's file path.
      */
     @Bean
     @DependsOn({SqliteConfig.FLYWAY_MIGRATION, "userRepository"})
@@ -166,8 +168,8 @@ public class AuthConfig {
             throws java.io.IOException {
         Optional<Path> tokenFile = bootstrapActivation.ensureBootstrapAdmin();
         tokenFile.ifPresentOrElse(
-                path -> log.info("Bootstrap admin created; activation token written to {}", path),
-                () -> log.info("Bootstrap admin already exists; no new activation token issued"));
+                path -> log.info("Bootstrap activation token written to {}", path),
+                () -> log.info("No bootstrap activation token issued"));
         return tokenFile;
     }
 }

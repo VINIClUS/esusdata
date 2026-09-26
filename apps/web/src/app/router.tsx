@@ -1,6 +1,9 @@
 import { createBrowserRouter, Navigate } from 'react-router'
 import { RequireAuth } from './RequireAuth'
 import { LoginPage } from '@/features/acesso/LoginPage'
+import { ActivationPage } from '@/features/acesso/ActivationPage'
+import { PendingActivationPage } from '@/features/acesso/PendingActivationPage'
+import { AccessHelpPage } from '@/features/acesso/AccessHelpPage'
 import { PainelPage } from '@/features/painel/PainelPage'
 import { IndicadoresListPage } from '@/features/indicadores/IndicadoresListPage'
 import { IndicadorDetailPage } from '@/features/indicadores/IndicadorDetailPage'
@@ -12,6 +15,8 @@ import { AjudaPage } from '@/features/ajuda/AjudaPage'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/ativar-acesso', element: <ActivationPage /> },
+  { path: '/ajuda-acesso', element: <AccessHelpPage /> },
   {
     element: <RequireAuth />,
     children: [
@@ -26,6 +31,7 @@ export const router = createBrowserRouter([
       { path: '/configuracoes/fonte-de-dados', element: <Navigate to="/configuracoes" replace /> },
       { path: '/configuracoes/isolamento-municipal', element: <IsolamentoPage /> },
       { path: '/ajuda', element: <AjudaPage /> },
+      { path: '/ativacoes-pendentes', element: <PendingActivationPage /> },
       { path: '*', element: <Navigate to="/painel" replace /> },
     ],
   },

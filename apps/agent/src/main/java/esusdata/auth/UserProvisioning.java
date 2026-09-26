@@ -1,6 +1,7 @@
 package esusdata.auth;
 
 import esusdata.auth.model.ActivationTokens;
+import esusdata.auth.model.AuthAuditWriter;
 import esusdata.auth.model.UserAccount;
 import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
@@ -8,6 +9,7 @@ import java.io.Serial;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -32,21 +34,63 @@ public final class UserProvisioning {
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
     private final SecurityProperties properties;
+    private final AuthAuditWriter auditWriter;
 
     public UserProvisioning(
             UserRepository userRepository,
             JdbcTemplate jdbc,
             TransactionTemplate transactionTemplate,
             Clock clock,
-            SecurityProperties properties) {
+            SecurityProperties properties,
+            AuthAuditWriter auditWriter) {
         this.userRepository = userRepository;
         this.jdbc = jdbc;
         this.transactionTemplate = transactionTemplate;
         this.clock = clock;
         this.properties = properties;
+        this.auditWriter = auditWriter;
     }
 
     public record ProvisionedUser(String userId, String activationToken, Instant expiresAt) {}
+
+    public record PendingUser(String userId, String username, String displayName, Instant expiresAt) {}
+
+    public List<PendingUser> pendingActivation() {
+        return jdbc.query(
+                """
+                select u.user_id, u.username, u.display_name, max(t.expires_at) as expires_at
+                  from users u left join activation_tokens t
+                    on t.user_id = u.user_id and t.consumed_at is null
+                 where u.state = 'PENDING_ACTIVATION'
+                 group by u.user_id, u.username, u.display_name
+                 order by u.username
+                """,
+                (rs, row) -> new PendingUser(
+                        rs.getString("user_id"),
+                        rs.getString("username"),
+                        rs.getString("display_name"),
+                        rs.getString("expires_at") == null ? null : Instant.parse(rs.getString("expires_at"))));
+    }
+
+    public ProvisionedUser reissue(String userId, String actorUserId) {
+        Instant now = clock.instant();
+        String rawToken = ActivationTokens.newOpaqueToken();
+        Instant expiresAt = now.plus(Duration.ofHours(properties.activationTokenValidityHours()));
+        return transactionTemplate.execute(status -> {
+            UserAccount user =
+                    userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("user not found"));
+            if (user.state() != UserState.PENDING_ACTIVATION) {
+                throw new IllegalArgumentException("user is not pending activation");
+            }
+            jdbc.update("delete from activation_tokens where user_id = ?", userId);
+            jdbc.update("""
+                    insert into activation_tokens (token_hash, user_id, expires_at, consumed_at)
+                    values (?,?,?,null)
+                    """, ActivationTokens.hash(rawToken), userId, expiresAt.toString());
+            auditWriter.record(now, actorUserId, "ACTIVATION_TOKEN_REISSUED", userId, "SUCCESS", "{}");
+            return new ProvisionedUser(userId, rawToken, expiresAt);
+        });
+    }
 
     public ProvisionedUser provision(String username, String displayName, String createdBy) {
         if (userRepository.findByUsername(username).isPresent()) {
