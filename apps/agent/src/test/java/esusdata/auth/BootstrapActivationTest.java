@@ -12,6 +12,7 @@ import esusdata.config.SqliteConfig;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.time.Clock;
 import java.time.Instant;
@@ -154,8 +155,10 @@ class BootstrapActivationTest {
         assertThat(activation.ensureBootstrapAdmin()).contains(tokenFile);
         String replacement = Files.readAllLines(tokenFile).get(0);
         assertThat(replacement).isNotEqualTo(original);
-        assertThat(Files.getPosixFilePermissions(tokenFile))
-                .isEqualTo(Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
+        if (Files.getFileAttributeView(tokenFile, PosixFileAttributeView.class) != null) {
+            assertThat(Files.getPosixFilePermissions(tokenFile))
+                    .isEqualTo(Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
+        }
         assertThatThrownBy(() -> activation.activate(original, "a-strong-enough-passphrase-1", clock.instant()))
                 .isInstanceOf(BootstrapActivation.ActivationFailedException.class);
         activation.activate(replacement, "a-strong-enough-passphrase-1", clock.instant());

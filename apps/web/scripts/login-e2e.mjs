@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { randomInt } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -13,11 +14,18 @@ const jarName = (await readdir(jarDir))
   .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }))[0]
 assert.ok(jarName, 'Build the web JAR first: mvn -f apps/agent/pom.xml -Pweb -DskipTests package')
 const temp = await mkdtemp(path.join(os.tmpdir(), 'esusdata-login-e2e-'))
-const port = 19000 + Math.floor(Math.random() * 1000)
+const port = randomInt(19000, 20000)
 const base = `http://127.0.0.1:${port}`
 const screenshotDir = process.env.E2E_SCREENSHOT_DIR
+const javaHome = process.env.JAVA_HOME
+assert.ok(javaHome && path.isAbsolute(javaHome), 'JAVA_HOME must name the trusted JDK installation')
+const javaExecutable = path.join(
+  javaHome,
+  'bin',
+  process.platform === 'win32' ? 'java.exe' : 'java',
+)
 const server = spawn(
-  'java',
+  javaExecutable,
   [
     '-jar',
     path.join(jarDir, jarName),
@@ -110,6 +118,25 @@ try {
   await page.getByRole('link', { name: 'Ativações pendentes' }).waitFor()
   await page.reload()
   await page.getByRole('link', { name: 'Ativações pendentes' }).waitFor()
+
+  const restrictedContext = await browser.newContext({ locale: 'pt-BR' })
+  await restrictedContext.addInitScript(() => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new globalThis.DOMException('Storage disabled', 'SecurityError')
+      },
+    })
+  })
+  const restrictedPage = await restrictedContext.newPage()
+  await restrictedPage.goto(`${base}/login`)
+  await restrictedPage.getByLabel('Usuário', { exact: true }).waitFor()
+  await restrictedPage.getByLabel('Usuário', { exact: true }).fill('admin')
+  await restrictedPage.getByLabel('Senha', { exact: true }).fill('very-strong-admin-password-1')
+  await restrictedPage.getByRole('checkbox', { name: /Lembrar somente o usuário/ }).check()
+  await restrictedPage.getByRole('button', { name: 'Entrar', exact: true }).click()
+  await restrictedPage.getByRole('link', { name: 'Ativações pendentes' }).waitFor()
+  await restrictedContext.close()
 
   const reauth = await post(page, '/auth/reauth', { password: 'very-strong-admin-password-1' })
   assert.equal(reauth.status(), 204)

@@ -20,7 +20,13 @@ export function LoginPage() {
   const { user, isLoading, login } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [usuario, setUsuario] = useState(() => localStorage.getItem(USERNAME_KEY) ?? '')
+  const [usuario, setUsuario] = useState(() => {
+    try {
+      return localStorage.getItem(USERNAME_KEY) ?? ''
+    } catch {
+      return ''
+    }
+  })
   const [senha, setSenha] = useState('')
   const [lembrar, setLembrar] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -35,8 +41,12 @@ export function LoginPage() {
     setLoading(true)
     try {
       await login(usuario, senha)
-      if (lembrar) localStorage.setItem(USERNAME_KEY, usuario.trim())
-      else localStorage.removeItem(USERNAME_KEY)
+      try {
+        if (lembrar) localStorage.setItem(USERNAME_KEY, usuario.trim())
+        else localStorage.removeItem(USERNAME_KEY)
+      } catch {
+        // A disabled preference store must not prevent an authenticated login.
+      }
       await navigate('/painel', { replace: true })
     } catch (err) {
       setErro(
