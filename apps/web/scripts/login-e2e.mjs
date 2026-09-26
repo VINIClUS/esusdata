@@ -138,6 +138,26 @@ try {
   await restrictedPage.getByRole('link', { name: 'Ativações pendentes' }).waitFor()
   await restrictedContext.close()
 
+  const rememberedContext = await browser.newContext({ locale: 'pt-BR' })
+  const rememberedPage = await rememberedContext.newPage()
+  await rememberedPage.goto(`${base}/login`)
+  await rememberedPage.evaluate(() => localStorage.setItem('esusdata.remembered-username', 'admin'))
+  await rememberedPage.reload()
+  await rememberedPage.getByLabel('Usuário', { exact: true }).waitFor()
+  assert.equal(await rememberedPage.getByLabel('Usuário', { exact: true }).inputValue(), 'admin')
+  assert.equal(
+    await rememberedPage.getByRole('checkbox', { name: /Lembrar somente o usuário/ }).isChecked(),
+    true,
+  )
+  await rememberedPage.getByLabel('Senha', { exact: true }).fill('very-strong-admin-password-1')
+  await rememberedPage.getByRole('button', { name: 'Entrar', exact: true }).click()
+  await rememberedPage.getByRole('link', { name: 'Ativações pendentes' }).waitFor()
+  assert.equal(
+    await rememberedPage.evaluate(() => localStorage.getItem('esusdata.remembered-username')),
+    'admin',
+  )
+  await rememberedContext.close()
+
   const reauth = await post(page, '/auth/reauth', { password: 'very-strong-admin-password-1' })
   assert.equal(reauth.status(), 204)
   const created = await post(page, '/users', {

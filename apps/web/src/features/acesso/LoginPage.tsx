@@ -20,15 +20,16 @@ export function LoginPage() {
   const { user, isLoading, login } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [usuario, setUsuario] = useState(() => {
+  const [rememberedUsername] = useState(() => {
     try {
       return localStorage.getItem(USERNAME_KEY) ?? ''
     } catch {
       return ''
     }
   })
+  const [usuario, setUsuario] = useState(rememberedUsername)
   const [senha, setSenha] = useState('')
-  const [lembrar, setLembrar] = useState(false)
+  const [lembrar, setLembrar] = useState(Boolean(rememberedUsername))
   const [erro, setErro] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
