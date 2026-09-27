@@ -160,6 +160,32 @@ try {
 
   const reauth = await post(page, '/auth/reauth', { password: 'very-strong-admin-password-1' })
   assert.equal(reauth.status(), 204)
+
+  // The bootstrap admin holds an installation-scoped grant and no read_clinical, so /auth/me
+  // names no municipality; the source screen must still show what it may manage.
+  const source = await post(page, '/sources', {
+    id: 'pec-e2e',
+    sourceFamily: 'PEC_POSTGRESQL',
+    pecInstallationRole: 'PRONTUARIO',
+    sourceLocationKind: 'PRIMARY',
+    host: '192.0.2.10',
+    port: 5433,
+    databaseName: 'esus',
+    dbUser: 'esus_leitura',
+    secretRef: 'PEC_DB_PASSWORD',
+    municipalityIbge: '3541307',
+    pecVersion: '5.5.28',
+    readModel: 'PEC_DW',
+  })
+  assert.equal(source.status(), 201)
+  await page.goto(`${base}/configuracoes`)
+  await page.getByLabel('Host', { exact: true }).waitFor()
+  assert.equal(await page.getByLabel('Host', { exact: true }).inputValue(), '192.0.2.10')
+  assert.equal(await page.getByLabel('Porta', { exact: true }).inputValue(), '5433')
+  assert.equal(await page.getByLabel('Usuário', { exact: true }).inputValue(), 'esus_leitura')
+  assert.equal(await page.getByLabel('Senha', { exact: true }).inputValue(), '')
+  await checkWidth(page)
+  if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'source-desktop.png') })
   const created = await post(page, '/users', {
     username: 'pending-e2e',
     displayName: 'Usuário Pendente',
@@ -197,7 +223,7 @@ try {
   if (screenshotDir)
     await page.screenshot({ path: path.join(screenshotDir, 'activation-mobile.png') })
   console.log(
-    'Chromium login and activation end-to-end passed; no horizontal overflow at 1448px or 390px',
+    'Chromium login, activation and source screen end-to-end passed; no horizontal overflow at 1448px or 390px',
   )
 } finally {
   if (browser) await browser.close()

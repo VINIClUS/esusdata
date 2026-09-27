@@ -46,6 +46,11 @@ public final class ApiAuthorization {
         }
     }
 
+    /** For narrowing a listing: whether {@link #requireObjectScope} would let this object through. */
+    public boolean permits(AuthenticatedSession session, Permission permission, String municipalityIbge) {
+        return scopeResolver.hasPermission(session.userId(), permission, municipalityIbge);
+    }
+
     /** Records an authorization denial without throwing, for an existing object hidden as 404. */
     public void auditDenied(AuthenticatedSession session, Permission permission, String municipalityIbge) {
         authAuditWriter.record(

@@ -364,6 +364,11 @@ class ExecPlaneLivePecTest {
             public Optional<SourceRecord> findById(String id) {
                 return Optional.of(source).filter(candidate -> candidate.id().equals(id));
             }
+
+            @Override
+            public List<SourceRecord> findAll() {
+                return List.of(source);
+            }
         };
     }
 

@@ -7,7 +7,7 @@ import type {
   IndicatorResultResponse,
   PainelResumo,
 } from './types'
-import type { ExecucaoAtual, RunResponse } from './types'
+import type { ExecucaoAtual, Fonte, RunResponse, SourceFamily, SourceResponse } from './types'
 
 interface CategoryDefinition {
   key: string
@@ -169,6 +169,32 @@ export function publishedPeriodsPath(municipalityIbge: string): string {
 
 export function recentRunsPath(municipalityIbge: string, limit: number): string {
   return `/runs?${new URLSearchParams({ municipalityIbge, limit: String(limit) }).toString()}`
+}
+
+// The API lists every source the caller may manage; the selected municipality, when there is
+// one, only decides which of them to show first.
+export function pickSource(
+  sources: SourceResponse[],
+  municipalityIbge: string | undefined,
+): SourceResponse | undefined {
+  return sources.find((s) => s.municipalityIbge === municipalityIbge) ?? sources[0]
+}
+
+const sourceFamilyLabels: Record<SourceFamily, string> = {
+  PEC_POSTGRESQL: 'PostgreSQL (e-SUS PEC)',
+  EXTERNAL_DATASET: 'Conjunto de dados externo',
+}
+
+// The API keeps no diagnostic history yet, so a freshly loaded source has no last test.
+export function normalizeSource(source: SourceResponse): Fonte {
+  return {
+    tipo: sourceFamilyLabels[source.sourceFamily],
+    host: source.host,
+    porta: String(source.port),
+    nomeBanco: source.databaseName,
+    usuario: source.dbUser,
+    ultimoTeste: null,
+  }
 }
 
 const runStateLabels: Record<RunResponse['state'], string> = {

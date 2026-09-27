@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import esusdata.auth.model.Role;
 import esusdata.web.ApiFixtureSupport;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.annotation.DirtiesContext;
@@ -93,6 +95,66 @@ class SourceApiTest extends ApiFixtureSupport {
                 authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/sources/" + sourceId + "/test"), null);
 
         assertThat(response.statusCode()).isEqualTo(404);
+    }
+
+    @Test
+    void anInstallationAdminListsTheSourcesOfEveryMunicipalityWithoutASecretValue() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantInstallation(admin, Role.TECHNICAL_ADMIN);
+        String sourceA = "src-a-" + System.nanoTime();
+        String sourceB = "src-b-" + System.nanoTime();
+        registerSource(sourceA, MUNICIPALITY);
+        registerSource(sourceB, MUNICIPALITY_B);
+
+        HttpResponse<String> response = get(sessionCookie(admin), "/api/v1/sources");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body())
+                .contains(sourceA)
+                .contains(sourceB)
+                .contains("\"secretRef\":\"PEC_DB_PASSWORD\"")
+                .doesNotContain("secretValue");
+    }
+
+    @Test
+    void aMunicipalAdminListsOnlyTheSourcesOfItsOwnMunicipality() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String ownSource = "src-own-" + System.nanoTime();
+        String otherSource = "src-other-" + System.nanoTime();
+        registerSource(ownSource, MUNICIPALITY);
+        registerSource(otherSource, MUNICIPALITY_B);
+
+        HttpResponse<String> response = get(sessionCookie(admin), "/api/v1/sources");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body())
+                .contains(ownSource)
+                .doesNotContain(otherSource)
+                .doesNotContain(MUNICIPALITY_B);
+    }
+
+    @Test
+    void aCallerWithoutManageSourceGetsAnEmptyListNotAnError() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        registerSource("src-" + System.nanoTime(), MUNICIPALITY);
+
+        HttpResponse<String> response = get(sessionCookie(manager), "/api/v1/sources");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).isEqualTo("[]");
+    }
+
+    private static HttpResponse<String> get(String sessionCookie, String path) throws Exception {
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            return client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + path))
+                            .header("Cookie", sessionCookie)
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+        }
     }
 
     private static String createSourceJson(String sourceId) {

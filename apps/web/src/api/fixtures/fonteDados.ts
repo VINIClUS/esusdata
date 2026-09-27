@@ -7,7 +7,6 @@ export const fonteFixture: Fonte = {
   porta: '5432',
   nomeBanco: 'pec_dw',
   usuario: 'esusdata',
-  senha: 'demo-senha-1',
   ultimoTeste: { ok: true, mensagem: 'Diagnóstico da fonte concluído com sucesso!' },
 }
 

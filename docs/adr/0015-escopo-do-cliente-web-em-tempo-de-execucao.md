@@ -36,3 +36,9 @@ ainda a oferecer. A tela de execução mostra o job mais recente do município.
   ele, e a leitura de evidências por equipe ainda não tem tela (issue #23).
 - Um usuário com `read_clinical` mas sem `run_indicator` (auditor) vê o painel, mas a tela de
   execução responde 404, como `GET /runs/{id}` já fazia.
+- `municipalities` não serve às telas técnicas. O administrador técnico não tem `read_clinical`
+  (ENG-45), e o do bootstrap tem concessão de instalação, sem município. Por isso
+  **`GET /api/v1/sources`** (issue #22) não recebe município: devolve toda fonte em que o usuário
+  tem `manage_source`, filtrando o que ele não alcança em vez de negar. Com concessão de instalação
+  ele vê todas as fontes, com concessão municipal só as do próprio município, e sem nenhuma recebe a
+  lista vazia. O cliente mostra a fonte do município selecionado, se houver, e senão a primeira.

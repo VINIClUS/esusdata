@@ -1,6 +1,7 @@
 package esusdata.source;
 
 import esusdata.source.model.SourceRecord;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -11,4 +12,6 @@ public interface SourceRepository {
     void upsert(SourceRecord source);
 
     Optional<SourceRecord> findById(String id);
+
+    List<SourceRecord> findAll();
 }

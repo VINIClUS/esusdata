@@ -307,6 +307,21 @@ paths:
           description: Unknown user, or caller lacks installation-scoped MANAGE_ACCESS.
 
   /api/v1/sources:
+    get:
+      tags: [sources]
+      summary: >-
+        Every source the caller holds MANAGE_SOURCE for, ordered by municipality then id. Narrowed,
+        never refused: an installation-scoped grant sees all sources, a municipal one only its own,
+        anyone else an empty list. No municipality parameter, because GET /auth/me lists only
+        READ_CLINICAL municipalities and a technical admin holds none. Read-only: no recent reauth.
+      responses:
+        "200":
+          description: OK. secretRef is a reference, never the secret value.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SourceResponse" }
     post:
       tags: [sources]
       summary: Register or update a PEC source configuration (MANAGE_SOURCE + recent reauth).

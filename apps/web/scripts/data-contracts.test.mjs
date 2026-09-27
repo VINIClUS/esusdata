@@ -214,6 +214,60 @@ test('builds the scope-discovery queries', () => {
   assert.equal(normalizers.recentRunsPath('3541307', 1), '/runs?municipalityIbge=3541307&limit=1')
 })
 
+const registeredSource = (id, municipalityIbge) => ({
+  id,
+  sourceConfigurationVersion: 1,
+  sourceFamily: 'PEC_POSTGRESQL',
+  pecInstallationRole: 'PRONTUARIO',
+  sourceLocationKind: 'PRIMARY',
+  host: '192.0.2.10',
+  port: 5432,
+  databaseName: 'esus',
+  dbUser: 'esus_leitura',
+  secretRef: 'PEC_DB_PASSWORD',
+  municipalityIbge,
+  pecVersion: '5.5.28',
+  readModel: 'PEC_DW',
+  createdAt: '2026-09-27T12:00:00Z',
+})
+
+test('shows the source of the selected municipality, else the first one listed', () => {
+  const sources = [registeredSource('a', '3304557'), registeredSource('b', '3541307')]
+
+  assert.equal(normalizers.pickSource(sources, '3541307')?.id, 'b')
+  assert.equal(normalizers.pickSource(sources, undefined)?.id, 'a')
+  assert.equal(normalizers.pickSource(sources, '9999999')?.id, 'a')
+  assert.equal(normalizers.pickSource([], '3541307'), undefined)
+})
+
+test('normalizes a registered source without inventing a password or a last test', () => {
+  const fonte = normalizers.normalizeSource({
+    id: 'pec-principal',
+    sourceConfigurationVersion: 2,
+    sourceFamily: 'PEC_POSTGRESQL',
+    pecInstallationRole: 'PRONTUARIO',
+    sourceLocationKind: 'PRIMARY',
+    host: '192.0.2.10',
+    port: 5433,
+    databaseName: 'esus',
+    dbUser: 'esus_leitura',
+    secretRef: 'PEC_DB_PASSWORD',
+    municipalityIbge: '3541307',
+    pecVersion: '5.5.28',
+    readModel: 'PEC_DW',
+    createdAt: '2026-09-27T12:00:00Z',
+  })
+
+  assert.deepEqual(fonte, {
+    tipo: 'PostgreSQL (e-SUS PEC)',
+    host: '192.0.2.10',
+    porta: '5433',
+    nomeBanco: 'esus',
+    usuario: 'esus_leitura',
+    ultimoTeste: null,
+  })
+})
+
 test('keeps a remembered scope choice only while the API still offers it', () => {
   assert.equal(pickScopeOption(['2026-08', '2026-07'], '2026-07'), '2026-07')
   assert.equal(pickScopeOption(['2026-08', '2026-07'], '2026-01'), '2026-08')

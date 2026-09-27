@@ -90,7 +90,8 @@ export function FonteDeDadosPage() {
     porta: data.porta,
     nomeBanco: data.nomeBanco,
     usuario: data.usuario,
-    senha: data.senha,
+    // The API never returns the password; this field only takes a new one.
+    senha: '',
   }
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...values, [k]: e.target.value })
