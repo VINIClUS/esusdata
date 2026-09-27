@@ -98,9 +98,9 @@ test da app image. `.github/workflows/package.yml` roda os dois em runners do pr
   via `java.beans`). Aceito até a redução de módulos.
 - `pec.env` continua sendo o resolvedor de desenvolvimento (§1.12.7 pendente); no pacote ele fica em
   `/etc/observatorio-aps/pec.env`, dono `observatorio`, modo `0600`.
-- Sem mocks, as telas de isolamento e relatórios mostram erro no pacote: a API ainda não tem as
-  rotas delas (issue #22). Fonte e requisitos já leem a API (`GET /sources`,
-  `GET /sources/{id}/requirements`).
+- Sem mocks, a tela de relatórios mostra erro no pacote: a API ainda não tem a rota dela
+  (issue #22). Fonte, requisitos e isolamento já leem a API (`GET /sources`,
+  `GET /sources/{id}/requirements`, `POST /sources/{id}/isolation-check`, ADR 0023).
 - Fora desta fatia: assinatura, SBOM e proveniência (§1.12.8),
   `.rpm`, e o teste de ciclo de vida completo da §1.12.5 (boot, perda de energia, rollback).
 - **Acompanhamento.** O workflow `package` instala o `.deb` num runner Ubuntu 24.04 com systemd e

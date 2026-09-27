@@ -372,6 +372,48 @@ paths:
         "404":
           description: Unknown source, or caller lacks MANAGE_SOURCE for its municipality.
 
+  /api/v1/sources/{id}/isolation-check:
+    post:
+      tags: [sources]
+      summary: >-
+        Municipal isolation check (ADR 0023): counts one competência's atendimentos individuais in
+        the source's PEC per tb_dim_municipio.co_ibge, through the execution plane and the same
+        compatibility handshake as an acquisition, and compares them with the registered
+        municipality. Aggregate counts only; MANAGE_SOURCE and a recent reauth.
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IsolationCheckRequest" }
+      responses:
+        "200":
+          description: >-
+            Check result. Every outcome but SOURCE_BUSY is stored as the source's
+            lastIsolationCheck for its current configuration version.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IsolationCheck" }
+        "400":
+          description: >-
+            referencePeriod is missing or not an ISO year-month (yyyy-MM), or the source is not a
+            PEC source with a complete identity (version, read model, installation role).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "401":
+          description: The session has no recent reauthentication.
+        "404":
+          description: Unknown source, or caller lacks MANAGE_SOURCE for its municipality.
+
   /api/v1/sources/{id}/requirements:
     get:
       tags: [sources]
@@ -838,6 +880,13 @@ components:
               description: >-
                 Null until a diagnostic ran against the current configuration version —
                 re-registering a source hides the previous one. Always null from POST /sources.
+            lastIsolationCheck:
+              allOf:
+                - $ref: "#/components/schemas/IsolationCheck"
+              nullable: true
+              description: >-
+                Null until an isolation check ran against the current configuration version. Always
+                null from POST /sources.
 
     LastDiagnostic:
       type: object
@@ -851,6 +900,45 @@ components:
           nullable: true
           description: Never contains the secret (§1.12.7 L550).
         testedAt: { type: string, format: date-time }
+
+    IsolationCheckRequest:
+      type: object
+      required: [referencePeriod]
+      properties:
+        referencePeriod: { type: string, example: "2026-03", description: Competência to count (yyyy-MM). }
+
+    IsolationCheck:
+      type: object
+      description: >-
+        The counts are atendimentos of referencePeriod aggregated per municipality code, null
+        unless outcome is CHECKED. They say nothing about data quality, CNES/INE or territory.
+      properties:
+        referencePeriod: { type: string, example: "2026-03" }
+        outcome:
+          type: string
+          enum: [DESTINATION_NOT_ALLOWED, SOURCE_BUSY, SOURCE_AUTHENTICATION_FAILED,
+                 SOURCE_PERMISSION_DENIED, CONNECTION_FAILED, COMPATIBILITY_MISMATCH,
+                 SOURCE_BUDGET_EXCEEDED, CHECKED]
+        registeredCount:
+          type: integer
+          format: int64
+          nullable: true
+          description: Atendimentos whose co_ibge is the source's municipality.
+        otherMunicipalityCount:
+          type: integer
+          format: int64
+          nullable: true
+          description: Atendimentos under another 7-digit co_ibge — an acquisition leaves them out.
+        otherMunicipalityCodes:
+          type: integer
+          nullable: true
+          description: How many distinct other municipality codes those were.
+        unidentifiedCount:
+          type: integer
+          format: int64
+          nullable: true
+          description: Atendimentos whose municipality row has no 7-digit co_ibge.
+        checkedAt: { type: string, format: date-time }
 
     SourceRequirementResponse:
       type: object

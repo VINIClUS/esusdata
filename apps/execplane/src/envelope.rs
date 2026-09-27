@@ -120,9 +120,80 @@ pub struct DiagnoseEnvelope {
     pub budget: SessionBudget,
 }
 
+/// The `{"type":"check_isolation",...}` message — pinned by
+/// `ExecPlaneIsolationCheck.writeIsolationEnvelope`. The source's identity (to find what to probe)
+/// and the competência to count, never the municipality: comparing the counts with the registered
+/// IBGE is Java's job, so this process only reports what the base holds.
+#[derive(Deserialize)]
+pub struct IsolationEnvelope {
+    #[serde(rename = "type")]
+    #[expect(
+        dead_code,
+        reason = "part of the check_isolation wire contract, not read by this process"
+    )]
+    pub message_type: String,
+    #[expect(
+        dead_code,
+        reason = "part of the check_isolation wire contract, not read by this process"
+    )]
+    pub source_id: String,
+    pub host: String,
+    pub port: u16,
+    pub database: String,
+    pub user: String,
+    pub password: String,
+    pub pec_version: String,
+    pub read_model: String,
+    pub installation_role: String,
+    pub adapter_version: String,
+    pub period_start: String,
+    pub period_end_exclusive: String,
+    /// Same meaning as `AcquireEnvelope::tls_root_cert`.
+    #[serde(default)]
+    pub tls_root_cert: Option<String>,
+    pub budget: IsolationBudget,
+}
+
+/// The session budget plus a ceiling on result rows — one per distinct `co_ibge` in the period.
+#[derive(Deserialize)]
+pub struct IsolationBudget {
+    #[serde(flatten)]
+    pub session: SessionBudget,
+    pub max_rows: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn isolation_envelope_parses_the_java_shape() {
+        let envelope: IsolationEnvelope = serde_json::from_str(
+            r#"{"type":"check_isolation","source_id":"s","host":"127.0.0.1","port":5432,
+                "database":"esus","user":"u","password":"p","pec_version":"5.5.28",
+                "read_model":"PEC_DW","installation_role":"PRONTUARIO","adapter_version":"0.1.0",
+                "period_start":"2026-03-01","period_end_exclusive":"2026-04-01",
+                "tls_root_cert":null,"budget":{"connect_timeout_ms":5000,"statement_timeout_ms":1,
+                "lock_timeout_ms":2,"idle_in_transaction_timeout_ms":3,"max_duration_ms":4,
+                "max_rows":5}}"#,
+        )
+        .unwrap();
+        assert_eq!(envelope.period_start, "2026-03-01");
+        assert_eq!(envelope.budget.session.max_duration_ms, 4);
+        assert_eq!(envelope.budget.max_rows, 5);
+    }
+
+    #[test]
+    fn isolation_envelope_without_a_period_is_rejected() {
+        let parsed: Result<IsolationEnvelope, _> = serde_json::from_str(
+            r#"{"type":"check_isolation","source_id":"s","host":"h","port":1,"database":"d",
+                "user":"u","password":"p","pec_version":"5.5.28","read_model":"PEC_DW",
+                "installation_role":"PRONTUARIO","adapter_version":"0.1.0",
+                "budget":{"connect_timeout_ms":1,"statement_timeout_ms":1,"lock_timeout_ms":1,
+                "idle_in_transaction_timeout_ms":1,"max_duration_ms":1,"max_rows":1}}"#,
+        );
+        assert!(parsed.is_err());
+    }
 
     /// Pinned against the exact keys `ExecPlaneConnectivityCheck` writes — an unknown field is
     /// ignored, a missing one fails the parse (and the process exits 1 with nothing on stdout).

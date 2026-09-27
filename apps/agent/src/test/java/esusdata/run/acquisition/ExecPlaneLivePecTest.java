@@ -11,13 +11,16 @@ import esusdata.source.JdbcSourceDiagnostics;
 import esusdata.source.SourceDiagnosticsService;
 import esusdata.source.SourceDiagnosticsService.Diagnostics;
 import esusdata.source.SourceDiagnosticsService.Outcome;
+import esusdata.source.SourceIsolationCheck;
 import esusdata.source.SourceRepository;
 import esusdata.source.model.LastDiagnostic;
+import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.EnvFileSecretResolver;
 import esusdata.source.pec.IndividualEncounterModalityCapability;
 import esusdata.source.pec.JdbcCompatibilityCatalog;
+import esusdata.source.pec.MunicipalIsolationContract;
 import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecConnectionProperties;
 import esusdata.source.pec.PecDataSourceFactory;
@@ -30,11 +33,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -178,17 +184,21 @@ class ExecPlaneLivePecTest {
         return command(extractionId, budget, LocalDate.of(2000, 1, 1), LocalDate.of(2027, 1, 1));
     }
 
+    private PecConnectionProperties connectionProperties() {
+        return new PecConnectionProperties(
+                env.get("PEC_SOURCE_ID"),
+                env.get("PEC_DB_HOST"),
+                port(),
+                env.get("PEC_DB_NAME"),
+                env.get("PEC_DB_USER"),
+                "PEC_DB_PASSWORD",
+                env.get("PEC_MUNICIPALITY_IBGE"));
+    }
+
     private AcquisitionCommand command(
             String extractionId, ReadBudget budget, LocalDate periodStart, LocalDate periodEndExclusive) {
         return new AcquisitionCommand(
-                new PecConnectionProperties(
-                        env.get("PEC_SOURCE_ID"),
-                        env.get("PEC_DB_HOST"),
-                        port(),
-                        env.get("PEC_DB_NAME"),
-                        env.get("PEC_DB_USER"),
-                        "PEC_DB_PASSWORD",
-                        env.get("PEC_MUNICIPALITY_IBGE")),
+                connectionProperties(),
                 identity(),
                 budget,
                 extractionId,
@@ -267,6 +277,48 @@ class ExecPlaneLivePecTest {
         assertThat(manifest.rowCount()).isPositive();
         assertThat(listener.uncertainReasons).isEmpty();
         assertThat(extractsDir.resolve("live-month.jsonl.gz")).exists();
+    }
+
+    /**
+     * ADR 0023's evidence on this installation: the isolation check of one competência through the
+     * packaged {@code municipal_isolation} entry and the real handshake, compared with the same
+     * frozen query run over JDBC. An aggregate per municipality code — no record leaves the PEC.
+     */
+    @Test
+    void isolationCheckOfOneCompetenciaMatchesTheSameQueryOverJdbc() throws Exception {
+        YearMonth march = YearMonth.of(2026, 3);
+        long started = System.nanoTime();
+        SourceIsolationCheck.Result result = new ExecPlaneIsolationCheck(
+                        List.of(realBinary),
+                        new EnvFileSecretResolver(envFile),
+                        ExecPlaneTransport.PLAINTEXT,
+                        Duration.ofSeconds(10))
+                .check(
+                        connectionProperties(),
+                        identity(),
+                        env.get("PEC_DB_HOST"),
+                        march,
+                        ReadBudget.initialEngineeringProposal());
+        long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
+
+        List<SourceIsolationCheck.MunicipalityCount> reference = new ArrayList<>();
+        try (Connection c = openCheckConnection();
+                PreparedStatement ps = c.prepareStatement(MunicipalIsolationContract.QUERY)) {
+            ps.setObject(1, march.atDay(1));
+            ps.setObject(2, march.plusMonths(1).atDay(1));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    reference.add(new SourceIsolationCheck.MunicipalityCount(rs.getString(1), rs.getLong(2)));
+                }
+            }
+        }
+        log.info("live isolation check " + march + ": status=" + result.status() + " counts=" + result.counts()
+                + " jdbc=" + reference + " elapsedMs=" + elapsedMs);
+
+        assertThat(result.status()).isEqualTo(SourceIsolationCheck.Status.CHECKED);
+        assertThat(result.counts()).isEqualTo(reference);
+        assertThat(result.counts())
+                .anyMatch(count -> env.get("PEC_MUNICIPALITY_IBGE").equals(count.ibge()) && count.count() > 0);
     }
 
     /**
@@ -383,6 +435,14 @@ class ExecPlaneLivePecTest {
 
             @Override
             public Map<String, LastDiagnostic> findLastDiagnostics() {
+                return Map.of();
+            }
+
+            @Override
+            public void recordIsolationCheck(String sourceId, LastIsolationCheck check) {}
+
+            @Override
+            public Map<String, LastIsolationCheck> findLastIsolationChecks() {
                 return Map.of();
             }
         };

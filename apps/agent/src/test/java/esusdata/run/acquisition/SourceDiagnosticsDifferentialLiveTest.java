@@ -9,6 +9,7 @@ import esusdata.source.SourceDiagnosticsService.Diagnostics;
 import esusdata.source.SourceDiagnosticsService.Outcome;
 import esusdata.source.SourceRepository;
 import esusdata.source.model.LastDiagnostic;
+import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.PecDataSourceFactory;
@@ -92,6 +93,14 @@ class SourceDiagnosticsDifferentialLiveTest {
 
         @Override
         public Map<String, LastDiagnostic> findLastDiagnostics() {
+            return Map.of();
+        }
+
+        @Override
+        public void recordIsolationCheck(String sourceId, LastIsolationCheck check) {}
+
+        @Override
+        public Map<String, LastIsolationCheck> findLastIsolationChecks() {
             return Map.of();
         }
     };

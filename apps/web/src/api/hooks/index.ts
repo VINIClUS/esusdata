@@ -3,12 +3,13 @@ import { USE_MOCKS, apiFetch, ensureApiReady, resolveMock } from '../client'
 import { execucaoFixture } from '../fixtures/execucao'
 import { fonteFixture, requisitosFixture } from '../fixtures/fonteDados'
 import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadores'
-import { isolamentoFixture } from '../fixtures/isolamento'
+import { isolamentoSourcesFixture } from '../fixtures/isolamento'
 import { painelFixture } from '../fixtures/painel'
 import { relatoriosFixture } from '../fixtures/relatorios'
 import { useScope } from '@/app/scope-context'
 import {
   indicatorResultsPath,
+  isPecSource,
   normalizeIndicatorPacks,
   normalizeIndicatorResult,
   normalizePainelResumo,
@@ -23,7 +24,7 @@ import type {
   IndicatorPack,
   IndicadorDetalhe,
   IndicatorResultResponse,
-  IsolamentoStatus,
+  IsolationCheckResponse,
   PainelResumo,
   RelatorioGerado,
   RequisitoFonte,
@@ -197,14 +198,50 @@ export function useRequisitosFonte(sourceId: string | undefined) {
   })
 }
 
-export function useIsolamento() {
+// Every PEC source the caller may manage, not only the clinical scope's: a technical admin has no
+// READ_CLINICAL municipality, so the page lets them pick the source instead. Keyed under ['fonte']
+// so a new check refreshes it together with the source.
+export function useFontesPec() {
   return useQuery({
-    queryKey: ['isolamento'],
-    queryFn: mockOnly<IsolamentoStatus>(
-      isolamentoFixture,
-      'A API ainda não fornece a validação do isolamento municipal neste ambiente.',
-    ),
+    queryKey: ['fonte', 'pec'],
+    queryFn: (): Promise<SourceResponse[]> =>
+      (USE_MOCKS
+        ? resolveMock(isolamentoSourcesFixture)
+        : apiFetch<SourceResponse[]>('/sources')
+      ).then((sources) => sources.filter(isPecSource)),
   })
+}
+
+/**
+ * Counts one competência's atendimentos in the source's PEC per municipality code (ADR 0023). Like
+ * `testarFonte`, the API requires a recent reauthentication first; the result is stored and read
+ * back through `useIsolamento`, which the caller then invalidates.
+ */
+export async function validarIsolamento(
+  sourceId: string,
+  senhaAtual: string,
+  referencePeriod: string,
+): Promise<IsolationCheckResponse> {
+  if (USE_MOCKS) {
+    return resolveMock<IsolationCheckResponse>({
+      referencePeriod,
+      outcome: 'CHECKED',
+      registeredCount: 0,
+      otherMunicipalityCount: 0,
+      otherMunicipalityCodes: 0,
+      unidentifiedCount: 0,
+      checkedAt: new Date().toISOString(),
+    })
+  }
+  await ensureApiReady()
+  await apiFetch<undefined>('/auth/reauth', {
+    method: 'POST',
+    body: JSON.stringify({ password: senhaAtual }),
+  })
+  return apiFetch<IsolationCheckResponse>(
+    `/sources/${encodeURIComponent(sourceId)}/isolation-check`,
+    { method: 'POST', body: JSON.stringify({ referencePeriod }) },
+  )
 }
 
 export function useRelatoriosRecentes() {

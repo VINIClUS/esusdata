@@ -2,26 +2,31 @@ import { useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
-import { Check, ChevronRight, FileText, RefreshCw } from 'lucide-react'
-import { useIsolamento } from '@/api/hooks'
-import type { RegraValidacao } from '@/api/types'
+import { useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router'
+import { Check, CircleAlert, CircleX, RefreshCw } from 'lucide-react'
+import { useFontesPec, validarIsolamento } from '@/api/hooks'
+import { isolationCheckNotice, normalizeIsolation, pickSource } from '@/api/normalizers'
+import type { IsolamentoStatus, RegraValidacao, SourceResponse } from '@/api/types'
+import { useScope } from '@/app/scope-context'
+import { formatReferencePeriod } from '@/app/display-context'
 import { CheckIcon } from '@/components/data/ChecklistCard'
 import { DataTable, type Column } from '@/components/data/DataTable'
 import { StatColumns } from '@/components/data/StatColumns'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Callout } from '@/components/ui/Callout'
+import { FilterSelect } from '@/components/ui/FilterSelect'
+import { Field, PasswordField } from '@/components/ui/Inputs'
 import { PageUnavailable } from '@/components/ui/PageUnavailable'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { StatusChip } from '@/components/ui/StatusChip'
-import { UnderlineTabs } from '@/components/ui/Tabs'
 import { formatInt } from '@/lib/format'
 import { colors } from '@/theme/tokens'
 
-const tabs = [
-  { key: 'validacao', label: 'Validação do recorte' },
-  { key: 'territorio', label: 'Território e equipes' },
-]
+const TITLE = 'Isolamento Municipal'
+const SUBTITLE =
+  'Confira, numa competência, se a base do PEC tem atendimentos só do município da fonte.'
 
 function RuleIcon({ resultado }: { resultado: RegraValidacao['resultado'] }) {
   if (resultado === 'conforme') return <CheckIcon size={26} />
@@ -31,7 +36,7 @@ function RuleIcon({ resultado }: { resultado: RegraValidacao['resultado'] }) {
         width: 26,
         height: 26,
         borderRadius: '50%',
-        bgcolor: colors.primary,
+        bgcolor: resultado === 'atencao' ? colors.warning : colors.primary,
         color: '#fff',
         display: 'grid',
         placeItems: 'center',
@@ -40,7 +45,7 @@ function RuleIcon({ resultado }: { resultado: RegraValidacao['resultado'] }) {
         flexShrink: 0,
       }}
     >
-      i
+      {resultado === 'atencao' ? '!' : 'i'}
     </Box>
   )
 }
@@ -61,7 +66,7 @@ const columns: Column<RegraValidacao>[] = [
     header: 'Descrição',
     render: (r) => (
       <Typography
-        sx={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.4, maxWidth: 300 }}
+        sx={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.4, maxWidth: 340 }}
       >
         {r.descricao}
       </Typography>
@@ -77,42 +82,119 @@ const columns: Column<RegraValidacao>[] = [
     key: 'detalhes',
     header: 'Detalhes',
     render: (r) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-        <Typography sx={{ fontSize: 13, color: colors.textSecondary }}>{r.detalhes}</Typography>
-        <ChevronRight size={18} color={colors.primary} />
-      </Box>
+      <Typography sx={{ fontSize: 13, color: colors.textSecondary }}>{r.detalhes}</Typography>
     ),
   },
 ]
 
+const bannerTones: Record<
+  IsolamentoStatus['situacao'],
+  { bg: string; border: string; ring: string; dot: string; icon: React.ReactNode }
+> = {
+  validado: {
+    bg: '#f4fbf6',
+    border: colors.successBorder,
+    ring: '#dff5e6',
+    dot: colors.success,
+    icon: <Check size={32} strokeWidth={3.5} />,
+  },
+  atencao: {
+    bg: colors.warningBg,
+    border: colors.warning,
+    ring: '#fdebd0',
+    dot: colors.warning,
+    icon: <CircleAlert size={32} strokeWidth={2.5} />,
+  },
+  falha: {
+    bg: colors.errorBg,
+    border: colors.error,
+    ring: '#fbdada',
+    dot: colors.error,
+    icon: <CircleX size={32} strokeWidth={2.5} />,
+  },
+  nunca: {
+    bg: colors.primarySoft,
+    border: colors.infoBorder,
+    ring: '#e4edfb',
+    dot: colors.primary,
+    icon: <RefreshCw size={30} strokeWidth={2.5} />,
+  },
+}
+
+/** The month before the current one, as yyyy-MM: the latest competência likely to be closed. */
+function previousMonth(): string {
+  const now = new Date()
+  const d = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+const NO_PEC_SOURCE = new Error('Nenhuma fonte do e-SUS PEC cadastrada que você possa administrar.')
+
+function sourceLabel(source: SourceResponse): string {
+  return `${source.municipalityIbge} · ${source.id}`
+}
+
 export function IsolamentoPage() {
-  const { data, error, isError, isPending } = useIsolamento()
-  const [tab, setTab] = useState('validacao')
-  if (isPending) return <PageSkeleton title="Isolamento Municipal" />
-  if (isError) {
-    return (
-      <PageUnavailable
-        title="Isolamento Municipal"
-        subtitle="Garanta que os dados utilizados são apenas do município selecionado."
-        error={error}
-      />
-    )
+  const { data: fontes, error, isError, isPending } = useFontesPec()
+  const { municipalityIbge, referencePeriod } = useScope()
+  // In the URL, so a reload after a check keeps showing the source that was checked.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const sourceId = searchParams.get('fonte')
+  const queryClient = useQueryClient()
+  const [competencia, setCompetencia] = useState<string | null>(null)
+  const [senhaAtual, setSenhaAtual] = useState('')
+  const [validando, setValidando] = useState(false)
+  const [erroValidacao, setErroValidacao] = useState<string | null>(null)
+
+  if (isPending) return <PageSkeleton title={TITLE} />
+  if (isError) return <PageUnavailable title={TITLE} subtitle={SUBTITLE} error={error} />
+  const fonte = fontes.find((f) => f.id === sourceId) ?? pickSource(fontes, municipalityIbge)
+  if (!fonte) return <PageUnavailable title={TITLE} subtitle={SUBTITLE} error={NO_PEC_SOURCE} />
+
+  const status = normalizeIsolation(fonte)
+  const selecionada = competencia ?? status.competencia ?? referencePeriod ?? previousMonth()
+  const tone = bannerTones[status.situacao]
+
+  async function validar() {
+    if (!senhaAtual || !selecionada) return
+    setValidando(true)
+    setErroValidacao(null)
+    try {
+      const resultado = await validarIsolamento(status.sourceId, senhaAtual, selecionada)
+      setSenhaAtual('')
+      setErroValidacao(isolationCheckNotice(resultado))
+      await queryClient.invalidateQueries({ queryKey: ['fonte'] })
+    } catch {
+      setErroValidacao('Senha incorreta ou validação indisponível. Tente novamente.')
+    } finally {
+      setValidando(false)
+    }
   }
 
   return (
     <>
       <PageHeader
-        title="Isolamento Municipal"
-        subtitle="Garanta que os dados utilizados são apenas do município selecionado."
-        lastUpdate
+        title={TITLE}
+        subtitle={SUBTITLE}
+        actions={
+          fontes.length > 1 && (
+            <FilterSelect
+              label="Fonte"
+              value={sourceLabel(fonte)}
+              options={fontes.map(sourceLabel)}
+              onChange={(label) => {
+                const chosen = fontes.find((f) => sourceLabel(f) === label)
+                if (chosen) setSearchParams({ fonte: chosen.id }, { replace: true })
+              }}
+            />
+          )
+        }
       />
-
-      <UnderlineTabs items={tabs} value={tab} onChange={setTab} sx={{ mb: 2 }} />
 
       <Box
         sx={{
-          bgcolor: '#f4fbf6',
-          border: `1px solid ${colors.successBorder}`,
+          bgcolor: tone.bg,
+          border: `1px solid ${tone.border}`,
           borderRadius: '14px',
           p: 2.5,
           mb: 2,
@@ -124,7 +206,7 @@ export function IsolamentoPage() {
               width: 100,
               height: 100,
               borderRadius: '50%',
-              bgcolor: '#dff5e6',
+              bgcolor: tone.ring,
               display: 'grid',
               placeItems: 'center',
               flexShrink: 0,
@@ -135,72 +217,107 @@ export function IsolamentoPage() {
                 width: 60,
                 height: 60,
                 borderRadius: '50%',
-                bgcolor: colors.success,
+                bgcolor: tone.dot,
                 color: '#fff',
                 display: 'grid',
                 placeItems: 'center',
               }}
             >
-              <Check size={32} strokeWidth={3.5} />
+              {tone.icon}
             </Box>
           </Box>
           <Box sx={{ flex: 1 }}>
             <Typography sx={{ fontSize: 22, fontWeight: 700, color: colors.navy }}>
-              Recorte municipal validado
+              {status.titulo}
             </Typography>
             <Typography sx={{ fontSize: 15, color: colors.textSecondary, mt: 0.5 }}>
-              A base de dados está filtrada e contém apenas registros do município de{' '}
-              <strong style={{ color: colors.navy }}>{data.municipioUf}</strong>.
+              {status.mensagem}
             </Typography>
             <Box sx={{ mt: 2 }}>
               <StatColumns
                 stats={[
-                  { label: 'Município identificado', value: data.municipio },
-                  { label: 'IBGE', value: data.ibge },
-                  { label: 'Total de cadastros', value: formatInt(data.totalCadastros) },
-                  { label: 'Última validação', value: data.ultimaValidacao },
+                  { label: 'IBGE da fonte', value: status.ibge },
+                  {
+                    label: 'Competência da validação',
+                    value: status.competencia ? formatReferencePeriod(status.competencia) : '—',
+                  },
+                  {
+                    label: 'Atendimentos individuais do município',
+                    value:
+                      status.atendimentosMunicipio === null
+                        ? '—'
+                        : formatInt(status.atendimentosMunicipio),
+                  },
+                  {
+                    label: 'Última validação',
+                    value: status.ultimaValidacao
+                      ? new Date(status.ultimaValidacao).toLocaleString('pt-BR')
+                      : '—',
+                  },
                 ]}
               />
             </Box>
           </Box>
         </Box>
         <Box
+          component="form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void validar()
+          }}
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: '340px 1fr' },
+            gridTemplateColumns: { xs: '1fr', md: '180px 1fr auto' },
             gap: 2.5,
+            alignItems: 'end',
             mt: 2.5,
           }}
         >
+          <Field
+            label="Competência"
+            type="month"
+            value={selecionada}
+            onChange={(e) => setCompetencia(e.target.value)}
+          />
+          <PasswordField
+            label="Senha da sua conta Esusdata"
+            value={senhaAtual}
+            onChange={(e) => setSenhaAtual(e.target.value)}
+            autoComplete="current-password"
+          />
           <Button
+            type="submit"
             variant="outlined"
             size="large"
+            disabled={validando || !senhaAtual || !selecionada}
             startIcon={<RefreshCw size={22} />}
-            sx={{ minHeight: 60, fontSize: 17, fontWeight: 500, borderWidth: 1.5 }}
+            sx={{ minHeight: 50, fontSize: 17, fontWeight: 500, borderWidth: 1.5 }}
           >
-            Validar novamente
+            {status.situacao === 'nunca' ? 'Validar' : 'Validar novamente'}
           </Button>
+        </Box>
+        {erroValidacao && (
+          <Typography role="alert" color="error" sx={{ mt: 1.5 }}>
+            {erroValidacao}
+          </Typography>
+        )}
+        <Box sx={{ mt: 2.5 }}>
           <Callout variant="info" title="Importante">
-            A validação confirma apenas que os registros pertencem ao município selecionado.
-            <br />
-            Não avalia a qualidade, a completude ou a consistência clínica dos dados.
+            A validação conta os atendimentos individuais da competência por código IBGE, sem ler
+            nenhum registro. Não avalia a qualidade, a completude ou a consistência clínica dos
+            dados, nem equipes, CNES ou território.
           </Callout>
         </Box>
       </Box>
 
       <SectionCard
         title="Regras de validação do recorte"
-        subtitle="Verificações realizadas para garantir o isolamento dos dados do município selecionado."
-        action={
-          <Button variant="outlined" startIcon={<FileText size={18} />} sx={{ fontSize: 14 }}>
-            Ver detalhes técnicos
-          </Button>
-        }
+        subtitle="O que a última validação mostrou sobre a competência validada."
         sx={{ mb: 2 }}
       >
         <DataTable
           columns={columns}
-          rows={data.regras}
+          rows={status.regras}
           getRowKey={(r) => r.nome}
           bordered
           sx={{ '& th': { fontSize: 13.5, py: 1 }, '& td': { py: 0.9 } }}
@@ -208,11 +325,9 @@ export function IsolamentoPage() {
       </SectionCard>
 
       <Callout variant="info" iconStyle="filled" title="Sobre o isolamento municipal">
-        Esta validação garante que os indicadores, relatórios e análises utilizarão apenas os
-        registros do município selecionado.
-        <br />
-        Para alterações de município, utilize o seletor no topo da página e valide novamente o
-        recorte.
+        Os indicadores usam apenas os atendimentos cujo código IBGE é o da fonte: a consulta de
+        extração filtra por ele. Esta validação mostra o que mais existe na base do PEC na
+        competência escolhida.
       </Callout>
     </>
   )

@@ -230,6 +230,7 @@ const registeredSource = (id, municipalityIbge) => ({
   readModel: 'PEC_DW',
   createdAt: '2026-09-27T12:00:00Z',
   lastDiagnostic: null,
+  lastIsolationCheck: null,
 })
 
 test('shows the source of the selected municipality, else the first one listed', () => {
@@ -258,6 +259,7 @@ test('normalizes a never-tested source without inventing a password or a last te
     readModel: 'PEC_DW',
     createdAt: '2026-09-27T12:00:00Z',
     lastDiagnostic: null,
+    lastIsolationCheck: null,
   })
 
   assert.deepEqual(fonte, {
@@ -327,6 +329,117 @@ test('labels every source requirement code, keeping the API order', () => {
       { label: 'Município configurado', ok: true },
     ],
   )
+})
+
+const checkedSource = (counts) =>
+  normalizers.normalizeIsolation({
+    ...registeredSource('pec', '3541307'),
+    lastIsolationCheck: {
+      referencePeriod: '2026-03',
+      outcome: 'CHECKED',
+      registeredCount: 10029,
+      otherMunicipalityCount: 0,
+      otherMunicipalityCodes: 0,
+      unidentifiedCount: 0,
+      checkedAt: '2026-09-27T12:00:00Z',
+      ...counts,
+    },
+  })
+
+test('offers the isolation check only for a PEC source with its whole identity', () => {
+  const pec = registeredSource('pec', '3541307')
+
+  assert.equal(normalizers.isPecSource(pec), true)
+  assert.equal(normalizers.isPecSource({ ...pec, sourceFamily: 'EXTERNAL_DATASET' }), false)
+  assert.equal(normalizers.isPecSource({ ...pec, pecVersion: null }), false)
+  assert.equal(normalizers.isPecSource({ ...pec, readModel: null }), false)
+  assert.equal(normalizers.isPecSource({ ...pec, pecInstallationRole: 'UNKNOWN' }), false)
+  assert.equal(normalizers.isPecSource({ ...pec, pecVersion: 'foo' }), false)
+  assert.equal(normalizers.isPecSource({ ...pec, readModel: 'BAD' }), false)
+  assert.equal(normalizers.isPecSource({ ...pec, id: '  ' }), false)
+})
+
+test('never claims a validated scope for a source that was never checked', () => {
+  const status = normalizers.normalizeIsolation(registeredSource('pec', '3541307'))
+
+  assert.equal(status.situacao, 'nunca')
+  assert.equal(status.competencia, null)
+  assert.equal(status.atendimentosMunicipio, null)
+  assert.deepEqual(
+    status.regras.map((r) => r.nome),
+    ['Recorte na consulta de extração'],
+  )
+})
+
+test('validates only a competência with atendimentos of the municipality and nothing else', () => {
+  const status = checkedSource({})
+
+  assert.equal(status.situacao, 'validado')
+  assert.equal(status.competencia, '2026-03')
+  assert.equal(status.atendimentosMunicipio, 10029)
+  assert.deepEqual(
+    status.regras.map((r) => [r.nome, r.resultado, r.detalhes]),
+    [
+      ['Município encontrado na base', 'conforme', '10.029 atendimentos'],
+      ['Registros de outros municípios', 'conforme', 'Nenhum'],
+      ['Atendimentos sem código IBGE', 'conforme', 'Nenhum'],
+      [
+        'Recorte na consulta de extração',
+        'verificado',
+        'Garantido pela consulta, não por esta contagem',
+      ],
+    ],
+  )
+})
+
+test('flags other municipalities and missing codes instead of calling the base isolated', () => {
+  const others = checkedSource({ otherMunicipalityCount: 12, otherMunicipalityCodes: 2 })
+  assert.equal(others.situacao, 'atencao')
+  assert.equal(others.regras[1].resultado, 'verificado')
+  assert.equal(others.regras[1].detalhes, '12 atendimentos de 2 municípios, fora do recorte')
+
+  const unidentified = checkedSource({ unidentifiedCount: 1 })
+  assert.equal(unidentified.situacao, 'atencao')
+  assert.equal(unidentified.regras[2].resultado, 'atencao')
+  assert.equal(unidentified.regras[2].detalhes, '1 atendimento')
+
+  const empty = checkedSource({ registeredCount: 0 })
+  assert.equal(empty.situacao, 'atencao')
+  assert.equal(empty.regras[0].resultado, 'atencao')
+})
+
+test('shows a failed check without counts it never produced', () => {
+  const status = normalizers.normalizeIsolation({
+    ...registeredSource('pec', '3541307'),
+    lastIsolationCheck: {
+      referencePeriod: '2026-03',
+      outcome: 'COMPATIBILITY_MISMATCH',
+      registeredCount: null,
+      otherMunicipalityCount: null,
+      otherMunicipalityCodes: null,
+      unidentifiedCount: null,
+      checkedAt: '2026-09-27T12:00:00Z',
+    },
+  })
+
+  assert.equal(status.situacao, 'falha')
+  assert.equal(status.atendimentosMunicipio, null)
+  assert.match(status.mensagem, /matriz de compatibilidade/)
+})
+
+test('warns about a busy source instead of showing the previous isolation check as this one', () => {
+  const response = (outcome) => ({
+    referencePeriod: '2026-03',
+    outcome,
+    registeredCount: null,
+    otherMunicipalityCount: null,
+    otherMunicipalityCodes: null,
+    unidentifiedCount: null,
+    checkedAt: '2026-09-27T12:00:00Z',
+  })
+
+  assert.match(normalizers.isolationCheckNotice(response('SOURCE_BUSY')), /em uso/)
+  assert.equal(normalizers.isolationCheckNotice(response('CHECKED')), null)
 })
 
 test('keeps a remembered scope choice only while the API still offers it', () => {

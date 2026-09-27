@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.auth.model.Role;
 import esusdata.source.model.LastDiagnostic;
+import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceRecord;
 import esusdata.web.ApiFixtureSupport;
 import java.net.URI;
@@ -221,6 +222,122 @@ class SourceApiTest extends ApiFixtureSupport {
     }
 
     @Test
+    void anIsolationCheckOfAnUnreachableSourceIsStoredForItsCompetencia() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String cookie = reauthenticatedSessionCookie(admin);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+        assertThat(get(cookie, "/api/v1/sources").body()).contains("\"lastIsolationCheck\":null");
+
+        HttpResponse<String> response = isolationCheck(cookie, sourceId, "{\"referencePeriod\":\"2026-03\"}");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body())
+                .contains("\"referencePeriod\":\"2026-03\"")
+                .contains("\"outcome\":\"DESTINATION_NOT_ALLOWED\"")
+                .contains("\"registeredCount\":null")
+                .doesNotContain("PEC_DB_PASSWORD");
+        assertThat(get(cookie, "/api/v1/sources").body())
+                .contains("\"lastIsolationCheck\":{\"referencePeriod\":\"2026-03\","
+                        + "\"outcome\":\"DESTINATION_NOT_ALLOWED\"");
+    }
+
+    @Test
+    void anIsolationCheckNeedsAValidCompetencia() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String cookie = reauthenticatedSessionCookie(admin);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+
+        assertThat(isolationCheck(cookie, sourceId, "{\"referencePeriod\":\"03/2026\"}")
+                        .statusCode())
+                .isEqualTo(400);
+        assertThat(isolationCheck(cookie, sourceId, "{}").statusCode()).isEqualTo(400);
+    }
+
+    @Test
+    void anIsolationCheckOfANonPecSourceIsABadRequestNotAnError() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String cookie = reauthenticatedSessionCookie(admin);
+        String sourceId = "src-" + System.nanoTime();
+        authenticatedPost(
+                cookie,
+                URI.create(BASE_URL + "/api/v1/sources"),
+                createSourceJson(sourceId).replace("PEC_POSTGRESQL", "EXTERNAL_DATASET"));
+
+        HttpResponse<String> response = isolationCheck(cookie, sourceId, "{\"referencePeriod\":\"2026-03\"}");
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(response.body()).contains("not a PEC source");
+    }
+
+    @Test
+    void anIsolationCheckRequiresRecentReauthentication() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+
+        HttpResponse<String> response =
+                isolationCheck(sessionCookie(admin), sourceId, "{\"referencePeriod\":\"2026-03\"}");
+
+        assertThat(response.statusCode()).isEqualTo(401);
+        assertThat(response.body()).contains("REAUTHENTICATION_REQUIRED");
+    }
+
+    @Test
+    void anIsolationCheckOfAnotherMunicipalitysSourceIsAnOpaque404() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String cookie = reauthenticatedSessionCookie(admin);
+        String otherSource = "src-other-" + System.nanoTime();
+        registerSource(otherSource, MUNICIPALITY_B);
+
+        HttpResponse<String> response = isolationCheck(cookie, otherSource, "{\"referencePeriod\":\"2026-03\"}");
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(response.body()).doesNotContain(otherSource);
+    }
+
+    @Test
+    void aLateIsolationCheckOfAReplacedConfigurationNeverOverwritesTheCurrentOne() {
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+        SourceRecord v1 = sourceRepository.findById(sourceId).orElseThrow();
+        sourceRepository.upsert(new SourceRecord(
+                v1.id(),
+                2,
+                v1.sourceFamily(),
+                v1.pecInstallationRole(),
+                v1.sourceLocationKind(),
+                v1.host(),
+                v1.port(),
+                v1.databaseName(),
+                "outro_usuario",
+                v1.secretRef(),
+                v1.municipalityIbge(),
+                v1.pecVersion(),
+                v1.readModel(),
+                v1.createdAt()));
+
+        sourceRepository.recordIsolationCheck(
+                sourceId, new LastIsolationCheck(2, "2026-03", "CHECKED", 10_029L, 0L, 0, 0L, "2026-09-27T12:00:00Z"));
+        sourceRepository.recordIsolationCheck(
+                sourceId,
+                new LastIsolationCheck(
+                        1, "2026-02", "CONNECTION_FAILED", null, null, null, null, "2026-09-27T12:00:01Z"));
+
+        LastIsolationCheck stored = sourceRepository.findLastIsolationChecks().get(sourceId);
+        assertThat(stored.sourceConfigurationVersion()).isEqualTo(2);
+        assertThat(stored.referencePeriod()).isEqualTo("2026-03");
+        assertThat(stored.registeredCount()).isEqualTo(10_029L);
+        assertThat(stored.otherMunicipalityCodes()).isZero();
+    }
+
+    @Test
     void requirementsOfAnotherMunicipalityOrAnUnknownSourceAreTheSameOpaque404() throws Exception {
         String admin = createUser("admin-" + System.nanoTime());
         grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
@@ -246,6 +363,11 @@ class SourceApiTest extends ApiFixtureSupport {
                             .build(),
                     HttpResponse.BodyHandlers.ofString());
         }
+    }
+
+    private HttpResponse<String> isolationCheck(String sessionCookie, String sourceId, String body) throws Exception {
+        return authenticatedPost(
+                sessionCookie, URI.create(BASE_URL + "/api/v1/sources/" + sourceId + "/isolation-check"), body);
     }
 
     private static String createSourceJson(String sourceId) {

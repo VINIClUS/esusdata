@@ -318,7 +318,7 @@ fn len_i64(value: &str) -> i64 {
 /// This does not touch the bytes plan §2.3 checksums — that checksum is computed from
 /// `QUERY_TEXT` directly, never from this converted copy, exactly mirroring what pgJDBC already
 /// does invisibly to the same frozen text on the Java side.
-fn to_positional_placeholders(query: &str) -> String {
+pub fn to_positional_placeholders(query: &str) -> String {
     let mut result = String::with_capacity(query.len() + 8);
     let mut n = 0;
     for c in query.chars() {
