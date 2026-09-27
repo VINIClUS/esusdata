@@ -199,8 +199,8 @@ class SourceApiTest extends ApiFixtureSupport {
                 get(cookie, "/api/v1/sources/src-missing-" + System.nanoTime() + "/requirements");
 
         assertThat(other.statusCode()).isEqualTo(404);
-        assertThat(other.body()).doesNotContain(otherSource).doesNotContain(MUNICIPALITY_B);
         assertThat(unknown.statusCode()).isEqualTo(404);
+        assertThat(other.body()).isEqualTo(unknown.body()).doesNotContain(otherSource);
     }
 
     private static HttpResponse<String> get(String sessionCookie, String path) throws Exception {

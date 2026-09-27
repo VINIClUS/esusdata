@@ -199,7 +199,7 @@ try {
   )
   // No destination is allowlisted in this run, so the stored diagnostic is a refusal. It must
   // survive a reload: it comes from the API, not from page state.
-  await page.getByLabel('Sua senha atual').fill('very-strong-admin-password-1')
+  await page.getByLabel('Senha da sua conta Esusdata').fill('very-strong-admin-password-1')
   await page.getByRole('button', { name: 'Testar fonte cadastrada' }).click()
   await page.getByText('Destino não autorizado nesta instalação.').waitFor()
   await page.reload()

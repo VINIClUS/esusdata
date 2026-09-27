@@ -17,6 +17,7 @@ import type {
   SourceRequirementCode,
   SourceRequirementResponse,
   SourceResponse,
+  SourceTestResponse,
 } from './types'
 
 interface CategoryDefinition {
@@ -221,6 +222,14 @@ export function normalizeSource(source: SourceResponse): Fonte {
         }
       : null,
   }
+}
+
+// A busy source is not stored, so the page would otherwise keep showing the previous result as if
+// it were this test's; every other outcome is read back from the stored last diagnostic.
+export function sourceTestNotice(response: SourceTestResponse): string | null {
+  return response.outcome === 'SOURCE_BUSY'
+    ? 'A fonte está em uso por uma aquisição. Tente novamente em instantes.'
+    : null
 }
 
 // Each label claims only what the API checks: a connection that opened, not a SELECT-only

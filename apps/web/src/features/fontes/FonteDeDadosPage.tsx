@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Building, Database, Radio, Shield, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { testarFonte, useFonte, useRequisitosFonte } from '@/api/hooks'
+import { sourceTestNotice } from '@/api/normalizers'
 import { Checklist } from '@/components/data/ChecklistCard'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Callout } from '@/components/ui/Callout'
@@ -98,8 +99,9 @@ export function FonteDeDadosPage() {
     setTestando(true)
     setErroTeste(null)
     try {
-      await testarFonte(fonte.id, senhaAtual)
+      const resultado = await testarFonte(fonte.id, senhaAtual)
       setSenhaAtual('')
+      setErroTeste(sourceTestNotice(resultado))
       await queryClient.invalidateQueries({ queryKey: ['fonte'] })
     } catch {
       setErroTeste('Senha incorreta ou teste indisponível. Tente novamente.')
@@ -152,13 +154,15 @@ export function FonteDeDadosPage() {
               </Box>
               <Field label="Nome do banco de dados" value={data.nomeBanco} slotProps={readOnly} />
               <Field label="Usuário" value={data.usuario} slotProps={readOnly} />
-              <PasswordField
-                label="Sua senha atual"
-                value={senhaAtual}
-                onChange={(e) => setSenhaAtual(e.target.value)}
-                autoComplete="current-password"
-                helperText="Confirme sua identidade para testar a fonte."
-              />
+              <Box sx={{ borderTop: `1px solid ${colors.infoBorder}`, pt: 2.5 }}>
+                <PasswordField
+                  label="Senha da sua conta Esusdata"
+                  value={senhaAtual}
+                  onChange={(e) => setSenhaAtual(e.target.value)}
+                  autoComplete="current-password"
+                  helperText="Não é a senha do banco: confirma sua identidade para testar a fonte."
+                />
+              </Box>
               {erroTeste && (
                 <Typography role="alert" color="error">
                   {erroTeste}

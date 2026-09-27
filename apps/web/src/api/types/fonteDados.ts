@@ -30,6 +30,15 @@ export interface LastDiagnosticResponse {
   testedAt: string
 }
 
+/** `POST /sources/{id}/test`; every outcome but SOURCE_BUSY is stored as the last diagnostic. */
+export interface SourceTestResponse {
+  outcome: DiagnosticOutcome | 'SOURCE_BUSY'
+  detail: string | null
+  maxRows: number
+  maxDurationMs: number
+  statementTimeoutMs: number
+}
+
 export type SourceRequirementCode =
   'READ_CONNECTION' | 'PEC_POSTGRESQL_FAMILY' | 'PEC_VERSION_IN_MATRIX' | 'MUNICIPAL_SCOPE'
 

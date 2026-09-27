@@ -298,6 +298,20 @@ test('shows the stored last diagnostic as the last test, failed unless CONNECTED
   }
 })
 
+test('warns about a busy source instead of passing off the previous result as this test', () => {
+  const response = (outcome) => ({
+    outcome,
+    detail: null,
+    maxRows: 1,
+    maxDurationMs: 1,
+    statementTimeoutMs: 1,
+  })
+
+  assert.match(normalizers.sourceTestNotice(response('SOURCE_BUSY')), /em uso por uma aquisição/)
+  assert.equal(normalizers.sourceTestNotice(response('CONNECTED')), null)
+  assert.equal(normalizers.sourceTestNotice(response('DESTINATION_NOT_ALLOWED')), null)
+})
+
 test('labels every source requirement code, keeping the API order', () => {
   assert.deepEqual(
     normalizers.normalizeRequirements([

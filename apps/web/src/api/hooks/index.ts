@@ -30,6 +30,7 @@ import type {
   RunResponse,
   SourceRequirementResponse,
   SourceResponse,
+  SourceTestResponse,
 } from '../types'
 
 function mockOnly<T>(mock: T, message: string) {
@@ -159,17 +160,27 @@ export function useFonte() {
  * caller's current password goes to `/auth/reauth` first; the result is stored by the API and read
  * back through `useFonte`/`useRequisitosFonte`, which the caller then invalidates.
  */
-export async function testarFonte(sourceId: string, senhaAtual: string): Promise<void> {
+export async function testarFonte(
+  sourceId: string,
+  senhaAtual: string,
+): Promise<SourceTestResponse> {
   if (USE_MOCKS) {
-    await resolveMock(undefined)
-    return
+    return resolveMock<SourceTestResponse>({
+      outcome: 'CONNECTED',
+      detail: null,
+      maxRows: 0,
+      maxDurationMs: 0,
+      statementTimeoutMs: 0,
+    })
   }
   await ensureApiReady()
   await apiFetch<undefined>('/auth/reauth', {
     method: 'POST',
     body: JSON.stringify({ password: senhaAtual }),
   })
-  await apiFetch<unknown>(`/sources/${encodeURIComponent(sourceId)}/test`, { method: 'POST' })
+  return apiFetch<SourceTestResponse>(`/sources/${encodeURIComponent(sourceId)}/test`, {
+    method: 'POST',
+  })
 }
 
 // Keyed under ['fonte'] so a new diagnostic refreshes the source and its requirements together.
