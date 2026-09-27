@@ -259,6 +259,7 @@ test('normalizes a registered source without inventing a password or a last test
   })
 
   assert.deepEqual(fonte, {
+    id: 'pec-principal',
     tipo: 'PostgreSQL (e-SUS PEC)',
     host: '192.0.2.10',
     porta: '5433',

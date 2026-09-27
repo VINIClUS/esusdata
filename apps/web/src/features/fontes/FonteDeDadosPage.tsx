@@ -73,7 +73,10 @@ export function FonteDeDadosPage() {
   } = useRequisitosFonte()
   const navigate = useNavigate()
   const [tab, setTab] = useState('conexao')
-  const [form, setForm] = useState<Record<string, string> | null>(null)
+  // Edits belong to the source they were made on: switching municipality shows the other source.
+  const [form, setForm] = useState<{ sourceId: string; values: Record<string, string> } | null>(
+    null,
+  )
 
   if (isPending) return <PageSkeleton title="Configuração da Fonte de Dados" />
   if (isError) {
@@ -85,7 +88,7 @@ export function FonteDeDadosPage() {
       />
     )
   }
-  const values = form ?? {
+  const values = (form?.sourceId === data.id ? form.values : null) ?? {
     host: data.host,
     porta: data.porta,
     nomeBanco: data.nomeBanco,
@@ -94,7 +97,7 @@ export function FonteDeDadosPage() {
     senha: '',
   }
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm({ ...values, [k]: e.target.value })
+    setForm({ sourceId: data.id, values: { ...values, [k]: e.target.value } })
 
   return (
     <>

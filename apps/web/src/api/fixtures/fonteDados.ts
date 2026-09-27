@@ -2,6 +2,7 @@
 import type { Fonte, RequisitoFonte } from '../types'
 
 export const fonteFixture: Fonte = {
+  id: 'pec-demo',
   tipo: 'PostgreSQL (e-SUS PEC)',
   host: '192.0.2.10', // TEST-NET-1 (RFC 5737): documentation range, never a real host
   porta: '5432',

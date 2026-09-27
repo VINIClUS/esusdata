@@ -188,6 +188,7 @@ const sourceFamilyLabels: Record<SourceFamily, string> = {
 // The API keeps no diagnostic history yet, so a freshly loaded source has no last test.
 export function normalizeSource(source: SourceResponse): Fonte {
   return {
+    id: source.id,
     tipo: sourceFamilyLabels[source.sourceFamily],
     host: source.host,
     porta: String(source.port),

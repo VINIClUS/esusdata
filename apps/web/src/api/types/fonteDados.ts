@@ -1,4 +1,5 @@
 export interface Fonte {
+  id: string
   tipo: string
   host: string
   porta: string

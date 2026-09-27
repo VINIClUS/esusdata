@@ -5,6 +5,7 @@ import esusdata.auth.model.ScopeKind;
 import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
@@ -50,6 +51,17 @@ public final class ScopeResolver {
      */
     public boolean hasPermission(String userId, Permission permission, String municipalityIbge) {
         return hasPermission(userId, permission, municipalityIbge, null, null);
+    }
+
+    /**
+     * {@link #hasPermission(String, Permission, String)} for many municipalities at once, reading
+     * the grants once — for narrowing a listing without one query per row. The grants are read
+     * when this is called, so the predicate must not outlive the request.
+     */
+    public Predicate<String> permissionByMunicipality(String userId, Permission permission) {
+        List<EffectiveGrant> grants = effectiveGrants(userId);
+        return municipalityIbge ->
+                grants.stream().anyMatch(grant -> grantAuthorizes(grant, permission, municipalityIbge, null, null));
     }
 
     /**

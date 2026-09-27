@@ -11,6 +11,7 @@ import esusdata.web.ApiNotFoundException;
 import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -55,8 +56,9 @@ public class SourceController {
      */
     @GetMapping("/api/v1/sources")
     public List<SourceResponse> list(@AuthenticationPrincipal AuthenticatedSession session) {
+        Predicate<String> permitted = authorization.permittedMunicipalities(session, Permission.MANAGE_SOURCE);
         return sourceRepository.findAll().stream()
-                .filter(source -> authorization.permits(session, Permission.MANAGE_SOURCE, source.municipalityIbge()))
+                .filter(source -> permitted.test(source.municipalityIbge()))
                 .map(SourceController::toResponse)
                 .toList();
     }
