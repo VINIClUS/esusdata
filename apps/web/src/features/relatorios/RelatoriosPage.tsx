@@ -123,13 +123,15 @@ export function RelatoriosPage() {
   const ibge = municipalityIbge ?? ''
   const ultima = competencias[0]
   // Defaults to the last three published competências, within the 24-competência limit.
+  // A choice made under another municipality may not be published here: then the default applies.
+  const publicada = (c: string | null) => (c && competencias.includes(c) ? c : null)
   const inicial =
-    inicio ??
+    publicada(inicio) ??
     competencias
       .slice(0, 3)
       .filter((c) => !!ultima && competenciasBetween(c, ultima) <= MAX_COMPETENCIAS)
       .at(-1)
-  const final = fim ?? ultima
+  const final = publicada(fim) ?? ultima
   const packs = indicadores.data?.itens ?? []
   const nomes = [TODOS, ...packs.map((p) => p.nome)]
   const pack = packs.find((p) => p.nome === indicador)?.codigo ?? null

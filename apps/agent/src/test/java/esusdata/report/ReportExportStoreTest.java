@@ -73,6 +73,9 @@ class ReportExportStoreTest {
         publish("r-apr-a", IBGE, "2026-04", "2026-05-01T00:00:00Z");
         publish("r-apr-b", IBGE, "2026-04", "2026-05-01T00:00:00Z");
         publish("r-may", IBGE, "2026-05", "2026-06-01T00:00:00Z");
+        // Later by half a second, though it sorts first as text.
+        publish("r-jun-z-old", IBGE, "2026-06", "2026-07-01T12:00:00Z");
+        publish("r-jun-a-new", IBGE, "2026-06", "2026-07-01T12:00:00.500Z");
         publish("r-other", OTHER_IBGE, "2026-03", "2026-04-03T00:00:00Z");
 
         List<PublishedResult> range = results.findLatestPublishedInRange(IBGE, null, "2026-02", "2026-04");
@@ -82,6 +85,12 @@ class ReportExportStoreTest {
         assertThat(results.findLatestPublishedInRange(IBGE, C1, "2026-05", "2026-05"))
                 .extracting(PublishedResult::resultId)
                 .containsExactly("r-may");
+        assertThat(results.findLatestPublishedInRange(IBGE, C1, "2026-06", "2026-06"))
+                .extracting(PublishedResult::resultId)
+                .containsExactly("r-jun-a-new");
+        assertThat(results.findPublished(IBGE, C1, "2026-06"))
+                .extracting(PublishedResult::resultId)
+                .containsExactly("r-jun-a-new", "r-jun-z-old");
         assertThat(results.findLatestPublishedInRange(IBGE, "other-pack", "2026-01", "2026-12"))
                 .isEmpty();
         assertThatThrownBy(() -> results.findLatestPublishedInRange("35", null, "2026-01", "2026-12"))

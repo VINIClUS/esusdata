@@ -56,7 +56,7 @@ public final class JdbcResultRepository implements ResultRepository {
         return jdbc.query("""
                 select * from results
                  where municipality_ibge = ? and indicator_pack = ? and reference_period = ?
-                 order by published_at desc
+                 order by julianday(published_at) desc, result_id desc
                 """, MAPPER, municipalityIbge, indicatorPack, referencePeriod);
     }
 
@@ -64,12 +64,14 @@ public final class JdbcResultRepository implements ResultRepository {
     public List<PublishedResult> findLatestPublishedInRange(
             String municipalityIbge, String indicatorPack, String fromPeriod, String toPeriod) {
         requireScope(municipalityIbge);
-        // result_id breaks a published_at tie, so the same range always yields the same rows.
+        // published_at is Instant.toString(), whose fraction varies in length, so the text does not
+        // sort in time order ("12:00:00Z" > "12:00:00.5Z"): julianday parses it. result_id breaks
+        // a tie, so the same range always yields the same rows.
         return jdbc.query("""
                 select * from (
                     select r.*, row_number() over (
                                partition by indicator_pack, reference_period
-                               order by published_at desc, result_id desc) as newest
+                               order by julianday(published_at) desc, result_id desc) as newest
                       from results r
                      where municipality_ibge = ?
                        and (? is null or indicator_pack = ?)
