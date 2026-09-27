@@ -3,6 +3,7 @@ use crate::{
     connect_session, end_transaction, hex_encode, matrix, report_pre_probe_failure, run_probes,
     session_tls_or_report, stream, write_line,
 };
+use chrono::NaiveDate;
 use postgres::IsolationLevel;
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -26,6 +27,9 @@ pub fn check_isolation(
     mut envelope: IsolationEnvelope,
     mut lines: io::Lines<io::StdinLock<'static>>,
 ) -> Result<i32, Box<dyn Error>> {
+    // A malformed period fails before any session exists.
+    let (period_start, period_end_exclusive) =
+        period(&envelope.period_start, &envelope.period_end_exclusive)?;
     let Some(session_tls) =
         session_tls_or_report(envelope.tls_root_cert.as_deref(), &mut envelope.password)?
     else {
@@ -83,18 +87,19 @@ pub fn check_isolation(
     let decision = lines
         .next()
         .ok_or("stdin closed before a decision was received")??;
-    if decision.contains("\"type\":\"abort\"") {
-        end_transaction(txn.rollback());
-        return Ok(1);
-    }
-    if !decision.contains("\"type\":\"proceed\"") {
-        eprintln!("observatorio-execplane: expected 'proceed' or 'abort', got: {decision}");
-        end_transaction(txn.rollback());
-        return Ok(3);
+    match Decision::of(&decision) {
+        Decision::Proceed => {}
+        Decision::Abort => {
+            end_transaction(txn.rollback());
+            return Ok(1);
+        }
+        Decision::Unexpected => {
+            eprintln!("observatorio-execplane: expected 'proceed' or 'abort', got: {decision}");
+            end_transaction(txn.rollback());
+            return Ok(3);
+        }
     }
 
-    let period_start = chrono::NaiveDate::from_str(&envelope.period_start)?;
-    let period_end_exclusive = chrono::NaiveDate::from_str(&envelope.period_end_exclusive)?;
     let rows = match txn.query(
         stream::to_positional_placeholders(QUERY_TEXT).as_str(),
         &[&period_start, &period_end_exclusive],
@@ -111,24 +116,63 @@ pub fn check_isolation(
     {
         return report_budget_exceeded(&detail);
     }
-    if i64::try_from(rows.len()).unwrap_or(i64::MAX) > budget.max_rows {
-        return report_budget_exceeded(&format!(
-            "row ceiling exceeded: {} > {}",
-            rows.len(),
-            budget.max_rows
+    let counts: Vec<(Option<String>, i64)> =
+        rows.iter().map(|row| (row.get(0), row.get(1))).collect();
+    match isolation_message(&counts, budget.max_rows) {
+        Ok(message) => {
+            write_line(&message)?;
+            Ok(0)
+        }
+        Err(detail) => report_budget_exceeded(&detail),
+    }
+}
+
+fn period(start: &str, end_exclusive: &str) -> Result<(NaiveDate, NaiveDate), Box<dyn Error>> {
+    let start = NaiveDate::from_str(start)?;
+    let end_exclusive = NaiveDate::from_str(end_exclusive)?;
+    if end_exclusive <= start {
+        return Err(format!("empty period: {start} to {end_exclusive}").into());
+    }
+    Ok((start, end_exclusive))
+}
+
+/// Java's answer to the `probe` message.
+#[derive(Debug, PartialEq, Eq)]
+enum Decision {
+    Proceed,
+    Abort,
+    Unexpected,
+}
+
+impl Decision {
+    fn of(line: &str) -> Self {
+        if line.contains("\"type\":\"abort\"") {
+            Self::Abort
+        } else if line.contains("\"type\":\"proceed\"") {
+            Self::Proceed
+        } else {
+            Self::Unexpected
+        }
+    }
+}
+
+/// The terminal `isolation` message, or why the counts exceed the row ceiling — one row per
+/// distinct `co_ibge` of the period.
+fn isolation_message(
+    counts: &[(Option<String>, i64)],
+    max_rows: i64,
+) -> Result<serde_json::Value, String> {
+    if i64::try_from(counts.len()).unwrap_or(i64::MAX) > max_rows {
+        return Err(format!(
+            "row ceiling exceeded: {} > {max_rows}",
+            counts.len()
         ));
     }
-
-    let counts: Vec<serde_json::Value> = rows
+    let counts: Vec<serde_json::Value> = counts
         .iter()
-        .map(|row| {
-            let ibge: Option<String> = row.get(0);
-            let count: i64 = row.get(1);
-            json!({ "ibge": ibge, "count": count })
-        })
+        .map(|(ibge, count)| json!({ "ibge": ibge, "count": count }))
         .collect();
-    write_line(&json!({ "type": "isolation", "counts": counts }))?;
-    Ok(0)
+    Ok(json!({ "type": "isolation", "counts": counts }))
 }
 
 pub fn query_checksum() -> String {
@@ -176,6 +220,58 @@ mod tests {
         assert_eq!(
             check_isolation(isolation_envelope(""), io::stdin().lock().lines()).unwrap(),
             1
+        );
+    }
+
+    #[test]
+    fn the_period_is_parsed_and_must_not_be_empty() {
+        assert_eq!(
+            period("2026-03-01", "2026-04-01").unwrap(),
+            (
+                NaiveDate::from_ymd_opt(2026, 3, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 4, 1).unwrap()
+            )
+        );
+        assert!(period("2026-03-01", "2026-03-01").is_err());
+        assert!(period("03/2026", "2026-04-01").is_err());
+    }
+
+    #[test]
+    fn a_malformed_period_fails_before_connecting() {
+        let mut envelope = isolation_envelope("");
+        envelope.period_start = "not-a-date".to_string();
+        assert!(check_isolation(envelope, io::stdin().lock().lines()).is_err());
+    }
+
+    #[test]
+    fn only_proceed_lets_the_query_run() {
+        assert_eq!(Decision::of(r#"{"type":"proceed"}"#), Decision::Proceed);
+        assert_eq!(
+            Decision::of(r#"{"type":"abort","code":"COMPATIBILITY_MISMATCH"}"#),
+            Decision::Abort
+        );
+        assert_eq!(Decision::of(r#"{"type":"cancel"}"#), Decision::Unexpected);
+    }
+
+    #[test]
+    fn counts_become_the_isolation_message_with_null_codes_kept() {
+        let message =
+            isolation_message(&[(Some("3541307".to_string()), 10_029), (None, 2)], 10).unwrap();
+        assert_eq!(
+            message,
+            json!({"type": "isolation", "counts": [
+                {"ibge": "3541307", "count": 10_029},
+                {"ibge": null, "count": 2},
+            ]})
+        );
+    }
+
+    #[test]
+    fn more_codes_than_the_row_ceiling_is_a_budget_overrun() {
+        let counts = vec![(Some("1".to_string()), 1), (Some("2".to_string()), 1)];
+        assert_eq!(
+            isolation_message(&counts, 1).unwrap_err(),
+            "row ceiling exceeded: 2 > 1"
         );
     }
 

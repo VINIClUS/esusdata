@@ -8,7 +8,7 @@ export const isolamentoFixture: IsolamentoStatus = normalizeIsolation({
   sourceFamily: 'PEC_POSTGRESQL',
   pecInstallationRole: 'PRONTUARIO',
   sourceLocationKind: 'PRIMARY',
-  host: '10.0.0.10',
+  host: 'pec.municipio.local',
   port: 5432,
   databaseName: 'esus',
   dbUser: 'esus_leitura',
