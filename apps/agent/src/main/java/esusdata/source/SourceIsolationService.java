@@ -72,14 +72,31 @@ public final class SourceIsolationService {
     }
 
     /**
+     * Only a PEC source with its whole identity can be checked: the matrix entry is chosen by
+     * version, read model and installation role. An external dataset or a replay-only source has
+     * nothing to count.
+     */
+    public static boolean canCheck(SourceRecord source) {
+        return "PEC_POSTGRESQL".equals(source.sourceFamily())
+                && source.pecVersion() != null
+                && source.readModel() != null
+                && source.pecInstallationRole() != null
+                && !"UNKNOWN".equals(source.pecInstallationRole());
+    }
+
+    /**
      * Runs the check for one registered source and competência.
      *
      * @throws SourceNotFoundException if {@code sourceId} does not resolve.
+     * @throws IllegalArgumentException if the source fails {@link #canCheck}.
      */
     public LastIsolationCheck check(String sourceId, YearMonth referencePeriod) {
         SourceRecord source = sourceRepository
                 .findById(sourceId)
                 .orElseThrow(() -> new SourceNotFoundException("unknown source: " + sourceId));
+        if (!canCheck(source)) {
+            throw new IllegalArgumentException("source is not a PEC source with a complete identity: " + sourceId);
+        }
         Checked checked = run(source, referencePeriod);
         Outcome outcome = checked.outcome();
         Summary summary = outcome == Outcome.CHECKED ? summarize(source.municipalityIbge(), checked.counts()) : null;

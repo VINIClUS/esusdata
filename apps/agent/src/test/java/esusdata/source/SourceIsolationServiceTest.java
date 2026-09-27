@@ -181,7 +181,31 @@ class SourceIsolationServiceTest {
 
         assertThat(service.find("src-other")).isEmpty();
         assertThatThrownBy(() -> service.check("src-other", MARCH)).isInstanceOf(SourceNotFoundException.class);
-        assertThatThrownBy(() -> service.check(source.id(), MARCH)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.check(source.id(), MARCH)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void onlyAPecSourceWithItsWholeIdentityCanBeChecked() {
+        SourceRecord pec = source("src-pec", "127.0.0.1", "PRONTUARIO");
+        assertThat(SourceIsolationService.canCheck(pec)).isTrue();
+        assertThat(SourceIsolationService.canCheck(source("src-unknown", "127.0.0.1", "UNKNOWN")))
+                .isFalse();
+        assertThat(SourceIsolationService.canCheck(new SourceRecord(
+                        pec.id(),
+                        1,
+                        "EXTERNAL_DATASET",
+                        null,
+                        null,
+                        pec.host(),
+                        pec.port(),
+                        pec.databaseName(),
+                        pec.dbUser(),
+                        pec.secretRef(),
+                        pec.municipalityIbge(),
+                        null,
+                        null,
+                        pec.createdAt())))
+                .isFalse();
     }
 
     @Test

@@ -195,6 +195,17 @@ export function pickSource(
   return sources.find((s) => s.municipalityIbge === municipalityIbge) ?? sources[0]
 }
 
+// Only a PEC source with its whole identity can be checked live; any other one is refused by the API.
+export function isPecSource(source: SourceResponse): boolean {
+  return (
+    source.sourceFamily === 'PEC_POSTGRESQL' &&
+    !!source.pecVersion &&
+    !!source.readModel &&
+    !!source.pecInstallationRole &&
+    source.pecInstallationRole !== 'UNKNOWN'
+  )
+}
+
 const sourceFamilyLabels: Record<SourceFamily, string> = {
   PEC_POSTGRESQL: 'PostgreSQL (e-SUS PEC)',
   EXTERNAL_DATASET: 'Conjunto de dados externo',

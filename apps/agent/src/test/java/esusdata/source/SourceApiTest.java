@@ -258,6 +258,23 @@ class SourceApiTest extends ApiFixtureSupport {
     }
 
     @Test
+    void anIsolationCheckOfANonPecSourceIsABadRequestNotAnError() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String cookie = reauthenticatedSessionCookie(admin);
+        String sourceId = "src-" + System.nanoTime();
+        authenticatedPost(
+                cookie,
+                URI.create(BASE_URL + "/api/v1/sources"),
+                createSourceJson(sourceId).replace("PEC_POSTGRESQL", "EXTERNAL_DATASET"));
+
+        HttpResponse<String> response = isolationCheck(cookie, sourceId, "{\"referencePeriod\":\"2026-03\"}");
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(response.body()).contains("not a PEC source");
+    }
+
+    @Test
     void anIsolationCheckRequiresRecentReauthentication() throws Exception {
         String admin = createUser("admin-" + System.nanoTime());
         grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);

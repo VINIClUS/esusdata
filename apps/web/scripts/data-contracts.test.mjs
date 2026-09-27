@@ -346,6 +346,16 @@ const checkedSource = (counts) =>
     },
   })
 
+test('offers the isolation check only for a PEC source with its whole identity', () => {
+  const pec = registeredSource('pec', '3541307')
+
+  assert.equal(normalizers.isPecSource(pec), true)
+  assert.equal(normalizers.isPecSource({ ...pec, sourceFamily: 'EXTERNAL_DATASET' }), false)
+  assert.equal(normalizers.isPecSource({ ...pec, pecVersion: null }), false)
+  assert.equal(normalizers.isPecSource({ ...pec, readModel: null }), false)
+  assert.equal(normalizers.isPecSource({ ...pec, pecInstallationRole: 'UNKNOWN' }), false)
+})
+
 test('never claims a validated scope for a source that was never checked', () => {
   const status = normalizers.normalizeIsolation(registeredSource('pec', '3541307'))
 

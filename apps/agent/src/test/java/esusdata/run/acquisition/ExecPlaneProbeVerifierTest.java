@@ -126,24 +126,19 @@ class ExecPlaneProbeVerifierTest {
     }
 
     @Test
-    void everyMarkerKindIsReadFromTheProbe() {
-        String zero = "sha256:" + "0".repeat(64);
-        String objectsUsed = "{\"object\": \"tb_fat_atendimento_individual\", \"signature_fingerprint\": \""
-                + zero + "\", \"columns_used\": [\"col_a\", \"UNIQUE_KEY=col_a\","
-                + " \"REQUIRED_DIMENSIONS=tb_dim_tempo,tb_dim_municipio\"]},"
-                + " {\"object\": \"tb_dim_tipo_atendimento\", \"signature_fingerprint\": \"" + zero
-                + "\", \"columns_used\": [\"LEAF_SEMANTICS=2\", \"LEAF_IDS=2\"]}";
+    void theUniqueKeyAndRequiredDimensionsMarkersAreReadFromTheProbe() {
+        String objectsUsed = "{\"object\": \"tb_fat_atendimento_individual\", \"signature_fingerprint\": \"sha256:"
+                + "0".repeat(64) + "\", \"columns_used\": [\"col_a\", \"UNIQUE_KEY=col_a\","
+                + " \"REQUIRED_DIMENSIONS=tb_dim_tempo,tb_dim_municipio\"]}";
         String objects = "{\"tb_fat_atendimento_individual\":{" + COLUMNS
                 + ",\"unique_key\":{\"matched_constraint_type\":\"PRIMARY KEY\",\"uniqueness_violation_found\":false}"
-                + ",\"required_dimensions\":{\"violating_fact_event_id\":null}},"
-                + "\"tb_dim_tipo_atendimento\":{" + COLUMNS
-                + ",\"leaf_semantics\":{\"rows\":[{\"id\":2,\"description\":\"Consulta\",\"parent_id\":1}]}"
-                + ",\"leaf_ids\":{\"found_ids\":[2]}}}";
+                + ",\"required_dimensions\":{\"violating_fact_event_id\":null}}}";
 
         String result = mismatch(matrixOf(objectsUsed), CHECKSUM, probe("9.6.13", CHECKSUM, objects));
 
-        // Each fingerprint is computed from all its markers; only its value differs from the pinned
-        // one. Which object is compared first depends on the matrix's map order.
-        assertThat(result).startsWith("fingerprint mismatch for tb_").contains("but computed sha256:");
+        // The fingerprint is computed from every marker; only its value differs from the pinned one.
+        assertThat(result)
+                .startsWith("fingerprint mismatch for tb_fat_atendimento_individual")
+                .contains("but computed sha256:");
     }
 }

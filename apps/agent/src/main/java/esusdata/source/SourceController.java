@@ -170,6 +170,9 @@ public class SourceController {
                 sourceIsolationService.find(id).orElseThrow(() -> new ApiNotFoundException("unknown source: " + id));
         authorization.requireObjectScope(session, Permission.MANAGE_SOURCE, source.municipalityIbge());
         YearMonth referencePeriod = parseReferencePeriod(request == null ? null : request.referencePeriod());
+        if (!SourceIsolationService.canCheck(source)) {
+            throw new IllegalArgumentException("source is not a PEC source with a complete identity: " + id);
+        }
         authorization.requireRecentReauth(session);
 
         return toResponse(sourceIsolationService.check(id, referencePeriod));

@@ -9,6 +9,7 @@ import { relatoriosFixture } from '../fixtures/relatorios'
 import { useScope } from '@/app/scope-context'
 import {
   indicatorResultsPath,
+  isPecSource,
   normalizeIndicatorPacks,
   normalizeIndicatorResult,
   normalizeIsolation,
@@ -202,8 +203,9 @@ export function useRequisitosFonte(sourceId: string | undefined) {
 async function resolveApiIsolamento(
   municipalityIbge: string | undefined,
 ): Promise<IsolamentoStatus> {
-  const source = pickSource(await apiFetch<SourceResponse[]>('/sources'), municipalityIbge)
-  if (!source) throw new Error('Nenhuma fonte cadastrada que você possa administrar.')
+  const sources = (await apiFetch<SourceResponse[]>('/sources')).filter(isPecSource)
+  const source = pickSource(sources, municipalityIbge)
+  if (!source) throw new Error('Nenhuma fonte do e-SUS PEC cadastrada que você possa administrar.')
   return normalizeIsolation(source)
 }
 

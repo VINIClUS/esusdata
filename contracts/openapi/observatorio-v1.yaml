@@ -403,7 +403,9 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/IsolationCheck" }
         "400":
-          description: referencePeriod is missing or not an ISO year-month (yyyy-MM).
+          description: >-
+            referencePeriod is missing or not an ISO year-month (yyyy-MM), or the source is not a
+            PEC source with a complete identity (version, read model, installation role).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
