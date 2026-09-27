@@ -208,8 +208,31 @@ try {
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'source-desktop.png') })
   // The isolation check is refused the same way; the page must not claim a validated scope, and
   // the stored failure, with the competência it was for, survives a reload.
+  // A second municipality's PEC source: with no clinical scope, the admin picks the source here.
+  assert.equal(
+    (await post(page, '/auth/reauth', { password: 'very-strong-admin-password-1' })).status(),
+    204,
+  )
+  const secondSource = await post(page, '/sources', {
+    id: 'pec-e2e-b',
+    sourceFamily: 'PEC_POSTGRESQL',
+    pecInstallationRole: 'PRONTUARIO',
+    sourceLocationKind: 'PRIMARY',
+    host: '192.0.2.11',
+    port: 5433,
+    databaseName: 'esus',
+    dbUser: 'esus_leitura',
+    secretRef: 'PEC_DB_PASSWORD',
+    municipalityIbge: '3304557',
+    pecVersion: '5.5.28',
+    readModel: 'PEC_DW',
+  })
+  assert.equal(secondSource.status(), 201)
   await page.goto(`${base}/configuracoes/isolamento-municipal`)
   await page.getByText('Recorte ainda não validado').waitFor()
+  await page.getByRole('combobox').filter({ hasText: 'Fonte:' }).click()
+  await page.getByRole('option', { name: '3541307 · pec-e2e', exact: true }).click()
+  await page.getByText('3541307', { exact: true }).waitFor()
   await page.getByLabel('Competência').fill('2026-03')
   await page.getByLabel('Senha da sua conta Esusdata').fill('very-strong-admin-password-1')
   await page.getByRole('button', { name: 'Validar', exact: true }).click()

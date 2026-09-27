@@ -195,14 +195,14 @@ export function pickSource(
   return sources.find((s) => s.municipalityIbge === municipalityIbge) ?? sources[0]
 }
 
-// Only a PEC source with its whole identity can be checked live; any other one is refused by the API.
+// Only a PEC source with a valid identity can be checked live: the same rules as the API's
+// PecSourceIdentity (a semantic version, a known read model and installation role).
 export function isPecSource(source: SourceResponse): boolean {
   return (
     source.sourceFamily === 'PEC_POSTGRESQL' &&
-    !!source.pecVersion &&
-    !!source.readModel &&
-    !!source.pecInstallationRole &&
-    source.pecInstallationRole !== 'UNKNOWN'
+    /^\d+\.\d+\.\d+$/.test(source.pecVersion ?? '') &&
+    (source.readModel === 'PEC_DW' || source.readModel === 'PEC_OLTP') &&
+    (source.pecInstallationRole === 'PRONTUARIO' || source.pecInstallationRole === 'CENTRALIZADOR')
   )
 }
 

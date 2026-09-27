@@ -77,11 +77,18 @@ public final class SourceIsolationService {
      * nothing to count.
      */
     public static boolean canCheck(SourceRecord source) {
-        return "PEC_POSTGRESQL".equals(source.sourceFamily())
-                && source.pecVersion() != null
-                && source.readModel() != null
-                && source.pecInstallationRole() != null
-                && !"UNKNOWN".equals(source.pecInstallationRole());
+        if (!"PEC_POSTGRESQL".equals(source.sourceFamily())) {
+            return false;
+        }
+        try {
+            // The same rules the check itself applies: a semantic version, a known read model
+            // and a known installation role.
+            return new PecSourceIdentity(
+                            source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole())
+                    .isComplete();
+        } catch (IllegalArgumentException invalid) {
+            return false;
+        }
     }
 
     /**
@@ -172,9 +179,6 @@ public final class SourceIsolationService {
                 source.municipalityIbge());
         PecSourceIdentity identity = new PecSourceIdentity(
                 source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole());
-        if (!identity.isComplete()) {
-            throw new IllegalStateException("PecSourceIdentity is required before opening a PEC source connection");
-        }
         try (SourceAcquisitionLimiter.Permit permit = SourceAcquisitionLimiter.acquireOrFail(source.id())) {
             return checked(isolationCheck.check(
                     properties,

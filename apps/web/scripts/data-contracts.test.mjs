@@ -354,6 +354,8 @@ test('offers the isolation check only for a PEC source with its whole identity',
   assert.equal(normalizers.isPecSource({ ...pec, pecVersion: null }), false)
   assert.equal(normalizers.isPecSource({ ...pec, readModel: null }), false)
   assert.equal(normalizers.isPecSource({ ...pec, pecInstallationRole: 'UNKNOWN' }), false)
+  assert.equal(normalizers.isPecSource({ ...pec, pecVersion: 'foo' }), false)
+  assert.equal(normalizers.isPecSource({ ...pec, readModel: 'BAD' }), false)
 })
 
 test('never claims a validated scope for a source that was never checked', () => {

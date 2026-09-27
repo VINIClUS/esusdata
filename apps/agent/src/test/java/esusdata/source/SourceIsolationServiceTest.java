@@ -190,6 +190,24 @@ class SourceIsolationServiceTest {
         assertThat(SourceIsolationService.canCheck(pec)).isTrue();
         assertThat(SourceIsolationService.canCheck(source("src-unknown", "127.0.0.1", "UNKNOWN")))
                 .isFalse();
+        assertThat(SourceIsolationService.canCheck(source("src-bad-role", "127.0.0.1", "BAD")))
+                .isFalse();
+        assertThat(SourceIsolationService.canCheck(new SourceRecord(
+                        pec.id(),
+                        1,
+                        pec.sourceFamily(),
+                        pec.pecInstallationRole(),
+                        pec.sourceLocationKind(),
+                        pec.host(),
+                        pec.port(),
+                        pec.databaseName(),
+                        pec.dbUser(),
+                        pec.secretRef(),
+                        pec.municipalityIbge(),
+                        "foo",
+                        "BAD",
+                        pec.createdAt())))
+                .isFalse();
         assertThat(SourceIsolationService.canCheck(new SourceRecord(
                         pec.id(),
                         1,

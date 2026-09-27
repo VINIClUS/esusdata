@@ -3,7 +3,7 @@ import { USE_MOCKS, apiFetch, ensureApiReady, resolveMock } from '../client'
 import { execucaoFixture } from '../fixtures/execucao'
 import { fonteFixture, requisitosFixture } from '../fixtures/fonteDados'
 import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadores'
-import { isolamentoFixture } from '../fixtures/isolamento'
+import { isolamentoSourcesFixture } from '../fixtures/isolamento'
 import { painelFixture } from '../fixtures/painel'
 import { relatoriosFixture } from '../fixtures/relatorios'
 import { useScope } from '@/app/scope-context'
@@ -12,7 +12,6 @@ import {
   isPecSource,
   normalizeIndicatorPacks,
   normalizeIndicatorResult,
-  normalizeIsolation,
   normalizePainelResumo,
   normalizeRequirements,
   normalizeRunResponse,
@@ -25,7 +24,6 @@ import type {
   IndicatorPack,
   IndicadorDetalhe,
   IndicatorResultResponse,
-  IsolamentoStatus,
   IsolationCheckResponse,
   PainelResumo,
   RelatorioGerado,
@@ -200,23 +198,17 @@ export function useRequisitosFonte(sourceId: string | undefined) {
   })
 }
 
-async function resolveApiIsolamento(
-  municipalityIbge: string | undefined,
-): Promise<IsolamentoStatus> {
-  const sources = (await apiFetch<SourceResponse[]>('/sources')).filter(isPecSource)
-  const source = pickSource(sources, municipalityIbge)
-  if (!source) throw new Error('Nenhuma fonte do e-SUS PEC cadastrada que você possa administrar.')
-  return normalizeIsolation(source)
-}
-
-// Keyed under ['fonte'] so a new check refreshes it together with the source.
-export function useIsolamento() {
-  const { municipalityIbge, isLoading } = useScope()
+// Every PEC source the caller may manage, not only the clinical scope's: a technical admin has no
+// READ_CLINICAL municipality, so the page lets them pick the source instead. Keyed under ['fonte']
+// so a new check refreshes it together with the source.
+export function useFontesPec() {
   return useQuery({
-    queryKey: ['fonte', 'isolamento', municipalityIbge],
-    queryFn: () =>
-      USE_MOCKS ? resolveMock(isolamentoFixture) : resolveApiIsolamento(municipalityIbge),
-    enabled: !isLoading,
+    queryKey: ['fonte', 'pec'],
+    queryFn: (): Promise<SourceResponse[]> =>
+      (USE_MOCKS
+        ? resolveMock(isolamentoSourcesFixture)
+        : apiFetch<SourceResponse[]>('/sources')
+      ).then((sources) => sources.filter(isPecSource)),
   })
 }
 

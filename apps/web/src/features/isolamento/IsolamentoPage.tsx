@@ -3,10 +3,11 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import { useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router'
 import { Check, CircleAlert, CircleX, RefreshCw } from 'lucide-react'
-import { useIsolamento, validarIsolamento } from '@/api/hooks'
-import { isolationCheckNotice } from '@/api/normalizers'
-import type { IsolamentoStatus, RegraValidacao } from '@/api/types'
+import { useFontesPec, validarIsolamento } from '@/api/hooks'
+import { isolationCheckNotice, normalizeIsolation, pickSource } from '@/api/normalizers'
+import type { IsolamentoStatus, RegraValidacao, SourceResponse } from '@/api/types'
 import { useScope } from '@/app/scope-context'
 import { formatReferencePeriod } from '@/app/display-context'
 import { CheckIcon } from '@/components/data/ChecklistCard'
@@ -14,6 +15,7 @@ import { DataTable, type Column } from '@/components/data/DataTable'
 import { StatColumns } from '@/components/data/StatColumns'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Callout } from '@/components/ui/Callout'
+import { FilterSelect } from '@/components/ui/FilterSelect'
 import { Field, PasswordField } from '@/components/ui/Inputs'
 import { PageUnavailable } from '@/components/ui/PageUnavailable'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
@@ -126,9 +128,18 @@ function previousMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+const NO_PEC_SOURCE = new Error('Nenhuma fonte do e-SUS PEC cadastrada que você possa administrar.')
+
+function sourceLabel(source: SourceResponse): string {
+  return `${source.municipalityIbge} · ${source.id}`
+}
+
 export function IsolamentoPage() {
-  const { data, error, isError, isPending } = useIsolamento()
-  const { referencePeriod } = useScope()
+  const { data: fontes, error, isError, isPending } = useFontesPec()
+  const { municipalityIbge, referencePeriod } = useScope()
+  // In the URL, so a reload after a check keeps showing the source that was checked.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const sourceId = searchParams.get('fonte')
   const queryClient = useQueryClient()
   const [competencia, setCompetencia] = useState<string | null>(null)
   const [senhaAtual, setSenhaAtual] = useState('')
@@ -137,8 +148,10 @@ export function IsolamentoPage() {
 
   if (isPending) return <PageSkeleton title={TITLE} />
   if (isError) return <PageUnavailable title={TITLE} subtitle={SUBTITLE} error={error} />
+  const fonte = fontes.find((f) => f.id === sourceId) ?? pickSource(fontes, municipalityIbge)
+  if (!fonte) return <PageUnavailable title={TITLE} subtitle={SUBTITLE} error={NO_PEC_SOURCE} />
 
-  const status = data
+  const status = normalizeIsolation(fonte)
   const selecionada = competencia ?? status.competencia ?? referencePeriod ?? previousMonth()
   const tone = bannerTones[status.situacao]
 
@@ -160,7 +173,23 @@ export function IsolamentoPage() {
 
   return (
     <>
-      <PageHeader title={TITLE} subtitle={SUBTITLE} />
+      <PageHeader
+        title={TITLE}
+        subtitle={SUBTITLE}
+        actions={
+          fontes.length > 1 && (
+            <FilterSelect
+              label="Fonte"
+              value={sourceLabel(fonte)}
+              options={fontes.map(sourceLabel)}
+              onChange={(label) => {
+                const chosen = fontes.find((f) => sourceLabel(f) === label)
+                if (chosen) setSearchParams({ fonte: chosen.id }, { replace: true })
+              }}
+            />
+          )
+        }
+      />
 
       <Box
         sx={{

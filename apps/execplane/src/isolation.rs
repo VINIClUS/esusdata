@@ -4,6 +4,7 @@ use crate::{
     session_tls_or_report, stream, write_line,
 };
 use chrono::NaiveDate;
+use postgres::fallible_iterator::FallibleIterator;
 use postgres::IsolationLevel;
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -100,31 +101,60 @@ pub fn check_isolation(
         }
     }
 
-    let rows = match txn.query(
-        stream::to_positional_placeholders(QUERY_TEXT).as_str(),
-        &[&period_start, &period_end_exclusive],
-    ) {
-        Ok(rows) => rows,
-        Err(err) => {
-            end_transaction(txn.rollback());
-            return report_pre_probe_failure(&err);
-        }
-    };
+    // Streamed and cut at max_rows + 1, like the acquisition: the row ceiling bounds what is read
+    // off the wire, not only what is reported.
+    let params: [&(dyn postgres::types::ToSql + Sync); 2] = [&period_start, &period_end_exclusive];
+    let fetched = txn
+        .query_raw(
+            stream::to_positional_placeholders(QUERY_TEXT).as_str(),
+            params,
+        )
+        .and_then(|rows| {
+            take_bounded(
+                rows.iterator()
+                    .map(|row| row.map(|row| (row.get(0), row.get(1)))),
+                budget.max_rows,
+            )
+        });
     end_transaction(txn.rollback());
+    let counts = match fetched {
+        Ok(Bounded::Within(counts)) => counts,
+        Ok(Bounded::Exceeded) => {
+            return report_budget_exceeded(&format!(
+                "row ceiling exceeded: more than {} municipality codes",
+                budget.max_rows
+            ))
+        }
+        Err(err) => return report_pre_probe_failure(&err),
+    };
     if let Some(stream::StreamOutcome::BudgetExceeded(detail)) =
         stream::check_duration(&start, &budget)
     {
         return report_budget_exceeded(&detail);
     }
-    let counts: Vec<(Option<String>, i64)> =
-        rows.iter().map(|row| (row.get(0), row.get(1))).collect();
-    match isolation_message(&counts, budget.max_rows) {
-        Ok(message) => {
-            write_line(&message)?;
-            Ok(0)
+    write_line(&isolation_message(&counts))?;
+    Ok(0)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Bounded<T> {
+    Within(Vec<T>),
+    Exceeded,
+}
+
+/// Reads at most `max_rows + 1` items: one past the ceiling is enough to know it was exceeded.
+fn take_bounded<T, E>(
+    rows: impl Iterator<Item = Result<T, E>>,
+    max_rows: i64,
+) -> Result<Bounded<T>, E> {
+    let mut taken = Vec::new();
+    for row in rows {
+        if i64::try_from(taken.len()).unwrap_or(i64::MAX) >= max_rows {
+            return Ok(Bounded::Exceeded);
         }
-        Err(detail) => report_budget_exceeded(&detail),
+        taken.push(row?);
     }
+    Ok(Bounded::Within(taken))
 }
 
 fn period(start: &str, end_exclusive: &str) -> Result<(NaiveDate, NaiveDate), Box<dyn Error>> {
@@ -156,23 +186,13 @@ impl Decision {
     }
 }
 
-/// The terminal `isolation` message, or why the counts exceed the row ceiling — one row per
-/// distinct `co_ibge` of the period.
-fn isolation_message(
-    counts: &[(Option<String>, i64)],
-    max_rows: i64,
-) -> Result<serde_json::Value, String> {
-    if i64::try_from(counts.len()).unwrap_or(i64::MAX) > max_rows {
-        return Err(format!(
-            "row ceiling exceeded: {} > {max_rows}",
-            counts.len()
-        ));
-    }
+/// The terminal `isolation` message: one count per distinct `co_ibge` of the period.
+fn isolation_message(counts: &[(Option<String>, i64)]) -> serde_json::Value {
     let counts: Vec<serde_json::Value> = counts
         .iter()
         .map(|(ibge, count)| json!({ "ibge": ibge, "count": count }))
         .collect();
-    Ok(json!({ "type": "isolation", "counts": counts }))
+    json!({ "type": "isolation", "counts": counts })
 }
 
 pub fn query_checksum() -> String {
@@ -255,8 +275,7 @@ mod tests {
 
     #[test]
     fn counts_become_the_isolation_message_with_null_codes_kept() {
-        let message =
-            isolation_message(&[(Some("3541307".to_string()), 10_029), (None, 2)], 10).unwrap();
+        let message = isolation_message(&[(Some("3541307".to_string()), 10_029), (None, 2)]);
         assert_eq!(
             message,
             json!({"type": "isolation", "counts": [
@@ -267,12 +286,26 @@ mod tests {
     }
 
     #[test]
-    fn more_codes_than_the_row_ceiling_is_a_budget_overrun() {
-        let counts = vec![(Some("1".to_string()), 1), (Some("2".to_string()), 1)];
-        assert_eq!(
-            isolation_message(&counts, 1).unwrap_err(),
-            "row ceiling exceeded: 2 > 1"
-        );
+    fn reading_stops_one_row_past_the_ceiling() {
+        let mut pulled = 0;
+        let rows = (0..1_000_000).map(|n| {
+            pulled += 1;
+            Ok::<i64, ()>(n)
+        });
+        assert_eq!(take_bounded(rows, 2), Ok(Bounded::Exceeded));
+        assert_eq!(pulled, 3);
+    }
+
+    #[test]
+    fn rows_within_the_ceiling_are_all_kept() {
+        let rows = vec![Ok::<i64, ()>(1), Ok(2)].into_iter();
+        assert_eq!(take_bounded(rows, 2), Ok(Bounded::Within(vec![1, 2])));
+    }
+
+    #[test]
+    fn a_failed_row_is_the_error() {
+        let rows = vec![Ok(1), Err("broken")].into_iter();
+        assert_eq!(take_bounded(rows, 5), Err("broken"));
     }
 
     #[test]
