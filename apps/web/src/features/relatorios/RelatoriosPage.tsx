@@ -122,7 +122,13 @@ export function RelatoriosPage() {
   // Mock mode has no /auth/me, hence no municipality; the demo hooks ignore it.
   const ibge = municipalityIbge ?? ''
   const ultima = competencias[0]
-  const inicial = inicio ?? competencias[Math.min(competencias.length, 3) - 1]
+  // Defaults to the last three published competências, within the 24-competência limit.
+  const inicial =
+    inicio ??
+    competencias
+      .slice(0, 3)
+      .filter((c) => !!ultima && competenciasBetween(c, ultima) <= MAX_COMPETENCIAS)
+      .at(-1)
   const final = fim ?? ultima
   const packs = indicadores.data?.itens ?? []
   const nomes = [TODOS, ...packs.map((p) => p.nome)]
@@ -157,9 +163,13 @@ export function RelatoriosPage() {
     setAviso(null)
     try {
       await baixarExportacao(exportacao, ibge)
-    } catch {
-      setAviso('A exportação expirou ou não está mais disponível. Gere uma nova.')
-      await queryClient.invalidateQueries({ queryKey: ['exportacoes'] })
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        setAviso('A exportação expirou ou não está mais disponível. Gere uma nova.')
+        await queryClient.invalidateQueries({ queryKey: ['exportacoes'] })
+      } else {
+        setAviso('Não foi possível baixar a exportação. Tente de novo.')
+      }
     }
   }
 
