@@ -209,7 +209,7 @@ export function IsolamentoPage() {
                 stats={[
                   { label: 'IBGE da fonte', value: status.ibge },
                   {
-                    label: 'Competência validada',
+                    label: 'Competência da validação',
                     value: status.competencia ? formatReferencePeriod(status.competencia) : '—',
                   },
                   {

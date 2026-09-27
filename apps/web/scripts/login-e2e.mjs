@@ -206,6 +206,20 @@ try {
   await page.getByText('Destino não autorizado nesta instalação.').waitFor()
   await checkWidth(page)
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'source-desktop.png') })
+  // The isolation check is refused the same way; the page must not claim a validated scope, and
+  // the stored failure, with the competência it was for, survives a reload.
+  await page.goto(`${base}/configuracoes/isolamento-municipal`)
+  await page.getByText('Recorte ainda não validado').waitFor()
+  await page.getByLabel('Competência').fill('2026-03')
+  await page.getByLabel('Senha da sua conta Esusdata').fill('very-strong-admin-password-1')
+  await page.getByRole('button', { name: 'Validar', exact: true }).click()
+  await page.getByText('Destino da fonte não autorizado nesta instalação.').waitFor()
+  await page.reload()
+  await page.getByText('Validação não concluída').waitFor()
+  await page.getByText('03/2026').waitFor()
+  await checkWidth(page)
+  if (screenshotDir)
+    await page.screenshot({ path: path.join(screenshotDir, 'isolation-desktop.png') })
   const created = await post(page, '/users', {
     username: 'pending-e2e',
     displayName: 'Usuário Pendente',
