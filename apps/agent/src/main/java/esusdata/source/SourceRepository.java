@@ -1,6 +1,7 @@
 package esusdata.source;
 
 import esusdata.source.model.LastDiagnostic;
+import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceRecord;
 import java.util.List;
 import java.util.Map;
@@ -30,4 +31,13 @@ public interface SourceRepository {
 
     /** {@link #findLastDiagnostic} for every source in one query, keyed by source id. */
     Map<String, LastDiagnostic> findLastDiagnostics();
+
+    /**
+     * Overwrites the source's last isolation check, under the same rule as {@link #recordDiagnostic}:
+     * only while the source still has {@code check.sourceConfigurationVersion()}.
+     */
+    void recordIsolationCheck(String sourceId, LastIsolationCheck check);
+
+    /** Every stored last isolation check, whatever its version, keyed by source id. */
+    Map<String, LastIsolationCheck> findLastIsolationChecks();
 }

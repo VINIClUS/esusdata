@@ -72,6 +72,42 @@
       "test_notes": "Validated twice, independently: (1) live against the production PEC on CT 133 through the actual adapter code, reproducing 7100 programados / 2929 espontaneos / 0 fora / 10029 total for competencia 2026-03, byte-identical to the psql baseline, and again end-to-end through a full acquire-extract-disconnect-recompute cycle (ENG-19). (2) against a synthetic Testcontainers postgres:9.6 fixture (fixture_checksum above) with two municipalities that deliberately share the same unidade/equipe/cbo surrogate ids, proving the join binds on tb_dim_municipio.co_ibge and not on any installation-local key (ENG-37, ENG-38). (3) PEC 5.5.28 added 2026-09-24: live against the municipal production PEC 5.5.28 / PostgreSQL 9.6.13, all seven signature_fingerprints recomputed byte-identical twice — by JdbcCompatibilityCatalog over JDBC and by ExecPlaneAcquisition from the Rust execution plane's own probe — and competencia 2026-03 acquired end-to-end through the Rust child (10029 rows, 0 exclusions).",
       "approved_at": "2026-09-19",
       "approved_by": "vasrtr@gmail.com"
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "municipal_isolation",
+      "status": "NOT_TESTED",
+      "status_reason": "Aggregate count of tb_fat_atendimento_individual per tb_dim_municipio.co_ibge within one competência (ADR 0023). Awaiting the live run against PEC 5.5.28.",
+      "objects_used": [
+        {
+          "object": "tb_fat_atendimento_individual",
+          "columns_used": ["co_seq_fat_atd_ind", "co_dim_municipio", "co_dim_tempo", "co_dim_tipo_atendimento", "co_dim_unidade_saude_1", "co_dim_equipe_1", "co_dim_cbo_1", "nu_uuid_ficha", "nu_atendimento", "UNIQUE_KEY=co_seq_fat_atd_ind", "REQUIRED_DIMENSIONS=tb_dim_tempo,tb_dim_municipio"],
+          "signature_fingerprint": "sha256:dd3436b57cf4f67c35b0d23eba93bbceb079b7744cfb8f2d6bc675123d3e67b1"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:79d8034747b64c1169a9569b01940519b05bd1b859917e2187580c661e870b1b"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:832ac21599d121a45d42c101169d96bec515bd16c900414cfb70f2615f81280d"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "No municipality parameter: the query groups the competência's atendimentos by co_ibge and Java compares each group with the source's registered IBGE. objects_used are byte-identical copies of individual_encounter_modality's, so REQUIRED_DIMENSIONS still fails closed on any fact row without a tb_dim_municipio row.",
+        "single_municipality_installation": true
+      },
+      "query_checksum": "sha256:fb81d62253454d38057ab5fe260a5d68562b000fdb4d861891c817ef4ebc6689",
+      "fixture_checksum": "sha256:8909c30b9acd60ffc1b96b8c0c2d77fa2bbe46b0d19bc7f4f9bfb6ae54164148",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "apps/agent/src/test/java/esusdata/run/acquisition/ExecPlaneLivePecTest.java; apps/agent/src/test/java/esusdata/run/acquisition/IsolationCheckDifferentialLiveTest.java"
     }
   ]
 }

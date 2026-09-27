@@ -2,7 +2,8 @@ package esusdata.source.dto;
 
 /**
  * {@code secretRef} is a reference/state string, never the resolved secret value (§1.12.7 L550).
- * {@code lastDiagnostic} is null until a diagnostic ran against the current configuration version.
+ * {@code lastDiagnostic} and {@code lastIsolationCheck} are null until one ran against the current
+ * configuration version.
  */
 public record SourceResponse(
         String id,
@@ -19,4 +20,5 @@ public record SourceResponse(
         String pecVersion,
         String readModel,
         String createdAt,
-        LastDiagnosticResponse lastDiagnostic) {}
+        LastDiagnosticResponse lastDiagnostic,
+        IsolationCheckResponse lastIsolationCheck) {}

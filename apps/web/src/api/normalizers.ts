@@ -11,6 +11,10 @@ import type {
   DiagnosticOutcome,
   ExecucaoAtual,
   Fonte,
+  IsolamentoStatus,
+  IsolationCheckResponse,
+  IsolationOutcome,
+  RegraValidacao,
   RequisitoFonte,
   RunResponse,
   SourceFamily,
@@ -243,6 +247,139 @@ const requirementLabels: Record<SourceRequirementCode, string> = {
 
 export function normalizeRequirements(requirements: SourceRequirementResponse[]): RequisitoFonte[] {
   return requirements.map((r) => ({ label: requirementLabels[r.code], ok: r.ok }))
+}
+
+const countFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
+
+function competenciaLabel(referencePeriod: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(referencePeriod)
+  return match ? `${match[2]}/${match[1]}` : referencePeriod
+}
+
+function atendimentos(count: number): string {
+  return `${countFormatter.format(count)} ${count === 1 ? 'atendimento' : 'atendimentos'}`
+}
+
+const isolationFailureMessages: Record<Exclude<IsolationOutcome, 'CHECKED'>, string> = {
+  DESTINATION_NOT_ALLOWED: 'Destino da fonte não autorizado nesta instalação.',
+  SOURCE_AUTHENTICATION_FAILED: 'A fonte recusou o usuário ou a senha.',
+  SOURCE_PERMISSION_DENIED: 'O usuário da fonte não tem permissão de leitura.',
+  CONNECTION_FAILED: 'Não foi possível conectar à fonte.',
+  COMPATIBILITY_MISMATCH:
+    'A estrutura do banco do PEC não confere com a matriz de compatibilidade. Nada foi contado.',
+  SOURCE_BUDGET_EXCEEDED: 'A contagem passou do tempo limite de leitura da fonte.',
+}
+
+// The extraction query itself is not run by the check: its binding is guaranteed by construction and
+// its checksum is verified on every acquisition, so this rule says so instead of claiming a test.
+const extractionScopeRule: RegraValidacao = {
+  nome: 'Recorte na consulta de extração',
+  descricao:
+    'A extração filtra pelo código IBGE da fonte (tb_dim_municipio.co_ibge), e a consulta é conferida pela matriz de compatibilidade a cada aquisição.',
+  resultado: 'verificado',
+  detalhes: 'Garantido pela consulta, não por esta contagem',
+}
+
+/**
+ * The stored last isolation check of the source's current configuration (ADR 0023). Each rule
+ * claims only what the counts show: atendimentos of the checked competência per municipality code,
+ * nothing about data quality, CNES/INE or territory.
+ */
+export function normalizeIsolation(source: SourceResponse): IsolamentoStatus {
+  const check = source.lastIsolationCheck
+  const base = { sourceId: source.id, ibge: source.municipalityIbge }
+  if (!check) {
+    return {
+      ...base,
+      situacao: 'nunca',
+      titulo: 'Recorte ainda não validado',
+      mensagem: 'Nenhuma validação foi feita com a configuração atual da fonte.',
+      competencia: null,
+      atendimentosMunicipio: null,
+      ultimaValidacao: null,
+      regras: [extractionScopeRule],
+    }
+  }
+  const competencia = competenciaLabel(check.referencePeriod)
+  if (
+    check.outcome !== 'CHECKED' ||
+    check.registeredCount === null ||
+    check.otherMunicipalityCount === null ||
+    check.otherMunicipalityCodes === null ||
+    check.unidentifiedCount === null
+  ) {
+    return {
+      ...base,
+      situacao: 'falha',
+      titulo: 'Validação não concluída',
+      mensagem:
+        check.outcome === 'CHECKED' || check.outcome === 'SOURCE_BUSY'
+          ? 'Não foi possível concluir a validação.'
+          : isolationFailureMessages[check.outcome],
+      competencia: check.referencePeriod,
+      atendimentosMunicipio: null,
+      ultimaValidacao: check.checkedAt,
+      regras: [extractionScopeRule],
+    }
+  }
+
+  const registered = check.registeredCount
+  const others = check.otherMunicipalityCount
+  const unidentified = check.unidentifiedCount
+  const regras: RegraValidacao[] = [
+    {
+      nome: 'Município encontrado na base',
+      descricao: `Atendimentos individuais de ${competencia} com o código IBGE da fonte (${source.municipalityIbge}).`,
+      resultado: registered > 0 ? 'conforme' : 'atencao',
+      detalhes: registered > 0 ? atendimentos(registered) : 'Nenhum atendimento nesta competência',
+    },
+    {
+      nome: 'Registros de outros municípios',
+      descricao: `Atendimentos de ${competencia} com código IBGE de outro município. A extração os deixa de fora.`,
+      resultado: others === 0 ? 'conforme' : 'verificado',
+      detalhes:
+        others === 0
+          ? 'Nenhum'
+          : `${atendimentos(others)} de ${check.otherMunicipalityCodes} ${check.otherMunicipalityCodes === 1 ? 'município' : 'municípios'}, fora do recorte`,
+    },
+    {
+      nome: 'Atendimentos sem código IBGE',
+      descricao: `Atendimentos de ${competencia} cujo município não tem código IBGE. Nunca entram na extração.`,
+      resultado: unidentified === 0 ? 'conforme' : 'atencao',
+      detalhes: unidentified === 0 ? 'Nenhum' : atendimentos(unidentified),
+    },
+    extractionScopeRule,
+  ]
+
+  let situacao: IsolamentoStatus['situacao'] = 'validado'
+  let titulo = 'Recorte municipal validado'
+  let mensagem = `Em ${competencia}, a base do PEC só tem atendimentos individuais do município ${source.municipalityIbge}.`
+  if (registered === 0) {
+    situacao = 'atencao'
+    titulo = 'Nenhum atendimento do município'
+    mensagem = `A base do PEC não tem atendimentos individuais do município ${source.municipalityIbge} em ${competencia}.`
+  } else if (others > 0 || unidentified > 0) {
+    situacao = 'atencao'
+    titulo = 'Base com registros fora do município'
+    mensagem = `Em ${competencia}, a base do PEC tem atendimentos fora do município ${source.municipalityIbge}. A extração usa só os do município.`
+  }
+  return {
+    ...base,
+    situacao,
+    titulo,
+    mensagem,
+    competencia: check.referencePeriod,
+    atendimentosMunicipio: registered,
+    ultimaValidacao: check.checkedAt,
+    regras,
+  }
+}
+
+// A busy source is not stored, so the page would otherwise keep showing the previous result.
+export function isolationCheckNotice(response: IsolationCheckResponse): string | null {
+  return response.outcome === 'SOURCE_BUSY'
+    ? 'A fonte está em uso por uma aquisição. Tente novamente em instantes.'
+    : null
 }
 
 const runStateLabels: Record<RunResponse['state'], string> = {

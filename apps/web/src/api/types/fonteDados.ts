@@ -1,3 +1,5 @@
+import type { IsolationCheckResponse } from './isolamento'
+
 export interface Fonte {
   id: string
   tipo: string
@@ -65,4 +67,5 @@ export interface SourceResponse {
   readModel: string | null
   createdAt: string
   lastDiagnostic: LastDiagnosticResponse | null
+  lastIsolationCheck: IsolationCheckResponse | null
 }

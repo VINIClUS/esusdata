@@ -11,6 +11,7 @@ import {
   indicatorResultsPath,
   normalizeIndicatorPacks,
   normalizeIndicatorResult,
+  normalizeIsolation,
   normalizePainelResumo,
   normalizeRequirements,
   normalizeRunResponse,
@@ -24,6 +25,7 @@ import type {
   IndicadorDetalhe,
   IndicatorResultResponse,
   IsolamentoStatus,
+  IsolationCheckResponse,
   PainelResumo,
   RelatorioGerado,
   RequisitoFonte,
@@ -197,14 +199,55 @@ export function useRequisitosFonte(sourceId: string | undefined) {
   })
 }
 
+async function resolveApiIsolamento(
+  municipalityIbge: string | undefined,
+): Promise<IsolamentoStatus> {
+  const source = pickSource(await apiFetch<SourceResponse[]>('/sources'), municipalityIbge)
+  if (!source) throw new Error('Nenhuma fonte cadastrada que você possa administrar.')
+  return normalizeIsolation(source)
+}
+
+// Keyed under ['fonte'] so a new check refreshes it together with the source.
 export function useIsolamento() {
+  const { municipalityIbge, isLoading } = useScope()
   return useQuery({
-    queryKey: ['isolamento'],
-    queryFn: mockOnly<IsolamentoStatus>(
-      isolamentoFixture,
-      'A API ainda não fornece a validação do isolamento municipal neste ambiente.',
-    ),
+    queryKey: ['fonte', 'isolamento', municipalityIbge],
+    queryFn: () =>
+      USE_MOCKS ? resolveMock(isolamentoFixture) : resolveApiIsolamento(municipalityIbge),
+    enabled: !isLoading,
   })
+}
+
+/**
+ * Counts one competência's atendimentos in the source's PEC per municipality code (ADR 0023). Like
+ * `testarFonte`, the API requires a recent reauthentication first; the result is stored and read
+ * back through `useIsolamento`, which the caller then invalidates.
+ */
+export async function validarIsolamento(
+  sourceId: string,
+  senhaAtual: string,
+  referencePeriod: string,
+): Promise<IsolationCheckResponse> {
+  if (USE_MOCKS) {
+    return resolveMock<IsolationCheckResponse>({
+      referencePeriod,
+      outcome: 'CHECKED',
+      registeredCount: 0,
+      otherMunicipalityCount: 0,
+      otherMunicipalityCodes: 0,
+      unidentifiedCount: 0,
+      checkedAt: new Date().toISOString(),
+    })
+  }
+  await ensureApiReady()
+  await apiFetch<undefined>('/auth/reauth', {
+    method: 'POST',
+    body: JSON.stringify({ password: senhaAtual }),
+  })
+  return apiFetch<IsolationCheckResponse>(
+    `/sources/${encodeURIComponent(sourceId)}/isolation-check`,
+    { method: 'POST', body: JSON.stringify({ referencePeriod }) },
+  )
 }
 
 export function useRelatoriosRecentes() {

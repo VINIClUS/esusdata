@@ -4,14 +4,19 @@ import esusdata.auth.ApiAuthorization;
 import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.Permission;
 import esusdata.source.dto.CreateSourceRequest;
+import esusdata.source.dto.IsolationCheckRequest;
+import esusdata.source.dto.IsolationCheckResponse;
 import esusdata.source.dto.LastDiagnosticResponse;
 import esusdata.source.dto.SourceRequirementResponse;
 import esusdata.source.dto.SourceResponse;
 import esusdata.source.dto.SourceTestResponse;
 import esusdata.source.model.LastDiagnostic;
+import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceRecord;
 import esusdata.web.ApiNotFoundException;
 import java.time.Clock;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,6 +43,7 @@ public class SourceController {
     private final SourceRepository sourceRepository;
     private final SourceDiagnosticsService sourceDiagnosticsService;
     private final SourceRequirementsService sourceRequirementsService;
+    private final SourceIsolationService sourceIsolationService;
     private final ApiAuthorization authorization;
     private final Clock clock;
 
@@ -45,11 +51,13 @@ public class SourceController {
             SourceRepository sourceRepository,
             SourceDiagnosticsService sourceDiagnosticsService,
             SourceRequirementsService sourceRequirementsService,
+            SourceIsolationService sourceIsolationService,
             ApiAuthorization authorization,
             Clock clock) {
         this.sourceRepository = sourceRepository;
         this.sourceDiagnosticsService = sourceDiagnosticsService;
         this.sourceRequirementsService = sourceRequirementsService;
+        this.sourceIsolationService = sourceIsolationService;
         this.authorization = authorization;
         this.clock = clock;
     }
@@ -60,19 +68,23 @@ public class SourceController {
      * own municipality's. Takes no municipality because {@code GET /auth/me} lists only
      * {@code READ_CLINICAL} municipalities, which a technical admin never holds (ENG-45). Read-only,
      * so no recent reauth; {@code secretRef} is a reference, never the secret value (§1.12.7 L550).
-     * Each source carries its last diagnostic, read for all of them in one query and kept only if it
-     * ran against the configuration version this listing read.
+     * Each source carries its last diagnostic and last isolation check, each read for all of them in
+     * one query and kept only if it ran against the configuration version this listing read.
      */
     @GetMapping("/api/v1/sources")
     public List<SourceResponse> list(@AuthenticationPrincipal AuthenticatedSession session) {
         Predicate<String> permitted = authorization.permittedMunicipalities(session, Permission.MANAGE_SOURCE);
         Map<String, LastDiagnostic> diagnostics = sourceRepository.findLastDiagnostics();
+        Map<String, LastIsolationCheck> isolationChecks = sourceRepository.findLastIsolationChecks();
         return sourceRepository.findAll().stream()
                 .filter(source -> permitted.test(source.municipalityIbge()))
                 .map(source -> toResponse(
                         source,
                         Optional.ofNullable(diagnostics.get(source.id()))
                                 .filter(diagnostic -> diagnostic.appliesTo(source))
+                                .orElse(null),
+                        Optional.ofNullable(isolationChecks.get(source.id()))
+                                .filter(check -> check.appliesTo(source))
                                 .orElse(null)))
                 .toList();
     }
@@ -123,8 +135,8 @@ public class SourceController {
                 request.readModel(),
                 clock.instant().toString());
         sourceRepository.upsert(record);
-        // A new configuration version has no diagnostic yet.
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(record, null));
+        // A new configuration version has no diagnostic nor isolation check yet.
+        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(record, null, null));
     }
 
     @PostMapping("/api/v1/sources/{id}/test")
@@ -144,7 +156,50 @@ public class SourceController {
                 diagnostics.statementTimeoutMs());
     }
 
-    private static SourceResponse toResponse(SourceRecord record, LastDiagnostic lastDiagnostic) {
+    /**
+     * Counts one competência's atendimentos in the source's PEC per municipality code (ADR 0023).
+     * Same order as {@code POST /sources/{id}/test}: an unknown id and another municipality's source
+     * are the same opaque 404, and it needs a recent reauth because it opens a session to the PEC.
+     */
+    @PostMapping("/api/v1/sources/{id}/isolation-check")
+    public IsolationCheckResponse checkIsolation(
+            @AuthenticationPrincipal AuthenticatedSession session,
+            @PathVariable("id") String id,
+            @RequestBody IsolationCheckRequest request) {
+        SourceRecord source =
+                sourceIsolationService.find(id).orElseThrow(() -> new ApiNotFoundException("unknown source: " + id));
+        authorization.requireObjectScope(session, Permission.MANAGE_SOURCE, source.municipalityIbge());
+        YearMonth referencePeriod = parseReferencePeriod(request == null ? null : request.referencePeriod());
+        authorization.requireRecentReauth(session);
+
+        return toResponse(sourceIsolationService.check(id, referencePeriod));
+    }
+
+    private static YearMonth parseReferencePeriod(String referencePeriod) {
+        if (referencePeriod == null || referencePeriod.isBlank()) {
+            throw new IllegalArgumentException("referencePeriod is required");
+        }
+        try {
+            return YearMonth.parse(referencePeriod);
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException(
+                    "referencePeriod must be an ISO YearMonth (yyyy-MM): " + referencePeriod, e);
+        }
+    }
+
+    private static IsolationCheckResponse toResponse(LastIsolationCheck check) {
+        return new IsolationCheckResponse(
+                check.referencePeriod(),
+                check.outcome(),
+                check.registeredCount(),
+                check.otherMunicipalityCount(),
+                check.otherMunicipalityCodes(),
+                check.unidentifiedCount(),
+                check.checkedAt());
+    }
+
+    private static SourceResponse toResponse(
+            SourceRecord record, LastDiagnostic lastDiagnostic, LastIsolationCheck lastIsolationCheck) {
         return new SourceResponse(
                 record.id(),
                 record.sourceConfigurationVersion(),
@@ -163,6 +218,7 @@ public class SourceController {
                 lastDiagnostic == null
                         ? null
                         : new LastDiagnosticResponse(
-                                lastDiagnostic.outcome(), lastDiagnostic.detail(), lastDiagnostic.testedAt()));
+                                lastDiagnostic.outcome(), lastDiagnostic.detail(), lastDiagnostic.testedAt()),
+                lastIsolationCheck == null ? null : toResponse(lastIsolationCheck));
     }
 }

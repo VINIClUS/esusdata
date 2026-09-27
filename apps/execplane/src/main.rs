@@ -1,5 +1,6 @@
 mod envelope;
 mod extract;
+mod isolation;
 mod matrix;
 mod probe;
 mod stream;
@@ -46,14 +47,20 @@ fn run() -> Result<i32, Box<dyn Error>> {
     match message.get("type").and_then(serde_json::Value::as_str) {
         Some("acquire") => acquire(serde_json::from_value(message)?, lines),
         Some("diagnose") => diagnose(serde_json::from_value(message)?),
+        Some("check_isolation") => {
+            isolation::check_isolation(serde_json::from_value(message)?, lines)
+        }
         other => {
-            eprintln!("observatorio-execplane: expected 'acquire' or 'diagnose', got: {other:?}");
+            eprintln!(
+                "observatorio-execplane: expected 'acquire', 'diagnose' or 'check_isolation', got: {other:?}"
+            );
             Ok(3)
         }
     }
 }
 
-/// Opens the one kind of session this process ever uses, for both `acquire` and `diagnose`.
+/// Opens the one kind of session this process ever uses, for `acquire`, `diagnose` and
+/// `check_isolation`.
 /// `Ok(None)` means the failure was already reported on stdout and the process should exit 1.
 fn connect_session(
     host: &str,
@@ -228,7 +235,14 @@ fn acquire(
         max_payload_bytes: envelope.budget.max_payload_bytes,
     };
 
-    let (postgres_version, objects_json) = match run_probes(&mut txn, &envelope, &start, &budget) {
+    let objects = matrix::objects_to_probe(
+        CAPABILITY,
+        &envelope.adapter_version,
+        &envelope.pec_version,
+        &envelope.read_model,
+        &envelope.installation_role,
+    );
+    let (postgres_version, objects_json) = match run_probes(&mut txn, &objects, &start, &budget) {
         Ok(report) => report,
         Err(err) => {
             end_transaction(txn.rollback());
@@ -412,7 +426,7 @@ fn hex_encode(bytes: impl AsRef<[u8]>) -> String {
 /// `report_pre_probe_failure` through one `Err`, instead of a bare `?` closing stdout silently.
 fn run_probes(
     txn: &mut postgres::Transaction,
-    envelope: &AcquireEnvelope,
+    objects: &[matrix::MatrixObject],
     start: &Instant,
     budget: &stream::Budget,
 ) -> Result<(String, Map<String, serde_json::Value>), Box<dyn Error>> {
@@ -423,16 +437,8 @@ fn run_probes(
         .to_string();
     check_probe_duration(start, budget)?;
 
-    let objects = matrix::objects_to_probe(
-        CAPABILITY,
-        &envelope.adapter_version,
-        &envelope.pec_version,
-        &envelope.read_model,
-        &envelope.installation_role,
-    );
-
     let mut objects_json = Map::new();
-    for object in &objects {
+    for object in objects {
         let probed = probe::probe_object(txn, &object.object, &object.columns_used)?;
         objects_json.insert(object.object.clone(), probed);
         check_probe_duration(start, budget)?;
@@ -571,7 +577,9 @@ mod tests {
             hex_encode(Sha256::digest(QUERY_TEXT.as_bytes()))
         );
         for entry in matrix["tested_with"].as_array().unwrap() {
-            assert_eq!(entry["query_checksum"], checksum.as_str());
+            if entry["capability"] == CAPABILITY {
+                assert_eq!(entry["query_checksum"], checksum.as_str());
+            }
         }
     }
 }

@@ -1,12 +1,5 @@
 package esusdata.source.pec;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-
 /**
  * The frozen contract of the {@code individual_encounter_modality} capability that production code
  * still needs once the read itself runs in the execution plane (ADR 0017): its name, adapter
@@ -29,34 +22,14 @@ public final class IndividualEncounterModalityContract {
      */
     private static final String QUERY_RESOURCE = "/compatibility/queries/individual_encounter_modality@0.1.0.sql";
 
-    public static final String QUERY = loadQuery();
+    public static final String QUERY = FrozenQuery.load(QUERY_RESOURCE);
 
     /**
      * Real SHA-256 of {@link #QUERY}, computed once and reused everywhere a query checksum is
      * recorded (the adapter matrix, extraction manifests) — so those provenance fields can never
      * drift from the query text they claim to describe.
      */
-    public static final String QUERY_CHECKSUM = computeQueryChecksum();
-
-    private static String loadQuery() {
-        try (InputStream resource = IndividualEncounterModalityContract.class.getResourceAsStream(QUERY_RESOURCE)) {
-            if (resource == null) {
-                throw new IllegalStateException("Packaged capability query is missing: " + QUERY_RESOURCE);
-            }
-            return new String(resource.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new IllegalStateException("Could not read packaged capability query: " + QUERY_RESOURCE, e);
-        }
-    }
-
-    private static String computeQueryChecksum() {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return "sha256:" + HexFormat.of().formatHex(digest.digest(QUERY.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
-    }
+    public static final String QUERY_CHECKSUM = FrozenQuery.checksum(QUERY);
 
     private IndividualEncounterModalityContract() {}
 }

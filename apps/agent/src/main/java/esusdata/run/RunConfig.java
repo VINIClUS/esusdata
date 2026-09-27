@@ -16,6 +16,7 @@ import esusdata.result.model.ResultStagingArea;
 import esusdata.run.acquisition.Acquisition;
 import esusdata.run.acquisition.ExecPlaneAcquisition;
 import esusdata.run.acquisition.ExecPlaneConnectivityCheck;
+import esusdata.run.acquisition.ExecPlaneIsolationCheck;
 import esusdata.run.acquisition.ExecPlaneTransport;
 import esusdata.run.extract.ExtractStore;
 import esusdata.run.extract.FileExtractStore;
@@ -34,6 +35,8 @@ import esusdata.source.JdbcSourceRepository;
 import esusdata.source.SourceConnectionProperties;
 import esusdata.source.SourceConnectivityCheck;
 import esusdata.source.SourceDiagnosticsService;
+import esusdata.source.SourceIsolationCheck;
+import esusdata.source.SourceIsolationService;
 import esusdata.source.SourceRepository;
 import esusdata.source.SourceRequirementsService;
 import esusdata.source.pec.AllowedDestinations;
@@ -158,6 +161,16 @@ public class RunConfig {
             SourceConnectivityCheck sourceConnectivityCheck,
             Clock clock) {
         return new SourceDiagnosticsService(sourceRepository, allowedDestinations, sourceConnectivityCheck, clock);
+    }
+
+    @Bean
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
+    public SourceIsolationService sourceIsolationService(
+            SourceRepository sourceRepository,
+            AllowedDestinations allowedDestinations,
+            SourceIsolationCheck sourceIsolationCheck,
+            Clock clock) {
+        return new SourceIsolationService(sourceRepository, allowedDestinations, sourceIsolationCheck, clock);
     }
 
     @Bean
@@ -363,6 +376,19 @@ public class RunConfig {
             PecSecretResolver pecSecretResolver,
             ExecPlaneTransport execPlaneTransport) {
         return new ExecPlaneConnectivityCheck(
+                executionPlaneCommand(executionPlaneProperties),
+                pecSecretResolver,
+                execPlaneTransport,
+                executionPlaneProperties.exitGrace());
+    }
+
+    /** ADR 0023: the isolation check runs through the same binary and handshake as every acquisition. */
+    @Bean
+    public SourceIsolationCheck sourceIsolationCheck(
+            ExecPlaneProperties executionPlaneProperties,
+            PecSecretResolver pecSecretResolver,
+            ExecPlaneTransport execPlaneTransport) {
+        return new ExecPlaneIsolationCheck(
                 executionPlaneCommand(executionPlaneProperties),
                 pecSecretResolver,
                 execPlaneTransport,
