@@ -44,6 +44,21 @@ public final class JdbcResultRepository implements ResultRepository {
             rs.getString("app_build"),
             rs.getString("published_at"));
 
+    /**
+     * Newest first, in time order. {@code published_at} is {@code Instant.toString()}: UTC, ending in
+     * {@code Z}, with a fraction of 0 to 9 digits. The text alone does not sort in time order
+     * ({@code 12:00:00Z} sorts after {@code 12:00:00.5Z}) and {@code julianday} stops at the
+     * millisecond, so this compares the whole seconds, then the fraction padded to nine digits.
+     * {@code result_id} breaks a real tie, so the same query always yields the same rows.
+     */
+    private static final String NEWEST_PUBLISHED_FIRST = """
+            substr(published_at, 1, 19) desc,
+            substr(case when instr(published_at, '.') > 0
+                        then substr(published_at, instr(published_at, '.') + 1,
+                                    length(published_at) - instr(published_at, '.') - 1)
+                        else '' end || '000000000', 1, 9) desc,
+            result_id desc""";
+
     private final JdbcTemplate jdbc;
 
     public JdbcResultRepository(JdbcTemplate jdbc) {
@@ -56,29 +71,35 @@ public final class JdbcResultRepository implements ResultRepository {
         return jdbc.query("""
                 select * from results
                  where municipality_ibge = ? and indicator_pack = ? and reference_period = ?
-                 order by julianday(published_at) desc, result_id desc
-                """, MAPPER, municipalityIbge, indicatorPack, referencePeriod);
+                 order by
+                """ + NEWEST_PUBLISHED_FIRST, MAPPER, municipalityIbge, indicatorPack, referencePeriod);
     }
 
     @Override
     public List<PublishedResult> findLatestPublishedInRange(
             String municipalityIbge, String indicatorPack, String fromPeriod, String toPeriod) {
         requireScope(municipalityIbge);
-        // published_at is Instant.toString(), whose fraction varies in length, so the text does not
-        // sort in time order ("12:00:00Z" > "12:00:00.5Z"): julianday parses it. result_id breaks
-        // a tie, so the same range always yields the same rows.
-        return jdbc.query("""
+        return jdbc.query(
+                """
                 select * from (
                     select r.*, row_number() over (
                                partition by indicator_pack, reference_period
-                               order by julianday(published_at) desc, result_id desc) as newest
+                               order by
+                """ + NEWEST_PUBLISHED_FIRST + """
+                               ) as newest
                       from results r
                      where municipality_ibge = ?
                        and (? is null or indicator_pack = ?)
                        and reference_period between ? and ?)
                  where newest = 1
                  order by indicator_pack, reference_period
-                """, MAPPER, municipalityIbge, indicatorPack, indicatorPack, fromPeriod, toPeriod);
+                """,
+                MAPPER,
+                municipalityIbge,
+                indicatorPack,
+                indicatorPack,
+                fromPeriod,
+                toPeriod);
     }
 
     @Override

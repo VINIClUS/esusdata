@@ -76,6 +76,9 @@ class ReportExportStoreTest {
         // Later by half a second, though it sorts first as text.
         publish("r-jun-z-old", IBGE, "2026-06", "2026-07-01T12:00:00Z");
         publish("r-jun-a-new", IBGE, "2026-06", "2026-07-01T12:00:00.500Z");
+        // Apart by a tenth of a microsecond: below julianday's millisecond.
+        publish("r-jul-a-new", IBGE, "2026-07", "2026-08-01T12:00:00.0000011Z");
+        publish("r-jul-z-old", IBGE, "2026-07", "2026-08-01T12:00:00.000001Z");
         publish("r-other", OTHER_IBGE, "2026-03", "2026-04-03T00:00:00Z");
 
         List<PublishedResult> range = results.findLatestPublishedInRange(IBGE, null, "2026-02", "2026-04");
@@ -88,6 +91,9 @@ class ReportExportStoreTest {
         assertThat(results.findLatestPublishedInRange(IBGE, C1, "2026-06", "2026-06"))
                 .extracting(PublishedResult::resultId)
                 .containsExactly("r-jun-a-new");
+        assertThat(results.findLatestPublishedInRange(IBGE, C1, "2026-07", "2026-07"))
+                .extracting(PublishedResult::resultId)
+                .containsExactly("r-jul-a-new");
         assertThat(results.findPublished(IBGE, C1, "2026-06"))
                 .extracting(PublishedResult::resultId)
                 .containsExactly("r-jun-a-new", "r-jun-z-old");
