@@ -5,7 +5,7 @@ import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
 import { useQueryClient } from '@tanstack/react-query'
 import { Calendar, Check, Download, FileText, List } from 'lucide-react'
-import { USE_MOCKS } from '@/api/client'
+import { ApiError, USE_MOCKS } from '@/api/client'
 import {
   baixarExportacao,
   gerarExportacao,
@@ -143,7 +143,11 @@ export function RelatoriosPage() {
       }
       await queryClient.invalidateQueries({ queryKey: ['exportacoes'] })
     } catch (e) {
-      setAviso(e instanceof Error ? e.message : 'Não foi possível gerar a exportação.')
+      setAviso(
+        e instanceof ApiError && e.code === 'EXPORT_QUOTA_EXCEEDED'
+          ? 'Limite de 10 exportações por hora atingido. Tente de novo mais tarde.'
+          : 'Não foi possível gerar a exportação. Tente de novo.',
+      )
     } finally {
       setGerando(false)
     }
