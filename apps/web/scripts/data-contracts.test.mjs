@@ -535,3 +535,42 @@ test('maps every detail tab to content instead of only changing its underline', 
   assert.equal(detailTabContent('evidencias'), 'evidencias')
   assert.equal(detailTabContent('historico'), 'historico')
 })
+
+test('builds the export queries without trusting the id as a path', () => {
+  assert.equal(normalizers.exportsPath('3541307'), '/exports?municipalityIbge=3541307')
+  assert.equal(
+    normalizers.exportContentPath('exp-1/../x', '3541307'),
+    '/exports/exp-1%2F..%2Fx/content?municipalityIbge=3541307',
+  )
+})
+
+test('normalizes a stored export for the recent-exports table', () => {
+  const response = {
+    id: 'exp-1',
+    fileName: 'esusdata-3541307-todos-2026-01_2026-03.csv',
+    municipalityIbge: '3541307',
+    indicatorPack: null,
+    fromPeriod: '2026-01',
+    toPeriod: '2026-03',
+    format: 'CSV',
+    rowCount: 3,
+    createdAt: '2026-09-27T12:00:00Z',
+    expiresAt: '2026-10-04T12:00:00Z',
+  }
+  assert.deepEqual(normalizers.normalizeExport(response), {
+    id: 'exp-1',
+    arquivo: 'esusdata-3541307-todos-2026-01_2026-03.csv',
+    indicador: 'Todos os indicadores',
+    periodo: '01/2026 a 03/2026',
+    linhas: 3,
+    geradoEm: '2026-09-27T12:00:00Z',
+    expiraEm: '2026-10-04T12:00:00Z',
+  })
+  const single = normalizers.normalizeExport({
+    ...response,
+    indicatorPack: 'c1-mais-acesso',
+    fromPeriod: '2026-03',
+  })
+  assert.equal(single.indicador, 'C1 – Mais acesso')
+  assert.equal(single.periodo, '03/2026')
+})

@@ -21,6 +21,7 @@ tags:
   - name: runs
   - name: results
   - name: indicator-packs
+  - name: exports
   - name: ready
 
 paths:
@@ -608,6 +609,95 @@ paths:
         "404":
           description: Caller lacks READ_CLINICAL for the requested municipality.
 
+  /api/v1/exports:
+    post:
+      tags: [exports]
+      summary: >-
+        Aggregate CSV export of published results (ADR 0024): the newest published result of each
+        indicator pack and competência in [fromPeriod, toPeriod]. Generated synchronously from
+        SQLite, never from the PEC, and kept for 7 days. READ_CLINICAL for the whole municipality;
+        no recent reauth, since it holds no record. Audited as EXPORT_CREATED.
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateExportRequest" }
+      responses:
+        "201":
+          description: Created. rowCount may be 0 when nothing was published in the range.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Export" }
+        "400":
+          description: >-
+            A period is missing or not yyyy-MM, fromPeriod is after toPeriod, the range spans more
+            than 24 competências, or the indicator pack is unknown.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "404":
+          description: Caller lacks READ_CLINICAL for the whole municipality.
+        "429":
+          description: The caller already created 10 exports in the last hour (EXPORT_QUOTA_EXCEEDED).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+    get:
+      tags: [exports]
+      summary: >-
+        The municipality's unexpired exports, newest first, at most 20 — every creator's, not only
+        the caller's (READ_CLINICAL).
+      parameters:
+        - name: municipalityIbge
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Export" }
+        "404":
+          description: Caller lacks READ_CLINICAL for the requested municipality.
+
+  /api/v1/exports/{id}/content:
+    get:
+      tags: [exports]
+      summary: >-
+        Downloads the CSV: UTF-8 with a BOM, ';' between cells, CRLF, every cell quoted, and a
+        cell starting with = + - @, tab or CR prefixed with an apostrophe (ENG-48). The scope is
+        checked again on every download; audited as EXPORT_DOWNLOADED.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: municipalityIbge
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: >-
+            The file, as an attachment with a server-chosen name and Cache-Control no-store.
+            Columns: municipio_ibge, indicador, versao_regra, competencia, status, numerador,
+            denominador, valor_percentual (decimal comma, empty without a denominator),
+            classificacao, data_corte, publicado_em, execucao.
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        "404":
+          description: >-
+            Unknown export, another municipality's, expired, or the caller lacks READ_CLINICAL for
+            the municipality — the same response for all four.
+
   /api/v1/results/periods:
     get:
       tags: [results]
@@ -900,6 +990,32 @@ components:
           nullable: true
           description: Never contains the secret (§1.12.7 L550).
         testedAt: { type: string, format: date-time }
+
+    CreateExportRequest:
+      type: object
+      required: [municipalityIbge, fromPeriod, toPeriod]
+      properties:
+        municipalityIbge: { type: string, example: "3541307" }
+        fromPeriod: { type: string, example: "2026-01", description: First competência (yyyy-MM), inclusive. }
+        toPeriod: { type: string, example: "2026-03", description: Last competência (yyyy-MM), inclusive. }
+        indicatorPack:
+          type: string
+          nullable: true
+          description: One pack from GET /indicator-packs; null or blank exports every pack.
+
+    Export:
+      type: object
+      properties:
+        id: { type: string }
+        fileName: { type: string, example: "esusdata-3541307-todos-2026-01_2026-03.csv" }
+        municipalityIbge: { type: string }
+        indicatorPack: { type: string, nullable: true, description: Null when every pack is exported. }
+        fromPeriod: { type: string, example: "2026-01" }
+        toPeriod: { type: string, example: "2026-03" }
+        format: { type: string, enum: [CSV] }
+        rowCount: { type: integer, description: One row per indicator pack and competência. }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
 
     IsolationCheckRequest:
       type: object

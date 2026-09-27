@@ -10,6 +10,8 @@ import type {
 import type {
   DiagnosticOutcome,
   ExecucaoAtual,
+  Exportacao,
+  ExportResponse,
   Fonte,
   IsolamentoStatus,
   IsolationCheckResponse,
@@ -182,6 +184,34 @@ export function publishedPeriodsPath(municipalityIbge: string): string {
   return `/results/periods?${new URLSearchParams({ municipalityIbge }).toString()}`
 }
 
+export function exportsPath(municipalityIbge: string): string {
+  return `/exports?${new URLSearchParams({ municipalityIbge }).toString()}`
+}
+
+export function exportContentPath(exportId: string, municipalityIbge: string): string {
+  return `/exports/${encodeURIComponent(exportId)}/content?${new URLSearchParams({ municipalityIbge }).toString()}`
+}
+
+function formatPeriodRange(fromPeriod: string, toPeriod: string): string {
+  return fromPeriod === toPeriod
+    ? competenciaLabel(fromPeriod)
+    : `${competenciaLabel(fromPeriod)} a ${competenciaLabel(toPeriod)}`
+}
+
+export function normalizeExport(response: ExportResponse): Exportacao {
+  return {
+    id: response.id,
+    arquivo: response.fileName,
+    indicador: response.indicatorPack
+      ? indicatorDisplayName(response.indicatorPack)
+      : 'Todos os indicadores',
+    periodo: formatPeriodRange(response.fromPeriod, response.toPeriod),
+    linhas: response.rowCount,
+    geradoEm: response.createdAt,
+    expiraEm: response.expiresAt,
+  }
+}
+
 export function recentRunsPath(municipalityIbge: string, limit: number): string {
   return `/runs?${new URLSearchParams({ municipalityIbge, limit: String(limit) }).toString()}`
 }
@@ -263,7 +293,8 @@ export function normalizeRequirements(requirements: SourceRequirementResponse[])
 
 const countFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
 
-function competenciaLabel(referencePeriod: string): string {
+/** 2026-03 → 03/2026. */
+export function competenciaLabel(referencePeriod: string): string {
   const match = /^(\d{4})-(\d{2})$/.exec(referencePeriod)
   return match ? `${match[2]}/${match[1]}` : referencePeriod
 }

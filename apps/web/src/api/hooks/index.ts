@@ -1,16 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
-import { USE_MOCKS, apiFetch, ensureApiReady, resolveMock } from '../client'
+import { USE_MOCKS, apiFetch, apiFetchBlob, ensureApiReady, resolveMock } from '../client'
 import { execucaoFixture } from '../fixtures/execucao'
 import { fonteFixture, requisitosFixture } from '../fixtures/fonteDados'
 import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadores'
 import { isolamentoSourcesFixture } from '../fixtures/isolamento'
 import { painelFixture } from '../fixtures/painel'
-import { relatoriosFixture } from '../fixtures/relatorios'
+import { exportPeriodsFixture, exportsFixture } from '../fixtures/relatorios'
 import { useScope } from '@/app/scope-context'
 import {
+  exportContentPath,
+  exportsPath,
   indicatorResultsPath,
   isPecSource,
   normalizeIndicatorPacks,
+  normalizeExport,
   normalizeIndicatorResult,
   normalizePainelResumo,
   normalizeRequirements,
@@ -20,23 +23,20 @@ import {
   recentRunsPath,
 } from '../normalizers'
 import type {
+  Exportacao,
+  ExportResponse,
   Fonte,
   IndicatorPack,
   IndicadorDetalhe,
   IndicatorResultResponse,
   IsolationCheckResponse,
   PainelResumo,
-  RelatorioGerado,
   RequisitoFonte,
   RunResponse,
   SourceRequirementResponse,
   SourceResponse,
   SourceTestResponse,
 } from '../types'
-
-function mockOnly<T>(mock: T, message: string) {
-  return () => (USE_MOCKS ? resolveMock(mock) : Promise.reject(new Error(message)))
-}
 
 function resolveMockIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> {
   const detalhe = findIndicadorDetalhe(codigo)
@@ -244,12 +244,73 @@ export async function validarIsolamento(
   )
 }
 
-export function useRelatoriosRecentes() {
+// The municipality's unexpired aggregate exports (ADR 0024), newest first.
+export function useExportacoes() {
+  const { municipalityIbge, isLoading } = useScope()
   return useQuery({
-    queryKey: ['relatorios'],
-    queryFn: mockOnly<RelatorioGerado[]>(
-      relatoriosFixture,
-      'A API ainda não fornece relatórios neste ambiente.',
-    ),
+    queryKey: ['exportacoes', municipalityIbge],
+    queryFn: (): Promise<Exportacao[]> => {
+      if (USE_MOCKS) return resolveMock(exportsFixture.map(normalizeExport))
+      if (!municipalityIbge) return Promise.reject(new Error(NO_MUNICIPALITY))
+      return apiFetch<ExportResponse[]>(exportsPath(municipalityIbge)).then((exports) =>
+        exports.map(normalizeExport),
+      )
+    },
+    enabled: !isLoading,
   })
+}
+
+/**
+ * Generates an aggregate CSV of the published results in `[fromPeriod, toPeriod]` (ADR 0024). No
+ * reauthentication: the file holds no record. The caller then invalidates `useExportacoes`.
+ */
+export async function gerarExportacao(
+  municipalityIbge: string,
+  fromPeriod: string,
+  toPeriod: string,
+  indicatorPack: string | null,
+): Promise<ExportResponse> {
+  if (USE_MOCKS) {
+    const createdAt = new Date()
+    return resolveMock<ExportResponse>({
+      id: `exp-demo-${createdAt.getTime()}`,
+      fileName: `esusdata-${municipalityIbge}-${indicatorPack ?? 'todos'}-${fromPeriod}_${toPeriod}.csv`,
+      municipalityIbge,
+      indicatorPack,
+      fromPeriod,
+      toPeriod,
+      format: 'CSV',
+      rowCount: 1,
+      createdAt: createdAt.toISOString(),
+      expiresAt: new Date(createdAt.getTime() + 7 * 24 * 3600 * 1000).toISOString(),
+    })
+  }
+  await ensureApiReady()
+  return apiFetch<ExportResponse>('/exports', {
+    method: 'POST',
+    body: JSON.stringify({ municipalityIbge, fromPeriod, toPeriod, indicatorPack }),
+  })
+}
+
+/** Downloads through fetch, so an expired export shows a message instead of an error page. */
+export async function baixarExportacao(
+  exportacao: Exportacao,
+  municipalityIbge: string,
+): Promise<void> {
+  const blob = USE_MOCKS
+    ? new Blob(['\uFEFF"municipio_ibge";"indicador"\r\n'], { type: 'text/csv' })
+    : await apiFetchBlob(exportContentPath(exportacao.id, municipalityIbge))
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = exportacao.arquivo
+  link.click()
+  // Revoked on the next task: revoking synchronously can cancel the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+/** Published competências, newest first — the scope's list, or the demo one in mock mode. */
+export function useCompetenciasPublicadas(): string[] {
+  const { periods } = useScope()
+  return USE_MOCKS ? exportPeriodsFixture : periods
 }

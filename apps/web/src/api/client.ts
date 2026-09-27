@@ -41,13 +41,22 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   if (token && !headers.has('X-XSRF-TOKEN')) headers.set('X-XSRF-TOKEN', token)
 
   const res = await fetch(`/api/v1${path}`, { ...init, credentials: 'same-origin', headers })
-  if (!res.ok) {
-    const error = (await res.json().catch(() => null)) as { code?: string; message?: string } | null
-    throw new ApiError(res.status, error?.message ?? `${res.status} ${res.statusText}`, error?.code)
-  }
+  if (!res.ok) throw await apiError(res)
   if (res.status === 204) return undefined as T
   const body = await res.text()
   return (body ? JSON.parse(body) : undefined) as T
+}
+
+/** GETs a file the API serves as an attachment; an error comes back as an ApiError, not a page. */
+export async function apiFetchBlob(path: string): Promise<Blob> {
+  const res = await fetch(`/api/v1${path}`, { credentials: 'same-origin' })
+  if (!res.ok) throw await apiError(res)
+  return res.blob()
+}
+
+async function apiError(res: Response): Promise<ApiError> {
+  const error = (await res.json().catch(() => null)) as { code?: string; message?: string } | null
+  return new ApiError(res.status, error?.message ?? `${res.status} ${res.statusText}`, error?.code)
 }
 
 /** Resolves a fixture after a short delay so loading states are exercised. */

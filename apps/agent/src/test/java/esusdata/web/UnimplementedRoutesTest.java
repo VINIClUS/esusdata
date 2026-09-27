@@ -12,7 +12,8 @@ import org.springframework.test.annotation.DirtiesContext;
 
 /**
  * §1.10.1 L409/L1788: "importações/exportações só são expostas quando implementadas" — and the
- * refusal itself is tested. An unauthenticated probe never learns whether the route exists at all
+ * refusal itself is tested. Exports now exist (ADR 0024, {@code ReportExportApiTest}); imports
+ * still do not. An unauthenticated probe never learns whether the route exists at all
  * (ENG-49: no bypass, no information leak before authentication); an authenticated probe gets a
  * plain 404, not a 501 announcing an unimplemented feature.
  */
@@ -28,14 +29,8 @@ class UnimplementedRoutesTest extends ApiFixtureSupport {
                             .GET()
                             .build(),
                     HttpResponse.BodyHandlers.ofString());
-            HttpResponse<String> exports = client.send(
-                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/exports"))
-                            .GET()
-                            .build(),
-                    HttpResponse.BodyHandlers.ofString());
 
             assertThat(imports.statusCode()).isEqualTo(401);
-            assertThat(exports.statusCode()).isEqualTo(401);
         }
     }
 
@@ -51,15 +46,8 @@ class UnimplementedRoutesTest extends ApiFixtureSupport {
                             .GET()
                             .build(),
                     HttpResponse.BodyHandlers.ofString());
-            HttpResponse<String> exports = client.send(
-                    HttpRequest.newBuilder(URI.create(BASE_URL + "/api/v1/exports"))
-                            .header("Cookie", sessionCookie(user))
-                            .GET()
-                            .build(),
-                    HttpResponse.BodyHandlers.ofString());
 
             assertThat(imports.statusCode()).isEqualTo(404);
-            assertThat(exports.statusCode()).isEqualTo(404);
         }
     }
 }

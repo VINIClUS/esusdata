@@ -51,6 +51,9 @@ configuração/auditoria puramente técnicas — `ScopeResolver.hasPermission` s
   qualquer leitor do código sabe que são decisão de projeto, não texto normativo da spec.
 - Adicionar uma quinta permissão no futuro (ex.: para importação/exportação, ainda não expostas)
   exige uma nova migração e uma atualização deste ADR, não uma mudança silenciosa de enum.
+  **Atualização (ADR 0024):** a exportação *agregada* de resultados já existe e não criou
+  permissão: ela usa `read_clinical` no município inteiro, como `GET /results`. Uma exportação
+  individualizada continua não exposta e segue esta regra.
 - `GrantRevalidator` (usado por `jobrunner` e, via o seam `PublicationAuthorization`, por
   `resultstore`) depende desta matriz para `RUN_INDICATOR` — mudar a matriz muda diretamente quem
   pode disparar/publicar execuções.
