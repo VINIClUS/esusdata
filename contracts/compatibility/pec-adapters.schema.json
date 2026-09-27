@@ -34,10 +34,13 @@
         "municipal_isolation_evidence",
         "query_checksum",
         "fixture_checksum",
-        "test_result",
-        "approved_at",
-        "approved_by"
+        "test_result"
       ],
+      "if": { "properties": { "status": { "const": "VALIDATED" } } },
+      "then": {
+        "required": ["approved_at", "approved_by"],
+        "properties": { "test_result": { "const": "PASS" } }
+      },
       "additionalProperties": false,
       "properties": {
         "pec_versions": {

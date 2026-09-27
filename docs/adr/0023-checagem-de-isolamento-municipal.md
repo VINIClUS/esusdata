@@ -58,13 +58,21 @@ sobre qualidade, completude, CNES, INE, equipes ou território.
 - `IsolationCheckDifferentialLiveTest`, contra `postgres:9.6.13`, com a fixture sintética de dois
   municípios, uma linha de município sem `co_ibge` e um atendimento fora da competência. O binário
   Rust e a mesma query rodada por JDBC dão as mesmas contagens. Senha errada vira `28P01`.
-- `ExecPlaneLivePecTest.isolationCheckOfOneCompetenciaMatchesTheSameQueryOverJdbc`, contra o PEC
-  5.5.28 de produção, pela matriz empacotada: os números estão em `test_notes` da entrada
-  `municipal_isolation` de `pec-adapters.json`.
+- **Pendente:** `ExecPlaneLivePecTest.isolationCheckOfOneCompetenciaMatchesTheSameQueryOverJdbc`
+  contra o PEC 5.5.28 de produção. O PostgreSQL do PEC só é alcançável pelo túnel SSH do ADR 0003,
+  que não estava disponível. Até essa execução, a entrada `municipal_isolation` fica `NOT_TESTED` e
+  sem aprovação, e a checagem falha fechada (`COMPATIBILITY_MISMATCH`) em produção. Para validar:
+  1. marcar a entrada como `VALIDATED` localmente;
+  2. rodar o teste com `-Dobservatorio.execution-plane.live-pec=true` e o `pec-253.env`;
+  3. se passar, gravar os números e a duração em `test_notes`, preencher `test_result: PASS`,
+     `approved_at` e `approved_by`, e recompilar o binário (o `include_str!` embute a matriz).
 
 ## Consequências
 
 - A checagem sobe um processo e faz as mesmas sondagens de uma aquisição, inclusive a varredura
   de `REQUIRED_DIMENSIONS`, antes da contagem.
+- O schema da matriz passa a exigir `approved_at`, `approved_by` e `test_result: PASS` só nas
+  entradas `VALIDATED`. Assim, uma entrada pode esperar sua evidência como `NOT_TESTED`, e o
+  `findExact` já recusa qualquer entrada que não esteja `VALIDATED`.
 - Uma versão do PEC só entra em `pec_versions` desta entrada com sua própria execução ao vivo.
   Compartilhar fingerprints com a extração não basta.

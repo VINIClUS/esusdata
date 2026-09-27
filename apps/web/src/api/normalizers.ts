@@ -266,7 +266,7 @@ const isolationFailureMessages: Record<Exclude<IsolationOutcome, 'CHECKED'>, str
   SOURCE_PERMISSION_DENIED: 'O usuário da fonte não tem permissão de leitura.',
   CONNECTION_FAILED: 'Não foi possível conectar à fonte.',
   COMPATIBILITY_MISMATCH:
-    'A estrutura do banco do PEC não confere com a matriz de compatibilidade. Nada foi contado.',
+    'A matriz de compatibilidade não tem esta checagem validada para a versão do PEC da fonte, ou a estrutura do banco não confere com ela. Nada foi contado.',
   SOURCE_BUDGET_EXCEEDED: 'A contagem passou do tempo limite de leitura da fonte.',
 }
 
