@@ -229,6 +229,7 @@ const registeredSource = (id, municipalityIbge) => ({
   pecVersion: '5.5.28',
   readModel: 'PEC_DW',
   createdAt: '2026-09-27T12:00:00Z',
+  lastDiagnostic: null,
 })
 
 test('shows the source of the selected municipality, else the first one listed', () => {
@@ -240,7 +241,7 @@ test('shows the source of the selected municipality, else the first one listed',
   assert.equal(normalizers.pickSource([], '3541307'), undefined)
 })
 
-test('normalizes a registered source without inventing a password or a last test', () => {
+test('normalizes a never-tested source without inventing a password or a last test', () => {
   const fonte = normalizers.normalizeSource({
     id: 'pec-principal',
     sourceConfigurationVersion: 2,
@@ -256,6 +257,7 @@ test('normalizes a registered source without inventing a password or a last test
     pecVersion: '5.5.28',
     readModel: 'PEC_DW',
     createdAt: '2026-09-27T12:00:00Z',
+    lastDiagnostic: null,
   })
 
   assert.deepEqual(fonte, {
@@ -267,6 +269,50 @@ test('normalizes a registered source without inventing a password or a last test
     usuario: 'esus_leitura',
     ultimoTeste: null,
   })
+})
+
+test('shows the stored last diagnostic as the last test, failed unless CONNECTED', () => {
+  const tested = (outcome) =>
+    normalizers.normalizeSource({
+      ...registeredSource('pec', '3541307'),
+      lastDiagnostic: { outcome, detail: null, testedAt: '2026-09-27T12:00:00Z' },
+    }).ultimoTeste
+
+  assert.deepEqual(tested('CONNECTED'), {
+    ok: true,
+    mensagem: 'Conexão de leitura estabelecida.',
+    testadoEm: '2026-09-27T12:00:00Z',
+  })
+  assert.deepEqual(tested('DESTINATION_NOT_ALLOWED'), {
+    ok: false,
+    mensagem: 'Destino não autorizado nesta instalação.',
+    testadoEm: '2026-09-27T12:00:00Z',
+  })
+  for (const outcome of [
+    'SOURCE_AUTHENTICATION_FAILED',
+    'SOURCE_PERMISSION_DENIED',
+    'CONNECTION_FAILED',
+  ]) {
+    assert.equal(tested(outcome).ok, false)
+    assert.ok(tested(outcome).mensagem)
+  }
+})
+
+test('labels every source requirement code, keeping the API order', () => {
+  assert.deepEqual(
+    normalizers.normalizeRequirements([
+      { code: 'READ_CONNECTION', ok: false },
+      { code: 'PEC_POSTGRESQL_FAMILY', ok: true },
+      { code: 'PEC_VERSION_IN_MATRIX', ok: true },
+      { code: 'MUNICIPAL_SCOPE', ok: true },
+    ]),
+    [
+      { label: 'Conexão de leitura confirmada no último teste', ok: false },
+      { label: 'Fonte PostgreSQL do e-SUS PEC', ok: true },
+      { label: 'Versão e modelo do PEC na matriz de compatibilidade', ok: true },
+      { label: 'Município configurado', ok: true },
+    ],
+  )
 })
 
 test('keeps a remembered scope choice only while the API still offers it', () => {

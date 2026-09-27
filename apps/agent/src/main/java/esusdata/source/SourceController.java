@@ -4,12 +4,16 @@ import esusdata.auth.ApiAuthorization;
 import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.Permission;
 import esusdata.source.dto.CreateSourceRequest;
+import esusdata.source.dto.LastDiagnosticResponse;
+import esusdata.source.dto.SourceRequirementResponse;
 import esusdata.source.dto.SourceResponse;
 import esusdata.source.dto.SourceTestResponse;
+import esusdata.source.model.LastDiagnostic;
 import esusdata.source.model.SourceRecord;
 import esusdata.web.ApiNotFoundException;
 import java.time.Clock;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import org.springframework.http.HttpStatus;
@@ -33,16 +37,19 @@ public class SourceController {
 
     private final SourceRepository sourceRepository;
     private final SourceDiagnosticsService sourceDiagnosticsService;
+    private final SourceRequirementsService sourceRequirementsService;
     private final ApiAuthorization authorization;
     private final Clock clock;
 
     public SourceController(
             SourceRepository sourceRepository,
             SourceDiagnosticsService sourceDiagnosticsService,
+            SourceRequirementsService sourceRequirementsService,
             ApiAuthorization authorization,
             Clock clock) {
         this.sourceRepository = sourceRepository;
         this.sourceDiagnosticsService = sourceDiagnosticsService;
+        this.sourceRequirementsService = sourceRequirementsService;
         this.authorization = authorization;
         this.clock = clock;
     }
@@ -53,13 +60,33 @@ public class SourceController {
      * own municipality's. Takes no municipality because {@code GET /auth/me} lists only
      * {@code READ_CLINICAL} municipalities, which a technical admin never holds (ENG-45). Read-only,
      * so no recent reauth; {@code secretRef} is a reference, never the secret value (§1.12.7 L550).
+     * Each source carries its last diagnostic, read for all of them in one query.
      */
     @GetMapping("/api/v1/sources")
     public List<SourceResponse> list(@AuthenticationPrincipal AuthenticatedSession session) {
         Predicate<String> permitted = authorization.permittedMunicipalities(session, Permission.MANAGE_SOURCE);
+        Map<String, LastDiagnostic> diagnostics = sourceRepository.findLastDiagnostics();
         return sourceRepository.findAll().stream()
                 .filter(source -> permitted.test(source.municipalityIbge()))
-                .map(SourceController::toResponse)
+                .map(source -> toResponse(source, diagnostics.get(source.id())))
+                .toList();
+    }
+
+    /**
+     * The requirements one source meets (issue #22). Resolved before the scope check, in the same
+     * order as {@code POST /sources/{id}/test}, so an unknown id and another municipality's source
+     * are the same opaque 404. Read-only, so no recent reauth.
+     */
+    @GetMapping("/api/v1/sources/{id}/requirements")
+    public List<SourceRequirementResponse> requirements(
+            @AuthenticationPrincipal AuthenticatedSession session, @PathVariable("id") String id) {
+        SourceRecord source =
+                sourceRepository.findById(id).orElseThrow(() -> new ApiNotFoundException("unknown source: " + id));
+        authorization.requireObjectScope(session, Permission.MANAGE_SOURCE, source.municipalityIbge());
+
+        return sourceRequirementsService.requirements(source, sourceRepository.findLastDiagnostic(id)).stream()
+                .map(requirement ->
+                        new SourceRequirementResponse(requirement.code().name(), requirement.ok()))
                 .toList();
     }
 
@@ -91,7 +118,8 @@ public class SourceController {
                 request.readModel(),
                 clock.instant().toString());
         sourceRepository.upsert(record);
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(record));
+        // A new configuration version has no diagnostic yet.
+        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(record, null));
     }
 
     @PostMapping("/api/v1/sources/{id}/test")
@@ -111,7 +139,7 @@ public class SourceController {
                 diagnostics.statementTimeoutMs());
     }
 
-    private static SourceResponse toResponse(SourceRecord record) {
+    private static SourceResponse toResponse(SourceRecord record, LastDiagnostic lastDiagnostic) {
         return new SourceResponse(
                 record.id(),
                 record.sourceConfigurationVersion(),
@@ -126,6 +154,10 @@ public class SourceController {
                 record.municipalityIbge(),
                 record.pecVersion(),
                 record.readModel(),
-                record.createdAt());
+                record.createdAt(),
+                lastDiagnostic == null
+                        ? null
+                        : new LastDiagnosticResponse(
+                                lastDiagnostic.outcome(), lastDiagnostic.detail(), lastDiagnostic.testedAt()));
     }
 }

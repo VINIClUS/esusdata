@@ -8,6 +8,7 @@ import esusdata.source.SourceDiagnosticsService;
 import esusdata.source.SourceDiagnosticsService.Diagnostics;
 import esusdata.source.SourceDiagnosticsService.Outcome;
 import esusdata.source.SourceRepository;
+import esusdata.source.model.LastDiagnostic;
 import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.PecDataSourceFactory;
@@ -20,6 +21,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
@@ -77,6 +79,21 @@ class SourceDiagnosticsDifferentialLiveTest {
         public List<SourceRecord> findAll() {
             return List.copyOf(sources.values());
         }
+
+        // These tests compare connection outcomes; where the last diagnostic is stored is not under test.
+        @Override
+        public void recordDiagnostic(
+                String sourceId, int sourceConfigurationVersion, String outcome, String detail, String testedAt) {}
+
+        @Override
+        public Optional<LastDiagnostic> findLastDiagnostic(String sourceId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Map<String, LastDiagnostic> findLastDiagnostics() {
+            return Map.of();
+        }
     };
     private final PecSecretResolver secrets = secretRef -> switch (secretRef) {
         case "GOOD" -> PG.getPassword().toCharArray();
@@ -112,7 +129,8 @@ class SourceDiagnosticsDifferentialLiveTest {
         execPlane = new SourceDiagnosticsService(
                 repository,
                 allowedDestinations,
-                new ExecPlaneConnectivityCheck(List.of(binary), secrets, Duration.ofSeconds(5)));
+                new ExecPlaneConnectivityCheck(List.of(binary), secrets, Duration.ofSeconds(5)),
+                Clock.systemUTC());
     }
 
     private static void createRolesOnce() throws Exception {

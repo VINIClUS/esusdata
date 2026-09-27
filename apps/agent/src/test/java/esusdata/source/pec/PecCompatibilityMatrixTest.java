@@ -58,6 +58,33 @@ class PecCompatibilityMatrixTest {
     }
 
     @Test
+    void aRegistrationListsInTheMatrixByVersionModelAndRoleAlone() {
+        PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromClasspathResource();
+
+        assertThat(matrix.lists(CT133_IDENTITY)).isTrue();
+        assertThat(matrix.lists(new PecSourceIdentity("matrix-test", "5.5.28", "PEC_DW", "PRONTUARIO")))
+                .isTrue();
+        assertThat(matrix.lists(new PecSourceIdentity("matrix-test", "5.4.38", "PEC_DW", "PRONTUARIO")))
+                .isFalse();
+        assertThat(matrix.lists(new PecSourceIdentity("matrix-test", "5.4.37", "PEC_OLTP", "PRONTUARIO")))
+                .isFalse();
+        assertThat(matrix.lists(new PecSourceIdentity("matrix-test", "5.4.37", "PEC_DW", "CENTRALIZADOR")))
+                .isFalse();
+        assertThat(matrix.lists(new PecSourceIdentity("matrix-test", "5.4.37", "PEC_DW", "UNKNOWN")))
+                .isFalse();
+    }
+
+    @Test
+    void anUnvalidatedMatrixListsNothing() {
+        PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromJson(
+                "{\"schema_version\":\"2\",\"validation_status\":\"DRAFT\",\"tested_with\":[{"
+                        + "\"pec_versions\":[\"5.4.37\"],\"read_model\":\"PEC_DW\","
+                        + "\"installation_role\":\"PRONTUARIO\",\"status\":\"VALIDATED\"}]}");
+
+        assertThat(matrix.lists(CT133_IDENTITY)).isFalse();
+    }
+
+    @Test
     void emptyMatrixCannotSelectAnAdapter() {
         PecCompatibilityMatrix matrix = PecCompatibilityMatrix.fromJson(
                 "{\"schema_version\":\"2\",\"validation_status\":\"VALIDATED\",\"tested_with\":[]}");

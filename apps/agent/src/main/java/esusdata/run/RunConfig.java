@@ -35,8 +35,10 @@ import esusdata.source.SourceConnectionProperties;
 import esusdata.source.SourceConnectivityCheck;
 import esusdata.source.SourceDiagnosticsService;
 import esusdata.source.SourceRepository;
+import esusdata.source.SourceRequirementsService;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.EnvFileSecretResolver;
+import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecSecretResolver;
 import esusdata.source.pec.ReadBudget;
 import java.nio.file.Files;
@@ -153,8 +155,14 @@ public class RunConfig {
     public SourceDiagnosticsService sourceDiagnosticsService(
             SourceRepository sourceRepository,
             AllowedDestinations allowedDestinations,
-            SourceConnectivityCheck sourceConnectivityCheck) {
-        return new SourceDiagnosticsService(sourceRepository, allowedDestinations, sourceConnectivityCheck);
+            SourceConnectivityCheck sourceConnectivityCheck,
+            Clock clock) {
+        return new SourceDiagnosticsService(sourceRepository, allowedDestinations, sourceConnectivityCheck, clock);
+    }
+
+    @Bean
+    public SourceRequirementsService sourceRequirementsService() {
+        return new SourceRequirementsService(PecCompatibilityMatrix.fromClasspathResource());
     }
 
     // --- jobrunner -------------------------------------------------------------------------

@@ -9,6 +9,7 @@ import esusdata.source.pec.ReadBudget;
 import esusdata.source.pec.SourceAcquisitionLimiter;
 import esusdata.source.pec.SourceBudgetExceededException;
 import java.net.InetAddress;
+import java.time.Clock;
 import java.util.Optional;
 
 /**
@@ -23,12 +24,17 @@ import java.util.Optional;
  * <p>Holds {@link SourceAcquisitionLimiter}'s one-active-acquisition-per-source permit for the
  * whole check — testing a source while a real job is acquiring from it fails fast as {@link
  * Outcome#SOURCE_BUSY}, not a hang or a race.
+ *
+ * <p>Every other outcome is stored as the source's last diagnostic, pinned to its configuration
+ * version ({@code V4__source_diagnostics.sql}) — {@code GET /sources} and the source requirements
+ * read it back. {@code SOURCE_BUSY} is not stored: it says nothing about the source itself.
  */
 public final class SourceDiagnosticsService {
 
     private final SourceRepository sourceRepository;
     private final AllowedDestinations allowedDestinations;
     private final SourceConnectivityCheck connectivityCheck;
+    private final Clock clock;
 
     public enum Outcome {
         DESTINATION_NOT_ALLOWED,
@@ -81,10 +87,12 @@ public final class SourceDiagnosticsService {
     public SourceDiagnosticsService(
             SourceRepository sourceRepository,
             AllowedDestinations allowedDestinations,
-            SourceConnectivityCheck connectivityCheck) {
+            SourceConnectivityCheck connectivityCheck,
+            Clock clock) {
         this.sourceRepository = sourceRepository;
         this.allowedDestinations = allowedDestinations;
         this.connectivityCheck = connectivityCheck;
+        this.clock = clock;
     }
 
     public Optional<SourceRecord> find(String sourceId) {
@@ -96,12 +104,25 @@ public final class SourceDiagnosticsService {
      *
      * @throws SourceNotFoundException if {@code sourceId} does not resolve.
      */
-    // javac's try lint / PMD: the permit is held for the block's scope and released on close, never read.
-    @SuppressWarnings({"try", "PMD.UnusedLocalVariable"})
     public Diagnostics test(String sourceId) {
         SourceRecord source = sourceRepository
                 .findById(sourceId)
                 .orElseThrow(() -> new SourceNotFoundException("unknown source: " + sourceId));
+        Diagnostics diagnostics = diagnose(source);
+        if (diagnostics.outcome() != Outcome.SOURCE_BUSY) {
+            sourceRepository.recordDiagnostic(
+                    source.id(),
+                    source.sourceConfigurationVersion(),
+                    diagnostics.outcome().name(),
+                    diagnostics.detail(),
+                    clock.instant().toString());
+        }
+        return diagnostics;
+    }
+
+    // javac's try lint / PMD: the permit is held for the block's scope and released on close, never read.
+    @SuppressWarnings({"try", "PMD.UnusedLocalVariable"})
+    private Diagnostics diagnose(SourceRecord source) {
         ReadBudget budget = ReadBudget.initialEngineeringProposal();
 
         InetAddress validatedAddress;

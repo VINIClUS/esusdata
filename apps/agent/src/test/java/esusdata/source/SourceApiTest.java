@@ -146,6 +146,63 @@ class SourceApiTest extends ApiFixtureSupport {
         assertThat(response.body()).isEqualTo("[]");
     }
 
+    @Test
+    void aTestedSourceCarriesItsLastDiagnosticAndItsRequirements() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String cookie = reauthenticatedSessionCookie(admin);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+
+        assertThat(get(cookie, "/api/v1/sources").body())
+                .contains("\"id\":\"" + sourceId + "\"")
+                .contains("\"lastDiagnostic\":null");
+        authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/sources/" + sourceId + "/test"), null);
+
+        assertThat(get(cookie, "/api/v1/sources").body())
+                .contains("\"lastDiagnostic\":{\"outcome\":\"DESTINATION_NOT_ALLOWED\"");
+        HttpResponse<String> requirements = get(cookie, "/api/v1/sources/" + sourceId + "/requirements");
+        assertThat(requirements.statusCode()).isEqualTo(200);
+        assertThat(requirements.body())
+                .isEqualTo("[{\"code\":\"READ_CONNECTION\",\"ok\":false},"
+                        + "{\"code\":\"PEC_POSTGRESQL_FAMILY\",\"ok\":true},"
+                        + "{\"code\":\"PEC_VERSION_IN_MATRIX\",\"ok\":true},"
+                        + "{\"code\":\"MUNICIPAL_SCOPE\",\"ok\":true}]");
+    }
+
+    @Test
+    void reRegisteringASourceHidesTheDiagnosticOfItsPreviousConfiguration() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String cookie = reauthenticatedSessionCookie(admin);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+        authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/sources/" + sourceId + "/test"), null);
+
+        authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/sources"), createSourceJson(sourceId));
+
+        assertThat(get(cookie, "/api/v1/sources").body())
+                .contains("\"id\":\"" + sourceId + "\",\"sourceConfigurationVersion\":2")
+                .doesNotContain("DESTINATION_NOT_ALLOWED");
+    }
+
+    @Test
+    void requirementsOfAnotherMunicipalityOrAnUnknownSourceAreTheSameOpaque404() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String cookie = sessionCookie(admin);
+        String otherSource = "src-other-" + System.nanoTime();
+        registerSource(otherSource, MUNICIPALITY_B);
+
+        HttpResponse<String> other = get(cookie, "/api/v1/sources/" + otherSource + "/requirements");
+        HttpResponse<String> unknown =
+                get(cookie, "/api/v1/sources/src-missing-" + System.nanoTime() + "/requirements");
+
+        assertThat(other.statusCode()).isEqualTo(404);
+        assertThat(other.body()).doesNotContain(otherSource).doesNotContain(MUNICIPALITY_B);
+        assertThat(unknown.statusCode()).isEqualTo(404);
+    }
+
     private static HttpResponse<String> get(String sessionCookie, String path) throws Exception {
         try (HttpClient client = HttpClient.newHttpClient()) {
             return client.send(

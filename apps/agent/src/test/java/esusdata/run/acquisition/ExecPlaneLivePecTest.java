@@ -12,6 +12,7 @@ import esusdata.source.SourceDiagnosticsService;
 import esusdata.source.SourceDiagnosticsService.Diagnostics;
 import esusdata.source.SourceDiagnosticsService.Outcome;
 import esusdata.source.SourceRepository;
+import esusdata.source.model.LastDiagnostic;
 import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.EnvFileSecretResolver;
@@ -369,6 +370,21 @@ class ExecPlaneLivePecTest {
             public List<SourceRecord> findAll() {
                 return List.of(source);
             }
+
+            // These tests compare connection outcomes; where the last diagnostic is stored is not under test.
+            @Override
+            public void recordDiagnostic(
+                    String sourceId, int sourceConfigurationVersion, String outcome, String detail, String testedAt) {}
+
+            @Override
+            public Optional<LastDiagnostic> findLastDiagnostic(String sourceId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Map<String, LastDiagnostic> findLastDiagnostics() {
+                return Map.of();
+            }
         };
     }
 
@@ -387,7 +403,8 @@ class ExecPlaneLivePecTest {
         return new SourceDiagnosticsService(
                 singleSourceRepository(),
                 allowedDestinations(),
-                new ExecPlaneConnectivityCheck(List.of(realBinary), secretResolver, Duration.ofSeconds(10)));
+                new ExecPlaneConnectivityCheck(List.of(realBinary), secretResolver, Duration.ofSeconds(10)),
+                Clock.systemUTC());
     }
 
     private long activeObservatorioQueries() throws Exception {

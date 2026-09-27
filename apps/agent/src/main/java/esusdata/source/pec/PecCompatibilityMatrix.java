@@ -13,6 +13,7 @@ import tools.jackson.databind.ObjectMapper;
 public final class PecCompatibilityMatrix {
 
     public static final String RESOURCE = "/compatibility/pec-adapters.json";
+    private static final String VALIDATED = "VALIDATED";
 
     private final JsonNode root;
 
@@ -51,7 +52,7 @@ public final class PecCompatibilityMatrix {
         }
         if (!root.isObject()
                 || !"2".equals(text(root, "schema_version"))
-                || !"VALIDATED".equals(text(root, "validation_status"))) {
+                || !VALIDATED.equals(text(root, "validation_status"))) {
             throw new IllegalStateException("Unsupported compatibility matrix schema");
         }
         JsonNode testedWith = root.get("tested_with");
@@ -62,7 +63,7 @@ public final class PecCompatibilityMatrix {
         for (JsonNode candidate : testedWith) {
             if (matches(candidate, capability, adapterVersion, identity, postgresVersion)) {
                 Entry entry = parseEntry(candidate);
-                if (!"VALIDATED".equals(entry.status())) {
+                if (!VALIDATED.equals(entry.status())) {
                     throw new IllegalStateException("Exact compatibility entry is not VALIDATED: " + entry.status());
                 }
                 return entry;
@@ -74,6 +75,35 @@ public final class PecCompatibilityMatrix {
                 + ", PostgreSQL=" + postgresVersion
                 + ", model=" + identity.readModel()
                 + ", role=" + identity.installationRole());
+    }
+
+    /**
+     * Whether some {@code VALIDATED} entry lists this PEC version for the same read model and
+     * installation role — what a source's registration alone can show. Looser than {@link
+     * #findExact}, which acquisition still enforces: it ignores the capability and the PostgreSQL
+     * version, which is only known once connected.
+     */
+    public boolean lists(PecSourceIdentity identity) {
+        if (identity == null
+                || !identity.isComplete()
+                || !root.isObject()
+                || !"2".equals(text(root, "schema_version"))
+                || !VALIDATED.equals(text(root, "validation_status"))) {
+            return false;
+        }
+        JsonNode testedWith = root.get("tested_with");
+        if (testedWith == null || !testedWith.isArray()) {
+            return false;
+        }
+        for (JsonNode candidate : testedWith) {
+            if (VALIDATED.equals(text(candidate, "status"))
+                    && pecVersions(candidate).contains(identity.pecVersion())
+                    && identity.readModel().equals(text(candidate, "read_model"))
+                    && identity.installationRole().equals(text(candidate, "installation_role"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean matches(

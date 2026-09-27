@@ -363,10 +363,38 @@ paths:
           schema: { type: string }
       responses:
         "200":
-          description: Diagnostic result. detail never contains the secret.
+          description: >-
+            Diagnostic result. detail never contains the secret. Every outcome but SOURCE_BUSY is
+            stored as the source's lastDiagnostic for its current configuration version.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SourceTestResponse" }
+        "404":
+          description: Unknown source, or caller lacks MANAGE_SOURCE for its municipality.
+
+  /api/v1/sources/{id}/requirements:
+    get:
+      tags: [sources]
+      summary: >-
+        The requirements a registered source meets, from its registration, its last diagnostic and
+        the packaged PEC compatibility matrix (MANAGE_SOURCE; read-only, no recent reauth). Each
+        code claims only what it checks — READ_CONNECTION means the last diagnostic under the
+        current configuration was CONNECTED, not that the account is SELECT-only;
+        PEC_VERSION_IN_MATRIX means the PEC version, read model and installation role appear in a
+        VALIDATED entry, not the exact capability/PostgreSQL entry acquisition still requires.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK, in a fixed order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SourceRequirementResponse" }
         "404":
           description: Unknown source, or caller lacks MANAGE_SOURCE for its municipality.
 
@@ -803,6 +831,34 @@ components:
           properties:
             sourceConfigurationVersion: { type: integer }
             createdAt: { type: string, format: date-time }
+            lastDiagnostic:
+              allOf:
+                - $ref: "#/components/schemas/LastDiagnostic"
+              nullable: true
+              description: >-
+                Null until a diagnostic ran against the current configuration version —
+                re-registering a source hides the previous one. Always null from POST /sources.
+
+    LastDiagnostic:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum: [DESTINATION_NOT_ALLOWED, SOURCE_AUTHENTICATION_FAILED, SOURCE_PERMISSION_DENIED,
+                 CONNECTION_FAILED, CONNECTED]
+        detail:
+          type: string
+          nullable: true
+          description: Never contains the secret (§1.12.7 L550).
+        testedAt: { type: string, format: date-time }
+
+    SourceRequirementResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          enum: [READ_CONNECTION, PEC_POSTGRESQL_FAMILY, PEC_VERSION_IN_MATRIX, MUNICIPAL_SCOPE]
+        ok: { type: boolean }
 
     SourceTestResponse:
       type: object

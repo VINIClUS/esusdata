@@ -52,5 +52,11 @@ com o novo:
   tentativa até o timeout de aquisição (10 logins falhos medidos em container). O registro
   `Diagnostics` é igual; o rastro no log do servidor é menor.
 - Sem o binário o backend já não subia (ADR 0016); o diagnóstico não acrescenta requisito.
+- **O último diagnóstico fica guardado (issue #22).** `source_diagnostics` (V4) tem uma linha por
+  fonte, sobrescrita a cada teste, com a versão de configuração em que ele rodou. `GET /sources`
+  devolve esse resultado como `lastDiagnostic` e `GET /sources/{id}/requirements` usa ele no
+  requisito `READ_CONNECTION`. Recadastrar a fonte muda a versão e esconde o resultado antigo, então
+  um `CONNECTED` nunca vale para outro host ou usuário. `SOURCE_BUSY` não é guardado, porque não diz
+  nada sobre a fonte. O `detail` guardado é o mesmo que a API devolve, sem o segredo.
 - Mexer no pgJDBC ou no código JDBC não afeta mais a produção, mas quebra as diferenciais, que
   continuam sendo a forma de provar uma mudança do filho.
