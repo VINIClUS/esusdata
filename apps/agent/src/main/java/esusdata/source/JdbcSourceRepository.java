@@ -1,6 +1,7 @@
 package esusdata.source;
 
 import esusdata.source.model.SourceRecord;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -71,5 +72,10 @@ public final class JdbcSourceRepository implements SourceRepository {
     public Optional<SourceRecord> findById(String id) {
         return jdbc.query("select * from sources where id = ?", MAPPER, id).stream()
                 .findFirst();
+    }
+
+    @Override
+    public List<SourceRecord> findAll() {
+        return jdbc.query("select * from sources order by municipality_ibge, id", MAPPER);
     }
 }

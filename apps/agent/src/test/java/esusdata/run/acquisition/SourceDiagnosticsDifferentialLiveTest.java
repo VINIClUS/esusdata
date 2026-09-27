@@ -72,6 +72,11 @@ class SourceDiagnosticsDifferentialLiveTest {
         public Optional<SourceRecord> findById(String id) {
             return Optional.ofNullable(sources.get(id));
         }
+
+        @Override
+        public List<SourceRecord> findAll() {
+            return List.copyOf(sources.values());
+        }
     };
     private final PecSecretResolver secrets = secretRef -> switch (secretRef) {
         case "GOOD" -> PG.getPassword().toCharArray();

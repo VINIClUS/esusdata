@@ -13,6 +13,8 @@ import {
   normalizeIndicatorResult,
   normalizePainelResumo,
   normalizeRunResponse,
+  normalizeSource,
+  pickSource,
   recentRunsPath,
 } from '../normalizers'
 import type {
@@ -25,6 +27,7 @@ import type {
   RelatorioGerado,
   RequisitoFonte,
   RunResponse,
+  SourceResponse,
 } from '../types'
 
 function mockOnly<T>(mock: T, message: string) {
@@ -90,6 +93,12 @@ async function resolveApiExecucaoAtual(municipalityIbge: string | undefined) {
   return normalizeRunResponse(latest)
 }
 
+async function resolveApiFonte(municipalityIbge: string | undefined): Promise<Fonte> {
+  const source = pickSource(await apiFetch<SourceResponse[]>('/sources'), municipalityIbge)
+  if (!source) throw new Error('Nenhuma fonte cadastrada que você possa administrar.')
+  return normalizeSource(source)
+}
+
 export function usePainelResumo() {
   const { municipalityIbge, referencePeriod, isLoading } = useScope()
   return useQuery({
@@ -135,12 +144,11 @@ export function useExecucaoAtual() {
 }
 
 export function useFonte() {
+  const { municipalityIbge, isLoading } = useScope()
   return useQuery({
-    queryKey: ['fonte'],
-    queryFn: mockOnly<Fonte>(
-      fonteFixture,
-      'A API ainda não fornece a leitura da fonte cadastrada neste ambiente.',
-    ),
+    queryKey: ['fonte', municipalityIbge],
+    queryFn: () => (USE_MOCKS ? resolveMock(fonteFixture) : resolveApiFonte(municipalityIbge)),
+    enabled: !isLoading,
   })
 }
 

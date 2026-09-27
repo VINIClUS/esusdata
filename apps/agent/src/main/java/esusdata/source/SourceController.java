@@ -9,10 +9,13 @@ import esusdata.source.dto.SourceTestResponse;
 import esusdata.source.model.SourceRecord;
 import esusdata.web.ApiNotFoundException;
 import java.time.Clock;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,6 +45,22 @@ public class SourceController {
         this.sourceDiagnosticsService = sourceDiagnosticsService;
         this.authorization = authorization;
         this.clock = clock;
+    }
+
+    /**
+     * Every source the caller may manage, narrowed rather than refused: an installation-scoped
+     * {@code MANAGE_SOURCE} (the bootstrap admin's grant) sees all of them, a municipal one only its
+     * own municipality's. Takes no municipality because {@code GET /auth/me} lists only
+     * {@code READ_CLINICAL} municipalities, which a technical admin never holds (ENG-45). Read-only,
+     * so no recent reauth; {@code secretRef} is a reference, never the secret value (§1.12.7 L550).
+     */
+    @GetMapping("/api/v1/sources")
+    public List<SourceResponse> list(@AuthenticationPrincipal AuthenticatedSession session) {
+        Predicate<String> permitted = authorization.permittedMunicipalities(session, Permission.MANAGE_SOURCE);
+        return sourceRepository.findAll().stream()
+                .filter(source -> permitted.test(source.municipalityIbge()))
+                .map(SourceController::toResponse)
+                .toList();
     }
 
     @PostMapping("/api/v1/sources")
