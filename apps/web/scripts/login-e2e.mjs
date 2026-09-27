@@ -183,7 +183,27 @@ try {
   assert.equal(await page.getByLabel('Host', { exact: true }).inputValue(), '192.0.2.10')
   assert.equal(await page.getByLabel('Porta', { exact: true }).inputValue(), '5433')
   assert.equal(await page.getByLabel('Usuário', { exact: true }).inputValue(), 'esus_leitura')
-  assert.equal(await page.getByLabel('Senha', { exact: true }).inputValue(), '')
+  // Requirements come from the API; with no diagnostic yet, the read connection is unconfirmed.
+  await page.getByText('Versão e modelo do PEC na matriz de compatibilidade').waitFor()
+  const requirements = await (
+    await page.request.get(`${base}/api/v1/sources/pec-e2e/requirements`)
+  ).json()
+  assert.deepEqual(
+    requirements.map((r) => [r.code, r.ok]),
+    [
+      ['READ_CONNECTION', false],
+      ['PEC_POSTGRESQL_FAMILY', true],
+      ['PEC_VERSION_IN_MATRIX', true],
+      ['MUNICIPAL_SCOPE', true],
+    ],
+  )
+  // No destination is allowlisted in this run, so the stored diagnostic is a refusal. It must
+  // survive a reload: it comes from the API, not from page state.
+  await page.getByLabel('Senha da sua conta Esusdata').fill('very-strong-admin-password-1')
+  await page.getByRole('button', { name: 'Testar fonte cadastrada' }).click()
+  await page.getByText('Destino não autorizado nesta instalação.').waitFor()
+  await page.reload()
+  await page.getByText('Destino não autorizado nesta instalação.').waitFor()
   await checkWidth(page)
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'source-desktop.png') })
   const created = await post(page, '/users', {

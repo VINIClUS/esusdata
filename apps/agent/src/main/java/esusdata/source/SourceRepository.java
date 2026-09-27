@@ -1,7 +1,9 @@
 package esusdata.source;
 
+import esusdata.source.model.LastDiagnostic;
 import esusdata.source.model.SourceRecord;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -14,4 +16,18 @@ public interface SourceRepository {
     Optional<SourceRecord> findById(String id);
 
     List<SourceRecord> findAll();
+
+    /**
+     * Overwrites the source's last diagnostic, pinned to the configuration version it ran against —
+     * only while the source still has that version, so a slow test of a replaced configuration never
+     * overwrites the current one's result.
+     */
+    void recordDiagnostic(
+            String sourceId, int sourceConfigurationVersion, String outcome, String detail, String testedAt);
+
+    /** The stored last diagnostic, whatever its version — check {@link LastDiagnostic#appliesTo}. */
+    Optional<LastDiagnostic> findLastDiagnostic(String sourceId);
+
+    /** {@link #findLastDiagnostic} for every source in one query, keyed by source id. */
+    Map<String, LastDiagnostic> findLastDiagnostics();
 }

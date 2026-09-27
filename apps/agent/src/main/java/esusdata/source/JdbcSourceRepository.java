@@ -1,8 +1,11 @@
 package esusdata.source;
 
+import esusdata.source.model.LastDiagnostic;
 import esusdata.source.model.SourceRecord;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
@@ -27,6 +30,12 @@ public final class JdbcSourceRepository implements SourceRepository {
             rs.getString("pec_version"),
             rs.getString("read_model"),
             rs.getString("created_at"));
+
+    private static final RowMapper<LastDiagnostic> DIAGNOSTIC_MAPPER = (rs, rowNum) -> new LastDiagnostic(
+            rs.getInt("source_configuration_version"),
+            rs.getString("outcome"),
+            rs.getString("detail"),
+            rs.getString("tested_at"));
 
     private final JdbcTemplate jdbc;
 
@@ -77,5 +86,34 @@ public final class JdbcSourceRepository implements SourceRepository {
     @Override
     public List<SourceRecord> findAll() {
         return jdbc.query("select * from sources order by municipality_ibge, id", MAPPER);
+    }
+
+    @Override
+    public void recordDiagnostic(
+            String sourceId, int sourceConfigurationVersion, String outcome, String detail, String testedAt) {
+        jdbc.update("""
+                INSERT INTO source_diagnostics (source_id, source_configuration_version, outcome, detail, tested_at)
+                SELECT id, source_configuration_version, ?, ?, ?
+                FROM sources WHERE id = ? AND source_configuration_version = ?
+                ON CONFLICT(source_id) DO UPDATE SET
+                    source_configuration_version = excluded.source_configuration_version,
+                    outcome = excluded.outcome, detail = excluded.detail, tested_at = excluded.tested_at
+                """, outcome, detail, testedAt, sourceId, sourceConfigurationVersion);
+    }
+
+    @Override
+    public Optional<LastDiagnostic> findLastDiagnostic(String sourceId) {
+        return jdbc.query("select * from source_diagnostics where source_id = ?", DIAGNOSTIC_MAPPER, sourceId).stream()
+                .findFirst();
+    }
+
+    @Override
+    public Map<String, LastDiagnostic> findLastDiagnostics() {
+        return jdbc
+                .query(
+                        "select * from source_diagnostics",
+                        (rs, rowNum) -> Map.entry(rs.getString("source_id"), DIAGNOSTIC_MAPPER.mapRow(rs, rowNum)))
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 }

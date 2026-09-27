@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { USE_MOCKS, apiFetch, resolveMock } from '../client'
+import { USE_MOCKS, apiFetch, ensureApiReady, resolveMock } from '../client'
 import { execucaoFixture } from '../fixtures/execucao'
 import { fonteFixture, requisitosFixture } from '../fixtures/fonteDados'
 import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadores'
@@ -12,6 +12,7 @@ import {
   normalizeIndicatorPacks,
   normalizeIndicatorResult,
   normalizePainelResumo,
+  normalizeRequirements,
   normalizeRunResponse,
   normalizeSource,
   pickSource,
@@ -27,7 +28,9 @@ import type {
   RelatorioGerado,
   RequisitoFonte,
   RunResponse,
+  SourceRequirementResponse,
   SourceResponse,
+  SourceTestResponse,
 } from '../types'
 
 function mockOnly<T>(mock: T, message: string) {
@@ -152,13 +155,45 @@ export function useFonte() {
   })
 }
 
-export function useRequisitosFonte() {
+/**
+ * Runs the diagnostic of the registered source. The API requires a recent reauthentication, so the
+ * caller's current password goes to `/auth/reauth` first; the result is stored by the API and read
+ * back through `useFonte`/`useRequisitosFonte`, which the caller then invalidates.
+ */
+export async function testarFonte(
+  sourceId: string,
+  senhaAtual: string,
+): Promise<SourceTestResponse> {
+  if (USE_MOCKS) {
+    return resolveMock<SourceTestResponse>({
+      outcome: 'CONNECTED',
+      detail: null,
+      maxRows: 0,
+      maxDurationMs: 0,
+      statementTimeoutMs: 0,
+    })
+  }
+  await ensureApiReady()
+  await apiFetch<undefined>('/auth/reauth', {
+    method: 'POST',
+    body: JSON.stringify({ password: senhaAtual }),
+  })
+  return apiFetch<SourceTestResponse>(`/sources/${encodeURIComponent(sourceId)}/test`, {
+    method: 'POST',
+  })
+}
+
+// Keyed under ['fonte'] so a new diagnostic refreshes the source and its requirements together.
+export function useRequisitosFonte(sourceId: string | undefined) {
   return useQuery({
-    queryKey: ['fonte', 'requisitos'],
-    queryFn: mockOnly<RequisitoFonte[]>(
-      requisitosFixture,
-      'A API ainda não fornece os requisitos da fonte neste ambiente.',
-    ),
+    queryKey: ['fonte', 'requisitos', sourceId],
+    queryFn: (): Promise<RequisitoFonte[]> =>
+      USE_MOCKS
+        ? resolveMock(requisitosFixture)
+        : apiFetch<SourceRequirementResponse[]>(
+            `/sources/${encodeURIComponent(sourceId ?? '')}/requirements`,
+          ).then(normalizeRequirements),
+    enabled: !!sourceId,
   })
 }
 

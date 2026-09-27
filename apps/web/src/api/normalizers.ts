@@ -7,7 +7,18 @@ import type {
   IndicatorResultResponse,
   PainelResumo,
 } from './types'
-import type { ExecucaoAtual, Fonte, RunResponse, SourceFamily, SourceResponse } from './types'
+import type {
+  DiagnosticOutcome,
+  ExecucaoAtual,
+  Fonte,
+  RequisitoFonte,
+  RunResponse,
+  SourceFamily,
+  SourceRequirementCode,
+  SourceRequirementResponse,
+  SourceResponse,
+  SourceTestResponse,
+} from './types'
 
 interface CategoryDefinition {
   key: string
@@ -185,8 +196,17 @@ const sourceFamilyLabels: Record<SourceFamily, string> = {
   EXTERNAL_DATASET: 'Conjunto de dados externo',
 }
 
-// The API keeps no diagnostic history yet, so a freshly loaded source has no last test.
+const diagnosticOutcomeMessages: Record<DiagnosticOutcome, string> = {
+  CONNECTED: 'Conexão de leitura estabelecida.',
+  DESTINATION_NOT_ALLOWED: 'Destino não autorizado nesta instalação.',
+  SOURCE_AUTHENTICATION_FAILED: 'A fonte recusou o usuário ou a senha.',
+  SOURCE_PERMISSION_DENIED: 'O usuário da fonte não tem permissão de leitura.',
+  CONNECTION_FAILED: 'Não foi possível conectar à fonte.',
+}
+
+// The API returns the last diagnostic only while it matches the source's current configuration.
 export function normalizeSource(source: SourceResponse): Fonte {
+  const diagnostic = source.lastDiagnostic
   return {
     id: source.id,
     tipo: sourceFamilyLabels[source.sourceFamily],
@@ -194,8 +214,35 @@ export function normalizeSource(source: SourceResponse): Fonte {
     porta: String(source.port),
     nomeBanco: source.databaseName,
     usuario: source.dbUser,
-    ultimoTeste: null,
+    ultimoTeste: diagnostic
+      ? {
+          ok: diagnostic.outcome === 'CONNECTED',
+          mensagem: diagnosticOutcomeMessages[diagnostic.outcome],
+          testadoEm: diagnostic.testedAt,
+        }
+      : null,
   }
+}
+
+// A busy source is not stored, so the page would otherwise keep showing the previous result as if
+// it were this test's; every other outcome is read back from the stored last diagnostic.
+export function sourceTestNotice(response: SourceTestResponse): string | null {
+  return response.outcome === 'SOURCE_BUSY'
+    ? 'A fonte está em uso por uma aquisição. Tente novamente em instantes.'
+    : null
+}
+
+// Each label claims only what the API checks: a connection that opened, not a SELECT-only
+// account; a version listed in the matrix, not the exact entry an acquisition requires.
+const requirementLabels: Record<SourceRequirementCode, string> = {
+  READ_CONNECTION: 'Conexão de leitura confirmada no último teste',
+  PEC_POSTGRESQL_FAMILY: 'Fonte PostgreSQL do e-SUS PEC',
+  PEC_VERSION_IN_MATRIX: 'Versão e modelo do PEC na matriz de compatibilidade',
+  MUNICIPAL_SCOPE: 'Município configurado',
+}
+
+export function normalizeRequirements(requirements: SourceRequirementResponse[]): RequisitoFonte[] {
+  return requirements.map((r) => ({ label: requirementLabels[r.code], ok: r.ok }))
 }
 
 const runStateLabels: Record<RunResponse['state'], string> = {

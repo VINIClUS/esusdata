@@ -8,12 +8,16 @@ export const fonteFixture: Fonte = {
   porta: '5432',
   nomeBanco: 'pec_dw',
   usuario: 'esusdata',
-  ultimoTeste: { ok: true, mensagem: 'Diagnóstico da fonte concluído com sucesso!' },
+  ultimoTeste: {
+    ok: true,
+    mensagem: 'Conexão de leitura estabelecida.',
+    testadoEm: '2026-09-19T13:05:00Z',
+  },
 }
 
 export const requisitosFixture: RequisitoFonte[] = [
-  { label: 'Acesso de leitura (somente SELECT)', ok: true },
-  { label: 'Família PostgreSQL compatível', ok: true },
-  { label: 'Estruturas DW e/ou transacionais', ok: true },
-  { label: 'Escopo municipal configurado', ok: true },
+  { label: 'Conexão de leitura confirmada no último teste', ok: true },
+  { label: 'Fonte PostgreSQL do e-SUS PEC', ok: true },
+  { label: 'Versão e modelo do PEC na matriz de compatibilidade', ok: true },
+  { label: 'Município configurado', ok: true },
 ]

@@ -3,9 +3,11 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Grid from '@mui/material/Grid'
 import Typography from '@mui/material/Typography'
+import { useQueryClient } from '@tanstack/react-query'
 import { Building, Database, Radio, Shield, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { useFonte, useRequisitosFonte } from '@/api/hooks'
+import { testarFonte, useFonte, useRequisitosFonte } from '@/api/hooks'
+import { sourceTestNotice } from '@/api/normalizers'
 import { Checklist } from '@/components/data/ChecklistCard'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Callout } from '@/components/ui/Callout'
@@ -70,13 +72,13 @@ export function FonteDeDadosPage() {
     data: requisitos,
     error: requisitosErrorValue,
     isError: requisitosError,
-  } = useRequisitosFonte()
+  } = useRequisitosFonte(data?.id)
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [tab, setTab] = useState('conexao')
-  // Edits belong to the source they were made on: switching municipality shows the other source.
-  const [form, setForm] = useState<{ sourceId: string; values: Record<string, string> } | null>(
-    null,
-  )
+  const [senhaAtual, setSenhaAtual] = useState('')
+  const [testando, setTestando] = useState(false)
+  const [erroTeste, setErroTeste] = useState<string | null>(null)
 
   if (isPending) return <PageSkeleton title="Configuração da Fonte de Dados" />
   if (isError) {
@@ -88,16 +90,25 @@ export function FonteDeDadosPage() {
       />
     )
   }
-  const values = (form?.sourceId === data.id ? form.values : null) ?? {
-    host: data.host,
-    porta: data.porta,
-    nomeBanco: data.nomeBanco,
-    usuario: data.usuario,
-    // The API never returns the password; this field only takes a new one.
-    senha: '',
+  const fonte = data
+  // The test runs against the registered configuration, so the fields only show it.
+  const readOnly = { input: { readOnly: true } }
+
+  async function testar() {
+    if (!senhaAtual) return
+    setTestando(true)
+    setErroTeste(null)
+    try {
+      const resultado = await testarFonte(fonte.id, senhaAtual)
+      setSenhaAtual('')
+      setErroTeste(sourceTestNotice(resultado))
+      await queryClient.invalidateQueries({ queryKey: ['fonte'] })
+    } catch {
+      setErroTeste('Senha incorreta ou teste indisponível. Tente novamente.')
+    } finally {
+      setTestando(false)
+    }
   }
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm({ sourceId: data.id, values: { ...values, [k]: e.target.value } })
 
   return (
     <>
@@ -120,14 +131,17 @@ export function FonteDeDadosPage() {
         <Grid size={{ xs: 12, md: 7.2 }}>
           <SectionCard
             title="Dados da fonte"
-            subtitle="Informe os parâmetros da fonte cadastrada."
+            subtitle="Parâmetros da fonte cadastrada. O teste usa esta configuração."
             padding={3}
             headerSx={{ pb: 2.5 }}
             sx={{ height: '100%' }}
           >
             <Box
               component="form"
-              onSubmit={(e) => e.preventDefault()}
+              onSubmit={(e) => {
+                e.preventDefault()
+                void testar()
+              }}
               sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}
             >
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
@@ -135,26 +149,25 @@ export function FonteDeDadosPage() {
                 <FilterSelect value={data.tipo} options={[data.tipo]} icon={Database} fullWidth />
               </Box>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 2.5 }}>
-                <Field label="Host" value={values.host} onChange={set('host')} />
-                <Field label="Porta" value={values.porta} onChange={set('porta')} />
+                <Field label="Host" value={data.host} slotProps={readOnly} />
+                <Field label="Porta" value={data.porta} slotProps={readOnly} />
               </Box>
-              <Field
-                label="Nome do banco de dados"
-                value={values.nomeBanco}
-                onChange={set('nomeBanco')}
-              />
-              <Field
-                label="Usuário"
-                value={values.usuario}
-                onChange={set('usuario')}
-                autoComplete="off"
-              />
-              <PasswordField
-                label="Senha"
-                value={values.senha}
-                onChange={set('senha')}
-                autoComplete="new-password"
-              />
+              <Field label="Nome do banco de dados" value={data.nomeBanco} slotProps={readOnly} />
+              <Field label="Usuário" value={data.usuario} slotProps={readOnly} />
+              <Box sx={{ borderTop: `1px solid ${colors.infoBorder}`, pt: 2.5 }}>
+                <PasswordField
+                  label="Senha da sua conta Esusdata"
+                  value={senhaAtual}
+                  onChange={(e) => setSenhaAtual(e.target.value)}
+                  autoComplete="current-password"
+                  helperText="Não é a senha do banco: confirma sua identidade para testar a fonte."
+                />
+              </Box>
+              {erroTeste && (
+                <Typography role="alert" color="error">
+                  {erroTeste}
+                </Typography>
+              )}
               <Box
                 sx={{
                   display: 'grid',
@@ -168,22 +181,25 @@ export function FonteDeDadosPage() {
                   type="submit"
                   variant="contained"
                   size="large"
+                  disabled={testando || !senhaAtual}
                   startIcon={<Radio size={22} />}
                   sx={{ minHeight: 58, px: 3, fontSize: 17, fontWeight: 500 }}
                 >
-                  Testar fonte
+                  Testar fonte cadastrada
                 </Button>
                 {data.ultimoTeste && (
                   <Box
+                    role="status"
                     sx={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 1.5,
                       px: 2,
-                      bgcolor: colors.successBg,
-                      border: `1px solid ${colors.successBorder}`,
+                      py: 1,
+                      bgcolor: data.ultimoTeste.ok ? colors.successBg : colors.errorBg,
+                      border: `1px solid ${data.ultimoTeste.ok ? colors.successBorder : colors.error}`,
                       borderRadius: '10px',
-                      color: colors.success,
+                      color: data.ultimoTeste.ok ? colors.success : colors.error,
                       fontSize: 15,
                       fontWeight: 600,
                     }}
@@ -193,7 +209,7 @@ export function FonteDeDadosPage() {
                         width: 26,
                         height: 26,
                         borderRadius: '50%',
-                        bgcolor: colors.success,
+                        bgcolor: data.ultimoTeste.ok ? colors.success : colors.error,
                         color: '#fff',
                         display: 'grid',
                         placeItems: 'center',
@@ -201,9 +217,14 @@ export function FonteDeDadosPage() {
                         flexShrink: 0,
                       }}
                     >
-                      ✓
+                      {data.ultimoTeste.ok ? '✓' : '✗'}
                     </Box>
-                    {data.ultimoTeste.mensagem}
+                    <span>
+                      {data.ultimoTeste.mensagem}{' '}
+                      <Box component="span" sx={{ fontWeight: 400 }}>
+                        Testado em {new Date(data.ultimoTeste.testadoEm).toLocaleString('pt-BR')}.
+                      </Box>
+                    </span>
                   </Box>
                 )}
               </Box>
