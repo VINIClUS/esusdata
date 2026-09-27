@@ -60,7 +60,8 @@ public class SourceController {
      * own municipality's. Takes no municipality because {@code GET /auth/me} lists only
      * {@code READ_CLINICAL} municipalities, which a technical admin never holds (ENG-45). Read-only,
      * so no recent reauth; {@code secretRef} is a reference, never the secret value (§1.12.7 L550).
-     * Each source carries its last diagnostic, read for all of them in one query.
+     * Each source carries its last diagnostic, read for all of them in one query and kept only if it
+     * ran against the configuration version this listing read.
      */
     @GetMapping("/api/v1/sources")
     public List<SourceResponse> list(@AuthenticationPrincipal AuthenticatedSession session) {
@@ -68,7 +69,11 @@ public class SourceController {
         Map<String, LastDiagnostic> diagnostics = sourceRepository.findLastDiagnostics();
         return sourceRepository.findAll().stream()
                 .filter(source -> permitted.test(source.municipalityIbge()))
-                .map(source -> toResponse(source, diagnostics.get(source.id())))
+                .map(source -> toResponse(
+                        source,
+                        Optional.ofNullable(diagnostics.get(source.id()))
+                                .filter(diagnostic -> diagnostic.appliesTo(source))
+                                .orElse(null)))
                 .toList();
     }
 

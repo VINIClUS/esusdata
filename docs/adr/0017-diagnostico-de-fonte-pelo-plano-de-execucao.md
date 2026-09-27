@@ -56,7 +56,10 @@ com o novo:
   fonte, sobrescrita a cada teste, com a versão de configuração em que ele rodou. `GET /sources`
   devolve esse resultado como `lastDiagnostic` e `GET /sources/{id}/requirements` usa ele no
   requisito `READ_CONNECTION`. Recadastrar a fonte muda a versão e esconde o resultado antigo, então
-  um `CONNECTED` nunca vale para outro host ou usuário. `SOURCE_BUSY` não é guardado, porque não diz
+  um `CONNECTED` nunca vale para outro host ou usuário. O resultado só é gravado se a fonte ainda
+  tem a versão testada, e quem lê compara a versão guardada com a do registro que leu, então nem
+  um teste lento nem um recadastro entre duas leituras juntam uma configuração com o resultado de
+  outra. `SOURCE_BUSY` não é guardado, porque não diz
   nada sobre a fonte. O `detail` guardado é o mesmo que a API devolve, sem o segredo.
 - Mexer no pgJDBC ou no código JDBC não afeta mais a produção, mas quebra as diferenciais, que
   continuam sendo a forma de provar uma mudança do filho.

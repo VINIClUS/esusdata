@@ -17,11 +17,15 @@ public interface SourceRepository {
 
     List<SourceRecord> findAll();
 
-    /** Overwrites the source's last diagnostic, pinned to the configuration version it ran against. */
+    /**
+     * Overwrites the source's last diagnostic, pinned to the configuration version it ran against —
+     * only while the source still has that version, so a slow test of a replaced configuration never
+     * overwrites the current one's result.
+     */
     void recordDiagnostic(
             String sourceId, int sourceConfigurationVersion, String outcome, String detail, String testedAt);
 
-    /** The last diagnostic, only if it ran against the source's current configuration version. */
+    /** The stored last diagnostic, whatever its version — check {@link LastDiagnostic#appliesTo}. */
     Optional<LastDiagnostic> findLastDiagnostic(String sourceId);
 
     /** {@link #findLastDiagnostic} for every source in one query, keyed by source id. */

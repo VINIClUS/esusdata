@@ -20,7 +20,7 @@ class SourceRequirementsServiceTest {
     void aValidatedRegistrationWithAConnectedDiagnosticMeetsEveryRequirement() {
         var requirements = service.requirements(
                 source("PEC_POSTGRESQL", "5.4.37", "PEC_DW", "3541307"),
-                Optional.of(new LastDiagnostic("CONNECTED", null, Instant.EPOCH.toString())));
+                Optional.of(new LastDiagnostic(1, "CONNECTED", null, Instant.EPOCH.toString())));
 
         assertThat(requirements)
                 .containsExactly(
@@ -43,7 +43,16 @@ class SourceRequirementsServiceTest {
         var requirements = service.requirements(
                 source("PEC_POSTGRESQL", "5.4.37", "PEC_DW", "3541307"),
                 Optional.of(new LastDiagnostic(
-                        "SOURCE_AUTHENTICATION_FAILED", "source authentication failed", Instant.EPOCH.toString())));
+                        1, "SOURCE_AUTHENTICATION_FAILED", "source authentication failed", Instant.EPOCH.toString())));
+
+        assertThat(requirements).contains(new Requirement(Code.READ_CONNECTION, false));
+    }
+
+    @Test
+    void aConnectedDiagnosticOfAnotherConfigurationVersionConfirmsNothing() {
+        var requirements = service.requirements(
+                source("PEC_POSTGRESQL", "5.4.37", "PEC_DW", "3541307"),
+                Optional.of(new LastDiagnostic(2, "CONNECTED", null, Instant.EPOCH.toString())));
 
         assertThat(requirements).contains(new Requirement(Code.READ_CONNECTION, false));
     }

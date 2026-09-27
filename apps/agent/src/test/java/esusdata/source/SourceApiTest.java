@@ -3,6 +3,8 @@ package esusdata.source;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.auth.model.Role;
+import esusdata.source.model.LastDiagnostic;
+import esusdata.source.model.SourceRecord;
 import esusdata.web.ApiFixtureSupport;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -184,6 +186,38 @@ class SourceApiTest extends ApiFixtureSupport {
         assertThat(get(cookie, "/api/v1/sources").body())
                 .contains("\"id\":\"" + sourceId + "\",\"sourceConfigurationVersion\":2")
                 .doesNotContain("DESTINATION_NOT_ALLOWED");
+    }
+
+    @Test
+    void aLateDiagnosticOfAReplacedConfigurationNeverOverwritesTheCurrentOne() {
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+        SourceRecord v1 = sourceRepository.findById(sourceId).orElseThrow();
+        SourceRecord v2 = new SourceRecord(
+                v1.id(),
+                2,
+                v1.sourceFamily(),
+                v1.pecInstallationRole(),
+                v1.sourceLocationKind(),
+                v1.host(),
+                v1.port(),
+                v1.databaseName(),
+                "outro_usuario",
+                v1.secretRef(),
+                v1.municipalityIbge(),
+                v1.pecVersion(),
+                v1.readModel(),
+                v1.createdAt());
+        sourceRepository.upsert(v2);
+
+        sourceRepository.recordDiagnostic(sourceId, 2, "DESTINATION_NOT_ALLOWED", "refused", "2026-09-27T12:00:00Z");
+        sourceRepository.recordDiagnostic(sourceId, 1, "CONNECTED", null, "2026-09-27T12:00:01Z");
+
+        LastDiagnostic stored = sourceRepository.findLastDiagnostic(sourceId).orElseThrow();
+        assertThat(stored.sourceConfigurationVersion()).isEqualTo(2);
+        assertThat(stored.outcome()).isEqualTo("DESTINATION_NOT_ALLOWED");
+        assertThat(stored.appliesTo(v2)).isTrue();
+        assertThat(stored.appliesTo(v1)).isFalse();
     }
 
     @Test

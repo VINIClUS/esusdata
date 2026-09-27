@@ -30,11 +30,15 @@ public final class SourceRequirementsService {
         this.matrix = matrix;
     }
 
+    /** A diagnostic of another configuration version than {@code source}'s confirms nothing. */
     public List<Requirement> requirements(SourceRecord source, Optional<LastDiagnostic> lastDiagnostic) {
         return List.of(
                 new Requirement(
                         Code.READ_CONNECTION,
-                        lastDiagnostic.map(d -> "CONNECTED".equals(d.outcome())).orElse(false)),
+                        lastDiagnostic
+                                .filter(d -> d.appliesTo(source))
+                                .map(d -> "CONNECTED".equals(d.outcome()))
+                                .orElse(false)),
                 new Requirement(Code.PEC_POSTGRESQL_FAMILY, "PEC_POSTGRESQL".equals(source.sourceFamily())),
                 new Requirement(Code.PEC_VERSION_IN_MATRIX, listedInMatrix(source)),
                 new Requirement(

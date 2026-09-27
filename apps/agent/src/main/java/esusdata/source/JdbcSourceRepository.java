@@ -31,16 +31,11 @@ public final class JdbcSourceRepository implements SourceRepository {
             rs.getString("read_model"),
             rs.getString("created_at"));
 
-    private static final RowMapper<LastDiagnostic> DIAGNOSTIC_MAPPER = (rs, rowNum) ->
-            new LastDiagnostic(rs.getString("outcome"), rs.getString("detail"), rs.getString("tested_at"));
-
-    /** A stored diagnostic applies only while the source still has the configuration it ran against. */
-    private static final String CURRENT_DIAGNOSTICS = """
-            select d.source_id, d.outcome, d.detail, d.tested_at
-            from source_diagnostics d
-            join sources s on s.id = d.source_id
-                and s.source_configuration_version = d.source_configuration_version
-            """;
+    private static final RowMapper<LastDiagnostic> DIAGNOSTIC_MAPPER = (rs, rowNum) -> new LastDiagnostic(
+            rs.getInt("source_configuration_version"),
+            rs.getString("outcome"),
+            rs.getString("detail"),
+            rs.getString("tested_at"));
 
     private final JdbcTemplate jdbc;
 
@@ -98,16 +93,17 @@ public final class JdbcSourceRepository implements SourceRepository {
             String sourceId, int sourceConfigurationVersion, String outcome, String detail, String testedAt) {
         jdbc.update("""
                 INSERT INTO source_diagnostics (source_id, source_configuration_version, outcome, detail, tested_at)
-                VALUES (?,?,?,?,?)
+                SELECT id, source_configuration_version, ?, ?, ?
+                FROM sources WHERE id = ? AND source_configuration_version = ?
                 ON CONFLICT(source_id) DO UPDATE SET
                     source_configuration_version = excluded.source_configuration_version,
                     outcome = excluded.outcome, detail = excluded.detail, tested_at = excluded.tested_at
-                """, sourceId, sourceConfigurationVersion, outcome, detail, testedAt);
+                """, outcome, detail, testedAt, sourceId, sourceConfigurationVersion);
     }
 
     @Override
     public Optional<LastDiagnostic> findLastDiagnostic(String sourceId) {
-        return jdbc.query(CURRENT_DIAGNOSTICS + " where d.source_id = ?", DIAGNOSTIC_MAPPER, sourceId).stream()
+        return jdbc.query("select * from source_diagnostics where source_id = ?", DIAGNOSTIC_MAPPER, sourceId).stream()
                 .findFirst();
     }
 
@@ -115,7 +111,7 @@ public final class JdbcSourceRepository implements SourceRepository {
     public Map<String, LastDiagnostic> findLastDiagnostics() {
         return jdbc
                 .query(
-                        CURRENT_DIAGNOSTICS,
+                        "select * from source_diagnostics",
                         (rs, rowNum) -> Map.entry(rs.getString("source_id"), DIAGNOSTIC_MAPPER.mapRow(rs, rowNum)))
                 .stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
