@@ -61,6 +61,25 @@ public final class JdbcResultRepository implements ResultRepository {
     }
 
     @Override
+    public List<PublishedResult> findLatestPublishedInRange(
+            String municipalityIbge, String indicatorPack, String fromPeriod, String toPeriod) {
+        requireScope(municipalityIbge);
+        // result_id breaks a published_at tie, so the same range always yields the same rows.
+        return jdbc.query("""
+                select * from (
+                    select r.*, row_number() over (
+                               partition by indicator_pack, reference_period
+                               order by published_at desc, result_id desc) as newest
+                      from results r
+                     where municipality_ibge = ?
+                       and (? is null or indicator_pack = ?)
+                       and reference_period between ? and ?)
+                 where newest = 1
+                 order by indicator_pack, reference_period
+                """, MAPPER, municipalityIbge, indicatorPack, indicatorPack, fromPeriod, toPeriod);
+    }
+
+    @Override
     public List<String> findPublishedPeriods(String municipalityIbge) {
         requireScope(municipalityIbge);
         return jdbc.queryForList("""

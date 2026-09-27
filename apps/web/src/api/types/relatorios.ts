@@ -1,7 +1,25 @@
-export interface RelatorioGerado {
+/** `POST /exports` and `GET /exports` (ADR 0024): one stored aggregate CSV export. */
+export interface ExportResponse {
   id: string
-  nome: string
+  fileName: string
+  municipalityIbge: string
+  /** Null when every indicator pack is exported. */
+  indicatorPack: string | null
+  fromPeriod: string
+  toPeriod: string
+  format: 'CSV'
+  rowCount: number
+  createdAt: string
+  expiresAt: string
+}
+
+export interface Exportacao {
+  id: string
+  arquivo: string
+  indicador: string
   periodo: string
+  linhas: number
+  /** ISO instants; the page formats them for display. */
   geradoEm: string
-  formato: string
+  expiraEm: string
 }

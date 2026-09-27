@@ -20,6 +20,6 @@ Geradas com `cd apps/web && npm run dev` + `npm run screenshot` (Playwright head
 - **Painel (1)**: a terceira linha (alertas, pendências, execuções) fica alguns pixels mais alta que na referência e o final do card "Alertas recentes" sai da dobra em 1086 px. A página rola normalmente.
 - **Detalhe (4)**: o card "Informações adicionais" fica abaixo da dobra em 1086 px; na referência ele cabe porque o texto é menor.
 - **Fonte de Dados (6)**: a terceira aba "Isolamento Municipal" navega para a tela 8 em vez de trocar o conteúdo na mesma página; os cards "Requisitos" e "Segurança" são ligeiramente mais compactos.
-- **Relatórios (7)**: a ilustração do card "Sobre o Relatório" é um SVG simples inline, não a ilustração da referência.
+- **Relatórios (7)**: só exporta CSV agregado (ADR 0024): as abas de PDF/XLSX e de qualidade da referência saíram. A ilustração do card "Sobre a exportação" é um SVG simples inline, não a da referência.
 - **Responsivo (9)**: no tablet, o card "Verificações de integridade" vai para a linha seguinte (a referência não o mostra). No celular, a lista de indicadores usa cards com código, nome, valor, chip de status e seta, como na referência.
 - **Barra de progresso (5)**: o percentual (68%) é calculado de `processados/total` da fixture, não é decorativo.

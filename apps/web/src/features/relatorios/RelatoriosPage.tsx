@@ -3,69 +3,54 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
-import { Calendar, ChartColumn, Check, Download, FileText, List } from 'lucide-react'
-import { useRelatoriosRecentes } from '@/api/hooks'
-import type { RelatorioGerado } from '@/api/types'
+import { useQueryClient } from '@tanstack/react-query'
+import { Calendar, Check, Download, FileText, List } from 'lucide-react'
+import { USE_MOCKS } from '@/api/client'
+import {
+  baixarExportacao,
+  gerarExportacao,
+  useCompetenciasPublicadas,
+  useExportacoes,
+  useIndicadores,
+} from '@/api/hooks'
+import { competenciaLabel } from '@/api/normalizers'
+import type { Exportacao } from '@/api/types'
+import { useScope } from '@/app/scope-context'
 import { DataTable, type Column } from '@/components/data/DataTable'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { Callout } from '@/components/ui/Callout'
 import { FilterSelect } from '@/components/ui/FilterSelect'
-import { LinkButton } from '@/components/ui/LinkButton'
 import { PageUnavailable } from '@/components/ui/PageUnavailable'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { SectionCard } from '@/components/ui/SectionCard'
-import { UnderlineTabs } from '@/components/ui/Tabs'
+import { formatInt } from '@/lib/format'
 import { colors } from '@/theme/tokens'
 
-const tabs = [
-  { key: 'indicadores', label: 'Relatório de indicadores', icon: ChartColumn },
-  { key: 'qualidade', label: 'Relatório de qualidade', icon: FileText },
-  { key: 'exportar', label: 'Exportar dados', icon: Download },
+const TITLE = 'Relatórios'
+const SUBTITLE = 'Exporte em CSV os resultados de indicadores já publicados para o município.'
+const TODOS = 'Todos os indicadores'
+
+/** At most 24 competências per export (ADR 0024). */
+const MAX_COMPETENCIAS = 24
+
+const colunasCsv = [
+  'Município (IBGE), indicador e versão da regra',
+  'Competência e status do resultado',
+  'Numerador e denominador exatos',
+  'Valor percentual publicado',
+  'Classificação e data de corte',
+  'Data de publicação e execução de origem',
 ]
 
-const conteudo = [
-  'Indicadores calculados e metas',
-  'Evolução temporal (séries históricas)',
-  'Comparativo entre competências',
-  'Tabelas detalhadas por categoria',
-  'Gráficos ilustrativos',
-  'Notas técnicas e fonte dos dados',
-]
+function formatInstant(iso: string): string {
+  return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+}
 
-const columns: Column<RelatorioGerado>[] = [
-  {
-    key: 'nome',
-    header: 'Nome',
-    render: (r) => <Typography sx={{ fontSize: 14, color: colors.navy }}>{r.nome}</Typography>,
-  },
-  {
-    key: 'periodo',
-    header: 'Período',
-    render: (r) => (
-      <Typography sx={{ fontSize: 14, color: colors.primary }}>{r.periodo}</Typography>
-    ),
-  },
-  {
-    key: 'gerado',
-    header: 'Gerado em',
-    render: (r) => <Typography sx={{ fontSize: 14, color: colors.navy }}>{r.geradoEm}</Typography>,
-  },
-  {
-    key: 'formato',
-    header: 'Formato',
-    render: (r) => <Typography sx={{ fontSize: 14, color: colors.navy }}>{r.formato}</Typography>,
-  },
-  {
-    key: 'acoes',
-    header: 'Ações',
-    align: 'center',
-    width: 140,
-    render: () => (
-      <IconButton size="small" aria-label="Baixar" sx={{ color: colors.primary }}>
-        <Download size={18} />
-      </IconButton>
-    ),
-  },
-]
+/** Competências in `[fromPeriod, toPeriod]`, both yyyy-MM. */
+function competenciasBetween(fromPeriod: string, toPeriod: string): number {
+  const month = (period: string) => Number(period.slice(0, 4)) * 12 + Number(period.slice(5, 7))
+  return month(toPeriod) - month(fromPeriod) + 1
+}
 
 function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -120,83 +105,223 @@ function ReportIllustration() {
 }
 
 export function RelatoriosPage() {
-  const { data, error, isError, isPending } = useRelatoriosRecentes()
-  const [tab, setTab] = useState('indicadores')
-  if (isPending) return <PageSkeleton title="Relatórios" />
-  if (isError) {
-    return (
-      <PageUnavailable
-        title="Relatórios"
-        subtitle="Gere relatórios personalizados com base nos indicadores e evidências do e-SUS PEC."
-        error={error}
-      />
-    )
+  const { data, error, isError, isPending } = useExportacoes()
+  const indicadores = useIndicadores()
+  const competencias = useCompetenciasPublicadas()
+  const { municipalityIbge } = useScope()
+  const queryClient = useQueryClient()
+  const [inicio, setInicio] = useState<string | null>(null)
+  const [fim, setFim] = useState<string | null>(null)
+  const [indicador, setIndicador] = useState<string | null>(null)
+  const [gerando, setGerando] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
+
+  if (isPending) return <PageSkeleton title={TITLE} />
+  if (isError) return <PageUnavailable title={TITLE} subtitle={SUBTITLE} error={error} />
+
+  // Mock mode has no /auth/me, hence no municipality; the demo hooks ignore it.
+  const ibge = municipalityIbge ?? ''
+  const ultima = competencias[0]
+  const inicial = inicio ?? competencias[Math.min(competencias.length, 3) - 1]
+  const final = fim ?? ultima
+  const packs = indicadores.data?.itens ?? []
+  const nomes = [TODOS, ...packs.map((p) => p.nome)]
+  const pack = packs.find((p) => p.nome === indicador)?.codigo ?? null
+  const intervaloInvalido =
+    !!inicial &&
+    !!final &&
+    (inicial > final || competenciasBetween(inicial, final) > MAX_COMPETENCIAS)
+
+  async function gerar() {
+    if (!inicial || !final || intervaloInvalido) return
+    setGerando(true)
+    setAviso(null)
+    try {
+      const exportacao = await gerarExportacao(ibge, inicial, final, pack)
+      if (exportacao.rowCount === 0) {
+        setAviso('Nenhum resultado publicado nesse intervalo: o arquivo só tem o cabeçalho.')
+      }
+      await queryClient.invalidateQueries({ queryKey: ['exportacoes'] })
+    } catch (e) {
+      setAviso(e instanceof Error ? e.message : 'Não foi possível gerar a exportação.')
+    } finally {
+      setGerando(false)
+    }
   }
+
+  async function baixar(exportacao: Exportacao) {
+    setAviso(null)
+    try {
+      await baixarExportacao(exportacao, ibge)
+    } catch {
+      setAviso('A exportação expirou ou não está mais disponível. Gere uma nova.')
+      await queryClient.invalidateQueries({ queryKey: ['exportacoes'] })
+    }
+  }
+
+  const columns: Column<Exportacao>[] = [
+    {
+      key: 'indicador',
+      header: 'Indicador',
+      render: (r) => (
+        <Typography sx={{ fontSize: 14, color: colors.navy }}>{r.indicador}</Typography>
+      ),
+    },
+    {
+      key: 'periodo',
+      header: 'Período',
+      render: (r) => (
+        <Typography sx={{ fontSize: 14, color: colors.primary }}>{r.periodo}</Typography>
+      ),
+    },
+    {
+      key: 'linhas',
+      header: 'Linhas',
+      align: 'center',
+      render: (r) => (
+        <Typography sx={{ fontSize: 14, color: colors.navy }}>{formatInt(r.linhas)}</Typography>
+      ),
+    },
+    {
+      key: 'gerado',
+      header: 'Gerado em',
+      render: (r) => (
+        <Typography sx={{ fontSize: 14, color: colors.navy }}>
+          {formatInstant(r.geradoEm)}
+        </Typography>
+      ),
+    },
+    {
+      key: 'expira',
+      header: 'Disponível até',
+      render: (r) => (
+        <Typography sx={{ fontSize: 14, color: colors.textSecondary }}>
+          {formatInstant(r.expiraEm)}
+        </Typography>
+      ),
+    },
+    {
+      key: 'acoes',
+      header: 'Baixar',
+      align: 'center',
+      width: 100,
+      render: (r) => (
+        <IconButton
+          size="small"
+          aria-label={`Baixar ${r.arquivo}`}
+          onClick={() => void baixar(r)}
+          sx={{ color: colors.primary }}
+        >
+          <Download size={18} />
+        </IconButton>
+      ),
+    },
+  ]
 
   return (
     <>
-      <PageHeader
-        title="Relatórios"
-        subtitle="Gere relatórios personalizados com base nos indicadores e evidências do e-SUS PEC."
-      />
-
-      <UnderlineTabs items={tabs} value={tab} onChange={setTab} sx={{ mb: 2 }} />
+      <PageHeader title={TITLE} subtitle={SUBTITLE} />
 
       <SectionCard
-        title="Filtros do relatório"
-        subtitle="Selecione o período, a categoria e o formato do relatório."
+        title="Exportar dados (CSV)"
+        subtitle="Escolha o intervalo de competências e o indicador. Cada exportação fica disponível por 7 dias."
         sx={{ mb: 2 }}
       >
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr 0.8fr 1.1fr' },
-            gap: 2.5,
-            alignItems: 'end',
-          }}
-        >
-          <FilterField label="Competência inicial">
-            <FilterSelect value="01/2025" options={['01/2025']} icon={Calendar} fullWidth bold />
-          </FilterField>
-          <FilterField label="Competência final">
-            <FilterSelect value="08/2026" options={['08/2026']} icon={Calendar} fullWidth bold />
-          </FilterField>
-          <FilterField label="Categoria">
-            <FilterSelect value="Todas" options={['Todas']} icon={List} fullWidth bold />
-          </FilterField>
-          <FilterField label="Formato">
-            <FilterSelect
-              value="PDF"
-              options={['PDF', 'XLSX', 'CSV']}
-              icon={FileText}
-              fullWidth
-              bold
-            />
-          </FilterField>
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={<FileText size={20} />}
-            sx={{ minHeight: 50, fontSize: 16, fontWeight: 500 }}
+        {competencias.length === 0 ? (
+          <Callout variant="info" dense>
+            Nenhum resultado publicado para este município ainda. Rode uma execução antes de
+            exportar.
+          </Callout>
+        ) : (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1.4fr 1.1fr' },
+              gap: 2.5,
+              alignItems: 'end',
+            }}
           >
-            Gerar relatório
-          </Button>
-        </Box>
+            <FilterField label="Competência inicial">
+              <FilterSelect
+                value={competenciaLabel(inicial ?? '')}
+                options={competencias.map(competenciaLabel)}
+                onChange={(label) =>
+                  setInicio(competencias.find((c) => competenciaLabel(c) === label) ?? null)
+                }
+                icon={Calendar}
+                fullWidth
+                bold
+              />
+            </FilterField>
+            <FilterField label="Competência final">
+              <FilterSelect
+                value={competenciaLabel(final ?? '')}
+                options={competencias.map(competenciaLabel)}
+                onChange={(label) =>
+                  setFim(competencias.find((c) => competenciaLabel(c) === label) ?? null)
+                }
+                icon={Calendar}
+                fullWidth
+                bold
+              />
+            </FilterField>
+            <FilterField label="Indicador">
+              <FilterSelect
+                value={indicador ?? TODOS}
+                options={nomes}
+                onChange={(nome) => setIndicador(nome === TODOS ? null : nome)}
+                icon={List}
+                fullWidth
+                bold
+              />
+            </FilterField>
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<FileText size={20} />}
+              disabled={gerando || intervaloInvalido || (!ibge && !USE_MOCKS)}
+              onClick={() => void gerar()}
+              sx={{ minHeight: 50, fontSize: 16, fontWeight: 500 }}
+            >
+              {gerando ? 'Gerando…' : 'Gerar exportação'}
+            </Button>
+          </Box>
+        )}
+        {intervaloInvalido && (
+          <Box sx={{ mt: 2 }}>
+            <Callout variant="warning" dense>
+              A competência inicial precisa vir antes da final, num intervalo de até{' '}
+              {MAX_COMPETENCIAS} competências.
+            </Callout>
+          </Box>
+        )}
+        {aviso && (
+          <Box sx={{ mt: 2 }}>
+            <Callout variant="warning" dense>
+              {aviso}
+            </Callout>
+          </Box>
+        )}
       </SectionCard>
 
       <SectionCard
-        title="Relatórios recentes"
-        subtitle="Histórico dos últimos relatórios gerados no sistema."
-        action={<LinkButton>Ver todos</LinkButton>}
+        title="Exportações recentes"
+        subtitle="Exportações do município que ainda não expiraram, da mais nova para a mais antiga."
         sx={{ mb: 2 }}
       >
-        <DataTable
-          columns={columns}
-          rows={data}
-          getRowKey={(r) => r.id}
-          bordered
-          sx={{ '& th': { fontSize: 14, py: 1.1 }, '& td': { py: 1 } }}
-        />
+        {data.length === 0 ? (
+          <Typography sx={{ fontSize: 14, color: colors.textSecondary }}>
+            Nenhuma exportação disponível.
+          </Typography>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={data}
+            getRowKey={(r) => r.id}
+            bordered
+            sx={{ '& th': { fontSize: 14, py: 1.1 }, '& td': { py: 1 } }}
+          />
+        )}
       </SectionCard>
 
       <Box
@@ -213,17 +338,18 @@ export function RelatoriosPage() {
         <ReportIllustration />
         <Box sx={{ flex: 1 }}>
           <Typography sx={{ fontSize: 19, fontWeight: 700, color: colors.navy, mb: 1 }}>
-            Sobre o Relatório de Indicadores
+            Sobre a exportação
           </Typography>
           <Typography
             sx={{ fontSize: 14.5, color: colors.textSecondary, lineHeight: 1.55, mb: 2.5 }}
           >
-            Este relatório apresenta os principais indicadores da APS, com dados extraídos do e-SUS
-            PEC, no período selecionado. Inclui gráficos, tabelas, evolução temporal e análise
-            comparativa entre competências, permitindo o acompanhamento da performance do município.
+            O arquivo traz uma linha por indicador e competência, com o resultado mais recente
+            publicado pelo sistema. Os valores são os mesmos da tela, sem recálculo. Não é o
+            relatório oficial do SISAB e não contém dados de pacientes. O CSV usa ponto e vírgula e
+            vírgula decimal, para abrir direto numa planilha em português.
           </Typography>
           <Typography sx={{ fontSize: 15, fontWeight: 700, color: colors.navy, mb: 1.5 }}>
-            O que o relatório contém:
+            O que o arquivo contém:
           </Typography>
           <Box
             sx={{
@@ -233,7 +359,7 @@ export function RelatoriosPage() {
               columnGap: 3,
             }}
           >
-            {conteudo.map((c) => (
+            {colunasCsv.map((c) => (
               <Box key={c} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                 <Box
                   sx={{

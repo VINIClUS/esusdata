@@ -248,7 +248,18 @@ try {
     displayName: 'Usuário Pendente',
   })
   assert.equal(created.status(), 201)
-  const initialCode = (await created.json()).activationToken
+  const { userId: pendingUserId, activationToken: initialCode } = await created.json()
+  // A municipal manager: the one who reads results, and therefore the one who exports them.
+  assert.equal(
+    (await post(page, '/auth/reauth', { password: 'very-strong-admin-password-1' })).status(),
+    204,
+  )
+  const grant = await post(page, `/users/${pendingUserId}/grants`, {
+    role: 'MANAGER',
+    scopeKind: 'MUNICIPALITY',
+    municipalityIbge: '3541307',
+  })
+  assert.equal(grant.status(), 201)
   await page.getByRole('link', { name: 'Ativações pendentes' }).click()
   await page.getByRole('button', { name: 'Reemitir código' }).last().click()
   await page.getByLabel('Sua senha atual').fill('very-strong-admin-password-1')
@@ -272,6 +283,56 @@ try {
   await page.getByRole('button', { name: 'Ativar meu acesso' }).click()
   await page.getByText('Acesso ativado. Entre com sua nova senha.').waitFor()
 
+  // Reports (ADR 0024): the manager exports the published results of a range. Nothing is
+  // published in this run, so the file has only its header, and it still downloads.
+  await page.getByLabel('Usuário', { exact: true }).fill('pending-e2e')
+  await page.getByLabel('Senha', { exact: true }).fill('very-strong-user-password-1')
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'))
+  await page.goto(`${base}/relatorios`)
+  await page.getByText('Nenhum resultado publicado para este município ainda.').waitFor()
+  await page.getByText('Nenhuma exportação disponível.').waitFor()
+  const exportCreated = await post(page, '/exports', {
+    municipalityIbge: '3541307',
+    fromPeriod: '2026-01',
+    toPeriod: '2026-03',
+  })
+  assert.equal(exportCreated.status(), 201)
+  const exported = await exportCreated.json()
+  assert.equal(exported.rowCount, 0)
+  assert.equal(exported.fileName, 'esusdata-3541307-todos-2026-01_2026-03.csv')
+  const tooLong = await post(page, '/exports', {
+    municipalityIbge: '3541307',
+    fromPeriod: '2024-01',
+    toPeriod: '2026-01',
+  })
+  assert.equal(tooLong.status(), 400)
+  const otherMunicipality = await post(page, '/exports', {
+    municipalityIbge: '3304557',
+    fromPeriod: '2026-01',
+    toPeriod: '2026-03',
+  })
+  assert.equal(otherMunicipality.status(), 404)
+  await page.reload()
+  await page.getByText('01/2026 a 03/2026').waitFor()
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: `Baixar ${exported.fileName}` }).click(),
+  ])
+  assert.equal(download.suggestedFilename(), exported.fileName)
+  const csv = await readFile(await download.path(), 'utf8')
+  assert.ok(csv.startsWith('\uFEFF"municipio_ibge";"indicador";'), csv)
+  assert.ok(csv.endsWith('"execucao"\r\n'), csv)
+  const missing = await page.request.get(
+    `${base}/api/v1/exports/${exported.id}/content?municipalityIbge=3304557`,
+  )
+  assert.equal(missing.status(), 404)
+  await checkWidth(page)
+  if (screenshotDir)
+    await page.screenshot({ path: path.join(screenshotDir, 'reports-desktop.png') })
+  await page.getByRole('button', { name: 'Sair' }).click()
+  await page.waitForURL('**/login')
+
   await page.setViewportSize({ width: 390, height: 844 })
   await checkWidth(page)
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'login-mobile.png') })
@@ -280,7 +341,7 @@ try {
   if (screenshotDir)
     await page.screenshot({ path: path.join(screenshotDir, 'activation-mobile.png') })
   console.log(
-    'Chromium login, activation and source screen end-to-end passed; no horizontal overflow at 1448px or 390px',
+    'Chromium login, activation, source and reports screens end-to-end passed; no horizontal overflow at 1448px or 390px',
   )
 } finally {
   if (browser) await browser.close()

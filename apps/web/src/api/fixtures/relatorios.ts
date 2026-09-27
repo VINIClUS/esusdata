@@ -1,40 +1,31 @@
 // DEMO DATA — dados de demonstração; não usar como referência clínica ou operacional.
-import type { RelatorioGerado } from '../types'
+import type { ExportResponse } from '../types'
 
-export const relatoriosFixture: RelatorioGerado[] = [
+export const exportPeriodsFixture = ['2026-08', '2026-07', '2026-06', '2026-05', '2026-04']
+
+export const exportsFixture: ExportResponse[] = [
   {
-    id: 'r1',
-    nome: 'Indicadores APS',
-    periodo: 'Jan/2026 - Ago/2026',
-    geradoEm: '16/08/2026 10:25',
-    formato: 'PDF',
+    id: 'exp-demo-1',
+    fileName: 'esusdata-3538704-todos-2026-04_2026-08.csv',
+    municipalityIbge: '3538704',
+    indicatorPack: null,
+    fromPeriod: '2026-04',
+    toPeriod: '2026-08',
+    format: 'CSV',
+    rowCount: 5,
+    createdAt: '2026-09-16T13:25:00Z',
+    expiresAt: '2026-09-23T13:25:00Z',
   },
   {
-    id: 'r2',
-    nome: 'Qualidade dos dados',
-    periodo: 'Abr/2026 - Ago/2026',
-    geradoEm: '14/08/2026 16:43',
-    formato: 'PDF',
-  },
-  {
-    id: 'r3',
-    nome: 'Evolução histórica',
-    periodo: '2024 - 2026',
-    geradoEm: '12/08/2026 09:18',
-    formato: 'PDF',
-  },
-  {
-    id: 'r4',
-    nome: 'Execução de dados',
-    periodo: 'Mai/2026 - Ago/2026',
-    geradoEm: '08/08/2026 11:32',
-    formato: 'PDF',
-  },
-  {
-    id: 'r5',
-    nome: 'Cobertura da população',
-    periodo: 'Jan/2026 - Jul/2026',
-    geradoEm: '05/08/2026 14:27',
-    formato: 'PDF',
+    id: 'exp-demo-2',
+    fileName: 'esusdata-3538704-c1-mais-acesso-2026-06_2026-06.csv',
+    municipalityIbge: '3538704',
+    indicatorPack: 'c1-mais-acesso',
+    fromPeriod: '2026-06',
+    toPeriod: '2026-06',
+    format: 'CSV',
+    rowCount: 1,
+    createdAt: '2026-09-14T19:43:00Z',
+    expiresAt: '2026-09-21T19:43:00Z',
   },
 ]

@@ -4,6 +4,7 @@ import esusdata.auth.AccessAdministrationService;
 import esusdata.auth.ReauthenticationGuard;
 import esusdata.auth.UserProvisioning;
 import esusdata.auth.model.ScopeDeniedException;
+import esusdata.report.model.ExportQuotaExceededException;
 import esusdata.result.model.EvidenceNotFoundException;
 import esusdata.result.model.InvalidCursorException;
 import esusdata.run.controller.SseConnectionLimiter;
@@ -88,6 +89,13 @@ public class ApiExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiError("BAD_REQUEST", e.getMessage()));
+    }
+
+    /** ADR 0024 / §1.13 L521: exports per user are bounded, so the caller must wait. */
+    @ExceptionHandler(ExportQuotaExceededException.class)
+    ResponseEntity<ApiError> handleExportQuotaExceeded(ExportQuotaExceededException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(new ApiError("EXPORT_QUOTA_EXCEEDED", e.getMessage()));
     }
 
     /** {@link SseConnectionLimiter} refused a new stream — the fast-cadence load bound from the plan. */

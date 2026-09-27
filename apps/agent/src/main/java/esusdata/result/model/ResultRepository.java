@@ -10,6 +10,14 @@ import java.util.Optional;
 public interface ResultRepository {
     List<PublishedResult> findPublished(String municipalityIbge, String indicatorPack, String referencePeriod);
 
+    /**
+     * The newest published result of each (indicator pack, competência) in {@code [fromPeriod,
+     * toPeriod]}, both {@code yyyy-MM} and inclusive, ordered by pack then competência — the rows
+     * of an aggregate export (ADR 0024). A null {@code indicatorPack} means every pack.
+     */
+    List<PublishedResult> findLatestPublishedInRange(
+            String municipalityIbge, String indicatorPack, String fromPeriod, String toPeriod);
+
     /** Reference periods with at least one published result in the municipality, newest first. */
     List<String> findPublishedPeriods(String municipalityIbge);
 
