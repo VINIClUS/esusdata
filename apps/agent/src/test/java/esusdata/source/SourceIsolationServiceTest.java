@@ -192,6 +192,8 @@ class SourceIsolationServiceTest {
                 .isFalse();
         assertThat(SourceIsolationService.canCheck(source("src-bad-role", "127.0.0.1", "BAD")))
                 .isFalse();
+        assertThat(SourceIsolationService.canCheck(source(" ", "127.0.0.1", "PRONTUARIO")))
+                .isFalse();
         assertThat(SourceIsolationService.canCheck(new SourceRecord(
                         pec.id(),
                         1,

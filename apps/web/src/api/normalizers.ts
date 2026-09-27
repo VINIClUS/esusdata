@@ -196,10 +196,11 @@ export function pickSource(
 }
 
 // Only a PEC source with a valid identity can be checked live: the same rules as the API's
-// PecSourceIdentity (a semantic version, a known read model and installation role).
+// PecSourceIdentity (an id, a semantic version, a known read model and installation role).
 export function isPecSource(source: SourceResponse): boolean {
   return (
     source.sourceFamily === 'PEC_POSTGRESQL' &&
+    source.id.trim() !== '' &&
     /^\d+\.\d+\.\d+$/.test(source.pecVersion ?? '') &&
     (source.readModel === 'PEC_DW' || source.readModel === 'PEC_OLTP') &&
     (source.pecInstallationRole === 'PRONTUARIO' || source.pecInstallationRole === 'CENTRALIZADOR')
