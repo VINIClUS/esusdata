@@ -133,7 +133,8 @@ export function normalizePainelResumo(
   const computedCount = packs.filter(
     (pack) => resultByPack.get(pack.id)?.status === 'COMPUTED',
   ).length
-  // BLOCKED results are published too; they only fail the release gates, so they are counted apart.
+  // A BLOCKED result is computed and published but held back by the release gates: counted apart,
+  // never as released.
   const blockedCount = packs.filter(
     (pack) => resultByPack.get(pack.id)?.status === 'BLOCKED',
   ).length
@@ -162,7 +163,7 @@ export function normalizePainelResumo(
       {
         id: 'indicadores',
         icone: 'indicadores',
-        label: 'Indicadores calculados',
+        label: 'Indicadores liberados',
         valor: `${computedCount} / ${packs.length}`,
         chip: computedPercent === null ? undefined : { label: '', valor: `${computedPercent}%` },
         tendencia:

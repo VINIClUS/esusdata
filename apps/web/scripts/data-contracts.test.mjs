@@ -555,7 +555,7 @@ test('derives the real-mode panel from the catalog and published results', () =>
   )
 
   const indicadores = painel.kpis.find((kpi) => kpi.id === 'indicadores')
-  assert.equal(indicadores?.label, 'Indicadores calculados')
+  assert.equal(indicadores?.label, 'Indicadores liberados')
   assert.equal(indicadores?.valor, '0 / 1')
   assert.deepEqual(indicadores?.tendencia, {
     texto: '1 bloqueado por portões de liberação',

@@ -31,7 +31,7 @@ test.describe('painel', () => {
     await expect(page.getByText('1 / 2', { exact: true })).toBeVisible()
   })
 
-  test('resultado bloqueado pelos portões conta à parte, não como calculado', async ({
+  test('resultado bloqueado pelos portões conta à parte, não como liberado', async ({
     page,
     api,
   }) => {
@@ -42,7 +42,7 @@ test.describe('painel', () => {
     })
     await page.goto('/painel')
     await expectSettled(page, 'Painel Principal')
-    await expect(page.getByText('Indicadores calculados')).toBeVisible()
+    await expect(page.getByText('Indicadores liberados')).toBeVisible()
     await expect(page.getByText('0 / 1', { exact: true })).toBeVisible()
     await expect(page.getByText('1 bloqueado por portões de liberação')).toBeVisible()
     await expect(page.getByText('Indicadores publicados')).toHaveCount(0)
