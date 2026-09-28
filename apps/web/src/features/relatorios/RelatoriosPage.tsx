@@ -259,6 +259,7 @@ export function RelatoriosPage() {
           >
             <FilterField label="Competência inicial">
               <FilterSelect
+                ariaLabel="Competência inicial"
                 value={competenciaLabel(inicial ?? '')}
                 options={competencias.map(competenciaLabel)}
                 onChange={(label) =>
@@ -271,6 +272,7 @@ export function RelatoriosPage() {
             </FilterField>
             <FilterField label="Competência final">
               <FilterSelect
+                ariaLabel="Competência final"
                 value={competenciaLabel(final ?? '')}
                 options={competencias.map(competenciaLabel)}
                 onChange={(label) =>
@@ -283,6 +285,7 @@ export function RelatoriosPage() {
             </FilterField>
             <FilterField label="Indicador">
               <FilterSelect
+                ariaLabel="Indicador"
                 value={indicador ?? TODOS}
                 options={nomes}
                 onChange={(nome) => setIndicador(nome === TODOS ? null : nome)}

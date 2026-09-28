@@ -54,7 +54,9 @@ export function DataTable<T>({
     )
   }
   return (
+    // Focusable so a table that scrolls sideways on a phone can be scrolled from the keyboard.
     <TableContainer
+      tabIndex={0}
       sx={{
         borderRadius: '10px',
         border: `1px solid ${colors.border}`,

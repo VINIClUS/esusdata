@@ -209,6 +209,7 @@ export function PainelPage() {
             subtitle="Acompanhe a evolução dos principais indicadores ao longo dos últimos meses."
             action={
               <FilterSelect
+                ariaLabel="Período do gráfico"
                 value="Últimos 8 meses"
                 options={['Últimos 8 meses', 'Últimos 12 meses']}
                 size="sm"

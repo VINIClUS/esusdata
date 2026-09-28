@@ -13,11 +13,16 @@ interface StatusDef {
 const map: Record<StatusKey, StatusDef> = {
   concluido: { label: 'Concluído', color: colors.success, bg: colors.successBg, icon: CircleCheck },
   calculado: { label: 'Calculado', color: colors.success, bg: colors.successBg },
-  em_execucao: { label: 'Em execução', color: '#e0850a', bg: colors.warningBg, icon: CircleDot },
+  em_execucao: {
+    label: 'Em execução',
+    color: colors.warningText,
+    bg: colors.warningBg,
+    icon: CircleDot,
+  },
   em_execucao_info: { label: 'Em execução', color: colors.primary, bg: colors.infoBg, icon: Info },
   pendente: { label: 'Pendente', color: colors.error, bg: colors.errorBg, icon: CircleX },
   critico: { label: 'Crítico', color: colors.error, bg: colors.errorBg },
-  atencao: { label: 'Atenção', color: '#e0850a', bg: colors.warningBg },
+  atencao: { label: 'Atenção', color: colors.warningText, bg: colors.warningBg },
   regular: { label: 'Regular', color: colors.primary, bg: colors.infoBg },
   conforme: { label: 'Conforme', color: colors.success, bg: colors.successBg },
   verificado: { label: 'Verificado', color: colors.primary, bg: colors.infoBg },

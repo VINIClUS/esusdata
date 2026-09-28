@@ -21,6 +21,7 @@ export function ProgressBar({ label, done, total }: ProgressBarProps) {
         </Typography>
       </Box>
       <LinearProgress
+        aria-label={label}
         variant={pct === null ? 'indeterminate' : 'determinate'}
         value={pct ?? undefined}
       />

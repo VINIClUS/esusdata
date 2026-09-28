@@ -14,6 +14,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { SearchInput } from '@/components/ui/Inputs'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
+import { PageUnavailable } from '@/components/ui/PageUnavailable'
 import { Pagination } from '@/components/ui/Pagination'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { PillTabs } from '@/components/ui/Tabs'
@@ -47,7 +48,7 @@ function IndicadorCard({ item }: { item: IndicadorResumo }) {
               item.status === 'pendente'
                 ? colors.error
                 : item.status === 'atencao'
-                  ? colors.warning
+                  ? colors.warningText
                   : colors.success,
             mt: 0.25,
           }}
@@ -62,7 +63,7 @@ function IndicadorCard({ item }: { item: IndicadorResumo }) {
 }
 
 export function IndicadoresListPage() {
-  const { data, isPending } = useIndicadores()
+  const { data, error, isError, isPending } = useIndicadores()
   const navigate = useNavigate()
   const theme = useTheme()
   const phone = useMediaQuery(theme.breakpoints.down('md'))
@@ -84,7 +85,16 @@ export function IndicadoresListPage() {
     })
   }, [data, categoria, busca, status])
 
-  if (isPending || !data) return <PageSkeleton title="Indicadores" />
+  if (isPending) return <PageSkeleton title="Indicadores" />
+  if (isError) {
+    return (
+      <PageUnavailable
+        title="Indicadores"
+        subtitle="Visualize os indicadores, acesse detalhes, metodologia e resultados."
+        error={error}
+      />
+    )
+  }
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const current = Math.min(page, pageCount)
