@@ -42,6 +42,53 @@ test('normalizes the backend indicator-pack catalog into the list view model', (
   ])
 })
 
+test('the list shows each pack as published in the chosen competência', () => {
+  const pack = (id) => ({
+    id,
+    ruleVersion: `${id}@0.1.0`,
+    family: 'C1',
+    unit: 'percentual',
+    dependsOn: [],
+    executionEnabled: true,
+    blockedGates: [],
+  })
+  const published = (indicatorPack, status, value) => ({
+    resultId: `r-${indicatorPack}`,
+    indicatorPack,
+    referencePeriod: '2026-03',
+    status,
+    value,
+    unit: 'percentual',
+    numerator: '7100',
+    denominator: '10029',
+    denominatorKind: 'PROGRAMADOS_MAIS_ESPONTANEOS',
+    classification: null,
+    dataCutoff: null,
+    limitations: [],
+    scope: { municipalityIbge: '3541307' },
+    publishedAt: '2026-09-28T12:00:00Z',
+  })
+
+  const { itens } = normalizeIndicatorPacks(
+    [pack('c1-a'), pack('c1-b'), pack('c1-c'), pack('c1-d')],
+    [
+      published('c1-a', 'COMPUTED', '70.7947'),
+      published('c1-b', 'BLOCKED', null),
+      published('c1-c', 'NO_DENOMINATOR', null),
+    ],
+  )
+
+  assert.deepEqual(
+    itens.map(({ status, resultado, ultimaExecucao }) => ({ status, resultado, ultimaExecucao })),
+    [
+      { status: 'concluido', resultado: 70.7947, ultimaExecucao: '2026-09-28T12:00:00Z' },
+      { status: 'bloqueado', resultado: null, ultimaExecucao: '2026-09-28T12:00:00Z' },
+      { status: 'atencao', resultado: null, ultimaExecucao: '2026-09-28T12:00:00Z' },
+      { status: 'regular', resultado: null, ultimaExecucao: null },
+    ],
+  )
+})
+
 test('phone status tabs match the status they advertise', () => {
   const pending = { status: 'pendente' }
   const calculated = { status: 'concluido' }
@@ -467,6 +514,7 @@ test('keeps a blocked result unavailable instead of turning it into zero', () =>
     publishedAt: null,
   })
 
+  assert.equal(detail.status, 'bloqueado')
   assert.equal(detail.resultado.valor, null)
   assert.deepEqual(detail.evolucao, [])
   assert.deepEqual(detail.distribuicao, [])
@@ -506,7 +554,13 @@ test('derives the real-mode panel from the catalog and published results', () =>
     '2026-08',
   )
 
-  assert.equal(painel.kpis.find((kpi) => kpi.id === 'indicadores')?.valor, '0 / 1')
+  const indicadores = painel.kpis.find((kpi) => kpi.id === 'indicadores')
+  assert.equal(indicadores?.label, 'Indicadores calculados')
+  assert.equal(indicadores?.valor, '0 / 1')
+  assert.deepEqual(indicadores?.tendencia, {
+    texto: '1 bloqueado por portões de liberação',
+    tom: 'down',
+  })
   assert.equal(painel.kpis.find((kpi) => kpi.id === 'pendencias')?.valor, '1')
   assert.equal(painel.alertas[0].descricao, 'Portão A (fonte e vigência) incompleto')
   assert.deepEqual(painel.evolucao.pontos, [])

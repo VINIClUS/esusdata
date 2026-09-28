@@ -11,7 +11,7 @@ import {
   gerarExportacao,
   useCompetenciasPublicadas,
   useExportacoes,
-  useIndicadores,
+  useCatalogoIndicadores,
 } from '@/api/hooks'
 import { competenciaLabel } from '@/api/normalizers'
 import type { Exportacao } from '@/api/types'
@@ -106,7 +106,7 @@ function ReportIllustration() {
 
 export function RelatoriosPage() {
   const { data, error, isError, isPending } = useExportacoes()
-  const indicadores = useIndicadores()
+  const indicadores = useCatalogoIndicadores()
   const competencias = useCompetenciasPublicadas()
   const { municipalityIbge } = useScope()
   const queryClient = useQueryClient()

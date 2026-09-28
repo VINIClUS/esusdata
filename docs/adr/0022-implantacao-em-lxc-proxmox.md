@@ -66,9 +66,10 @@ não guarda credencial nenhuma dessa infraestrutura.
   implantar uma tag específica (inclusive voltar a uma anterior), dispare `Deploy esusdata` com
   `tag=vX.Y.Z`. Uma release que falhou não é tentada de novo pelo agendamento, só por disparo
   explícito.
-- **Pré-requisito no PEC:** o PostgreSQL do PEC (`192.168.1.253`, Windows, 9.6.13) hoje escuta
-  só em `localhost:5433` e não tem TLS. Até a operação do PEC concluir a mudança abaixo, o app sobe
-  e responde `/ready`, e o diagnóstico da fonte falha com `08001`.
+- **Pré-requisito no PEC** (feito em 2026-09-28, ver
+  [discovery](../discovery/2026-09-28-pec-5528-tls.md)): o PostgreSQL do PEC (`192.168.1.253`,
+  Windows, 9.6.13) escutava só em `localhost:5433` e não tinha TLS. Sem a mudança abaixo, o app sobe
+  e responde `/ready`, mas o diagnóstico da fonte falha com `08001`.
   - Instalar `server.crt`, com SAN `IP:192.168.1.253` e emitido pela CA cujo certificado vai em
     `tls-root-cert`, e `server.key` no diretório de dados.
   - Configurar `ssl = on` e `listen_addresses` incluindo `192.168.1.253`.

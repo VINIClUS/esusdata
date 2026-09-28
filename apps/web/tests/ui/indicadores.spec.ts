@@ -1,4 +1,6 @@
 import { indicadoresFixture } from '../../src/api/fixtures/indicadores.ts'
+import { exportPeriodsFixture } from '../../src/api/fixtures/relatorios.ts'
+import { formatReferencePeriod } from '../../src/app/display-context.ts'
 import { expectNoA11yViolations } from '../support/a11y.ts'
 import { expect, test } from '../support/test.ts'
 
@@ -50,6 +52,37 @@ test.describe('lista de indicadores', () => {
     await expect(
       page.getByText(`Mostrando 1–${previne.length} de ${previne.length} indicadores`),
     ).toBeVisible()
+  })
+
+  test('o select de categoria filtra como as abas', async ({ page }) => {
+    const previne = itens.filter((i) => i.categoria === 'Previne Brasil')
+    const categoria = page.getByRole('combobox', { name: 'Categoria' })
+    await categoria.click()
+    await page.getByRole('option', { name: 'Previne Brasil' }).click()
+    await expect(categoria).toHaveText(/Previne Brasil/)
+    await expect(page.getByRole('tab', { name: /^Previne Brasil/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(
+      page.getByText(`Mostrando 1–${previne.length} de ${previne.length} indicadores`),
+    ).toBeVisible()
+    await categoria.click()
+    await page.getByRole('option', { name: 'Todas' }).click()
+    await expect(page.getByText(`de ${itens.length} indicadores`)).toBeVisible()
+  })
+
+  test('o select de competência lista as competências publicadas, não um mês fixo', async ({
+    page,
+  }) => {
+    const labels = exportPeriodsFixture.map(formatReferencePeriod)
+    const competencia = page.getByRole('combobox', { name: 'Competência' })
+    await expect(competencia).toHaveText(new RegExp(labels[0] ?? ''))
+    await competencia.click()
+    await expect(page.getByRole('option')).toHaveText(labels)
+    await page.getByRole('option', { name: labels[1] }).click()
+    await expect(competencia).toHaveText(new RegExp(labels[1] ?? ''))
+    await expectNoA11yViolations(page)
   })
 
   test('o filtro de status mostra só os pendentes', async ({ page }) => {

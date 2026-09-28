@@ -63,20 +63,48 @@ export function indicatorDisplayName(id: string): string {
   return `${prefix.toUpperCase()} – ${label.charAt(0).toUpperCase()}${label.slice(1)}`
 }
 
-function itemForPack(pack: IndicatorPack): IndicadorResumo {
+/** A published result wins over the catalog: BLOCKED shows as blocked, never as a value of 0. */
+function statusForItem(
+  pack: IndicatorPack,
+  result: IndicatorResultResponse | undefined,
+): IndicadorResumo['status'] {
+  if (result?.status === 'COMPUTED') return 'concluido'
+  if (result?.status === 'BLOCKED') return 'bloqueado'
+  if (result) return 'atencao'
+  return pack.executionEnabled ? 'regular' : 'pendente'
+}
+
+function itemForPack(
+  pack: IndicatorPack,
+  result: IndicatorResultResponse | undefined,
+): IndicadorResumo {
   const category = categoryForFamily(pack.family)
   return {
     codigo: pack.id,
     nome: indicatorDisplayName(pack.id),
     categoria: category.label,
-    status: pack.executionEnabled ? 'regular' : 'pendente',
-    ultimaExecucao: null,
-    resultado: null,
+    status: statusForItem(pack, result),
+    ultimaExecucao: result?.publishedAt ?? null,
+    resultado: result?.status === 'COMPUTED' ? numberFromApi(result.value) : null,
   }
 }
 
-export function normalizeIndicatorPacks(packs: IndicatorPack[]): IndicadoresLista {
-  const itens = packs.map(itemForPack)
+/** The newest result per pack; `/results` lists newest first. */
+function latestResultByPack(results: IndicatorResultResponse[]) {
+  const resultByPack = new Map<string, IndicatorResultResponse>()
+  for (const result of results) {
+    if (!resultByPack.has(result.indicatorPack)) resultByPack.set(result.indicatorPack, result)
+  }
+  return resultByPack
+}
+
+/** The catalog, with each pack's status and value in the chosen competência when one is published. */
+export function normalizeIndicatorPacks(
+  packs: IndicatorPack[],
+  results: IndicatorResultResponse[] = [],
+): IndicadoresLista {
+  const resultByPack = latestResultByPack(results)
+  const itens = packs.map((pack) => itemForPack(pack, resultByPack.get(pack.id)))
   const categorias = [
     { key: 'todos', label: 'Todos', total: itens.length },
     ...categoryDefinitions
@@ -100,13 +128,14 @@ export function normalizePainelResumo(
   results: IndicatorResultResponse[],
   referencePeriod: string,
 ): PainelResumo {
-  const resultByPack = new Map<string, IndicatorResultResponse>()
-  for (const result of results) {
-    if (!resultByPack.has(result.indicatorPack)) resultByPack.set(result.indicatorPack, result)
-  }
+  const resultByPack = latestResultByPack(results)
 
   const computedCount = packs.filter(
     (pack) => resultByPack.get(pack.id)?.status === 'COMPUTED',
+  ).length
+  // BLOCKED results are published too; they only fail the release gates, so they are counted apart.
+  const blockedCount = packs.filter(
+    (pack) => resultByPack.get(pack.id)?.status === 'BLOCKED',
   ).length
   const pendingPacks = packs.filter((pack) => resultByPack.get(pack.id)?.status !== 'COMPUTED')
   const computedPercent =
@@ -133,10 +162,16 @@ export function normalizePainelResumo(
       {
         id: 'indicadores',
         icone: 'indicadores',
-        label: 'Indicadores publicados',
+        label: 'Indicadores calculados',
         valor: `${computedCount} / ${packs.length}`,
         chip: computedPercent === null ? undefined : { label: '', valor: `${computedPercent}%` },
-        tendencia: { texto: `Competência ${referencePeriod}`, tom: 'up' },
+        tendencia:
+          blockedCount > 0
+            ? {
+                texto: `${blockedCount} ${blockedCount === 1 ? 'bloqueado' : 'bloqueados'} por portões de liberação`,
+                tom: 'down',
+              }
+            : { texto: `Competência ${referencePeriod}`, tom: 'up' },
       },
       {
         id: 'cobertura',
@@ -548,7 +583,8 @@ function requiredNumberFromApi(value: string | null): number {
 }
 
 function statusFromApi(status: string): IndicadorDetalhe['status'] {
-  return status === 'COMPUTED' ? 'concluido' : 'pendente'
+  if (status === 'COMPUTED') return 'concluido'
+  return status === 'BLOCKED' ? 'bloqueado' : 'pendente'
 }
 
 export function normalizeIndicatorResult(result: IndicatorResultResponse): IndicadorDetalhe {

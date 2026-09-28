@@ -23,6 +23,7 @@ const map: Record<StatusKey, StatusDef> = {
   pendente: { label: 'Pendente', color: colors.error, bg: colors.errorBg, icon: CircleX },
   critico: { label: 'Crítico', color: colors.error, bg: colors.errorBg },
   atencao: { label: 'Atenção', color: colors.warningText, bg: colors.warningBg },
+  bloqueado: { label: 'Bloqueado', color: colors.warningText, bg: colors.warningBg },
   regular: { label: 'Regular', color: colors.primary, bg: colors.infoBg },
   conforme: { label: 'Conforme', color: colors.success, bg: colors.successBg },
   verificado: { label: 'Verificado', color: colors.primary, bg: colors.infoBg },
