@@ -6,6 +6,13 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
 
 /** Runs axe on what is on screen now; call it after the state under test has rendered. */
 export async function expectNoA11yViolations(page: Page) {
+  // A menu still fading in or out has its options at partial opacity, which axe reports as low
+  // contrast. Wait until every MUI popover is fully open (opacity 1) or gone.
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.MuiPopover-paper')].every(
+      (paper) => getComputedStyle(paper).opacity === '1',
+    ),
+  )
   const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze()
   const found = violations.map(
     (v) =>
