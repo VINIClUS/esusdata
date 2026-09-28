@@ -52,6 +52,8 @@ test('o admin reemite o código de um usuário pendente', async () => {
 test('ao sair, as telas protegidas levam ao login', async () => {
   const { page } = session
   await page.getByRole('button', { name: 'Sair' }).click()
+  // Waits for the logout to finish: navigating away earlier could cancel it.
+  await expect(page).toHaveURL('/login')
   await page.goto('/ativacoes-pendentes')
   await expect(page).toHaveURL('/login')
 })

@@ -74,6 +74,8 @@ test.describe('sessão', () => {
     await page.goto('/painel')
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Painel Principal')
     await page.reload()
+    // The URL is /painel before /auth/me answers; the heading only renders once it has.
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Painel Principal')
     await expect(page).toHaveURL('/painel')
   })
 
