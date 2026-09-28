@@ -3,7 +3,7 @@ import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import { ChartColumn, FileText, Settings, Users, type LucideIcon } from 'lucide-react'
-import { demoContext } from '@/api/fixtures/context'
+import { APP_VERSION } from '@/api/client'
 import { Logo } from '@/components/layout/Logo'
 import { WaveDecoration } from '@/components/layout/WaveDecoration'
 import { colors } from '@/theme/tokens'
@@ -125,7 +125,7 @@ export function AuthLayout({
             Uma APS mais forte.
           </Typography>
           <Typography sx={{ fontSize: 17, color: colors.textSecondary, pb: 0.5 }}>
-            {demoContext.versao}
+            {APP_VERSION}
           </Typography>
         </Box>
       </Box>

@@ -4,7 +4,7 @@ import { CircleQuestionMark, LogOut, KeyRound, type LucideIcon } from 'lucide-re
 import { NavLink, useLocation, useNavigate } from 'react-router'
 import { navItems } from '@/app/navigation'
 import { useAuth } from '@/app/auth-context'
-import { demoContext } from '@/api/fixtures/context'
+import { APP_VERSION } from '@/api/client'
 import { colors, layout } from '@/theme/tokens'
 import { Logo } from './Logo'
 import { WaveDecoration } from './WaveDecoration'
@@ -156,7 +156,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         <Typography
           sx={{ fontSize: 12.5, color: 'rgba(255,255,255,0.7)', textAlign: 'right', mt: 0.5 }}
         >
-          {demoContext.versao}
+          {APP_VERSION}
         </Typography>
       </Box>
 

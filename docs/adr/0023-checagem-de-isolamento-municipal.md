@@ -58,14 +58,12 @@ sobre qualidade, completude, CNES, INE, equipes ou território.
 - `IsolationCheckDifferentialLiveTest`, contra `postgres:9.6.13`, com a fixture sintética de dois
   municípios, uma linha de município sem `co_ibge` e um atendimento fora da competência. O binário
   Rust e a mesma query rodada por JDBC dão as mesmas contagens. Senha errada vira `28P01`.
-- **Pendente:** `ExecPlaneLivePecTest.isolationCheckOfOneCompetenciaMatchesTheSameQueryOverJdbc`
-  contra o PEC 5.5.28 de produção. O PostgreSQL do PEC só é alcançável pelo túnel SSH do ADR 0003,
-  que não estava disponível. Até essa execução, a entrada `municipal_isolation` fica `NOT_TESTED` e
-  sem aprovação, e a checagem falha fechada (`COMPATIBILITY_MISMATCH`) em produção. Para validar:
-  1. marcar a entrada como `VALIDATED` localmente;
-  2. rodar o teste com `-Dobservatorio.execution-plane.live-pec=true` e o `pec-253.env`;
-  3. se passar, gravar os números e a duração em `test_notes`, preencher `test_result: PASS`,
-     `approved_at` e `approved_by`, e recompilar o binário (o `include_str!` embute a matriz).
+- `ExecPlaneLivePecTest.isolationCheckOfOneCompetenciaMatchesTheSameQueryOverJdbc` contra o PEC
+  5.5.28 de produção, em 2026-09-28, seguindo o roteiro previsto aqui (marcar a entrada como
+  `VALIDATED` localmente, recompilar o binário e rodar com `-Dobservatorio.execution-plane.live-pec=true`).
+  Resultado: `CHECKED` em 2026-03, `3541307=10029`, igual à query por JDBC. A entrada
+  `municipal_isolation` ficou `VALIDATED`, e o app respondeu o mesmo pela API
+  ([discovery](../discovery/2026-09-28-pec-5528-isolamento.md)).
 
 ## Consequências
 

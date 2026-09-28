@@ -80,8 +80,8 @@
       "read_model": "PEC_DW",
       "installation_role": "PRONTUARIO",
       "capability": "municipal_isolation",
-      "status": "NOT_TESTED",
-      "status_reason": "Aggregate count of tb_fat_atendimento_individual per tb_dim_municipio.co_ibge within one competência (ADR 0023). Awaiting the live run against PEC 5.5.28.",
+      "status": "VALIDATED",
+      "status_reason": "Aggregate count of tb_fat_atendimento_individual per tb_dim_municipio.co_ibge within one competência (ADR 0023).",
       "objects_used": [
         {
           "object": "tb_fat_atendimento_individual",
@@ -106,8 +106,11 @@
       },
       "query_checksum": "sha256:fb81d62253454d38057ab5fe260a5d68562b000fdb4d861891c817ef4ebc6689",
       "fixture_checksum": "sha256:8909c30b9acd60ffc1b96b8c0c2d77fa2bbe46b0d19bc7f4f9bfb6ae54164148",
-      "test_result": "NOT_RUN",
-      "test_evidence_ref": "apps/agent/src/test/java/esusdata/run/acquisition/ExecPlaneLivePecTest.java; apps/agent/src/test/java/esusdata/run/acquisition/IsolationCheckDifferentialLiveTest.java"
+      "test_result": "PASS",
+      "test_evidence_ref": "docs/discovery/2026-09-28-pec-5528-isolamento.md; apps/agent/src/test/java/esusdata/run/acquisition/ExecPlaneLivePecTest.java; apps/agent/src/test/java/esusdata/run/acquisition/IsolationCheckDifferentialLiveTest.java",
+      "test_notes": "Validated 2026-09-28 live against the municipal production PEC 5.5.28 / PostgreSQL 9.6.13 through an SSH tunnel, with this entry marked VALIDATED locally and the execution plane rebuilt from it (ADR 0023): ExecPlaneLivePecTest isolation case CHECKED for competencia 2026-03, counts [3541307=10029] byte-identical to the same frozen query over JDBC, 2.5 s; the same run re-checked all seven signature_fingerprints (identical) and acquired 2026-03 end-to-end (10029 rows, 0 exclusions). The app itself (POST /sources/{id}/isolation-check) answered CHECKED with registeredCount 10029, otherMunicipalityCount 0, unidentifiedCount 0.",
+      "approved_at": "2026-09-28",
+      "approved_by": "vasrtr@gmail.com"
     }
   ]
 }
