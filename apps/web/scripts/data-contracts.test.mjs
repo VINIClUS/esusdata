@@ -7,6 +7,7 @@ import {
   normalizeIndicatorResult,
   normalizePainelResumo,
   indicatorResultsPath,
+  formatInstant,
 } from '../src/api/normalizers.ts'
 import * as normalizers from '../src/api/normalizers.ts'
 import { pickScopeOption } from '../src/app/scope-model.ts'
@@ -81,12 +82,22 @@ test('the list shows each pack as published in the chosen competência', () => {
   assert.deepEqual(
     itens.map(({ status, resultado, ultimaExecucao }) => ({ status, resultado, ultimaExecucao })),
     [
-      { status: 'concluido', resultado: 70.7947, ultimaExecucao: '2026-09-28T12:00:00Z' },
-      { status: 'bloqueado', resultado: null, ultimaExecucao: '2026-09-28T12:00:00Z' },
-      { status: 'atencao', resultado: null, ultimaExecucao: '2026-09-28T12:00:00Z' },
+      {
+        status: 'concluido',
+        resultado: 70.7947,
+        ultimaExecucao: formatInstant('2026-09-28T12:00:00Z'),
+      },
+      {
+        status: 'bloqueado',
+        resultado: null,
+        ultimaExecucao: formatInstant('2026-09-28T12:00:00Z'),
+      },
+      { status: 'atencao', resultado: null, ultimaExecucao: formatInstant('2026-09-28T12:00:00Z') },
       { status: 'regular', resultado: null, ultimaExecucao: null },
     ],
   )
+  // Localized, never the raw UTC instant.
+  assert.match(itens[0].ultimaExecucao, /^\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}$/)
 })
 
 test('phone status tabs match the status they advertise', () => {

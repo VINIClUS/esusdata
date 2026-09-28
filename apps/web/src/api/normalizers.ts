@@ -56,6 +56,11 @@ function categoryForFamily(family: string): (typeof categoryDefinitions)[number]
   )
 }
 
+/** An API instant in the browser's time zone, as the screens show dates: "28/09/2026, 15:16". */
+export function formatInstant(iso: string): string {
+  return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+}
+
 export function indicatorDisplayName(id: string): string {
   const [prefix, ...words] = id.split('-')
   if (!prefix || words.length === 0) return id
@@ -82,7 +87,7 @@ function itemForPack(
     nome: indicatorDisplayName(pack.id),
     categoria: category.label,
     status: statusForItem(pack, result),
-    ultimaExecucao: result?.publishedAt ?? null,
+    ultimaExecucao: result?.publishedAt ? formatInstant(result.publishedAt) : null,
     resultado: result?.status === 'COMPUTED' ? numberFromApi(result.value) : null,
   }
 }
