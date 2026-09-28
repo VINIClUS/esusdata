@@ -123,6 +123,45 @@ test.describe('indicadores', () => {
     await expect(page.getByRole('row', { name: /c1-mais-acesso/ })).toBeVisible()
   })
 
+  test('o filtro de status isola os sem denominador (Atenção)', async ({ page, api }) => {
+    manager(api, [PERIOD])
+    api.get('/indicator-packs', { json: [pack('c1-mais-acesso'), pack('c2-cuidado')] })
+    api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, {
+      json: [result('c1-mais-acesso', null, { status: 'NO_DENOMINATOR' })],
+    })
+    api.get(/^\/results\?.*indicatorPack=c2-cuidado/, { json: [result('c2-cuidado', '55')] })
+    await page.goto('/indicadores')
+    await expectSettled(page, 'Indicadores')
+    await page.getByRole('combobox', { name: 'Status' }).click()
+    await page.getByRole('option', { name: 'Atenção' }).click()
+    await expect(page.getByText('Mostrando 1–1 de 1 indicadores')).toBeVisible()
+    await expect(page.getByRole('row', { name: /c1-mais-acesso/ }).getByRole('status')).toHaveText(
+      'Atenção',
+    )
+  })
+
+  test.describe('no celular', () => {
+    test.use({ viewport: { width: 390, height: 844 } })
+
+    test('a competência também se escolhe no celular', async ({ page, api }) => {
+      manager(api, [PERIOD, '2026-02'])
+      api.get('/indicator-packs', { json: [pack('c1-mais-acesso')] })
+      api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, (request) =>
+        new URL(request.url()).searchParams.get('referencePeriod') === PERIOD
+          ? { json: [blockedResult('c1-mais-acesso')] }
+          : { json: [result('c1-mais-acesso', '70', { referencePeriod: '2026-02' })] },
+      )
+      await page.goto('/indicadores')
+      await expectSettled(page, 'Indicadores')
+      const competencia = page.getByRole('combobox', { name: 'Competência' })
+      await expect(competencia).toHaveText(/03\/2026/)
+      await competencia.click()
+      await page.getByRole('option', { name: '02/2026' }).click()
+      await expect(page.getByText('70,0%')).toBeVisible()
+      await expectSettled(page, 'Indicadores')
+    })
+  })
+
   test('sem competência publicada, o select de competência fica desabilitado', async ({
     page,
     api,

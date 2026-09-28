@@ -85,6 +85,7 @@ export function IndicadoresListPage() {
       if (status === 'Pendente' && i.status !== 'pendente') return false
       if (status === 'Em execução' && !i.status.startsWith('em_execucao')) return false
       if (status === 'Bloqueado' && i.status !== 'bloqueado') return false
+      if (status === 'Atenção' && i.status !== 'atencao') return false
       return true
     })
   }, [data, categoria, busca, status])
@@ -176,6 +177,25 @@ export function IndicadoresListPage() {
   const categorias = data.categorias.filter((c) => c.key !== 'todos')
   const categoriaLabel = categorias.find((c) => c.key === categoria)?.label ?? TODAS
 
+  const competenciaSelect = (
+    <FilterSelect
+      label="Competência"
+      value={formatReferencePeriod(competencia)}
+      options={
+        competencias.length > 0
+          ? competencias.map(formatReferencePeriod)
+          : [formatReferencePeriod(undefined)]
+      }
+      onChange={(label) => {
+        const escolhida = competencias.find((c) => formatReferencePeriod(c) === label)
+        if (escolhida) setCompetencia(escolhida)
+        setPage(1)
+      }}
+      disabled={competencias.length === 0}
+      fullWidth
+    />
+  )
+
   const tabs = phone
     ? [
         { key: 'todos', label: 'Todos', count: data.total },
@@ -227,6 +247,8 @@ export function IndicadoresListPage() {
         </Box>
       )}
 
+      {phone && <Box sx={{ mb: 1.5 }}>{competenciaSelect}</Box>}
+
       <PillTabs
         items={tabs}
         value={categoria}
@@ -257,7 +279,7 @@ export function IndicadoresListPage() {
           <FilterSelect
             label="Status"
             value={status}
-            options={['Todos', 'Concluído', 'Bloqueado', 'Em execução', 'Pendente']}
+            options={['Todos', 'Concluído', 'Bloqueado', 'Atenção', 'Em execução', 'Pendente']}
             onChange={(v) => {
               setStatus(v)
               setPage(1)
@@ -274,22 +296,7 @@ export function IndicadoresListPage() {
             }}
             fullWidth
           />
-          <FilterSelect
-            label="Competência"
-            value={formatReferencePeriod(competencia)}
-            options={
-              competencias.length > 0
-                ? competencias.map(formatReferencePeriod)
-                : [formatReferencePeriod(undefined)]
-            }
-            onChange={(label) => {
-              const escolhida = competencias.find((c) => formatReferencePeriod(c) === label)
-              if (escolhida) setCompetencia(escolhida)
-              setPage(1)
-            }}
-            disabled={competencias.length === 0}
-            fullWidth
-          />
+          {competenciaSelect}
         </Box>
       )}
 
