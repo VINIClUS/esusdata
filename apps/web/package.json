@@ -8,10 +8,11 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "lint": "oxlint --deny-warnings && eslint --max-warnings 0 .",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" scripts eslint.config.js",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" scripts eslint.config.js",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" scripts tests \"playwright.*.config.ts\" eslint.config.js",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" scripts tests \"playwright.*.config.ts\" eslint.config.js",
     "test:data": "node --experimental-strip-types --test scripts/data-contracts.test.mjs",
-    "test:e2e": "node scripts/login-e2e.mjs",
+    "test:ui": "playwright test -c playwright.ui.config.ts",
+    "test:e2e": "playwright test -c playwright.e2e.config.ts",
     "preview": "vite preview",
     "screenshot": "node scripts/screenshot.mjs"
   },
@@ -29,7 +30,9 @@
     "recharts": "^3.10.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
@@ -39,7 +42,6 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.12.0",
     "oxlint": "^1.85.0",
-    "playwright": "^1.63.0",
     "prettier": "^3.9.8",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.70.1",

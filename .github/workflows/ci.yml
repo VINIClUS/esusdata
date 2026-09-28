@@ -124,7 +124,22 @@ jobs:
         run: npm run test:data
       - name: Build
         run: npm run build
+      # Interface tests without a backend (ADR 0025): the demo fixtures and the production build
+      # against stubbed API responses, with axe (WCAG 2.1 AA) on every screen.
+      - name: Browser
+        run: npx playwright install --with-deps chromium
+      - name: Interface tests
+        run: npm run test:ui
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-test-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7
 
+  # End-to-end against the real JAR (ADR 0025): each spec file boots its own backend.
   login-e2e:
     runs-on: ubuntu-24.04
     steps:
@@ -154,6 +169,14 @@ jobs:
         run: VITE_USE_MOCKS=false mvn -B -f apps/agent/pom.xml -Pweb -DskipTests package
       - name: Browser flow
         run: npm run test:e2e --prefix apps/web
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-test-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7
 
   # Fail-closed: without SONAR_TOKEN (a pull request from a fork) the check fails instead of being
   # skipped, because a skipped required check counts as passed. A maintainer re-runs such a change

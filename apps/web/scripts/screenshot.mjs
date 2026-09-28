@@ -1,6 +1,6 @@
 // Captures screenshots of every screen against the running dev server.
 // Usage: npm run screenshot [-- --only=03-indicadores] [--base=http://localhost:5173]
-import { chromium } from 'playwright'
+import { chromium } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 
