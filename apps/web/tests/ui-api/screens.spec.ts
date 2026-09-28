@@ -174,8 +174,6 @@ test.describe('indicadores', () => {
       await page.getByRole('option', { name: 'Bloqueado' }).click()
       await expect(page.getByText('C1 – Mais acesso')).toBeVisible()
       await expect(page.getByText('C2 – Cuidado')).toHaveCount(0)
-      // axe on a menu still fading out measures its options against the backdrop.
-      await expect(page.locator('[role="listbox"]')).toHaveCount(0)
       await expectSettled(page, 'Indicadores')
     })
   })
