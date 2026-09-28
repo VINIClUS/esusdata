@@ -10,6 +10,12 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-ui-*
+
+# Playwright (ADR 0025)
+test-results
+playwright-report
+blob-report
 *.local
 
 # Editor directories and files

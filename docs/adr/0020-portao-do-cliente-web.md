@@ -15,7 +15,8 @@ defeitos reais.
 
 Um job `web` no `ci.yml`, sem filtro de caminho e obrigatório no ruleset do `main`, com o Node que
 o `frontend-maven-plugin` fixa no `apps/agent/pom.xml` (lido de lá, uma versão só). Ele roda
-typecheck, lint, `prettier --check`, o teste `node --test` e o build de produção.
+typecheck, lint, `prettier --check`, o teste `node --test` e o build de produção. Desde o ADR 0025,
+também roda os testes de interface (`test:ui`).
 
 - **oxlint** roda primeiro, com `--deny-warnings`, a partir do `.oxlintrc.json`.
 - **ESLint** complementa, não duplica (`eslint.config.js`):

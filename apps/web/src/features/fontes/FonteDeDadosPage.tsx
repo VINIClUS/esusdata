@@ -146,7 +146,13 @@ export function FonteDeDadosPage() {
             >
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                 <Typography sx={{ fontSize: 15, fontWeight: 600 }}>Família da fonte</Typography>
-                <FilterSelect value={data.tipo} options={[data.tipo]} icon={Database} fullWidth />
+                <FilterSelect
+                  ariaLabel="Família da fonte"
+                  value={data.tipo}
+                  options={[data.tipo]}
+                  icon={Database}
+                  fullWidth
+                />
               </Box>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 2.5 }}>
                 <Field label="Host" value={data.host} slotProps={readOnly} />

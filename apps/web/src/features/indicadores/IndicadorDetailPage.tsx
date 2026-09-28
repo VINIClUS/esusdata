@@ -371,6 +371,7 @@ export function IndicadorDetailPage() {
                   title="Evolução temporal"
                   action={
                     <FilterSelect
+                      ariaLabel="Período do gráfico"
                       value={phone ? 'Últimos 8 meses' : 'Últimos 12 meses'}
                       options={['Últimos 12 meses', 'Últimos 8 meses']}
                       size="sm"

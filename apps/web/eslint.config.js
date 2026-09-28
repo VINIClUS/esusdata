@@ -10,7 +10,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig([
-  globalIgnores(['dist', 'node_modules']),
+  globalIgnores(['dist', 'dist-ui-*', 'node_modules', 'test-results', 'playwright-report']),
   {
     files: ['src/**/*.{ts,tsx}'],
     extends: [
@@ -35,6 +35,24 @@ export default defineConfig([
         'error',
         { ignorePrimitives: { string: true } },
       ],
+    },
+  },
+  // Playwright tests and configs (ADR 0025): typed through tsconfig.e2e.json, run by Node.
+  {
+    files: ['tests/**/*.ts', 'playwright.*.config.ts'],
+    extends: [
+      js.configs.recommended,
+      tseslint.configs.strictTypeChecked,
+      tseslint.configs.stylisticTypeChecked,
+    ],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: { project: './tsconfig.e2e.json', tsconfigRootDir: import.meta.dirname },
+    },
+    rules: {
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+      // Playwright requires the object pattern in a test that uses only testInfo: `async ({}, testInfo)`.
+      'no-empty-pattern': 'off',
     },
   },
   // Node scripts and this file sit outside tsconfig.app.json: no type information for them.

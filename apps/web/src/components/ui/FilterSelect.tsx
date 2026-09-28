@@ -6,6 +6,8 @@ import { colors } from '@/theme/tokens'
 
 interface FilterSelectProps {
   label?: string
+  /** Accessible name when there is no `label`; the prefix label is only drawn inside the value. */
+  ariaLabel?: string
   value: string
   options: string[]
   onChange?: (value: string) => void
@@ -29,6 +31,7 @@ function Chevron(props: object) {
 /** Select with an inline prefix label ("Status: Todos") or an icon prefix. */
 export function FilterSelect({
   label,
+  ariaLabel,
   value,
   options,
   onChange,
@@ -43,6 +46,7 @@ export function FilterSelect({
       value={value}
       onChange={(e: SelectChangeEvent) => onChange?.(e.target.value)}
       IconComponent={Chevron}
+      SelectDisplayProps={{ 'aria-label': ariaLabel ?? label }}
       fullWidth={fullWidth}
       renderValue={(v) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
