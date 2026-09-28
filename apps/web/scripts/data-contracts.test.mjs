@@ -572,6 +572,51 @@ test('derives the real-mode panel from the catalog and published results', () =>
   assert.equal(painel.qualidade.percentual, null)
 })
 
+test('a zero denominator passed the release gates: released, not pending', () => {
+  const pack = (id) => ({
+    id,
+    ruleVersion: `${id}@0.1.0`,
+    family: 'C1',
+    unit: 'percentual',
+    dependsOn: [],
+    executionEnabled: true,
+    blockedGates: [],
+  })
+  const published = (indicatorPack, status) => ({
+    resultId: `r-${indicatorPack}`,
+    indicatorPack,
+    referencePeriod: '2026-03',
+    status,
+    value: status === 'COMPUTED' ? '50' : null,
+    unit: 'percentual',
+    numerator: '0',
+    denominator: '0',
+    denominatorKind: 'PROGRAMADOS_MAIS_ESPONTANEOS',
+    classification: null,
+    dataCutoff: null,
+    limitations: status === 'BLOCKED' ? ['Portão A (fonte e vigência) incompleto'] : [],
+    scope: { municipalityIbge: '3541307' },
+    publishedAt: null,
+  })
+
+  const painel = normalizePainelResumo(
+    [pack('c1-a'), pack('c1-b'), pack('c1-c')],
+    [
+      published('c1-a', 'COMPUTED'),
+      published('c1-b', 'NO_DENOMINATOR'),
+      published('c1-c', 'BLOCKED'),
+    ],
+    '2026-03',
+  )
+
+  assert.equal(painel.kpis.find((kpi) => kpi.id === 'indicadores')?.valor, '2 / 3')
+  assert.equal(painel.kpis.find((kpi) => kpi.id === 'pendencias')?.valor, '1')
+  assert.deepEqual(
+    painel.alertas.map((alerta) => alerta.id),
+    ['indicator-c1-c'],
+  )
+})
+
 test('uses the runtime API scope in real-mode display context', () => {
   assert.deepEqual(
     realContextForScope({

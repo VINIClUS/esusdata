@@ -117,6 +117,8 @@ export function normalizeIndicatorPacks(
   return { categorias, itens, total: itens.length }
 }
 
+const RELEASED_STATUSES = new Set(['COMPUTED', 'NO_DENOMINATOR'])
+
 /**
  * Builds the panel from the API surfaces that exist today. The API has no aggregate panel route,
  * so values that cannot be derived from the catalog/results contract remain explicitly unavailable.
@@ -128,17 +130,18 @@ export function normalizePainelResumo(
 ): PainelResumo {
   const resultByPack = latestResultByPack(results)
 
-  const computedCount = packs.filter(
-    (pack) => resultByPack.get(pack.id)?.status === 'COMPUTED',
-  ).length
-  // A BLOCKED result is computed and published but held back by the release gates: counted apart,
-  // never as released.
+  // Released: passed the release gates, with a value (COMPUTED) or a zero denominator
+  // (NO_DENOMINATOR). A BLOCKED result is computed and published but held back by the gates, so it
+  // is counted apart, never as released.
+  const released = (pack: IndicatorPack) =>
+    RELEASED_STATUSES.has(resultByPack.get(pack.id)?.status ?? '')
+  const releasedCount = packs.filter(released).length
   const blockedCount = packs.filter(
     (pack) => resultByPack.get(pack.id)?.status === 'BLOCKED',
   ).length
-  const pendingPacks = packs.filter((pack) => resultByPack.get(pack.id)?.status !== 'COMPUTED')
-  const computedPercent =
-    packs.length === 0 ? null : Math.round((computedCount / packs.length) * 100)
+  const pendingPacks = packs.filter((pack) => !released(pack))
+  const releasedPercent =
+    packs.length === 0 ? null : Math.round((releasedCount / packs.length) * 100)
   const alertas: PainelResumo['alertas'] = pendingPacks.map((pack) => {
     const result = resultByPack.get(pack.id)
     const description =
@@ -162,8 +165,8 @@ export function normalizePainelResumo(
         id: 'indicadores',
         icone: 'indicadores',
         label: 'Indicadores liberados',
-        valor: `${computedCount} / ${packs.length}`,
-        chip: computedPercent === null ? undefined : { label: '', valor: `${computedPercent}%` },
+        valor: `${releasedCount} / ${packs.length}`,
+        chip: releasedPercent === null ? undefined : { label: '', valor: `${releasedPercent}%` },
         tendencia:
           blockedCount > 0
             ? {
