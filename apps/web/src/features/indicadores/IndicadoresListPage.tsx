@@ -7,7 +7,7 @@ import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import { ChevronRight, EllipsisVertical, SlidersHorizontal } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { useIndicadores } from '@/api/hooks'
+import { useCompetencia, useIndicadores } from '@/api/hooks'
 import type { IndicadorResumo } from '@/api/types'
 import { DataTable, type Column } from '@/components/data/DataTable'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -18,11 +18,13 @@ import { PageUnavailable } from '@/components/ui/PageUnavailable'
 import { Pagination } from '@/components/ui/Pagination'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { PillTabs } from '@/components/ui/Tabs'
+import { formatReferencePeriod } from '@/app/display-context'
 import { formatPercent } from '@/lib/format'
 import { colors } from '@/theme/tokens'
 import { matchesIndicatorTab } from './filter'
 
 const PAGE_SIZE = 10
+const TODAS = 'Todas'
 
 const phoneStatus = (s: IndicadorResumo['status']) => (s === 'concluido' ? 'calculado' : s)
 
@@ -47,7 +49,7 @@ function IndicadorCard({ item }: { item: IndicadorResumo }) {
             color:
               item.status === 'pendente'
                 ? colors.error
-                : item.status === 'atencao'
+                : item.status === 'atencao' || item.status === 'bloqueado'
                   ? colors.warningText
                   : colors.success,
             mt: 0.25,
@@ -64,6 +66,7 @@ function IndicadorCard({ item }: { item: IndicadorResumo }) {
 
 export function IndicadoresListPage() {
   const { data, error, isError, isPending } = useIndicadores()
+  const { competencia, competencias, setCompetencia } = useCompetencia()
   const navigate = useNavigate()
   const theme = useTheme()
   const phone = useMediaQuery(theme.breakpoints.down('md'))
@@ -81,6 +84,8 @@ export function IndicadoresListPage() {
       if (status === 'Concluído' && i.status !== 'concluido') return false
       if (status === 'Pendente' && i.status !== 'pendente') return false
       if (status === 'Em execução' && !i.status.startsWith('em_execucao')) return false
+      if (status === 'Bloqueado' && i.status !== 'bloqueado') return false
+      if (status === 'Atenção' && i.status !== 'atencao') return false
       return true
     })
   }, [data, categoria, busca, status])
@@ -169,6 +174,41 @@ export function IndicadoresListPage() {
     },
   ]
 
+  const categorias = data.categorias.filter((c) => c.key !== 'todos')
+  const categoriaLabel = categorias.find((c) => c.key === categoria)?.label ?? TODAS
+
+  const statusSelect = (
+    <FilterSelect
+      label="Status"
+      value={status}
+      options={['Todos', 'Concluído', 'Bloqueado', 'Atenção', 'Em execução', 'Pendente']}
+      onChange={(v) => {
+        setStatus(v)
+        setPage(1)
+      }}
+      fullWidth
+    />
+  )
+
+  const competenciaSelect = (
+    <FilterSelect
+      label="Competência"
+      value={formatReferencePeriod(competencia)}
+      options={
+        competencias.length > 0
+          ? competencias.map(formatReferencePeriod)
+          : [formatReferencePeriod(undefined)]
+      }
+      onChange={(label) => {
+        const escolhida = competencias.find((c) => formatReferencePeriod(c) === label)
+        if (escolhida) setCompetencia(escolhida)
+        setPage(1)
+      }}
+      disabled={competencias.length === 0}
+      fullWidth
+    />
+  )
+
   const tabs = phone
     ? [
         { key: 'todos', label: 'Todos', count: data.total },
@@ -220,6 +260,13 @@ export function IndicadoresListPage() {
         </Box>
       )}
 
+      {phone && (
+        <Box sx={{ display: 'grid', gap: 1, mb: 1.5 }}>
+          {competenciaSelect}
+          {statusSelect}
+        </Box>
+      )}
+
       <PillTabs
         items={tabs}
         value={categoria}
@@ -247,23 +294,18 @@ export function IndicadoresListPage() {
               setPage(1)
             }}
           />
+          {statusSelect}
           <FilterSelect
-            label="Status"
-            value={status}
-            options={['Todos', 'Concluído', 'Em execução', 'Pendente']}
-            onChange={(v) => {
-              setStatus(v)
+            label="Categoria"
+            value={categoriaLabel}
+            options={[TODAS, ...categorias.map((c) => c.label)]}
+            onChange={(label) => {
+              setCategoria(categorias.find((c) => c.label === label)?.key ?? 'todos')
               setPage(1)
             }}
             fullWidth
           />
-          <FilterSelect label="Categoria" value="Todas" options={['Todas']} fullWidth />
-          <FilterSelect
-            label="Competência"
-            value="Ago/2026"
-            options={['Ago/2026', 'Jul/2026', 'Jun/2026']}
-            fullWidth
-          />
+          {competenciaSelect}
         </Box>
       )}
 

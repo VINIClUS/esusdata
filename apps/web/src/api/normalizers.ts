@@ -56,6 +56,11 @@ function categoryForFamily(family: string): (typeof categoryDefinitions)[number]
   )
 }
 
+/** An API instant in the browser's time zone, as the screens show dates: "28/09/2026, 15:16". */
+export function formatInstant(iso: string): string {
+  return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+}
+
 export function indicatorDisplayName(id: string): string {
   const [prefix, ...words] = id.split('-')
   if (!prefix || words.length === 0) return id
@@ -63,20 +68,46 @@ export function indicatorDisplayName(id: string): string {
   return `${prefix.toUpperCase()} – ${label.charAt(0).toUpperCase()}${label.slice(1)}`
 }
 
-function itemForPack(pack: IndicatorPack): IndicadorResumo {
+/** A published result wins over the catalog: BLOCKED shows as blocked, never as a value of 0. */
+function statusForItem(
+  pack: IndicatorPack,
+  result: IndicatorResultResponse | undefined,
+): IndicadorResumo['status'] {
+  if (result) return statusFromApi(result.status)
+  return pack.executionEnabled ? 'regular' : 'pendente'
+}
+
+function itemForPack(
+  pack: IndicatorPack,
+  result: IndicatorResultResponse | undefined,
+): IndicadorResumo {
   const category = categoryForFamily(pack.family)
   return {
     codigo: pack.id,
     nome: indicatorDisplayName(pack.id),
     categoria: category.label,
-    status: pack.executionEnabled ? 'regular' : 'pendente',
-    ultimaExecucao: null,
-    resultado: null,
+    status: statusForItem(pack, result),
+    ultimaExecucao: result?.publishedAt ? formatInstant(result.publishedAt) : null,
+    resultado: result?.status === 'COMPUTED' ? numberFromApi(result.value) : null,
   }
 }
 
-export function normalizeIndicatorPacks(packs: IndicatorPack[]): IndicadoresLista {
-  const itens = packs.map(itemForPack)
+/** The newest result per pack; `/results` lists newest first. */
+function latestResultByPack(results: IndicatorResultResponse[]) {
+  const resultByPack = new Map<string, IndicatorResultResponse>()
+  for (const result of results) {
+    if (!resultByPack.has(result.indicatorPack)) resultByPack.set(result.indicatorPack, result)
+  }
+  return resultByPack
+}
+
+/** The catalog, with each pack's status and value in the chosen competência when one is published. */
+export function normalizeIndicatorPacks(
+  packs: IndicatorPack[],
+  results: IndicatorResultResponse[] = [],
+): IndicadoresLista {
+  const resultByPack = latestResultByPack(results)
+  const itens = packs.map((pack) => itemForPack(pack, resultByPack.get(pack.id)))
   const categorias = [
     { key: 'todos', label: 'Todos', total: itens.length },
     ...categoryDefinitions
@@ -91,6 +122,8 @@ export function normalizeIndicatorPacks(packs: IndicatorPack[]): IndicadoresList
   return { categorias, itens, total: itens.length }
 }
 
+const RELEASED_STATUSES = new Set(['COMPUTED', 'NO_DENOMINATOR'])
+
 /**
  * Builds the panel from the API surfaces that exist today. The API has no aggregate panel route,
  * so values that cannot be derived from the catalog/results contract remain explicitly unavailable.
@@ -100,17 +133,20 @@ export function normalizePainelResumo(
   results: IndicatorResultResponse[],
   referencePeriod: string,
 ): PainelResumo {
-  const resultByPack = new Map<string, IndicatorResultResponse>()
-  for (const result of results) {
-    if (!resultByPack.has(result.indicatorPack)) resultByPack.set(result.indicatorPack, result)
-  }
+  const resultByPack = latestResultByPack(results)
 
-  const computedCount = packs.filter(
-    (pack) => resultByPack.get(pack.id)?.status === 'COMPUTED',
+  // Released: passed the release gates, with a value (COMPUTED) or a zero denominator
+  // (NO_DENOMINATOR). A BLOCKED result is computed and published but held back by the gates, so it
+  // is counted apart, never as released.
+  const released = (pack: IndicatorPack) =>
+    RELEASED_STATUSES.has(resultByPack.get(pack.id)?.status ?? '')
+  const releasedCount = packs.filter(released).length
+  const blockedCount = packs.filter(
+    (pack) => resultByPack.get(pack.id)?.status === 'BLOCKED',
   ).length
-  const pendingPacks = packs.filter((pack) => resultByPack.get(pack.id)?.status !== 'COMPUTED')
-  const computedPercent =
-    packs.length === 0 ? null : Math.round((computedCount / packs.length) * 100)
+  const pendingPacks = packs.filter((pack) => !released(pack))
+  const releasedPercent =
+    packs.length === 0 ? null : Math.round((releasedCount / packs.length) * 100)
   const alertas: PainelResumo['alertas'] = pendingPacks.map((pack) => {
     const result = resultByPack.get(pack.id)
     const description =
@@ -133,10 +169,16 @@ export function normalizePainelResumo(
       {
         id: 'indicadores',
         icone: 'indicadores',
-        label: 'Indicadores publicados',
-        valor: `${computedCount} / ${packs.length}`,
-        chip: computedPercent === null ? undefined : { label: '', valor: `${computedPercent}%` },
-        tendencia: { texto: `Competência ${referencePeriod}`, tom: 'up' },
+        label: 'Indicadores liberados',
+        valor: `${releasedCount} / ${packs.length}`,
+        chip: releasedPercent === null ? undefined : { label: '', valor: `${releasedPercent}%` },
+        tendencia:
+          blockedCount > 0
+            ? {
+                texto: `${blockedCount} ${blockedCount === 1 ? 'bloqueado' : 'bloqueados'} por portões de liberação`,
+                tom: 'down',
+              }
+            : { texto: `Competência ${referencePeriod}`, tom: 'up' },
       },
       {
         id: 'cobertura',
@@ -547,8 +589,10 @@ function requiredNumberFromApi(value: string | null): number {
   return numberFromApi(value) ?? 0
 }
 
+/** One mapping for the list and the detail, so a result never changes status between screens. */
 function statusFromApi(status: string): IndicadorDetalhe['status'] {
-  return status === 'COMPUTED' ? 'concluido' : 'pendente'
+  if (status === 'COMPUTED') return 'concluido'
+  return status === 'BLOCKED' ? 'bloqueado' : 'atencao'
 }
 
 export function normalizeIndicatorResult(result: IndicatorResultResponse): IndicadorDetalhe {

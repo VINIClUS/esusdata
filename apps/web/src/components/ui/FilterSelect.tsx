@@ -15,6 +15,7 @@ interface FilterSelectProps {
   fullWidth?: boolean
   size?: 'sm' | 'md'
   bold?: boolean
+  disabled?: boolean
 }
 
 function Chevron(props: object) {
@@ -39,6 +40,7 @@ export function FilterSelect({
   fullWidth,
   size = 'md',
   bold,
+  disabled,
 }: FilterSelectProps) {
   const h = size === 'sm' ? 36 : 50
   return (
@@ -48,6 +50,7 @@ export function FilterSelect({
       IconComponent={Chevron}
       SelectDisplayProps={{ 'aria-label': ariaLabel ?? label }}
       fullWidth={fullWidth}
+      disabled={disabled}
       renderValue={(v) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
           {Icon && <Icon size={20} color={colors.primary} />}

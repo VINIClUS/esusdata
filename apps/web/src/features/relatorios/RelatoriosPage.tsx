@@ -11,9 +11,9 @@ import {
   gerarExportacao,
   useCompetenciasPublicadas,
   useExportacoes,
-  useIndicadores,
+  useCatalogoIndicadores,
 } from '@/api/hooks'
-import { competenciaLabel } from '@/api/normalizers'
+import { competenciaLabel, formatInstant } from '@/api/normalizers'
 import type { Exportacao } from '@/api/types'
 import { useScope } from '@/app/scope-context'
 import { DataTable, type Column } from '@/components/data/DataTable'
@@ -41,10 +41,6 @@ const colunasCsv = [
   'Classificação e data de corte',
   'Data de publicação e execução de origem',
 ]
-
-function formatInstant(iso: string): string {
-  return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-}
 
 /** Competências in `[fromPeriod, toPeriod]`, both yyyy-MM. */
 function competenciasBetween(fromPeriod: string, toPeriod: string): number {
@@ -106,7 +102,7 @@ function ReportIllustration() {
 
 export function RelatoriosPage() {
   const { data, error, isError, isPending } = useExportacoes()
-  const indicadores = useIndicadores()
+  const indicadores = useCatalogoIndicadores()
   const competencias = useCompetenciasPublicadas()
   const { municipalityIbge } = useScope()
   const queryClient = useQueryClient()

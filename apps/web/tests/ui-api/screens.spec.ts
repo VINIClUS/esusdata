@@ -1,7 +1,7 @@
 import { expectNoA11yViolations } from '../support/a11y.ts'
 import { expectNoHorizontalOverflow } from '../support/layout.ts'
 import { IBGE, expect, test, type ApiStub } from './api.ts'
-import { PERIOD, exportResponse, pack, result, run, source } from './data.ts'
+import { PERIOD, blockedResult, exportResponse, pack, result, run, source } from './data.ts'
 
 const serverError = { status: 500, json: { code: 'INTERNAL', message: 'Falha interna da API.' } }
 
@@ -29,6 +29,23 @@ test.describe('painel', () => {
     await page.goto('/painel')
     await expectSettled(page, 'Painel Principal')
     await expect(page.getByText('1 / 2', { exact: true })).toBeVisible()
+  })
+
+  test('resultado bloqueado pelos portões conta à parte, não como liberado', async ({
+    page,
+    api,
+  }) => {
+    manager(api, [PERIOD])
+    api.get('/indicator-packs', { json: [pack('c1-mais-acesso')] })
+    api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, {
+      json: [blockedResult('c1-mais-acesso')],
+    })
+    await page.goto('/painel')
+    await expectSettled(page, 'Painel Principal')
+    await expect(page.getByText('Indicadores liberados')).toBeVisible()
+    await expect(page.getByText('0 / 1', { exact: true })).toBeVisible()
+    await expect(page.getByText('1 bloqueado por portões de liberação')).toBeVisible()
+    await expect(page.getByText('Indicadores publicados')).toHaveCount(0)
   })
 
   test('sem nada publicado', async ({ page, api }) => {
@@ -59,6 +76,122 @@ test.describe('indicadores', () => {
     await expectSettled(page, 'Indicadores')
     await expect(page.getByText('Mostrando 1–2 de 2 indicadores')).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Previne Brasil / ISF (1)' })).toHaveCount(0)
+  })
+
+  test('a competência escolhida é a do escopo e troca os resultados da lista', async ({
+    page,
+    api,
+  }) => {
+    manager(api, [PERIOD, '2026-02'])
+    api.get('/indicator-packs', { json: [pack('c1-mais-acesso')] })
+    api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, (request) =>
+      new URL(request.url()).searchParams.get('referencePeriod') === PERIOD
+        ? { json: [blockedResult('c1-mais-acesso')] }
+        : { json: [result('c1-mais-acesso', '70', { referencePeriod: '2026-02' })] },
+    )
+    await page.goto('/indicadores')
+    await expectSettled(page, 'Indicadores')
+    const competencia = page.getByRole('combobox', { name: 'Competência' })
+    await expect(competencia).toHaveText(/03\/2026/)
+    const row = page.getByRole('row', { name: /c1-mais-acesso/ })
+    await expect(row.getByRole('status')).toHaveText('Bloqueado')
+    await expect(row.getByText('--', { exact: true })).toBeVisible()
+
+    await competencia.click()
+    await expect(page.getByRole('option')).toHaveText(['03/2026', '02/2026'])
+    await page.getByRole('option', { name: '02/2026' }).click()
+    await expect(row.getByRole('status')).toHaveText('Concluído')
+    await expect(row.getByText('70,0%')).toBeVisible()
+    // The choice is the global scope's: the top bar follows it.
+    await expect(page.getByRole('banner').getByText('02/2026')).toBeVisible()
+    expect(api.calls.some((c) => c.path.includes('referencePeriod=2026-02'))).toBe(true)
+    await expectSettled(page, 'Indicadores')
+  })
+
+  test('o filtro de status separa os bloqueados', async ({ page, api }) => {
+    manager(api, [PERIOD])
+    api.get('/indicator-packs', { json: [pack('c1-mais-acesso'), pack('c2-cuidado')] })
+    api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, {
+      json: [blockedResult('c1-mais-acesso')],
+    })
+    api.get(/^\/results\?.*indicatorPack=c2-cuidado/, { json: [result('c2-cuidado', '55')] })
+    await page.goto('/indicadores')
+    await expectSettled(page, 'Indicadores')
+    await page.getByRole('combobox', { name: 'Status' }).click()
+    await page.getByRole('option', { name: 'Bloqueado' }).click()
+    await expect(page.getByText('Mostrando 1–1 de 1 indicadores')).toBeVisible()
+    await expect(page.getByRole('row', { name: /c1-mais-acesso/ })).toBeVisible()
+  })
+
+  test('o filtro de status isola os sem denominador (Atenção)', async ({ page, api }) => {
+    manager(api, [PERIOD])
+    api.get('/indicator-packs', { json: [pack('c1-mais-acesso'), pack('c2-cuidado')] })
+    api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, {
+      json: [result('c1-mais-acesso', null, { status: 'NO_DENOMINATOR' })],
+    })
+    api.get(/^\/results\?.*indicatorPack=c2-cuidado/, { json: [result('c2-cuidado', '55')] })
+    await page.goto('/indicadores')
+    await expectSettled(page, 'Indicadores')
+    await page.getByRole('combobox', { name: 'Status' }).click()
+    await page.getByRole('option', { name: 'Atenção' }).click()
+    await expect(page.getByText('Mostrando 1–1 de 1 indicadores')).toBeVisible()
+    await expect(page.getByRole('row', { name: /c1-mais-acesso/ }).getByRole('status')).toHaveText(
+      'Atenção',
+    )
+  })
+
+  test.describe('no celular', () => {
+    test.use({ viewport: { width: 390, height: 844 } })
+
+    test('a competência também se escolhe no celular', async ({ page, api }) => {
+      manager(api, [PERIOD, '2026-02'])
+      api.get('/indicator-packs', { json: [pack('c1-mais-acesso')] })
+      api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, (request) =>
+        new URL(request.url()).searchParams.get('referencePeriod') === PERIOD
+          ? { json: [blockedResult('c1-mais-acesso')] }
+          : { json: [result('c1-mais-acesso', '70', { referencePeriod: '2026-02' })] },
+      )
+      await page.goto('/indicadores')
+      await expectSettled(page, 'Indicadores')
+      const competencia = page.getByRole('combobox', { name: 'Competência' })
+      await expect(competencia).toHaveText(/03\/2026/)
+      await competencia.click()
+      await page.getByRole('option', { name: '02/2026' }).click()
+      await expect(page.getByText('70,0%')).toBeVisible()
+      await expectSettled(page, 'Indicadores')
+    })
+
+    test('os filtros de status novos também existem no celular', async ({ page, api }) => {
+      manager(api, [PERIOD])
+      api.get('/indicator-packs', { json: [pack('c1-mais-acesso'), pack('c2-cuidado')] })
+      api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, {
+        json: [blockedResult('c1-mais-acesso')],
+      })
+      api.get(/^\/results\?.*indicatorPack=c2-cuidado/, { json: [result('c2-cuidado', '55')] })
+      await page.goto('/indicadores')
+      await expectSettled(page, 'Indicadores')
+      await page.getByRole('combobox', { name: 'Status' }).click()
+      await page.getByRole('option', { name: 'Bloqueado' }).click()
+      await expect(page.getByText('C1 – Mais acesso')).toBeVisible()
+      await expect(page.getByText('C2 – Cuidado')).toHaveCount(0)
+      // axe on a menu still fading out measures its options against the backdrop.
+      await expect(page.locator('[role="listbox"]')).toHaveCount(0)
+      await expectSettled(page, 'Indicadores')
+    })
+  })
+
+  test('sem competência publicada, o select de competência fica desabilitado', async ({
+    page,
+    api,
+  }) => {
+    manager(api)
+    api.get('/indicator-packs', { json: [pack('c1-mais-acesso')] })
+    await page.goto('/indicadores')
+    await expectSettled(page, 'Indicadores')
+    const competencia = page.getByRole('combobox', { name: 'Competência' })
+    await expect(competencia).toHaveText(/Sem resultados/)
+    await expect(competencia).toHaveAttribute('aria-disabled', 'true')
+    expect(api.calls.filter((c) => c.path.startsWith('/results?'))).toEqual([])
   })
 
   test('erro da API não deixa a tela carregando para sempre', async ({ page, api }) => {

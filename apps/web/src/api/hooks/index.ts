@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { USE_MOCKS, apiFetch, apiFetchBlob, ensureApiReady, resolveMock } from '../client'
 import { execucaoFixture } from '../fixtures/execucao'
@@ -68,16 +69,13 @@ function resolveApiIndicadorDetalhe(
   })
 }
 
-async function resolveApiPainelResumo({
-  municipalityIbge,
-  referencePeriod,
-}: ApiScope): Promise<PainelResumo> {
-  const packs = await apiFetch<IndicatorPack[]>('/indicator-packs')
-  if (!municipalityIbge || !referencePeriod) {
-    return normalizePainelResumo(packs, [], referencePeriod || 'período atual')
-  }
-
-  const results = (
+/** Every pack's results in the scope's competência; none without a municipality and a period. */
+async function resultsForPacks(
+  packs: IndicatorPack[],
+  { municipalityIbge, referencePeriod }: ApiScope,
+): Promise<IndicatorResultResponse[]> {
+  if (!municipalityIbge || !referencePeriod) return []
+  return (
     await Promise.all(
       packs.map((pack) =>
         apiFetch<IndicatorResultResponse[]>(
@@ -86,8 +84,17 @@ async function resolveApiPainelResumo({
       ),
     )
   ).flat()
+}
 
-  return normalizePainelResumo(packs, results, referencePeriod)
+async function resolveApiPainelResumo(scope: ApiScope): Promise<PainelResumo> {
+  const packs = await apiFetch<IndicatorPack[]>('/indicator-packs')
+  const results = await resultsForPacks(packs, scope)
+  return normalizePainelResumo(packs, results, scope.referencePeriod || 'período atual')
+}
+
+async function resolveApiIndicadores(scope: ApiScope) {
+  const packs = await apiFetch<IndicatorPack[]>('/indicator-packs')
+  return normalizeIndicatorPacks(packs, await resultsForPacks(packs, scope))
 }
 
 async function resolveApiExecucaoAtual(municipalityIbge: string | undefined) {
@@ -115,13 +122,28 @@ export function usePainelResumo() {
   })
 }
 
-export function useIndicadores() {
+/** The pack catalog alone, for screens that only list the indicators by name. */
+export function useCatalogoIndicadores() {
   return useQuery({
-    queryKey: ['indicadores'],
+    queryKey: ['indicadores', 'catalogo'],
     queryFn: () =>
       USE_MOCKS
         ? resolveMock(indicadoresFixture)
-        : apiFetch<IndicatorPack[]>('/indicator-packs').then(normalizeIndicatorPacks),
+        : apiFetch<IndicatorPack[]>('/indicator-packs').then((packs) =>
+            normalizeIndicatorPacks(packs),
+          ),
+  })
+}
+
+export function useIndicadores() {
+  const { municipalityIbge, referencePeriod, isLoading } = useScope()
+  return useQuery({
+    queryKey: ['indicadores', 'lista', municipalityIbge, referencePeriod],
+    queryFn: () =>
+      USE_MOCKS
+        ? resolveMock(indicadoresFixture)
+        : resolveApiIndicadores({ municipalityIbge, referencePeriod }),
+    enabled: !isLoading,
   })
 }
 
@@ -313,4 +335,21 @@ export async function baixarExportacao(
 export function useCompetenciasPublicadas(): string[] {
   const { periods } = useScope()
   return USE_MOCKS ? exportPeriodsFixture : periods
+}
+
+/**
+ * The competência the screens read, and how to change it: the global scope's in API mode (so the
+ * top bar follows), a local choice among the demo competências in mock mode.
+ */
+export function useCompetencia(): {
+  competencia: string | undefined
+  competencias: string[]
+  setCompetencia: (value: string) => void
+} {
+  const { referencePeriod, setPeriod } = useScope()
+  const competencias = useCompetenciasPublicadas()
+  const [demo, setDemo] = useState(competencias[0])
+  return USE_MOCKS
+    ? { competencia: demo, competencias, setCompetencia: setDemo }
+    : { competencia: referencePeriod, competencias, setCompetencia: setPeriod }
 }

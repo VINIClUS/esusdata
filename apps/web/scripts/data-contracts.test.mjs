@@ -7,6 +7,7 @@ import {
   normalizeIndicatorResult,
   normalizePainelResumo,
   indicatorResultsPath,
+  formatInstant,
 } from '../src/api/normalizers.ts'
 import * as normalizers from '../src/api/normalizers.ts'
 import { pickScopeOption } from '../src/app/scope-model.ts'
@@ -40,6 +41,63 @@ test('normalizes the backend indicator-pack catalog into the list view model', (
     { key: 'todos', label: 'Todos', total: 1 },
     { key: 'previne', label: 'Previne Brasil', total: 1 },
   ])
+})
+
+test('the list shows each pack as published in the chosen competência', () => {
+  const pack = (id) => ({
+    id,
+    ruleVersion: `${id}@0.1.0`,
+    family: 'C1',
+    unit: 'percentual',
+    dependsOn: [],
+    executionEnabled: true,
+    blockedGates: [],
+  })
+  const published = (indicatorPack, status, value) => ({
+    resultId: `r-${indicatorPack}`,
+    indicatorPack,
+    referencePeriod: '2026-03',
+    status,
+    value,
+    unit: 'percentual',
+    numerator: '7100',
+    denominator: '10029',
+    denominatorKind: 'PROGRAMADOS_MAIS_ESPONTANEOS',
+    classification: null,
+    dataCutoff: null,
+    limitations: [],
+    scope: { municipalityIbge: '3541307' },
+    publishedAt: '2026-09-28T12:00:00Z',
+  })
+
+  const { itens } = normalizeIndicatorPacks(
+    [pack('c1-a'), pack('c1-b'), pack('c1-c'), pack('c1-d')],
+    [
+      published('c1-a', 'COMPUTED', '70.7947'),
+      published('c1-b', 'BLOCKED', null),
+      published('c1-c', 'NO_DENOMINATOR', null),
+    ],
+  )
+
+  assert.deepEqual(
+    itens.map(({ status, resultado, ultimaExecucao }) => ({ status, resultado, ultimaExecucao })),
+    [
+      {
+        status: 'concluido',
+        resultado: 70.7947,
+        ultimaExecucao: formatInstant('2026-09-28T12:00:00Z'),
+      },
+      {
+        status: 'bloqueado',
+        resultado: null,
+        ultimaExecucao: formatInstant('2026-09-28T12:00:00Z'),
+      },
+      { status: 'atencao', resultado: null, ultimaExecucao: formatInstant('2026-09-28T12:00:00Z') },
+      { status: 'regular', resultado: null, ultimaExecucao: null },
+    ],
+  )
+  // Localized, never the raw UTC instant.
+  assert.match(itens[0].ultimaExecucao, /^\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}$/)
 })
 
 test('phone status tabs match the status they advertise', () => {
@@ -450,7 +508,7 @@ test('keeps a remembered scope choice only while the API still offers it', () =>
 })
 
 test('keeps a blocked result unavailable instead of turning it into zero', () => {
-  const detail = normalizeIndicatorResult({
+  const blockedDetailInput = {
     resultId: 'blocked-1',
     indicatorPack: 'c1-mais-acesso',
     referencePeriod: '2026-08',
@@ -465,9 +523,15 @@ test('keeps a blocked result unavailable instead of turning it into zero', () =>
     limitations: ['Portão A (fonte e vigência) incompleto'],
     scope: { municipalityIbge: '3541307' },
     publishedAt: null,
-  })
+  }
+  const detail = normalizeIndicatorResult(blockedDetailInput)
 
+  assert.equal(detail.status, 'bloqueado')
   assert.equal(detail.resultado.valor, null)
+  assert.equal(
+    normalizeIndicatorResult({ ...blockedDetailInput, status: 'NO_DENOMINATOR' }).status,
+    'atencao',
+  )
   assert.deepEqual(detail.evolucao, [])
   assert.deepEqual(detail.distribuicao, [])
 })
@@ -506,11 +570,62 @@ test('derives the real-mode panel from the catalog and published results', () =>
     '2026-08',
   )
 
-  assert.equal(painel.kpis.find((kpi) => kpi.id === 'indicadores')?.valor, '0 / 1')
+  const indicadores = painel.kpis.find((kpi) => kpi.id === 'indicadores')
+  assert.equal(indicadores?.label, 'Indicadores liberados')
+  assert.equal(indicadores?.valor, '0 / 1')
+  assert.deepEqual(indicadores?.tendencia, {
+    texto: '1 bloqueado por portões de liberação',
+    tom: 'down',
+  })
   assert.equal(painel.kpis.find((kpi) => kpi.id === 'pendencias')?.valor, '1')
   assert.equal(painel.alertas[0].descricao, 'Portão A (fonte e vigência) incompleto')
   assert.deepEqual(painel.evolucao.pontos, [])
   assert.equal(painel.qualidade.percentual, null)
+})
+
+test('a zero denominator passed the release gates: released, not pending', () => {
+  const pack = (id) => ({
+    id,
+    ruleVersion: `${id}@0.1.0`,
+    family: 'C1',
+    unit: 'percentual',
+    dependsOn: [],
+    executionEnabled: true,
+    blockedGates: [],
+  })
+  const published = (indicatorPack, status) => ({
+    resultId: `r-${indicatorPack}`,
+    indicatorPack,
+    referencePeriod: '2026-03',
+    status,
+    value: status === 'COMPUTED' ? '50' : null,
+    unit: 'percentual',
+    numerator: '0',
+    denominator: '0',
+    denominatorKind: 'PROGRAMADOS_MAIS_ESPONTANEOS',
+    classification: null,
+    dataCutoff: null,
+    limitations: status === 'BLOCKED' ? ['Portão A (fonte e vigência) incompleto'] : [],
+    scope: { municipalityIbge: '3541307' },
+    publishedAt: null,
+  })
+
+  const painel = normalizePainelResumo(
+    [pack('c1-a'), pack('c1-b'), pack('c1-c')],
+    [
+      published('c1-a', 'COMPUTED'),
+      published('c1-b', 'NO_DENOMINATOR'),
+      published('c1-c', 'BLOCKED'),
+    ],
+    '2026-03',
+  )
+
+  assert.equal(painel.kpis.find((kpi) => kpi.id === 'indicadores')?.valor, '2 / 3')
+  assert.equal(painel.kpis.find((kpi) => kpi.id === 'pendencias')?.valor, '1')
+  assert.deepEqual(
+    painel.alertas.map((alerta) => alerta.id),
+    ['indicator-c1-c'],
+  )
 })
 
 test('uses the runtime API scope in real-mode display context', () => {

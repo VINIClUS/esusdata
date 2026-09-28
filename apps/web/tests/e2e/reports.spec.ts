@@ -114,3 +114,15 @@ test('sair volta ao login', async () => {
   await page.getByRole('button', { name: 'Sair' }).click()
   await expect(page).toHaveURL('/login')
 })
+
+test('Indicadores lista o catálogo real e, sem competência publicada, não inventa um mês', async () => {
+  const { page } = session
+  await signIn(page, 'gestor-e2e', MANAGER_PASSWORD)
+  await page.goto('/indicadores')
+  await expect(page.getByRole('row', { name: /c1-mais-acesso/ })).toBeVisible()
+  const competencia = page.getByRole('combobox', { name: 'Competência' })
+  await expect(competencia).toHaveText(/Sem resultados/)
+  await expect(competencia).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByText('Ago/2026')).toHaveCount(0)
+  await expectNoA11yViolations(page)
+})

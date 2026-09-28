@@ -22,7 +22,11 @@ export function pack(id: string, family = 'C1'): IndicatorPack {
   }
 }
 
-export function result(indicatorPack: string, value: string): IndicatorResultResponse {
+export function result(
+  indicatorPack: string,
+  value: string | null,
+  overrides: Partial<IndicatorResultResponse> = {},
+): IndicatorResultResponse {
   return {
     resultId: `r-${indicatorPack}`,
     indicatorPack,
@@ -38,7 +42,16 @@ export function result(indicatorPack: string, value: string): IndicatorResultRes
     limitations: [],
     scope: { municipalityIbge: IBGE },
     publishedAt: '2026-04-02T12:00:00Z',
+    ...overrides,
   }
+}
+
+/** The C1 pilot as it is published today: computed, but held back by the release gates. */
+export function blockedResult(indicatorPack: string): IndicatorResultResponse {
+  return result(indicatorPack, null, {
+    status: 'BLOCKED',
+    limitations: ['Portão A (fonte e vigência) incompleto'],
+  })
 }
 
 export function source(overrides: Partial<SourceResponse> = {}): SourceResponse {

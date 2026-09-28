@@ -9,6 +9,7 @@ export type StatusKey =
   | 'conforme'
   | 'verificado'
   | 'calculado'
+  | 'bloqueado'
 
 export type Severity = 'success' | 'info' | 'warning' | 'error'
 
