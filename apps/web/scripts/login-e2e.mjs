@@ -116,6 +116,9 @@ try {
   await page.getByLabel('Senha', { exact: true }).fill('very-strong-admin-password-1')
   await page.getByRole('button', { name: 'Entrar', exact: true }).click()
   await page.getByRole('link', { name: 'Ativações pendentes' }).waitFor()
+  // The -Pweb build stamps the JAR's own version, not the demo fixture's.
+  const jarVersion = jarName.replace(/^esusdata-agent-/, '').replace(/\.jar$/, '')
+  await page.getByText(`v${jarVersion}`, { exact: true }).waitFor()
   await page.reload()
   await page.getByRole('link', { name: 'Ativações pendentes' }).waitFor()
 

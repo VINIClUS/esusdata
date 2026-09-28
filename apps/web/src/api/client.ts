@@ -1,4 +1,15 @@
+import { demoContext } from './fixtures/context'
+
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS !== 'false'
+
+// The -Pweb build passes the Maven project version; without it only the demo shows a version.
+const packagedVersion: unknown = import.meta.env.VITE_APP_VERSION
+export const APP_VERSION =
+  typeof packagedVersion === 'string' && packagedVersion !== ''
+    ? `v${packagedVersion}`
+    : USE_MOCKS
+      ? demoContext.versao
+      : ''
 
 if (USE_MOCKS && import.meta.env.DEV) {
   console.warn('[esusdata] usando dados de demonstração (VITE_USE_MOCKS != "false")')

@@ -519,6 +519,7 @@
                   <arguments>run build</arguments>
                   <environmentVariables>
                     <VITE_USE_MOCKS>false</VITE_USE_MOCKS>
+                    <VITE_APP_VERSION>${project.version}</VITE_APP_VERSION>
                   </environmentVariables>
                 </configuration>
               </execution>
