@@ -177,6 +177,19 @@ export function IndicadoresListPage() {
   const categorias = data.categorias.filter((c) => c.key !== 'todos')
   const categoriaLabel = categorias.find((c) => c.key === categoria)?.label ?? TODAS
 
+  const statusSelect = (
+    <FilterSelect
+      label="Status"
+      value={status}
+      options={['Todos', 'Concluído', 'Bloqueado', 'Atenção', 'Em execução', 'Pendente']}
+      onChange={(v) => {
+        setStatus(v)
+        setPage(1)
+      }}
+      fullWidth
+    />
+  )
+
   const competenciaSelect = (
     <FilterSelect
       label="Competência"
@@ -247,7 +260,12 @@ export function IndicadoresListPage() {
         </Box>
       )}
 
-      {phone && <Box sx={{ mb: 1.5 }}>{competenciaSelect}</Box>}
+      {phone && (
+        <Box sx={{ display: 'grid', gap: 1, mb: 1.5 }}>
+          {competenciaSelect}
+          {statusSelect}
+        </Box>
+      )}
 
       <PillTabs
         items={tabs}
@@ -276,16 +294,7 @@ export function IndicadoresListPage() {
               setPage(1)
             }}
           />
-          <FilterSelect
-            label="Status"
-            value={status}
-            options={['Todos', 'Concluído', 'Bloqueado', 'Atenção', 'Em execução', 'Pendente']}
-            onChange={(v) => {
-              setStatus(v)
-              setPage(1)
-            }}
-            fullWidth
-          />
+          {statusSelect}
           <FilterSelect
             label="Categoria"
             value={categoriaLabel}

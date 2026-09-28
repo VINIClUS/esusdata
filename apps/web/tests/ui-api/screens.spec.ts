@@ -160,6 +160,24 @@ test.describe('indicadores', () => {
       await expect(page.getByText('70,0%')).toBeVisible()
       await expectSettled(page, 'Indicadores')
     })
+
+    test('os filtros de status novos também existem no celular', async ({ page, api }) => {
+      manager(api, [PERIOD])
+      api.get('/indicator-packs', { json: [pack('c1-mais-acesso'), pack('c2-cuidado')] })
+      api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, {
+        json: [blockedResult('c1-mais-acesso')],
+      })
+      api.get(/^\/results\?.*indicatorPack=c2-cuidado/, { json: [result('c2-cuidado', '55')] })
+      await page.goto('/indicadores')
+      await expectSettled(page, 'Indicadores')
+      await page.getByRole('combobox', { name: 'Status' }).click()
+      await page.getByRole('option', { name: 'Bloqueado' }).click()
+      await expect(page.getByText('C1 – Mais acesso')).toBeVisible()
+      await expect(page.getByText('C2 – Cuidado')).toHaveCount(0)
+      // axe on a menu still fading out measures its options against the backdrop.
+      await expect(page.locator('[role="listbox"]')).toHaveCount(0)
+      await expectSettled(page, 'Indicadores')
+    })
   })
 
   test('sem competência publicada, o select de competência fica desabilitado', async ({

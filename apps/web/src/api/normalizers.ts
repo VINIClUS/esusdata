@@ -68,9 +68,7 @@ function statusForItem(
   pack: IndicatorPack,
   result: IndicatorResultResponse | undefined,
 ): IndicadorResumo['status'] {
-  if (result?.status === 'COMPUTED') return 'concluido'
-  if (result?.status === 'BLOCKED') return 'bloqueado'
-  if (result) return 'atencao'
+  if (result) return statusFromApi(result.status)
   return pack.executionEnabled ? 'regular' : 'pendente'
 }
 
@@ -583,9 +581,10 @@ function requiredNumberFromApi(value: string | null): number {
   return numberFromApi(value) ?? 0
 }
 
+/** One mapping for the list and the detail, so a result never changes status between screens. */
 function statusFromApi(status: string): IndicadorDetalhe['status'] {
   if (status === 'COMPUTED') return 'concluido'
-  return status === 'BLOCKED' ? 'bloqueado' : 'pendente'
+  return status === 'BLOCKED' ? 'bloqueado' : 'atencao'
 }
 
 export function normalizeIndicatorResult(result: IndicatorResultResponse): IndicadorDetalhe {

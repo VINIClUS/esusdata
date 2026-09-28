@@ -497,7 +497,7 @@ test('keeps a remembered scope choice only while the API still offers it', () =>
 })
 
 test('keeps a blocked result unavailable instead of turning it into zero', () => {
-  const detail = normalizeIndicatorResult({
+  const blockedDetailInput = {
     resultId: 'blocked-1',
     indicatorPack: 'c1-mais-acesso',
     referencePeriod: '2026-08',
@@ -512,10 +512,15 @@ test('keeps a blocked result unavailable instead of turning it into zero', () =>
     limitations: ['Portão A (fonte e vigência) incompleto'],
     scope: { municipalityIbge: '3541307' },
     publishedAt: null,
-  })
+  }
+  const detail = normalizeIndicatorResult(blockedDetailInput)
 
   assert.equal(detail.status, 'bloqueado')
   assert.equal(detail.resultado.valor, null)
+  assert.equal(
+    normalizeIndicatorResult({ ...blockedDetailInput, status: 'NO_DENOMINATOR' }).status,
+    'atencao',
+  )
   assert.deepEqual(detail.evolucao, [])
   assert.deepEqual(detail.distribuicao, [])
 })
