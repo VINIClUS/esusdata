@@ -238,6 +238,9 @@ class LiveAcquisitionEndToEndTest {
 
         assertThatThrownBy(() -> fixture.executor.runLive(context, cancellation))
                 .isInstanceOf(JobCancelledException.class);
+        // runLive is called directly here, so nothing plays JobWorker's part of finalizing the
+        // cancelled job; while it stays RUNNING, V7 (ADR 0026) refuses the retry's enqueue.
+        fixture.jdbc.update("update jobs set state = 'CANCELLED' where job_id = ?", "job-live-cancel-guard");
 
         var retryContext = liveContext("job-live-cancel-guard-retry", "1100015");
         assertThatThrownBy(() -> fixture.executor.runLive(retryContext, new CancellationToken()))

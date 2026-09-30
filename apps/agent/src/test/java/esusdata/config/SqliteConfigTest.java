@@ -62,9 +62,9 @@ class SqliteConfigTest {
             while (rs.next()) {
                 appliedVersions.add(rs.getString(1));
             }
-            assertThat(appliedVersions).containsExactly("1", "2", "3", "4", "5", "6");
+            assertThat(appliedVersions).containsExactly("1", "2", "3", "4", "5", "6", "7");
         }
-        assertThat(migration.migrationsExecuted()).isEqualTo(6);
+        assertThat(migration.migrationsExecuted()).isEqualTo(7);
     }
 
     @Test

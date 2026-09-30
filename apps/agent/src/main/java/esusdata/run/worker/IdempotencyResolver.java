@@ -1,12 +1,12 @@
 package esusdata.run.worker;
 
+import esusdata.run.job.ActiveJobExistsException;
 import esusdata.run.job.EnqueueRequest;
 import esusdata.run.job.Job;
 import esusdata.run.job.JobRepository;
 import esusdata.run.job.JobRequestConflictException;
-import java.sql.SQLException;
+import esusdata.run.job.SqliteUniqueViolation;
 import java.time.Clock;
-import java.util.Locale;
 import java.util.Optional;
 import org.springframework.dao.DataAccessException;
 
@@ -17,6 +17,8 @@ import org.springframework.dao.DataAccessException;
  * new job.
  */
 public final class IdempotencyResolver {
+
+    private static final String IDEMPOTENCY_INDEX_COLUMN = "jobs.idempotency_key";
 
     private final JobRepository jobRepository;
     private final Clock clock;
@@ -48,8 +50,14 @@ public final class IdempotencyResolver {
 
         try {
             return jobRepository.enqueue(request);
+        } catch (ActiveJobExistsException active) {
+            // A concurrent submission under the same key can trip V7's active-job index before
+            // the idempotency index; the key's own winner, when there is one, is the answer.
+            return sameKeyWinner(request).orElseThrow(() -> active);
         } catch (DataAccessException raced) {
-            if (!isIdempotencyKeyUniqueViolation(raced)) {
+            // Not just any unique violation (e.g. jobs.job_id, the caller-supplied primary key) —
+            // specifically the idempotency index, so an unrelated collision still propagates.
+            if (!SqliteUniqueViolation.on(raced, IDEMPOTENCY_INDEX_COLUMN)) {
                 throw raced;
             }
             // Lost a race against a concurrent submission under the same key — both requests
@@ -57,41 +65,15 @@ public final class IdempotencyResolver {
             // and apply the exact same hash check as the non-racing path; otherwise a genuinely
             // different payload (different município/escopo) under the same key would silently
             // adopt the winner's job instead of conflicting.
-            Optional<Job> winner =
-                    jobRepository.findByIdempotency(request.idempotencyPrincipal(), request.idempotencyKey());
-            if (winner.isEmpty()) {
-                throw raced;
-            }
-            requireSameRequest(request, winner.get());
-            return winner.get();
+            return sameKeyWinner(request).orElseThrow(() -> raced);
         }
     }
 
-    /**
-     * SQLite's JDBC driver throws a plain {@code org.sqlite.SQLiteException} with no SQL state, so
-     * Spring's default translator — there is no SQLite entry in {@code sql-error-codes.xml} —
-     * cannot recognize it as {@link org.springframework.dao.DuplicateKeyException} the way it
-     * would for Postgres/MySQL; it falls back to the generic {@code UncategorizedSQLException}
-     * (confirmed empirically: {@code catch (DuplicateKeyException)} here never fired against real
-     * SQLite). Detect the {@code SQLITE_CONSTRAINT_UNIQUE} condition the same way
-     * {@link FailureClassifier} detects {@code SQLITE_BUSY} — by walking the cause chain for the
-     * message text, since there is no portable exception type to catch instead.
-     */
-    private static boolean isIdempotencyKeyUniqueViolation(Throwable failure) {
-        for (Throwable current = failure; current != null; current = current.getCause()) {
-            if (current instanceof SQLException sql) {
-                String message = sql.getMessage();
-                if (message == null) {
-                    return false;
-                }
-                String upper = message.toUpperCase(Locale.ROOT);
-                // Not just any unique violation (e.g. jobs.job_id, the caller-supplied primary
-                // key) — specifically the idempotency index, so an unrelated collision still
-                // propagates instead of being misread as this race.
-                return upper.contains("UNIQUE CONSTRAINT FAILED") && upper.contains("IDEMPOTENCY");
-            }
-        }
-        return false;
+    private Optional<Job> sameKeyWinner(EnqueueRequest request) {
+        Optional<Job> winner =
+                jobRepository.findByIdempotency(request.idempotencyPrincipal(), request.idempotencyKey());
+        winner.ifPresent(job -> requireSameRequest(request, job));
+        return winner;
     }
 
     private static void requireSameRequest(EnqueueRequest request, Job job) {

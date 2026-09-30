@@ -9,6 +9,7 @@ import esusdata.result.model.EvidenceNotFoundException;
 import esusdata.result.model.InvalidCursorException;
 import esusdata.run.controller.SseConnectionLimiter;
 import esusdata.run.controller.TooManyEventStreamsException;
+import esusdata.run.job.ActiveJobExistsException;
 import esusdata.run.job.JobNotCancellableException;
 import esusdata.run.job.JobRequestConflictException;
 import esusdata.source.model.SourceNotFoundException;
@@ -78,6 +79,13 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiError> handleJobRequestConflict(JobRequestConflictException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiError("IDEMPOTENCY_KEY_CONFLICT", e.getMessage()));
+    }
+
+    /** ADR 0026: another live job for the same competência is still active. */
+    @ExceptionHandler(ActiveJobExistsException.class)
+    ResponseEntity<ActiveJobError> handleActiveJobExists(ActiveJobExistsException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ActiveJobError("ACTIVE_JOB_EXISTS", e.getMessage(), e.activeJobId()));
     }
 
     /** The job's current state lost the cancel CAS — already terminal, or the worker won the race. */

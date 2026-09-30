@@ -24,6 +24,11 @@ public interface JobRepository {
             String failureCode,
             String failureDetail) {}
 
+    /**
+     * Inserts a {@code QUEUED} job.
+     *
+     * @throws ActiveJobExistsException if a live job for the same competência is still active
+     */
     Job enqueue(EnqueueRequest request);
 
     Optional<Job> findById(String jobId);
@@ -32,6 +37,12 @@ public interface JobRepository {
     List<Job> findRecent(String municipalityIbge, int limit);
 
     Optional<Job> findByIdempotency(String principal, String idempotencyKey);
+
+    /**
+     * The live job still active ({@code QUEUED}, {@code RUNNING}, {@code STAGED} or {@code
+     * CANCEL_REQUESTED}) for this competência, if any — the row V7's unique index protects.
+     */
+    Optional<Job> findActive(String sourceId, String municipalityIbge, String indicatorPack, String referencePeriod);
 
     /**
      * Frees an expired idempotency key so a later request may reuse it (§1.9.5: "janela de
