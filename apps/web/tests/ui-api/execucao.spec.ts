@@ -170,6 +170,9 @@ test.describe('execução única', () => {
     api.get('/runs/job-1', { json: run() })
     await page.goto('/execucao')
     await expect(page.getByText('Execução registrada.')).toBeVisible()
+    // 11:00Z is 08:00 in Brasília: the log shows the local time, not the UTC one.
+    await expect(page.getByText('08:00').first()).toBeVisible()
+    await expect(page.getByText('11:00')).toHaveCount(0)
     await page.getByRole('button', { name: 'Limpar' }).click()
     await expect(page.getByText('Execução registrada.')).toHaveCount(0)
   })

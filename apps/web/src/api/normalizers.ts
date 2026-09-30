@@ -517,9 +517,13 @@ export function isRunTerminal(run: Pick<RunResponse, 'state'>): boolean {
   return terminalRunStates.has(run.state)
 }
 
+// In the browser's time zone, like formatInstant: the API instants are UTC.
 function timeLabel(timestamp: string | null): string | null {
   if (!timestamp) return null
-  return /^\d{4}-\d{2}-\d{2}T(\d{2}:\d{2})/.exec(timestamp)?.[1] ?? timestamp
+  const date = new Date(timestamp)
+  return Number.isNaN(date.getTime())
+    ? timestamp
+    : date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 function stageStatus(
