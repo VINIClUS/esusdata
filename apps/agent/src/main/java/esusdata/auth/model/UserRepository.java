@@ -1,6 +1,7 @@
 package esusdata.auth.model;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -14,6 +15,9 @@ public interface UserRepository {
     Optional<UserAccount> findById(String userId);
 
     Optional<UserAccount> findByUsername(String username);
+
+    /** Every account, by username: the users screen lists them all. */
+    List<UserAccount> findAll();
 
     boolean anyExistsWithRole(Role role);
 

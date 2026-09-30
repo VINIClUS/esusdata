@@ -61,6 +61,11 @@ public final class JdbcGrantRepository implements GrantRepository {
         return jdbc.query("select * from user_grants where user_id = ? and revoked_at is null", MAPPER, userId);
     }
 
+    @Override
+    public List<Grant> allActiveGrants() {
+        return jdbc.query("select * from user_grants where revoked_at is null order by granted_at", MAPPER);
+    }
+
     /** @return {@code true} if a grant with this id was active and is now revoked by this call. */
     @Override
     public boolean revoke(String grantId, Instant at, String revokedBy) {

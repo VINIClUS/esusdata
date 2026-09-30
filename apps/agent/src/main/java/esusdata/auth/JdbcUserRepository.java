@@ -5,6 +5,7 @@ import esusdata.auth.model.UserAccount;
 import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -69,6 +70,11 @@ public final class JdbcUserRepository implements UserRepository {
     public Optional<UserAccount> findByUsername(String username) {
         return jdbc.query("select * from users where username = ?", MAPPER, username).stream()
                 .findFirst();
+    }
+
+    @Override
+    public List<UserAccount> findAll() {
+        return jdbc.query("select * from users order by username", MAPPER);
     }
 
     @Override

@@ -2,7 +2,7 @@ import type { Request, Route } from '@playwright/test'
 import type { AuthMeResponse } from '../../src/app/auth-model.ts'
 import { expect, test as base } from '../support/test.ts'
 
-type Method = 'GET' | 'POST' | 'PUT'
+type Method = 'GET' | 'POST' | 'PUT' | 'DELETE'
 interface Reply {
   status?: number
   json?: unknown
@@ -53,6 +53,10 @@ export class ApiStub {
 
   put(path: string | RegExp, reply: Reply | Handler) {
     return this.on('PUT', path, reply)
+  }
+
+  delete(path: string | RegExp, reply: Reply | Handler) {
+    return this.on('DELETE', path, reply)
   }
 
   /**

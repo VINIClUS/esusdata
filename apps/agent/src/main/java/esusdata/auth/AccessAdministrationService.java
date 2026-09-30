@@ -4,12 +4,15 @@ import esusdata.auth.model.Grant;
 import esusdata.auth.model.GrantRepository;
 import esusdata.auth.model.Role;
 import esusdata.auth.model.ScopeKind;
+import esusdata.auth.model.UserAccount;
 import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
 import java.io.Serial;
 import java.time.Clock;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -126,6 +129,37 @@ public final class AccessAdministrationService {
                     targetUserId, "USER_BLOCKED", "blocked by " + actorUserId, actorUserId);
         });
     }
+
+    /**
+     * Undoes {@link #block}: an account that had activated returns to ACTIVE, one that never did to
+     * PENDING_ACTIVATION, so unblocking never makes an account usable without its own password. The
+     * authorization version is bumped like any other access change, which also leaves an audit row.
+     */
+    public void unblock(String targetUserId, String actorUserId) {
+        UserAccount user = userRepository
+                .findById(targetUserId)
+                .orElseThrow(() -> new UserNotFoundException("unknown user: " + targetUserId));
+        if (user.state() != UserState.BLOCKED) {
+            throw new IllegalArgumentException("user is not blocked: " + targetUserId);
+        }
+        UserState restored = "UNSET".equals(user.passwordHash()) ? UserState.PENDING_ACTIVATION : UserState.ACTIVE;
+        transactionTemplate.executeWithoutResult(status -> {
+            userRepository.setState(targetUserId, restored);
+            authorizationVersionGuard.bumpAndRevokeSessions(
+                    targetUserId, "USER_UNBLOCKED", "unblocked by " + actorUserId, actorUserId);
+        });
+    }
+
+    /** Every account with its active grants, for the users screen. */
+    public List<UserWithGrants> usersWithGrants() {
+        Map<String, List<Grant>> grants =
+                grantRepository.allActiveGrants().stream().collect(Collectors.groupingBy(Grant::userId));
+        return userRepository.findAll().stream()
+                .map(user -> new UserWithGrants(user, grants.getOrDefault(user.userId(), List.of())))
+                .toList();
+    }
+
+    public record UserWithGrants(UserAccount user, List<Grant> grants) {}
 
     public List<Grant> activeGrants(String userId) {
         return grantRepository.activeGrantsForUser(userId);

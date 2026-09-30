@@ -13,6 +13,9 @@ public interface GrantRepository {
 
     List<Grant> activeGrantsForUser(String userId);
 
+    /** Every active grant of every user, in one read. */
+    List<Grant> allActiveGrants();
+
     /** Revokes a grant; {@code true} only if it was active and this call revoked it. */
     boolean revoke(String grantId, Instant at, String revokedBy);
 

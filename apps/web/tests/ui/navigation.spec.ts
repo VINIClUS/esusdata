@@ -38,12 +38,15 @@ test.describe('navegação no desktop', () => {
     await expect(page.getByRole('button', { name: 'Entrar', exact: true })).toBeVisible()
   })
 
-  test('ativações pendentes exige quem administra acessos', async ({ page }) => {
-    // The demo user has no canManageAccess: no link, and the route falls back to the painel.
+  test('ativações pendentes e usuários exigem quem administra acessos', async ({ page }) => {
+    // The demo user has no canManageAccess: no links, and the routes fall back to the painel.
     await page.goto('/painel?mock-login=1')
     await expect(page.getByRole('link', { name: 'Ativações pendentes' })).toHaveCount(0)
-    await page.goto('/ativacoes-pendentes')
-    await expect(page).toHaveURL('/painel')
+    await expect(page.getByRole('link', { name: 'Usuários' })).toHaveCount(0)
+    for (const path of ['/ativacoes-pendentes', '/configuracoes/usuarios']) {
+      await page.goto(path)
+      await expect(page).toHaveURL('/painel')
+    }
   })
 
   test('sair encerra a sessão e protege as telas de novo', async ({ page }) => {
