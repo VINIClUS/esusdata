@@ -2,9 +2,7 @@
 
 Serviço local que lê o PEC e-SUS de um município em modo somente-leitura, calcula indicadores
 metodológicos versionados (piloto: C1 — Mais Acesso) e publica resultados com evidência mínima.
-Um processo de serviço por instalação; SQLite próprio; nunca escreve no PEC. A aquisição viva pode
-rodar num plano de execução efêmero em processo filho, que também gera o data file do extrato
-(ADR 0010, ADR 0011) — o worker de cálculo continua único por instalação.
+Um processo por instalação, SQLite próprio, nunca escreve no PEC.
 
 - Especificação: [`Tech_Spec_Observatorio_APS_v0_4.md`](./Tech_Spec_Observatorio_APS_v0_4.md)
 - Vocabulário canônico: [`CONTEXT.md`](./CONTEXT.md)
@@ -13,176 +11,58 @@ rodar num plano de execução efêmero em processo filho, que também gera o dat
 ## Mapa do repositório
 
 ```
-apps/agent/      backend Java 21 / Spring Boot — um único projeto Maven (ADR 0001)
-apps/web/        frontend React + Vite + MUI ("Esusdata Helper")
-apps/execplane/  plano de execução em Rust — aquisição viva do PEC e geração do data file do extrato,
-                 IPC por stdin/stdout (ADR 0010, ADR 0011)
-contracts/       contratos publicados: compatibilidade de adaptadores PEC e OpenAPI v1
-deployment/      empacotamento jpackage por SO e smoke test da app image (ADR 0014)
-docs/adr/        registros de decisão
-docs/discovery/  investigação do PEC real (CT 133)
-docs/fichas/     fichas metodológicas dos indicadores
+apps/agent/      backend Java 21 / Spring Boot, um único projeto Maven (ADR 0001)
+apps/web/        frontend React + Vite + MUI
+apps/execplane/  plano de execução em Rust: aquisição do PEC e geração do extrato (ADR 0010, 0011)
+contracts/       compatibilidade de adaptadores PEC e OpenAPI v1
+deployment/      empacotamento jpackage, SBOM e release (ADR 0014, 0021)
+docs/            ADRs e investigação do PEC real
 ```
 
-`indicator-packs/` da §1.5 ainda não existe: o pacote C1 compila dentro de `apps/agent`
-(`indicator.pack.c1`).
+`apps/agent` usa o pacote base `esusdata`, uma pasta por assunto (ADR 0013): `auth`, `source`,
+`run`, `indicator`, `result`, `config` e `web`. As fronteiras entre eles são verificadas por
+ArchUnit em `ModuleBoundaryTest`.
 
-### `apps/agent` — pacotes
-
-Pacote base `esusdata`. Uma pasta por assunto, sem camadas obrigatórias (ADR 0013):
-
-| Pacote | Responsabilidade |
-|---|---|
-| `auth` | usuários, papéis, concessões, sessões, escopo; `security/` tem filtros e `SecurityConfig` |
-| `source` | registro e diagnóstico de fontes; `pec/` tem conexão, segredo, orçamento e matriz de compatibilidade |
-| `run` | `controller/` HTTP e SSE, `worker/` executor, `job/` fila e máquina de estados, `acquisition/` in-process ou plano de execução, `extract/` extrato e manifesto |
-| `indicator` | motor puro (`model/`) e regras compiladas (`pack/c1`) — sem JDBC nem HTTP |
-| `result` | staging, publicação, evidência, reprodutibilidade |
-| `config` | SQLite, Flyway, lock de processo |
-| `web` | `ApiError`, handler global de exceções, `/ready` |
-
-Três regras ArchUnit em `src/test/java/esusdata/architecture/ModuleBoundaryTest.java`: motor de
-indicador é Java puro; driver Postgres só em `source.pec` e `run.acquisition`; `auth`, `source` e
-`indicator` não dependem de `run`.
-
-## Rodar
-
-### Primeiro acesso e códigos de ativação
-
-No primeiro início, o serviço grava o código do administrador em
-`~/.local/share/observatorio-aps/bootstrap-activation.token` (ou no diretório definido por
-`observatorio.data.directory`). O arquivo deve ser lido apenas pela conta do serviço. Entregue o
-código ao administrador por um canal seguro; ele abre `/ativar-acesso`, define a senha e depois
-entra como `admin`.
-
-Se a conta inicial ainda estiver pendente e o código vencer, o arquivo desaparecer ou deixar de
-corresponder ao banco, reinicie o serviço. O início reemite um código, invalida o anterior e grava
-o mesmo arquivo com acesso restrito. Se a gravação falhar, o serviço não inicia. Uma conta já ativa
-não recebe outro código nesse processo.
-
-Administradores com `manage_access` na instalação podem abrir **Ativações pendentes**, consultar a
-validade do código de cada conta pendente e reemiti-lo após informar a própria senha. O novo código
-aparece uma única vez; copie e entregue ao usuário por um canal seguro. A recuperação de senha de
-contas já ativas depende do suporte local.
+## Desenvolvimento
 
 ```bash
-# backend (testes incluem ArchUnit e o contrato OpenAPI; o verify também roda Spotless, Error
-# Prone e PMD, ADR 0018, e o piso de cobertura do JaCoCo, ADR 0019 — relatório em
-# target/site/jacoco/; mvn spotless:apply corrige a formatação)
+# backend: testes, ArchUnit, OpenAPI, Spotless, Error Prone, PMD e JaCoCo
 cd apps/agent && mvn verify -Dsurefire.reuseForks=false
-cd apps/agent && mvn spotless:apply
 
-# plano de execução: o mesmo portão do CI (ADR 0018), mais o piso de cobertura (ADR 0019, exige
-# cargo-llvm-cov e o componente llvm-tools-preview)
+# plano de execução
 cd apps/execplane && cargo fmt && cargo clippy --locked --all-targets -- -D warnings
-cd apps/execplane && cargo llvm-cov --locked --fail-under-lines 40
+cd apps/execplane && cargo build --release && cargo test
 
-# frontend (dados mockados por padrão: VITE_USE_MOCKS; com VITE_USE_MOCKS=false fala com o
-# backend em :8080 pelo proxy do Vite — município e competência vêm da API, ADR 0015)
+# frontend (mocks por padrão; VITE_USE_MOCKS=false usa o backend em :8080)
 cd apps/web && npm install && npm run dev
 
-# jar com o frontend embutido (Node fixado baixado em target/, bundle sem mocks), servido pelo
-# próprio backend em http://127.0.0.1:8080/ — é o que o empacotamento (ADR 0014) usa
+# jar com o frontend embutido, servido em http://127.0.0.1:8080/
 cd apps/agent && mvn -Pweb package -DskipTests
-
-# plano de execução (ADR 0010, ADR 0011, ADR 0016, ADR 0017) — único caminho até o PEC, para
-# aquisição e para o diagnóstico de fonte (POST /sources/{id}/test); o pgJDBC é só de teste: sem
-# observatorio.execution-plane.binary apontando para o binário compilado o backend não inicia, então
-# rodá-lo localmente exige o cargo build abaixo antes. O mvn verify não depende do binário (os
-# testes usam o adaptador JDBC de src/test como referência). O filho é dono de todo
-# o pipeline de geração do data file (parse, validação por registro, gzip, SHA-256, teto de
-# bytes); Java mantém lock, reconcile, manifesto e publicação atômica. Handshake de
-# compatibilidade, streaming e geração do extrato (JDBC vs. Rust, mesmo fixture) estão cobertos
-# por ExecPlaneDifferentialLiveTest, gated atrás de -Dobservatorio.execution-plane.binary.
-# O mesmo teste cobre cancelar depois de linhas já emitidas (1 de ~55 execuções não cancelou e
-# seguiu até max_duration_ms, sem causa encontrada — ver ADR 0011) e compara com o JDBC a
-# classificação de senha errada e de fonte inalcançável, sem cooldown ENG-51. O cancelamento via
-# EOF em stdin (pai morto) continua verificado só manualmente. ExecPlaneLivePecTest roda contra
-# um PEC real com a identidade verdadeira da instalação (PEC_SOURCE_ID, PEC_VERSION e
-# PEC_MUNICIPALITY_IBGE no arquivo de segredo, escolhido com
-# -Dobservatorio.execution-plane.live-pec.env-file), só com o opt-in explícito
-# -Dobservatorio.execution-plane.live-pec=true — o comando abaixo nunca toca o PEC real. Passou
-# 6/6 contra o PEC 5.5.28 em produção, com as fingerprints do Rust e do JDBC idênticas às da
-# matriz e o diagnóstico de fonte igual ao do JDBC (docs/discovery/2026-09-24-pec-5528.md);
-# SourceDiagnosticsDifferentialLiveTest compara os dois diagnósticos em container, mesmo gate.
-cd apps/execplane && cargo build --release && cargo test
-cd apps/agent && mvn verify -Dsurefire.reuseForks=false \
-  -Dobservatorio.execution-plane.binary=$PWD/../execplane/target/release/observatorio-execplane
 ```
 
-Testes com sufixo `LiveTest` exigem um PEC acessível e são pulados sem ele (ADR 0002, ADR 0003).
+O backend exige `observatorio.execution-plane.binary` apontando para o binário do execplane.
+Testes `*LiveTest` precisam de um PEC acessível e são pulados sem ele (ADR 0002, 0003).
 
-## Qualidade e segurança (ADR 0019)
+No primeiro início, o código de ativação do administrador é gravado em
+`~/.local/share/observatorio-aps/bootstrap-activation.token`. Abra `/ativar-acesso` com ele.
 
-- `ci.yml`: `java` e `rust` rodam análise estática, testes e pisos de cobertura; `web` roda
-  typecheck, oxlint, ESLint, Prettier, o teste de dados e o build (ADR 0020). `sonar` envia
-  tudo ao SonarQube Cloud (`viniclus` / `VINIClUS_esusdata`) e falha com o quality gate ou com
-  qualquer issue aberta (`.github/scripts/sonar-strict-gate.sh`). Exceção só no código:
-  `@SuppressWarnings("java:Sxxxx")` com o motivo ao lado, nunca "aceitar" na interface do Sonar.
-- `security.yml`: Trivy sobre `pom.xml`, `package-lock.json` e `Cargo.lock`, mais segredos, em
-  todo PR, em todo push e diariamente. O SARIF vai para a aba Security, e qualquer achado HIGH ou
-  CRITICAL bloqueia. Um achado aceito entra em `.trivyignore.yaml` com `statement` e `expired_at`,
-  no máximo 90 dias.
-- `package.yml`: exige o JDK Temurin mais recente e gera, valida (CycloneDX 1.5) e verifica os
-  SBOMs de cada build, inclusive o dos plugins Maven (ADR 0021). A release os publica ao lado dos
-  instaladores e do atestado de proveniência, todos cobertos pelo `SHA256SUMS`, que é assinado
-  (`SHA256SUMS.sig`, chave em `deployment/release/allowed_signers`).
+## Qualidade e segurança
+
+- `ci.yml`: análise estática, testes e cobertura de Java, Rust e web, mais o quality gate do
+  SonarQube Cloud (ADR 0018, 0019, 0020).
+- `security.yml`: Trivy em dependências, segredos e configuração. HIGH ou CRITICAL bloqueiam.
+- `package.yml`: instaladores `.deb` e `.msi`, SBOMs CycloneDX e `SHA256SUMS` assinado (ADR 0021).
+
+## Empacotamento e release
 
 ```bash
-# o mesmo portão do Trivy, local (binário fixado e verificado por hash, em target/tools/)
-deployment/sbom/install-tool.sh trivy target/tools
-target/tools/trivy fs . --skip-dirs target --scanners vuln,secret,misconfig --severity HIGH,CRITICAL \
-  --ignorefile .trivyignore.yaml --exit-code 1
+deployment/jpackage/package-linux.sh       # app image + .deb em target/jpackage/
+deployment/jpackage/smoke-app-image.sh
 ```
 
-## Empacotar (ADR 0014)
+O `.deb` (Ubuntu 24.04+ / Debian 13) instala o serviço systemd `observatorio-aps`. O `.msi` do
+Windows é gerado pelo workflow `package`. Detalhes em ADR 0014.
 
-```bash
-# Linux: app image + .deb com serviço systemd em target/jpackage/ (JDK 21 com jmods, cargo, dpkg-deb, fakeroot)
-deployment/jpackage/package-linux.sh            # --skip-tests para iterar
-deployment/jpackage/smoke-app-image.sh          # sobe a app image num diretório temporário e espera /ready
-sudo apt install ./target/jpackage/observatorio-aps_*.deb
-systemctl status observatorio-aps
-```
-
-O `.deb` instala em `/opt/observatorio-aps`, cria o usuário `observatorio`, dados em
-`/var/lib/observatorio-aps` e configuração em `/etc/observatorio-aps/application.yml` (vence os
-defaults empacotados; mudar o diretório de dados exige também `systemctl edit observatorio-aps` com
-`ReadWritePaths=` para o novo caminho). Remover o pacote, inclusive com purge, preserva dados e configuração.
-O `.msi` do Windows sai do workflow `package` (`deployment/jpackage/package-windows.ps1`, PowerShell
-7.3+, WiX 3). Instalado como administrador, registra o serviço `observatorio-aps` (conta
-LocalService, reinicia em falha), cria `C:\ProgramData\ObservatorioAPS\{config,data,logs}` e o
-atalho "Observatorio APS" no Menu Iniciar, que abre o cliente web em `http://localhost:8080/`.
-Configuração local em `C:\ProgramData\ObservatorioAPS\config\application.yml`; o `pec.env` vai no
-mesmo diretório, criado num prompt elevado (fica com o dono Administradores e a ACL do diretório,
-que é o que o serviço aceita). Desinstalar preserva dados, configuração e logs. No workflow, o
-`.msi` passa por `deployment/jpackage/test-msi-lifecycle.ps1` (instalar, reiniciar, reparar,
-desinstalar) — localmente, só numa VM descartável, como administrador.
-
-O `.deb` exige Ubuntu 24.04+ ou Debian 13 (depende de `libasound2t64`); só é testado no Ubuntu 24.04. O workflow `package` o
-instala num runner com systemd e percorre o ciclo de vida com `deployment/jpackage/test-deb-lifecycle.sh`
-(instalar, reiniciar, reinstalar, remover, purgar). Localmente, só numa VM descartável:
-`sudo deployment/jpackage/test-deb-lifecycle.sh target/jpackage/observatorio-aps_*.deb`.
-
-### Release
-
-1. Atualize `<version>` em `apps/agent/pom.xml` (só números, `X.Y.Z` — o MSI não aceita sufixos) e
-   faça o merge em `main`.
-2. `git tag vX.Y.Z && git push origin vX.Y.Z` — a tag precisa ser igual à versão do pom.
-3. O workflow `package` gera o `.deb` e o `.msi`, testa o ciclo de vida dos dois e cria um
-   **draft** de GitHub Release com os instaladores, os SBOMs, a proveniência e o `SHA256SUMS`
-   assinado. O job `release` roda no Environment `release`, o único que lê a chave de assinatura.
-   Revise e publique.
-
-### Implantação (ADR 0022)
-
-Publicar a release basta: o workflow `Deploy esusdata` do `infra-ansible` verifica a cada 15
-minutos a última release publicada e, se ela for nova, a instala no CT 170 (`esusdata-lxc`). A
-instalação confere a assinatura do `SHA256SUMS` e o checksum do `.deb`, gera o `application.yml`,
-espera o `/ready` e, se algo falhar, volta para a release anterior. O serviço fica em
-`https://pe.esusdata.com`. Para implantar uma tag específica, ou voltar a uma anterior, dispare
-`Deploy esusdata` no `infra-ansible` com `tag=vX.Y.Z`.
-
-Uma fonte fora do loopback exige TLS com validação de certificado: configure
-`observatorio.source.tls-root-cert` com o PEM da CA do servidor, ou o app não sobe (Tech Spec
-§1.12.6). O execplane então só abre sessões TLS para o endereço exato do certificado.
+Release: atualize `<version>` em `apps/agent/pom.xml`, faça o merge em `main` e publique a tag
+`vX.Y.Z`. O workflow `package` cria um draft de GitHub Release para revisão. Uma release
+publicada é implantada automaticamente pelo `infra-ansible` (ADR 0022).
