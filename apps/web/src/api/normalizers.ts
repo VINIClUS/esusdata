@@ -334,7 +334,9 @@ export function normalizeOverview(overview: OverviewResponse): PainelResumo {
   const pending = overview.pendingPeriods
   const sources = new Set(checks.flatMap((c) => (c.sourceId ? [c.sourceId] : []))).size
 
-  const periods = [...new Set(overview.history.map((h) => h.referencePeriod))].sort()
+  const periods = [...new Set(overview.history.map((h) => h.referencePeriod))].sort((a, b) =>
+    a.localeCompare(b),
+  )
   const plotted = [
     ...new Set(overview.history.filter((h) => h.value !== null).map((h) => h.indicatorPack)),
   ]
@@ -423,7 +425,7 @@ export function normalizeOverview(overview: OverviewResponse): PainelResumo {
       valor: checkStatusLabels[c.status],
       ok: c.status === 'OK',
     })),
-    alertas: overview.alerts.map(overviewAlert),
+    alertas: overview.alerts.map((alert, index) => overviewAlert(alert, index)),
     maiorPendencia: pendingPacks.map((i) => ({
       codigo: i.indicatorPack,
       indicador: indicatorDisplayName(i.indicatorPack),
