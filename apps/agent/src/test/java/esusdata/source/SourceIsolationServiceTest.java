@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import esusdata.source.SourceIsolationCheck.MunicipalityCount;
+import esusdata.source.model.LastCoverage;
 import esusdata.source.model.LastDiagnostic;
 import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceNotFoundException;
@@ -88,6 +89,18 @@ class SourceIsolationServiceTest {
             @Override
             public Map<String, LastIsolationCheck> findLastIsolationChecks() {
                 return Map.copyOf(stored);
+            }
+
+            @Override
+            public void recordCoverage(String sourceId, LastCoverage coverage) {
+
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Map<String, LastCoverage> findLastCoverages() {
+
+                return Map.of();
             }
         };
     }

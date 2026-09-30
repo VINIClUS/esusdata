@@ -8,11 +8,13 @@ import esusdata.run.job.CancellationToken;
 import esusdata.run.job.JobCancelledException;
 import esusdata.run.worker.FailureClassifier;
 import esusdata.source.JdbcSourceDiagnostics;
+import esusdata.source.SourceCoverageCheck;
 import esusdata.source.SourceDiagnosticsService;
 import esusdata.source.SourceDiagnosticsService.Diagnostics;
 import esusdata.source.SourceDiagnosticsService.Outcome;
 import esusdata.source.SourceIsolationCheck;
 import esusdata.source.SourceRepository;
+import esusdata.source.model.LastCoverage;
 import esusdata.source.model.LastDiagnostic;
 import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceRecord;
@@ -26,6 +28,7 @@ import esusdata.source.pec.PecConnectionProperties;
 import esusdata.source.pec.PecDataSourceFactory;
 import esusdata.source.pec.PecSecretResolver;
 import esusdata.source.pec.PecSourceIdentity;
+import esusdata.source.pec.PeriodCoverageContract;
 import esusdata.source.pec.ReadBudget;
 import esusdata.testsupport.LivePecAssumptions;
 import java.io.IOException;
@@ -322,6 +325,51 @@ class ExecPlaneLivePecTest {
     }
 
     /**
+     * ADR 0027's evidence on this installation: the coverage of a 24-month window through the
+     * packaged {@code period_coverage} entry and the real handshake, compared with the same frozen
+     * query run over JDBC. Aggregates per municipality code and month — no record leaves the PEC.
+     */
+    @Test
+    void coverageOfTheWindowMatchesTheSameQueryOverJdbc() throws Exception {
+        YearMonth to = YearMonth.of(2026, 10);
+        YearMonth from = to.minusMonths(25);
+        long started = System.nanoTime();
+        SourceCoverageCheck.Result result = new ExecPlaneCoverageCheck(
+                        List.of(realBinary),
+                        new EnvFileSecretResolver(envFile),
+                        ExecPlaneTransport.PLAINTEXT,
+                        Duration.ofSeconds(10))
+                .check(
+                        connectionProperties(),
+                        identity(),
+                        env.get("PEC_DB_HOST"),
+                        from,
+                        to,
+                        ReadBudget.initialEngineeringProposal());
+        long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
+
+        List<SourceCoverageCheck.PeriodCount> reference = new ArrayList<>();
+        try (Connection c = openCheckConnection();
+                PreparedStatement ps = c.prepareStatement(PeriodCoverageContract.QUERY)) {
+            ps.setObject(1, from.atDay(1));
+            ps.setObject(2, to.atDay(1));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    reference.add(new SourceCoverageCheck.PeriodCount(rs.getString(1), rs.getString(2), rs.getLong(3)));
+                }
+            }
+        }
+        log.info("live coverage check " + from + ".." + to + ": status=" + result.status() + " counts="
+                + result.counts() + " jdbc=" + reference + " elapsedMs=" + elapsedMs);
+
+        assertThat(result.status()).isEqualTo(SourceIsolationCheck.Status.CHECKED);
+        assertThat(result.counts()).isEqualTo(reference);
+        // The competência every earlier evidence counted: 10029 atendimentos in 2026-03.
+        assertThat(result.counts())
+                .contains(new SourceCoverageCheck.PeriodCount(env.get("PEC_MUNICIPALITY_IBGE"), "2026-03", 10_029));
+    }
+
+    /**
      * Exactly one failed login against the production server (it lands in its auth log) — the
      * JDBC-parity half of this is proven against a container by {@code
      * ExecPlaneDifferentialLiveTest}, not repeated here.
@@ -443,6 +491,18 @@ class ExecPlaneLivePecTest {
 
             @Override
             public Map<String, LastIsolationCheck> findLastIsolationChecks() {
+                return Map.of();
+            }
+
+            @Override
+            public void recordCoverage(String sourceId, LastCoverage coverage) {
+
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Map<String, LastCoverage> findLastCoverages() {
+
                 return Map.of();
             }
         };

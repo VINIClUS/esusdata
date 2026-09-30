@@ -111,6 +111,45 @@
       "test_notes": "Validated 2026-09-28 live against the municipal production PEC 5.5.28 / PostgreSQL 9.6.13 through an SSH tunnel, with this entry marked VALIDATED locally and the execution plane rebuilt from it (ADR 0023): ExecPlaneLivePecTest isolation case CHECKED for competencia 2026-03, counts [3541307=10029] byte-identical to the same frozen query over JDBC, 2.5 s; the same run re-checked all seven signature_fingerprints (identical) and acquired 2026-03 end-to-end (10029 rows, 0 exclusions). The app itself (POST /sources/{id}/isolation-check) answered CHECKED with registeredCount 10029, otherMunicipalityCount 0, unidentifiedCount 0.",
       "approved_at": "2026-09-28",
       "approved_by": "vasrtr@gmail.com"
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "period_coverage",
+      "status": "VALIDATED",
+      "status_reason": "Aggregate count of tb_fat_atendimento_individual per (tb_dim_municipio.co_ibge, yyyy-MM of tb_dim_tempo.dt_registro) within a window of competências (ADR 0027).",
+      "objects_used": [
+        {
+          "object": "tb_fat_atendimento_individual",
+          "columns_used": ["co_seq_fat_atd_ind", "co_dim_municipio", "co_dim_tempo", "co_dim_tipo_atendimento", "co_dim_unidade_saude_1", "co_dim_equipe_1", "co_dim_cbo_1", "nu_uuid_ficha", "nu_atendimento", "UNIQUE_KEY=co_seq_fat_atd_ind", "REQUIRED_DIMENSIONS=tb_dim_tempo,tb_dim_municipio"],
+          "signature_fingerprint": "sha256:dd3436b57cf4f67c35b0d23eba93bbceb079b7744cfb8f2d6bc675123d3e67b1"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:79d8034747b64c1169a9569b01940519b05bd1b859917e2187580c661e870b1b"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:832ac21599d121a45d42c101169d96bec515bd16c900414cfb70f2615f81280d"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "No municipality parameter: the query groups the window's atendimentos by co_ibge and month, and Java keeps only the source's registered IBGE. objects_used are byte-identical copies of individual_encounter_modality's, so REQUIRED_DIMENSIONS still fails closed on any fact row without a tb_dim_municipio row.",
+        "single_municipality_installation": true
+      },
+      "query_checksum": "sha256:4a777a1428681c3c73af5c2f31039015acedaa6b4faea50de413b47aec77b0a4",
+      "fixture_checksum": "sha256:8909c30b9acd60ffc1b96b8c0c2d77fa2bbe46b0d19bc7f4f9bfb6ae54164148",
+      "test_result": "PASS",
+      "test_evidence_ref": "docs/discovery/2026-09-30-pec-5528-cobertura.md; apps/agent/src/test/java/esusdata/run/acquisition/ExecPlaneLivePecTest.java; apps/agent/src/test/java/esusdata/run/acquisition/CoverageCheckDifferentialLiveTest.java",
+      "test_notes": "Validated 2026-09-30 live against the municipal production PEC 5.5.28 / PostgreSQL 9.6.13 through an SSH tunnel, with this entry marked VALIDATED locally and the execution plane rebuilt from it (ADR 0023 recipe): ExecPlaneLivePecTest coverage case CHECKED for the window 2024-09..2026-10 (exclusive), 24 (co_ibge, month) groups, all 3541307, byte-identical to the same frozen query over JDBC, 4.5 s; competencia 2026-03 = 10029, the same total every earlier evidence counted.",
+      "approved_at": "2026-09-30",
+      "approved_by": "vinicius0zero0@gmail.com"
     }
   ]
 }

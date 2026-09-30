@@ -415,6 +415,42 @@ paths:
         "404":
           description: Unknown source, or caller lacks MANAGE_SOURCE for its municipality.
 
+  /api/v1/sources/{id}/coverage-check:
+    post:
+      tags: [sources]
+      summary: >-
+        Competência coverage check (ADR 0027): counts the atendimentos individuais of the last 24
+        closed competências plus the current one in the source's PEC per tb_dim_municipio.co_ibge
+        and month, through the execution plane and the same compatibility handshake as an
+        acquisition, and keeps the registered municipality's months. Aggregate counts only;
+        MANAGE_SOURCE and a recent reauth.
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: >-
+            Check result. Every outcome but SOURCE_BUSY is stored as the source's lastCoverage for
+            its current configuration version.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Coverage" }
+        "400":
+          description: The source is not a PEC source with a complete identity.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "401":
+          description: The session has no recent reauthentication.
+        "404":
+          description: Unknown source, or caller lacks MANAGE_SOURCE for its municipality.
+
   /api/v1/sources/{id}/requirements:
     get:
       tags: [sources]
@@ -991,6 +1027,35 @@ components:
               description: >-
                 Null until an isolation check ran against the current configuration version. Always
                 null from POST /sources.
+            lastCoverage:
+              allOf:
+                - $ref: "#/components/schemas/Coverage"
+              nullable: true
+              description: >-
+                Null until a coverage check ran against the current configuration version. Always
+                null from POST /sources.
+
+    Coverage:
+      type: object
+      properties:
+        windowFrom: { type: string, example: "2024-09", description: First competência counted. }
+        windowToExclusive: { type: string, example: "2026-10" }
+        outcome:
+          type: string
+          enum: [DESTINATION_NOT_ALLOWED, SOURCE_BUSY, SOURCE_AUTHENTICATION_FAILED,
+                 SOURCE_PERMISSION_DENIED, CONNECTION_FAILED, COMPATIBILITY_MISMATCH,
+                 SOURCE_BUDGET_EXCEEDED, CHECKED]
+        periods:
+          type: array
+          description: >-
+            The registered municipality's competências with at least one atendimento, newest
+            first. Empty unless outcome is CHECKED.
+          items:
+            type: object
+            properties:
+              referencePeriod: { type: string, example: "2026-03" }
+              count: { type: integer, format: int64 }
+        checkedAt: { type: string, format: date-time }
 
     LastDiagnostic:
       type: object
