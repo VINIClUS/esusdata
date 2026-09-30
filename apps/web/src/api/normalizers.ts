@@ -467,6 +467,27 @@ export function isolationCheckNotice(response: IsolationCheckResponse): string |
     : null
 }
 
+const failureReasons: Record<string, string> = {
+  DESTINATION_NOT_ALLOWED: 'O endereço do PEC não está liberado na configuração do Esusdata.',
+  SOURCE_AUTHENTICATION_FAILED: 'O PEC recusou o usuário ou a senha de leitura.',
+  SOURCE_BUSY: 'A fonte estava em uso por outra leitura.',
+  COMPATIBILITY_MISMATCH: 'A estrutura do PEC não confere com a versão validada.',
+  SOURCE_BUDGET_EXCEEDED: 'A leitura ultrapassou o limite de tempo ou de linhas.',
+  SOURCE_ACQUISITION_BLOCKED: 'A leitura desta fonte está bloqueada.',
+  TRANSIENT_SQL_ERROR: 'O PEC ficou indisponível durante a leitura.',
+  SQL_ERROR: 'O PEC respondeu com um erro à consulta.',
+  FAILED: 'A conexão ou a consulta ao PEC falhou.',
+  ACCESS_REVOKED: 'A permissão de quem pediu a execução foi revogada.',
+  ACCESS_REVOKED_BEFORE_PUBLICATION:
+    'A permissão de quem pediu a execução foi revogada antes da publicação.',
+  DUPLICATE_ACTIVE_JOB: 'Havia outra execução ativa para a mesma competência.',
+}
+
+/** A failure or refusal code in plain Portuguese; an unknown code is shown as it came. */
+export function failureReason(code: string): string {
+  return failureReasons[code] ?? code
+}
+
 const runStateLabels: Record<RunResponse['state'], string> = {
   QUEUED: 'Execução na fila',
   RUNNING: 'Execução em andamento',
@@ -491,9 +512,18 @@ const stageForRunState: Record<RunResponse['state'], number> = {
 
 const terminalRunStates = new Set<RunResponse['state']>(['CANCELLED', 'SUCCEEDED', 'FAILED'])
 
+/** Nothing more will happen to a run in these states. */
+export function isRunTerminal(run: Pick<RunResponse, 'state'>): boolean {
+  return terminalRunStates.has(run.state)
+}
+
+// In the browser's time zone, like formatInstant: the API instants are UTC.
 function timeLabel(timestamp: string | null): string | null {
   if (!timestamp) return null
-  return /^\d{4}-\d{2}-\d{2}T(\d{2}:\d{2})/.exec(timestamp)?.[1] ?? timestamp
+  const date = new Date(timestamp)
+  return Number.isNaN(date.getTime())
+    ? timestamp
+    : date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 function stageStatus(
@@ -525,6 +555,8 @@ function runLog(response: RunResponse): ExecucaoAtual['log'] {
     response.state === 'SUCCEEDED' ? 'success' : 'info',
   )
   if (response.finishedAt) add(response.finishedAt, 'Execução finalizada.')
+  if (response.failureCode)
+    add(response.finishedAt ?? response.lastProgressAt, failureReason(response.failureCode))
   if (response.failureDetail)
     add(response.finishedAt ?? response.lastProgressAt, response.failureDetail)
   return lines
@@ -552,7 +584,9 @@ export function normalizeRunResponse(response: RunResponse): ExecucaoAtual {
     {
       titulo: 'Finalização',
       timestamp: response.finishedAt,
-      descricao: response.failureDetail ?? `${runStateLabels[response.state]}.`,
+      descricao: response.failureCode
+        ? failureReason(response.failureCode)
+        : `${runStateLabels[response.state]}.`,
     },
   ]
 

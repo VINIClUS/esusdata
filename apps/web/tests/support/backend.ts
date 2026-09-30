@@ -130,13 +130,21 @@ export async function startBackend(): Promise<Backend> {
 }
 
 /** A state-changing API call in the page's session, with the CSRF header the client would send. */
-export async function apiPost(page: Page, url: string, data: unknown) {
+export async function apiPost(
+  page: Page,
+  url: string,
+  data: unknown,
+  headers: Record<string, string> = {},
+) {
   const cookies = async () => page.context().cookies()
   if (!(await cookies()).some((c) => c.name === 'XSRF-TOKEN'))
     await page.request.get('/api/v1/ready')
   const xsrf = (await cookies()).find((c) => c.name === 'XSRF-TOKEN')?.value
   expect(xsrf, 'cookie XSRF-TOKEN').toBeTruthy()
-  return page.request.post(`/api/v1${url}`, { data, headers: { 'X-XSRF-TOKEN': xsrf ?? '' } })
+  return page.request.post(`/api/v1${url}`, {
+    data,
+    headers: { ...headers, 'X-XSRF-TOKEN': xsrf ?? '' },
+  })
 }
 
 /**

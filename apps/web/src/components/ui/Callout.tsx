@@ -73,7 +73,9 @@ export function Callout({
                   ? colors.success
                   : variant === 'info'
                     ? colors.primary
-                    : d.color,
+                    : variant === 'warning'
+                      ? colors.warningText
+                      : d.color,
             }}
           >
             {title}

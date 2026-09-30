@@ -18,10 +18,13 @@ if (USE_MOCKS && import.meta.env.DEV) {
 export class ApiError extends Error {
   status: number
   code?: string
-  constructor(status: number, message: string, code?: string) {
+  /** The job that already holds the competência, on a 409 `ACTIVE_JOB_EXISTS` (ADR 0026). */
+  jobId?: string
+  constructor(status: number, message: string, code?: string, jobId?: string) {
     super(message)
     this.status = status
     this.code = code
+    this.jobId = jobId
   }
 }
 
@@ -66,8 +69,17 @@ export async function apiFetchBlob(path: string): Promise<Blob> {
 }
 
 async function apiError(res: Response): Promise<ApiError> {
-  const error = (await res.json().catch(() => null)) as { code?: string; message?: string } | null
-  return new ApiError(res.status, error?.message ?? `${res.status} ${res.statusText}`, error?.code)
+  const error = (await res.json().catch(() => null)) as {
+    code?: string
+    message?: string
+    jobId?: string
+  } | null
+  return new ApiError(
+    res.status,
+    error?.message ?? `${res.status} ${res.statusText}`,
+    error?.code,
+    error?.jobId,
+  )
 }
 
 /** Resolves a fixture after a short delay so loading states are exercised. */

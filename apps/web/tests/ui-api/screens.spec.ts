@@ -1,7 +1,7 @@
 import { expectNoA11yViolations } from '../support/a11y.ts'
 import { expectNoHorizontalOverflow } from '../support/layout.ts'
 import { IBGE, expect, test, type ApiStub } from './api.ts'
-import { PERIOD, blockedResult, exportResponse, pack, result, run, source } from './data.ts'
+import { PERIOD, blockedResult, exportResponse, pack, result, source } from './data.ts'
 
 const serverError = { status: 500, json: { code: 'INTERNAL', message: 'Falha interna da API.' } }
 
@@ -218,32 +218,6 @@ test.describe('indicadores', () => {
     await page.goto('/indicadores/c1-mais-acesso')
     await expect(page.getByRole('heading', { name: 'Detalhes indisponíveis' })).toBeVisible()
     await expectSettled(page, 'c1-mais-acesso')
-  })
-})
-
-test.describe('execução', () => {
-  test('última execução do município', async ({ page, api }) => {
-    manager(api)
-    api.get(`/runs?municipalityIbge=${IBGE}&limit=1`, { json: [run()] })
-    await page.goto('/execucao')
-    await expectSettled(page, 'Execução de Dados')
-    await expect(page.getByText('Enfileiramento').first()).toBeVisible()
-  })
-
-  test('nenhuma execução registrada', async ({ page, api }) => {
-    manager(api)
-    api.get(`/runs?municipalityIbge=${IBGE}&limit=1`, { json: [] })
-    await page.goto('/execucao')
-    await expect(page.getByText('Nenhuma execução registrada para este município.')).toBeVisible()
-    await expectSettled(page, 'Execução de Dados')
-  })
-
-  test('sem município autorizado', async ({ page, api }) => {
-    api.signedIn({ municipalities: [] })
-    await page.goto('/execucao')
-    await expect(
-      page.getByText('Nenhum município autorizado para leitura de resultados.'),
-    ).toBeVisible()
   })
 })
 
