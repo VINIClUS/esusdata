@@ -4,6 +4,7 @@ import type {
   IndicatorPack,
   IndicatorResultResponse,
   RunResponse,
+  RunSourceResponse,
   SourceResponse,
 } from '../../src/api/types/index.ts'
 import { IBGE } from './api.ts'
@@ -113,6 +114,34 @@ export function exportResponse(overrides: Partial<ExportResponse> = {}): ExportR
     rowCount: 3,
     createdAt: '2026-04-02T12:00:00Z',
     expiresAt: '2026-04-09T12:00:00Z',
+    ...overrides,
+  }
+}
+
+/** A PEC source with a checked coverage: 2026-03 published, 2026-02 and 2026-01 pending. */
+export function runSource(overrides: Partial<RunSourceResponse> = {}): RunSourceResponse {
+  return {
+    sourceId: 'pec-a',
+    pecVersion: '5.5.28',
+    coverageOutcome: 'CHECKED',
+    coverageCheckedAt: '2026-04-02T10:00:00Z',
+    periods: [
+      { referencePeriod: PERIOD, count: 10029, published: true },
+      { referencePeriod: '2026-02', count: 9500, published: false },
+      { referencePeriod: '2026-01', count: 9100, published: false },
+    ],
+    schedule: {
+      schedulerEnabled: true,
+      enabled: true,
+      intervalHours: 6,
+      settleDays: 5,
+      nextTickAt: '2026-04-02T16:00:00Z',
+      lastTickAt: '2026-04-02T10:00:00Z',
+      lastOutcome: 'UP_TO_DATE',
+      lastDetail: null,
+      lastJobId: null,
+      lastPeriod: null,
+    },
     ...overrides,
   }
 }

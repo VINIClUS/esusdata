@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { USE_MOCKS, apiFetch, apiFetchBlob, ensureApiReady, resolveMock } from '../client'
-import { execucaoFixture } from '../fixtures/execucao'
+import { useEffect, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { USE_MOCKS, ApiError, apiFetch, apiFetchBlob, ensureApiReady, resolveMock } from '../client'
+import { execucaoFixture, fontesExecucaoFixture, pacotesFixture } from '../fixtures/execucao'
 import { fonteFixture, requisitosFixture } from '../fixtures/fonteDados'
 import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadores'
 import { isolamentoSourcesFixture } from '../fixtures/isolamento'
@@ -13,17 +13,18 @@ import {
   exportsPath,
   indicatorResultsPath,
   isPecSource,
+  isRunTerminal,
   normalizeIndicatorPacks,
   normalizeExport,
   normalizeIndicatorResult,
   normalizePainelResumo,
   normalizeRequirements,
-  normalizeRunResponse,
   normalizeSource,
   pickSource,
   recentRunsPath,
 } from '../normalizers'
 import type {
+  CreateRunRequest,
   Exportacao,
   ExportResponse,
   Fonte,
@@ -34,6 +35,8 @@ import type {
   PainelResumo,
   RequisitoFonte,
   RunResponse,
+  RunSchedule,
+  RunSourceResponse,
   SourceRequirementResponse,
   SourceResponse,
   SourceTestResponse,
@@ -97,13 +100,6 @@ async function resolveApiIndicadores(scope: ApiScope) {
   return normalizeIndicatorPacks(packs, await resultsForPacks(packs, scope))
 }
 
-async function resolveApiExecucaoAtual(municipalityIbge: string | undefined) {
-  if (!municipalityIbge) throw new Error(NO_MUNICIPALITY)
-  const [latest] = await apiFetch<RunResponse[]>(recentRunsPath(municipalityIbge, 1))
-  if (!latest) throw new Error('Nenhuma execução registrada para este município.')
-  return normalizeRunResponse(latest)
-}
-
 async function resolveApiFonte(municipalityIbge: string | undefined): Promise<Fonte> {
   const source = pickSource(await apiFetch<SourceResponse[]>('/sources'), municipalityIbge)
   if (!source) throw new Error('Nenhuma fonte cadastrada que você possa administrar.')
@@ -159,13 +155,197 @@ export function useIndicadorDetalhe(codigo: string) {
   })
 }
 
-export function useExecucaoAtual() {
-  const { municipalityIbge, isLoading } = useScope()
+/** The pack catalog as the API returns it: what a run needs (`id`, `ruleVersion`, `executionEnabled`). */
+export function usePacotesIndicadores(enabled = true) {
   return useQuery({
-    queryKey: ['execucao', municipalityIbge],
+    queryKey: ['indicadores', 'pacotes'],
+    enabled,
     queryFn: () =>
-      USE_MOCKS ? resolveMock(execucaoFixture) : resolveApiExecucaoAtual(municipalityIbge),
-    enabled: !isLoading,
+      USE_MOCKS ? resolveMock(pacotesFixture) : apiFetch<IndicatorPack[]>('/indicator-packs'),
+  })
+}
+
+/** The municipality's PEC sources a run can read, with their competências and scheduler (ADR 0028). */
+export function useFontesExecucao(municipalityIbge: string | undefined) {
+  return useQuery({
+    queryKey: ['execucao', 'fontes', municipalityIbge],
+    queryFn: () =>
+      USE_MOCKS
+        ? resolveMock(fontesExecucaoFixture)
+        : apiFetch<RunSourceResponse[]>(
+            `/run-sources?${new URLSearchParams({ municipalityIbge: municipalityIbge ?? '' }).toString()}`,
+          ),
+    enabled: USE_MOCKS || !!municipalityIbge,
+  })
+}
+
+/** The municipality's latest run, or null when none was ever registered. Needs RUN_INDICATOR. */
+export function useUltimaExecucao(municipalityIbge: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['execucao', 'ultima', municipalityIbge],
+    queryFn: async (): Promise<RunResponse | null> => {
+      if (USE_MOCKS) return resolveMock(execucaoFixture)
+      const [latest] = await apiFetch<RunResponse[]>(recentRunsPath(municipalityIbge ?? '', 1))
+      return latest ?? null
+    },
+    enabled: enabled && (USE_MOCKS || !!municipalityIbge),
+  })
+}
+
+const POLL_INTERVAL_MS = 3000
+
+/**
+ * One run, followed live: the API's `run` events (SSE) replace the cached run until it reaches a
+ * terminal state; if the stream fails, the query polls instead. The stream is closed on a terminal
+ * state and on unmount, since the API caps open streams per user. When a followed run finishes, what
+ * it may have changed — published competências, results, the sources' coverage — is refetched.
+ */
+export function useExecucao(jobId: string | undefined, initial: RunResponse | null | undefined) {
+  const queryClient = useQueryClient()
+  const [pollingJobId, setPollingJobId] = useState<string>()
+  const query = useQuery({
+    queryKey: ['execucao', 'run', jobId],
+    queryFn: () =>
+      USE_MOCKS
+        ? resolveMock(initial ?? execucaoFixture)
+        : apiFetch<RunResponse>(`/runs/${encodeURIComponent(jobId ?? '')}`),
+    enabled: !!jobId,
+    initialData: initial && initial.jobId === jobId ? initial : undefined,
+    refetchInterval: (q) =>
+      pollingJobId === jobId && q.state.data && !isRunTerminal(q.state.data)
+        ? POLL_INTERVAL_MS
+        : false,
+  })
+
+  const live = !USE_MOCKS && !!jobId && !!query.data && !isRunTerminal(query.data)
+  useEffect(() => {
+    if (!live || !jobId) return
+    const source = new EventSource(`/api/v1/runs/${encodeURIComponent(jobId)}/events`)
+    source.addEventListener('run', (event: MessageEvent<string>) => {
+      const run = JSON.parse(event.data) as RunResponse
+      queryClient.setQueryData(['execucao', 'run', jobId], run)
+      if (isRunTerminal(run)) source.close()
+    })
+    source.onerror = () => {
+      source.close()
+      setPollingJobId(jobId)
+    }
+    return () => source.close()
+  }, [live, jobId, queryClient])
+
+  // Only a run seen unfinished and then finished refreshes: opening an old run changes nothing.
+  const seenUnfinished = useRef<string | null>(null)
+  const run = query.data
+  useEffect(() => {
+    if (!run) return
+    if (!isRunTerminal(run)) {
+      seenUnfinished.current = run.jobId
+      return
+    }
+    if (seenUnfinished.current !== run.jobId) return
+    seenUnfinished.current = null
+    void queryClient.invalidateQueries({ queryKey: ['results'] })
+    void queryClient.invalidateQueries({ queryKey: ['painel'] })
+    void queryClient.invalidateQueries({ queryKey: ['indicadores'] })
+    void queryClient.invalidateQueries({ queryKey: ['execucao', 'fontes'] })
+    void queryClient.invalidateQueries({ queryKey: ['execucao', 'ultima'] })
+  }, [run, queryClient])
+
+  return query
+}
+
+/**
+ * `POST /runs`. The caller keeps one `idempotencyKey` per intent, so a double click or a retry gets
+ * the same job back. A competência that already has an active job answers 409 `ACTIVE_JOB_EXISTS`
+ * (ADR 0026); that job is returned instead, marked `existente`.
+ */
+export async function executarIndicador(
+  request: CreateRunRequest,
+  idempotencyKey: string,
+): Promise<{ run: RunResponse; existente: boolean }> {
+  if (USE_MOCKS) {
+    return resolveMock({
+      run: {
+        ...execucaoFixture,
+        ...request,
+        jobId: `job-demo-${Date.now()}`,
+        state: 'QUEUED' as const,
+        createdAt: new Date().toISOString(),
+        startedAt: null,
+        lastProgressAt: null,
+      },
+      existente: false,
+    })
+  }
+  await ensureApiReady()
+  try {
+    const run = await apiFetch<RunResponse>('/runs', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(request),
+    })
+    return { run, existente: false }
+  } catch (error) {
+    if (error instanceof ApiError && error.code === 'ACTIVE_JOB_EXISTS' && error.jobId) {
+      const run = await apiFetch<RunResponse>(`/runs/${encodeURIComponent(error.jobId)}`)
+      return { run, existente: true }
+    }
+    throw error
+  }
+}
+
+/** `POST /runs/{id}/cancel`: a queued run is cancelled at once, a running one asked to stop. */
+export async function cancelarExecucao(run: RunResponse): Promise<RunResponse> {
+  if (USE_MOCKS) return resolveMock({ ...run, state: 'CANCEL_REQUESTED' as const })
+  await ensureApiReady()
+  return apiFetch<RunResponse>(`/runs/${encodeURIComponent(run.jobId)}/cancel`, { method: 'POST' })
+}
+
+async function reautenticar(senhaAtual: string): Promise<void> {
+  await ensureApiReady()
+  await apiFetch<undefined>('/auth/reauth', {
+    method: 'POST',
+    body: JSON.stringify({ password: senhaAtual }),
+  })
+}
+
+/** Turns one source's scheduler on or off; the API requires a recent reauthentication. */
+const agendamentoDemo = (): RunSchedule => {
+  const [fonte] = fontesExecucaoFixture
+  if (!fonte) throw new Error('fixture de agendamento vazia')
+  return fonte.schedule
+}
+
+export async function alterarAgendamento(
+  sourceId: string,
+  enabled: boolean,
+  senhaAtual: string,
+): Promise<RunSchedule> {
+  if (USE_MOCKS) return resolveMock({ ...agendamentoDemo(), enabled })
+  await reautenticar(senhaAtual)
+  return apiFetch<RunSchedule>(`/sources/${encodeURIComponent(sourceId)}/schedule`, {
+    method: 'PUT',
+    body: JSON.stringify({ enabled }),
+  })
+}
+
+/**
+ * "Verificar agora": one scheduler tick for the source — its coverage is refreshed and at most one
+ * pending competência is enqueued. The API requires a recent reauthentication.
+ */
+export async function verificarAgora(sourceId: string, senhaAtual: string): Promise<RunSchedule> {
+  if (USE_MOCKS) {
+    return resolveMock({
+      ...agendamentoDemo(),
+      lastTickAt: new Date().toISOString(),
+      lastOutcome: 'UP_TO_DATE' as const,
+      lastJobId: null,
+      lastPeriod: null,
+    })
+  }
+  await reautenticar(senhaAtual)
+  return apiFetch<RunSchedule>(`/sources/${encodeURIComponent(sourceId)}/schedule/run-now`, {
+    method: 'POST',
   })
 }
 
@@ -196,11 +376,7 @@ export async function testarFonte(
       statementTimeoutMs: 0,
     })
   }
-  await ensureApiReady()
-  await apiFetch<undefined>('/auth/reauth', {
-    method: 'POST',
-    body: JSON.stringify({ password: senhaAtual }),
-  })
+  await reautenticar(senhaAtual)
   return apiFetch<SourceTestResponse>(`/sources/${encodeURIComponent(sourceId)}/test`, {
     method: 'POST',
   })
@@ -223,9 +399,10 @@ export function useRequisitosFonte(sourceId: string | undefined) {
 // Every PEC source the caller may manage, not only the clinical scope's: a technical admin has no
 // READ_CLINICAL municipality, so the page lets them pick the source instead. Keyed under ['fonte']
 // so a new check refreshes it together with the source.
-export function useFontesPec() {
+export function useFontesPec(enabled = true) {
   return useQuery({
     queryKey: ['fonte', 'pec'],
+    enabled,
     queryFn: (): Promise<SourceResponse[]> =>
       (USE_MOCKS
         ? resolveMock(isolamentoSourcesFixture)
@@ -255,11 +432,7 @@ export async function validarIsolamento(
       checkedAt: new Date().toISOString(),
     })
   }
-  await ensureApiReady()
-  await apiFetch<undefined>('/auth/reauth', {
-    method: 'POST',
-    body: JSON.stringify({ password: senhaAtual }),
-  })
+  await reautenticar(senhaAtual)
   return apiFetch<IsolationCheckResponse>(
     `/sources/${encodeURIComponent(sourceId)}/isolation-check`,
     { method: 'POST', body: JSON.stringify({ referencePeriod }) },

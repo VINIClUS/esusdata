@@ -2,7 +2,7 @@ import type { Request, Route } from '@playwright/test'
 import type { AuthMeResponse } from '../../src/app/auth-model.ts'
 import { expect, test as base } from '../support/test.ts'
 
-type Method = 'GET' | 'POST'
+type Method = 'GET' | 'POST' | 'PUT'
 interface Reply {
   status?: number
   json?: unknown
@@ -49,6 +49,23 @@ export class ApiStub {
 
   post(path: string | RegExp, reply: Reply | Handler) {
     return this.on('POST', path, reply)
+  }
+
+  put(path: string | RegExp, reply: Reply | Handler) {
+    return this.on('PUT', path, reply)
+  }
+
+  /**
+   * `GET /runs/{id}/events` as the API's SSE: one `run` event per given state, then the stream
+   * ends. `retry` keeps the browser from reconnecting while the test runs; the app closes the
+   * stream on a terminal run and polls after an error instead.
+   */
+  runEvents(jobId: string, ...runs: unknown[]) {
+    const events = runs.map((r) => `event: run\ndata: ${JSON.stringify(r)}\n\n`).join('')
+    return this.get(`/runs/${jobId}/events`, {
+      headers: { 'content-type': 'text/event-stream' },
+      body: `retry: 60000\n\n${events}`,
+    })
   }
 
   /** `GET /auth/me` for a signed-in user; the session itself is the HttpOnly cookie the stub omits. */

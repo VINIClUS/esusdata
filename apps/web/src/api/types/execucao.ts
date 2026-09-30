@@ -60,3 +60,53 @@ export interface ExecucaoAtual {
   progresso: { label: string; processados: number; total: number | null }
   parametros: ParametroExecucao[]
 }
+
+export type ScheduleOutcome =
+  | 'ENQUEUED'
+  | 'UP_TO_DATE'
+  | 'JOB_ACTIVE'
+  | 'NO_MANAGER'
+  | 'COVERAGE_FAILED'
+  | 'SOURCE_BUSY'
+  | 'DISABLED'
+
+/** `schedulerEnabled` is the installation's switch; `enabled` this source's (ADR 0028). */
+export interface RunSchedule {
+  schedulerEnabled: boolean
+  enabled: boolean
+  intervalHours: number
+  settleDays: number
+  nextTickAt: string | null
+  lastTickAt: string | null
+  lastOutcome: ScheduleOutcome | null
+  lastDetail: string | null
+  lastJobId: string | null
+  lastPeriod: string | null
+}
+
+/** A competência the PEC holds data for (last coverage, ADR 0027). */
+export interface RunSourcePeriod {
+  referencePeriod: string
+  count: number
+  published: boolean
+}
+
+/** `GET /run-sources`: a PEC source a run can read, its competências and its scheduler. */
+export interface RunSourceResponse {
+  sourceId: string
+  pecVersion: string
+  coverageOutcome: 'CHECKED' | 'FAILED' | 'COMPATIBILITY_MISMATCH' | 'SOURCE_BUDGET_EXCEEDED' | null
+  coverageCheckedAt: string | null
+  /** Newest first; empty unless the last coverage was `CHECKED`. */
+  periods: RunSourcePeriod[]
+  schedule: RunSchedule
+}
+
+export interface CreateRunRequest {
+  municipalityIbge: string
+  indicatorPack: string
+  ruleVersion: string
+  referencePeriod: string
+  sourceId: string
+  extractionId: null
+}
