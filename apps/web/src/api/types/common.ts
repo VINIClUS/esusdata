@@ -21,6 +21,8 @@ export interface SessionUser {
   sobrenome: string
   papel: string
   iniciais: string
+  /** The account id, once `/auth/me` answered: the users screen marks the caller's own row. */
+  userId?: string
   canManageAccess?: boolean
 }
 

@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
-import { CircleQuestionMark, LogOut, KeyRound, type LucideIcon } from 'lucide-react'
+import { CircleQuestionMark, LogOut, KeyRound, Users, type LucideIcon } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router'
 import { navItems } from '@/app/navigation'
 import { useAuth } from '@/app/auth-context'
@@ -108,6 +108,15 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             onClick={onNavigate}
           />
         ))}
+        {user?.canManageAccess && (
+          <NavRow
+            to="/configuracoes/usuarios"
+            label="Usuários"
+            icon={Users}
+            active={pathname.startsWith('/configuracoes/usuarios')}
+            onClick={onNavigate}
+          />
+        )}
         {user?.canManageAccess && (
           <NavRow
             to="/ativacoes-pendentes"

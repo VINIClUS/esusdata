@@ -29,6 +29,7 @@ export function sessionUserFromLogin(response: AuthLoginResponse): SessionUser {
     sobrenome: parts.slice(1).join(' '),
     papel: 'Usuário',
     iniciais: initialsFor(parts, nome),
+    userId: response.userId,
   }
 }
 
@@ -39,6 +40,7 @@ export function sessionUserFromMe(
   return {
     ...(previous ??
       sessionUserFromLogin({ userId: response.userId, displayName: response.userId })),
+    userId: response.userId,
     canManageAccess: response.canManageAccess,
   }
 }

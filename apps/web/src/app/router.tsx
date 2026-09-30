@@ -14,6 +14,7 @@ import { RelatoriosPage } from '@/features/relatorios/RelatoriosPage'
 import { AjudaPage } from '@/features/ajuda/AjudaPage'
 import { AlertasPage } from '@/features/alertas/AlertasPage'
 import { QualidadePage } from '@/features/qualidade/QualidadePage'
+import { UsuariosPage } from '@/features/usuarios/UsuariosPage'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
       { path: '/configuracoes', element: <FonteDeDadosPage /> },
       { path: '/configuracoes/fonte-de-dados', element: <Navigate to="/configuracoes" replace /> },
       { path: '/configuracoes/isolamento-municipal', element: <IsolamentoPage /> },
+      { path: '/configuracoes/usuarios', element: <UsuariosPage /> },
       { path: '/ajuda', element: <AjudaPage /> },
       { path: '/ativacoes-pendentes', element: <PendingActivationPage /> },
       { path: '*', element: <Navigate to="/painel" replace /> },

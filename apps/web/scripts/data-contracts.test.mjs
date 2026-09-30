@@ -123,9 +123,11 @@ test('maps backend authentication responses into the session user model', () => 
     sobrenome: 'Silva',
     papel: 'Usuário',
     iniciais: 'MS',
+    userId: 'admin',
   })
   assert.deepEqual(sessionUserFromMe({ userId: 'admin', canManageAccess: true }, user), {
     ...user,
+    userId: 'admin',
     canManageAccess: true,
   })
 })

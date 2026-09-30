@@ -150,6 +150,19 @@ paths:
               schema: { $ref: "#/components/schemas/ApiError" }
 
   /api/v1/users:
+    get:
+      tags: [admin]
+      summary: Every account with its active grants (MANAGE_ACCESS, installation scope). No password material.
+      responses:
+        "200":
+          description: Accounts by username.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/User" }
+        "404":
+          description: Caller lacks installation-scoped MANAGE_ACCESS.
     post:
       tags: [admin]
       summary: Provision a new user account (MANAGE_ACCESS, installation scope, + recent reauth).
@@ -254,6 +267,26 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
+        "404":
+          description: Unknown user, or caller lacks installation-scoped MANAGE_ACCESS.
+
+  /api/v1/users/{id}/unblock:
+    post:
+      tags: [admin]
+      summary: >-
+        Undo a block: ACTIVE if the account had activated, PENDING_ACTIVATION if it never did.
+        Bumps authorization_version (audited). MANAGE_ACCESS + recent reauth.
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: Unblocked.
+        "400":
+          description: The account is not blocked.
         "404":
           description: Unknown user, or caller lacks installation-scoped MANAGE_ACCESS.
 
@@ -1080,6 +1113,18 @@ components:
         role: { type: string, enum: [TECHNICAL_ADMIN, MANAGER, TEAM_SCOPED_PROFESSIONAL, AUDITOR] }
         scopeKind: { type: string, enum: [INSTALLATION] }
 
+    User:
+      type: object
+      properties:
+        userId: { type: string }
+        username: { type: string }
+        displayName: { type: string }
+        state: { type: string, enum: [PENDING_ACTIVATION, ACTIVE, BLOCKED] }
+        createdAt: { type: string, format: date-time }
+        lastLoginAt: { type: string, format: date-time, nullable: true }
+        grants:
+          type: array
+          items: { $ref: "#/components/schemas/GrantResponse" }
     GrantResponse:
       type: object
       properties:

@@ -4,6 +4,7 @@ import esusdata.auth.dto.CreateGrantRequest;
 import esusdata.auth.dto.CreateUserRequest;
 import esusdata.auth.dto.CreateUserResponse;
 import esusdata.auth.dto.GrantResponse;
+import esusdata.auth.dto.UserResponse;
 import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.Grant;
 import esusdata.auth.model.Permission;
@@ -42,6 +43,24 @@ public class AdminController {
         this.userProvisioning = userProvisioning;
         this.accessAdministrationService = accessAdministrationService;
         this.authorization = authorization;
+    }
+
+    /** Every account with its active grants: the users screen. */
+    @GetMapping("/api/v1/users")
+    public List<UserResponse> users(@AuthenticationPrincipal AuthenticatedSession session) {
+        authorization.requireInstallationPermission(session, Permission.MANAGE_ACCESS);
+        return accessAdministrationService.usersWithGrants().stream()
+                .map(entry -> new UserResponse(
+                        entry.user().userId(),
+                        entry.user().username(),
+                        entry.user().displayName(),
+                        entry.user().state().name(),
+                        entry.user().createdAt().toString(),
+                        entry.user().lastLoginAt() == null
+                                ? null
+                                : entry.user().lastLoginAt().toString(),
+                        entry.grants().stream().map(AdminController::toResponse).toList()))
+                .toList();
     }
 
     @GetMapping("/api/v1/users/pending-activation")
@@ -115,6 +134,15 @@ public class AdminController {
         authorization.requireInstallationPermission(session, Permission.MANAGE_ACCESS);
         authorization.requireRecentReauth(session);
         accessAdministrationService.block(userId, session.userId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/api/v1/users/{id}/unblock")
+    public ResponseEntity<Void> unblock(
+            @AuthenticationPrincipal AuthenticatedSession session, @PathVariable("id") String userId) {
+        authorization.requireInstallationPermission(session, Permission.MANAGE_ACCESS);
+        authorization.requireRecentReauth(session);
+        accessAdministrationService.unblock(userId, session.userId());
         return ResponseEntity.noContent().build();
     }
 
