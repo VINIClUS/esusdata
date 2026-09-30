@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { USE_MOCKS, ApiError, apiFetch, apiFetchBlob, ensureApiReady, resolveMock } from '../client'
 import { execucaoFixture, fontesExecucaoFixture, pacotesFixture } from '../fixtures/execucao'
-import { fonteFixture, requisitosFixture } from '../fixtures/fonteDados'
+import { fonteFixture, fonteSourceFixture, requisitosFixture } from '../fixtures/fonteDados'
 import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadores'
 import { isolamentoSourcesFixture } from '../fixtures/isolamento'
 import { demoContext } from '../fixtures/context'
@@ -44,6 +44,8 @@ import type {
   SourceRequirementResponse,
   SourceResponse,
   SourceTestResponse,
+  CreateSourceRequest,
+  CoverageResponse,
 } from '../types'
 
 function resolveMockIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> {
@@ -407,6 +409,39 @@ export async function testarFonte(
   }
   await reautenticar(senhaAtual)
   return apiFetch<SourceTestResponse>(`/sources/${encodeURIComponent(sourceId)}/test`, {
+    method: 'POST',
+  })
+}
+
+/**
+ * Re-registers the source with the edited connection (`POST /sources`, MANAGE_SOURCE and a recent
+ * reauthentication). The API stores it as the next configuration version, so the last test,
+ * isolation check and coverage stop applying until they are run again.
+ */
+export async function salvarFonte(
+  cadastro: CreateSourceRequest,
+  senhaAtual: string,
+): Promise<SourceResponse> {
+  if (USE_MOCKS) return resolveMock({ ...fonteSourceFixture, ...cadastro })
+  await reautenticar(senhaAtual)
+  return apiFetch<SourceResponse>('/sources', { method: 'POST', body: JSON.stringify(cadastro) })
+}
+
+/**
+ * Counts the municipality's atendimentos per competência in the source's PEC (ADR 0027). It opens a
+ * PEC session, so the API wants a recent reauthentication; the result is stored as `lastCoverage`.
+ */
+export async function verificarCobertura(
+  sourceId: string,
+  senhaAtual: string,
+): Promise<CoverageResponse> {
+  if (USE_MOCKS) {
+    const { lastCoverage } = fonteSourceFixture
+    if (!lastCoverage) throw new Error('fixture de cobertura vazia')
+    return resolveMock(lastCoverage)
+  }
+  await reautenticar(senhaAtual)
+  return apiFetch<CoverageResponse>(`/sources/${encodeURIComponent(sourceId)}/coverage-check`, {
     method: 'POST',
   })
 }

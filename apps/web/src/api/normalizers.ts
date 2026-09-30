@@ -21,6 +21,8 @@ import type {
   ExecucaoAtual,
   Exportacao,
   ExportResponse,
+  CoberturaFonte,
+  CoverageResponse,
   Fonte,
   IsolamentoStatus,
   IsolationCheckResponse,
@@ -153,7 +155,7 @@ export const checkStatusLabels: Record<CheckStatus, string> = {
 
 /** Where each check is looked at and redone. */
 export const checkScreens: Record<CheckCode, string> = {
-  SOURCE_CONNECTION: '/configuracoes',
+  SOURCE_CONNECTION: '/configuracoes?aba=teste',
   MUNICIPAL_ISOLATION: '/configuracoes/isolamento-municipal',
   PEC_COVERAGE: '/execucao?aba=agendamento',
   SCHEDULER: '/execucao?aba=agendamento',
@@ -534,6 +536,23 @@ export function normalizeSource(source: SourceResponse): Fonte {
     porta: String(source.port),
     nomeBanco: source.databaseName,
     usuario: source.dbUser,
+    secretRef: source.secretRef,
+    municipioIbge: source.municipalityIbge,
+    versao: source.sourceConfigurationVersion,
+    cadastro: {
+      id: source.id,
+      sourceFamily: source.sourceFamily,
+      pecInstallationRole: source.pecInstallationRole,
+      sourceLocationKind: source.sourceLocationKind,
+      host: source.host,
+      port: source.port,
+      databaseName: source.databaseName,
+      dbUser: source.dbUser,
+      secretRef: source.secretRef,
+      municipalityIbge: source.municipalityIbge,
+      pecVersion: source.pecVersion,
+      readModel: source.readModel,
+    },
     ultimoTeste: diagnostic
       ? {
           ok: diagnostic.outcome === 'CONNECTED',
@@ -541,6 +560,36 @@ export function normalizeSource(source: SourceResponse): Fonte {
           testadoEm: diagnostic.testedAt,
         }
       : null,
+    cobertura: source.lastCoverage ? normalizeCoverage(source.lastCoverage) : null,
+  }
+}
+
+/** A coverage check (ADR 0027): the competências with atendimentos, or why nothing was counted. */
+export function normalizeCoverage(coverage: CoverageResponse): CoberturaFonte {
+  const competencias = coverage.periods.map((p) => ({
+    periodo: p.referencePeriod,
+    label: `${competenciaLabel(p.referencePeriod)} · ${atendimentos(p.count)}`,
+  }))
+  const { outcome } = coverage
+  if (outcome === 'CHECKED') {
+    return {
+      ok: true,
+      mensagem:
+        competencias.length === 0
+          ? 'Nenhuma competência com atendimentos do município nos últimos 24 meses.'
+          : `${competencias.length} ${competencias.length === 1 ? 'competência' : 'competências'} com atendimentos do município.`,
+      verificadaEm: coverage.checkedAt,
+      competencias,
+    }
+  }
+  return {
+    ok: false,
+    mensagem:
+      outcome === 'SOURCE_BUSY'
+        ? 'A fonte está em uso por uma aquisição. Tente novamente em instantes.'
+        : isolationFailureMessages[outcome],
+    verificadaEm: coverage.checkedAt,
+    competencias: [],
   }
 }
 

@@ -8,7 +8,6 @@ const protectedRoutes = [
   { path: '/indicadores', heading: 'Indicadores' },
   { path: '/indicadores/PB-01', heading: 'PB-01 – Pré-natal adequado' },
   { path: '/execucao', heading: 'Execução de Dados' },
-  { path: '/base-de-dados', heading: 'Configuração da Fonte de Dados' },
   { path: '/relatorios', heading: 'Relatórios' },
   { path: '/configuracoes', heading: 'Configuração da Fonte de Dados' },
   { path: '/configuracoes/isolamento-municipal', heading: 'Isolamento Municipal' },

@@ -30,7 +30,7 @@ export const router = createBrowserRouter([
       { path: '/indicadores', element: <IndicadoresListPage /> },
       { path: '/indicadores/:codigo', element: <IndicadorDetailPage /> },
       { path: '/execucao', element: <ExecucaoPage /> },
-      { path: '/base-de-dados', element: <FonteDeDadosPage /> },
+      { path: '/base-de-dados', element: <Navigate to="/configuracoes" replace /> },
       { path: '/relatorios', element: <RelatoriosPage /> },
       { path: '/configuracoes', element: <FonteDeDadosPage /> },
       { path: '/configuracoes/fonte-de-dados', element: <Navigate to="/configuracoes" replace /> },

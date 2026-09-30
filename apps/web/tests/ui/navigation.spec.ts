@@ -4,7 +4,6 @@ const sidebar = [
   { link: 'Painel', path: '/painel', heading: 'Painel Principal' },
   { link: 'Indicadores', path: '/indicadores', heading: 'Indicadores' },
   { link: 'Execução de Dados', path: '/execucao', heading: 'Execução de Dados' },
-  { link: 'Base de Dados', path: '/base-de-dados', heading: 'Configuração da Fonte de Dados' },
   { link: 'Relatórios', path: '/relatorios', heading: 'Relatórios' },
   { link: 'Configurações', path: '/configuracoes', heading: 'Configuração da Fonte de Dados' },
   { link: 'Ajuda', path: '/ajuda', heading: 'Ajuda' },
@@ -28,6 +27,9 @@ test.describe('navegação no desktop', () => {
   test('a raiz e rotas desconhecidas levam ao painel', async ({ page }) => {
     await page.goto('/?mock-login=1')
     await expect(page).toHaveURL('/painel')
+    // The old "Base de Dados" screen was the same page: its path now leads to Configurações.
+    await page.goto('/base-de-dados')
+    await expect(page).toHaveURL('/configuracoes')
     await page.goto('/nao-existe')
     await expect(page).toHaveURL('/painel')
   })
