@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
-import { Check } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import { colors } from '@/theme/tokens'
 
 interface ChecklistItem {
@@ -29,7 +29,12 @@ export function CheckIcon({ size = 24, ok = true }: { size?: number; ok?: boolea
         flexShrink: 0,
       }}
     >
-      <Check size={size * 0.6} strokeWidth={3} />
+      {/* A red circle must not carry a check mark: a failed item reads as failed. */}
+      {ok ? (
+        <Check size={size * 0.6} strokeWidth={3} aria-hidden />
+      ) : (
+        <X size={size * 0.6} strokeWidth={3} aria-hidden />
+      )}
     </Box>
   )
 }

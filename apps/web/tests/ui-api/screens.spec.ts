@@ -1,7 +1,15 @@
 import { expectNoA11yViolations } from '../support/a11y.ts'
 import { expectNoHorizontalOverflow } from '../support/layout.ts'
 import { IBGE, expect, test, type ApiStub } from './api.ts'
-import { PERIOD, blockedResult, exportResponse, pack, result, source } from './data.ts'
+import {
+  PERIOD,
+  exportResponse,
+  pack,
+  overview,
+  overviewIndicator,
+  result,
+  source,
+} from './data.ts'
 
 const serverError = { status: 500, json: { code: 'INTERNAL', message: 'Falha interna da API.' } }
 
@@ -18,17 +26,33 @@ async function expectSettled(page: import('@playwright/test').Page, heading: str
   await expectNoA11yViolations(page)
 }
 
+/** What the Execução screen reads when a link opens it (its own spec covers it). */
+function execucaoOpens(api: ApiStub) {
+  api.get(`/run-sources?municipalityIbge=${IBGE}`, { json: [] })
+  api.get(`/runs?municipalityIbge=${IBGE}&limit=1`, { json: [] })
+}
+
+/** `GET /overview` of the scope, answered per competência asked (`null`: none asked). */
+function stubOverview(api: ApiStub, body: (period: string | null) => ReturnType<typeof overview>) {
+  api.get(/^\/overview\?/, (request) => ({
+    json: body(new URL(request.url()).searchParams.get('referencePeriod')),
+  }))
+}
+
 test.describe('painel', () => {
-  test('com resultados publicados', async ({ page, api }) => {
+  test('com resultados publicados, numa leitura só', async ({ page, api }) => {
     manager(api, [PERIOD])
-    api.get('/indicator-packs', { json: [pack('c1-mais-acesso'), pack('c2-cuidado')] })
-    api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, {
-      json: [result('c1-mais-acesso', '70')],
-    })
-    api.get(/^\/results\?.*indicatorPack=c2-cuidado/, { json: [] })
+    stubOverview(api, () =>
+      overview([
+        overviewIndicator('c1-mais-acesso', 'COMPUTED', '70'),
+        overviewIndicator('c2-cuidado'),
+      ]),
+    )
     await page.goto('/painel')
     await expectSettled(page, 'Painel Principal')
     await expect(page.getByText('1 / 2', { exact: true })).toBeVisible()
+    // No per-pack /results: the whole panel is GET /overview.
+    expect(api.calls.filter((c) => c.path.startsWith('/results?'))).toEqual([])
   })
 
   test('resultado bloqueado pelos portões conta à parte, não como liberado', async ({
@@ -36,10 +60,7 @@ test.describe('painel', () => {
     api,
   }) => {
     manager(api, [PERIOD])
-    api.get('/indicator-packs', { json: [pack('c1-mais-acesso')] })
-    api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, {
-      json: [blockedResult('c1-mais-acesso')],
-    })
+    stubOverview(api, () => overview([overviewIndicator('c1-mais-acesso', 'BLOCKED')]))
     await page.goto('/painel')
     await expectSettled(page, 'Painel Principal')
     await expect(page.getByText('Indicadores liberados')).toBeVisible()
@@ -48,17 +69,131 @@ test.describe('painel', () => {
     await expect(page.getByText('Indicadores publicados')).toHaveCount(0)
   })
 
-  test('sem nada publicado', async ({ page, api }) => {
+  test('instalação nova: o alerta diz o que falta e leva à execução da competência pendente', async ({
+    page,
+    api,
+  }) => {
     manager(api)
-    api.get('/indicator-packs', { json: [pack('c1-mais-acesso')] })
+    stubOverview(api, () =>
+      overview([overviewIndicator('c1-mais-acesso')], {
+        referencePeriod: null,
+        checks: [
+          {
+            code: 'PEC_COVERAGE',
+            sourceId: 'pec-a',
+            status: 'OK',
+            at: null,
+            referencePeriod: null,
+          },
+          {
+            code: 'RESULTS_PUBLISHED',
+            sourceId: null,
+            status: 'ATTENTION',
+            at: null,
+            referencePeriod: null,
+          },
+        ],
+        alerts: [
+          {
+            code: 'PENDING_PERIODS',
+            severity: 'INFO',
+            subject: null,
+            referencePeriod: '2026-01',
+            sourceId: 'pec-a',
+            detail: '2',
+            at: null,
+          },
+        ],
+        pendingPeriods: [
+          { sourceId: 'pec-a', referencePeriod: '2026-01', count: 9100 },
+          { sourceId: 'pec-a', referencePeriod: '2026-02', count: 9500 },
+        ],
+      }),
+    )
+    execucaoOpens(api)
     await page.goto('/painel')
     await expectSettled(page, 'Painel Principal')
-    await expect(page.getByText('0 / 1', { exact: true })).toBeVisible()
+    await expect(page.getByText('Nada publicado ainda')).toBeVisible()
+    await expect(page.getByText('2 competências com dados sem resultado')).toBeVisible()
+    await page.getByRole('button', { name: 'Executar nova importação de dados' }).click()
+    await expect(page).toHaveURL('/execucao?competencia=2026-01')
+  })
+
+  test('"Atualizar" lê a visão geral de novo', async ({ page, api }) => {
+    manager(api, [PERIOD])
+    stubOverview(api, () => overview([overviewIndicator('c1-mais-acesso', 'COMPUTED', '70')]))
+    await page.goto('/painel')
+    await expectSettled(page, 'Painel Principal')
+    const before = api.calls.filter((c) => c.path.startsWith('/overview?')).length
+    await page.getByRole('button', { name: 'Atualizar' }).click()
+    await expect
+      .poll(() => api.calls.filter((c) => c.path.startsWith('/overview?')).length)
+      .toBeGreaterThan(before)
+  })
+
+  test('"Ver todos" os alertas e os detalhes da qualidade abrem as telas próprias', async ({
+    page,
+    api,
+  }) => {
+    manager(api, [PERIOD])
+    stubOverview(api, () =>
+      overview([overviewIndicator('c1-mais-acesso', 'BLOCKED')], {
+        quality: { published: 1, completeSnapshot: 1 },
+        checks: [
+          {
+            code: 'SOURCE_CONNECTION',
+            sourceId: 'pec-a',
+            status: 'FAILED',
+            at: '2026-04-02T10:00:00Z',
+            referencePeriod: null,
+          },
+        ],
+        alerts: [
+          {
+            code: 'CHECK_FAILED',
+            severity: 'ERROR',
+            subject: 'SOURCE_CONNECTION',
+            referencePeriod: null,
+            sourceId: 'pec-a',
+            detail: null,
+            at: '2026-04-02T10:00:00Z',
+          },
+          {
+            code: 'RESULT_BLOCKED',
+            severity: 'WARNING',
+            subject: 'c1-mais-acesso',
+            referencePeriod: PERIOD,
+            sourceId: null,
+            detail: null,
+            at: null,
+          },
+        ],
+      }),
+    )
+    await page.goto('/painel')
+    await expectSettled(page, 'Painel Principal')
+    await page.getByRole('link', { name: 'Ver todos' }).first().click()
+    await expect(page).toHaveURL('/alertas')
+    await expectSettled(page, 'Alertas')
+    await page.getByRole('tab', { name: /Erros/ }).click()
+    await expect(page.getByText('Conexão com o PEC: falhou')).toBeVisible()
+    await expect(page.getByText('C1 – Mais acesso bloqueado')).toHaveCount(0)
+    api.get('/sources', { json: [] })
+    await page.getByText('Conexão com o PEC: falhou').click()
+    await expect(page).toHaveURL('/configuracoes')
+
+    await page.goto('/painel')
+    await page.getByRole('button', { name: 'Ver detalhes da qualidade dos dados' }).click()
+    await expect(page).toHaveURL('/qualidade')
+    await expectSettled(page, 'Qualidade dos dados')
+    await expect(
+      page.getByRole('row', { name: /Conexão com o PEC/ }).getByRole('status'),
+    ).toHaveText('Falhou')
   })
 
   test('erro da API', async ({ page, api }) => {
     manager(api)
-    api.get('/indicator-packs', serverError)
+    api.get(/^\/overview\?/, serverError)
     await page.goto('/painel')
     await expect(page.getByText('Painel indisponível')).toBeVisible()
     await expect(page.getByText('Falha interna da API.')).toBeVisible()
@@ -69,9 +204,12 @@ test.describe('painel', () => {
 test.describe('indicadores', () => {
   test('lista os pacotes da API', async ({ page, api }) => {
     manager(api)
-    api.get('/indicator-packs', {
-      json: [pack('c1-mais-acesso'), pack('previne-pre-natal', 'PREVINE_BRASIL')],
-    })
+    stubOverview(api, () =>
+      overview([
+        overviewIndicator('c1-mais-acesso'),
+        overviewIndicator('previne-pre-natal', null, null, { family: 'PREVINE_BRASIL' }),
+      ]),
+    )
     await page.goto('/indicadores')
     await expectSettled(page, 'Indicadores')
     await expect(page.getByText('Mostrando 1–2 de 2 indicadores')).toBeVisible()
@@ -83,11 +221,12 @@ test.describe('indicadores', () => {
     api,
   }) => {
     manager(api, [PERIOD, '2026-02'])
-    api.get('/indicator-packs', { json: [pack('c1-mais-acesso')] })
-    api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, (request) =>
-      new URL(request.url()).searchParams.get('referencePeriod') === PERIOD
-        ? { json: [blockedResult('c1-mais-acesso')] }
-        : { json: [result('c1-mais-acesso', '70', { referencePeriod: '2026-02' })] },
+    stubOverview(api, (period) =>
+      period === '2026-02'
+        ? overview([overviewIndicator('c1-mais-acesso', 'COMPUTED', '70')], {
+            referencePeriod: '2026-02',
+          })
+        : overview([overviewIndicator('c1-mais-acesso', 'BLOCKED')]),
     )
     await page.goto('/indicadores')
     await expectSettled(page, 'Indicadores')
@@ -110,11 +249,12 @@ test.describe('indicadores', () => {
 
   test('o filtro de status separa os bloqueados', async ({ page, api }) => {
     manager(api, [PERIOD])
-    api.get('/indicator-packs', { json: [pack('c1-mais-acesso'), pack('c2-cuidado')] })
-    api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, {
-      json: [blockedResult('c1-mais-acesso')],
-    })
-    api.get(/^\/results\?.*indicatorPack=c2-cuidado/, { json: [result('c2-cuidado', '55')] })
+    stubOverview(api, () =>
+      overview([
+        overviewIndicator('c1-mais-acesso', 'BLOCKED'),
+        overviewIndicator('c2-cuidado', 'COMPUTED', '55'),
+      ]),
+    )
     await page.goto('/indicadores')
     await expectSettled(page, 'Indicadores')
     await page.getByRole('combobox', { name: 'Status' }).click()
@@ -125,11 +265,12 @@ test.describe('indicadores', () => {
 
   test('o filtro de status isola os sem denominador (Atenção)', async ({ page, api }) => {
     manager(api, [PERIOD])
-    api.get('/indicator-packs', { json: [pack('c1-mais-acesso'), pack('c2-cuidado')] })
-    api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, {
-      json: [result('c1-mais-acesso', null, { status: 'NO_DENOMINATOR' })],
-    })
-    api.get(/^\/results\?.*indicatorPack=c2-cuidado/, { json: [result('c2-cuidado', '55')] })
+    stubOverview(api, () =>
+      overview([
+        overviewIndicator('c1-mais-acesso', 'NO_DENOMINATOR'),
+        overviewIndicator('c2-cuidado', 'COMPUTED', '55'),
+      ]),
+    )
     await page.goto('/indicadores')
     await expectSettled(page, 'Indicadores')
     await page.getByRole('combobox', { name: 'Status' }).click()
@@ -140,40 +281,70 @@ test.describe('indicadores', () => {
     )
   })
 
+  test('o menu de ações executa de novo e exporta o CSV da competência', async ({ page, api }) => {
+    manager(api, [PERIOD])
+    stubOverview(api, () => overview([overviewIndicator('c1-mais-acesso', 'BLOCKED')]))
+    api.post('/exports', {
+      status: 201,
+      json: exportResponse({ indicatorPack: 'c1-mais-acesso', fromPeriod: PERIOD }),
+    })
+    api.get(/^\/exports\/exp-1\/content/, {
+      headers: { 'content-type': 'text/csv' },
+      body: '"municipio_ibge";"indicador"\r\n',
+    })
+    await page.goto('/indicadores')
+    await expectSettled(page, 'Indicadores')
+    await page.getByRole('button', { name: 'Ações de c1-mais-acesso' }).click()
+    const download = page.waitForEvent('download')
+    await page.getByRole('menuitem', { name: 'Exportar CSV da competência' }).click()
+    expect((await download).suggestedFilename()).toMatch(/\.csv$/)
+    expect(api.callsTo('POST', '/exports')[0]?.body).toEqual({
+      municipalityIbge: IBGE,
+      fromPeriod: PERIOD,
+      toPeriod: PERIOD,
+      indicatorPack: 'c1-mais-acesso',
+    })
+
+    execucaoOpens(api)
+    await page.getByRole('button', { name: 'Ações de c1-mais-acesso' }).click()
+    await page.getByRole('menuitem', { name: 'Executar novamente' }).click()
+    await expect(page).toHaveURL(`/execucao?indicador=c1-mais-acesso&competencia=${PERIOD}`)
+  })
+
   test.describe('no celular', () => {
     test.use({ viewport: { width: 390, height: 844 } })
 
-    test('a competência também se escolhe no celular', async ({ page, api }) => {
+    test('"Filtros" mostra a competência e o status, que trocam a lista', async ({ page, api }) => {
       manager(api, [PERIOD, '2026-02'])
-      api.get('/indicator-packs', { json: [pack('c1-mais-acesso')] })
-      api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, (request) =>
-        new URL(request.url()).searchParams.get('referencePeriod') === PERIOD
-          ? { json: [blockedResult('c1-mais-acesso')] }
-          : { json: [result('c1-mais-acesso', '70', { referencePeriod: '2026-02' })] },
+      stubOverview(api, (period) =>
+        period === '2026-02'
+          ? overview(
+              [
+                overviewIndicator('c1-mais-acesso', 'COMPUTED', '70'),
+                overviewIndicator('c2-cuidado', 'BLOCKED'),
+              ],
+              { referencePeriod: '2026-02' },
+            )
+          : overview([
+              overviewIndicator('c1-mais-acesso', 'BLOCKED'),
+              overviewIndicator('c2-cuidado', 'COMPUTED', '55'),
+            ]),
       )
       await page.goto('/indicadores')
       await expectSettled(page, 'Indicadores')
+      const filtros = page.getByRole('button', { name: 'Filtros' })
+      await expect(page.getByRole('combobox', { name: 'Competência' })).toHaveCount(0)
+      await filtros.click()
+      await expect(filtros).toHaveAttribute('aria-expanded', 'true')
       const competencia = page.getByRole('combobox', { name: 'Competência' })
       await expect(competencia).toHaveText(/03\/2026/)
       await competencia.click()
       await page.getByRole('option', { name: '02/2026' }).click()
       await expect(page.getByText('70,0%')).toBeVisible()
-      await expectSettled(page, 'Indicadores')
-    })
-
-    test('os filtros de status novos também existem no celular', async ({ page, api }) => {
-      manager(api, [PERIOD])
-      api.get('/indicator-packs', { json: [pack('c1-mais-acesso'), pack('c2-cuidado')] })
-      api.get(/^\/results\?.*indicatorPack=c1-mais-acesso/, {
-        json: [blockedResult('c1-mais-acesso')],
-      })
-      api.get(/^\/results\?.*indicatorPack=c2-cuidado/, { json: [result('c2-cuidado', '55')] })
-      await page.goto('/indicadores')
-      await expectSettled(page, 'Indicadores')
       await page.getByRole('combobox', { name: 'Status' }).click()
       await page.getByRole('option', { name: 'Bloqueado' }).click()
-      await expect(page.getByText('C1 – Mais acesso')).toBeVisible()
-      await expect(page.getByText('C2 – Cuidado')).toHaveCount(0)
+      await expect(page.getByText('C2 – Cuidado')).toBeVisible()
+      await expect(page.getByText('C1 – Mais acesso')).toHaveCount(0)
       await expectSettled(page, 'Indicadores')
     })
   })
@@ -183,7 +354,9 @@ test.describe('indicadores', () => {
     api,
   }) => {
     manager(api)
-    api.get('/indicator-packs', { json: [pack('c1-mais-acesso')] })
+    stubOverview(api, () =>
+      overview([overviewIndicator('c1-mais-acesso')], { referencePeriod: null }),
+    )
     await page.goto('/indicadores')
     await expectSettled(page, 'Indicadores')
     const competencia = page.getByRole('combobox', { name: 'Competência' })
@@ -194,7 +367,7 @@ test.describe('indicadores', () => {
 
   test('erro da API não deixa a tela carregando para sempre', async ({ page, api }) => {
     manager(api)
-    api.get('/indicator-packs', serverError)
+    api.get(/^\/overview\?/, serverError)
     await page.goto('/indicadores')
     await expect(page.getByText('Falha interna da API.')).toBeVisible()
     await expectSettled(page, 'Indicadores')

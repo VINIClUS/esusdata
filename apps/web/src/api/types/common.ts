@@ -10,6 +10,9 @@ export type StatusKey =
   | 'verificado'
   | 'calculado'
   | 'bloqueado'
+  | 'falhou'
+  | 'cancelado'
+  | 'nao_executado'
 
 export type Severity = 'success' | 'info' | 'warning' | 'error'
 

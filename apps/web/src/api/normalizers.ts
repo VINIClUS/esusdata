@@ -1,11 +1,20 @@
 import type {
+  Alerta,
   CategoriaIndicador,
+  CheckCode,
+  CheckStatus,
+  ExecucaoResumo,
   IndicatorPack,
   IndicadorDetalhe,
   IndicadorResumo,
   IndicadoresLista,
   IndicatorResultResponse,
+  OverviewAlert,
+  OverviewCheck,
+  OverviewIndicator,
+  OverviewResponse,
   PainelResumo,
+  SeriePonto,
 } from './types'
 import type {
   DiagnosticOutcome,
@@ -69,18 +78,21 @@ export function indicatorDisplayName(id: string): string {
 }
 
 /** A published result wins over the catalog: BLOCKED shows as blocked, never as a value of 0. */
+/** What the catalog screens need of a published result: `GET /results` and `GET /overview` both have it. */
+type PackResult = Pick<
+  IndicatorResultResponse,
+  'indicatorPack' | 'status' | 'value' | 'publishedAt'
+>
+
 function statusForItem(
   pack: IndicatorPack,
-  result: IndicatorResultResponse | undefined,
+  result: PackResult | undefined,
 ): IndicadorResumo['status'] {
   if (result) return statusFromApi(result.status)
   return pack.executionEnabled ? 'regular' : 'pendente'
 }
 
-function itemForPack(
-  pack: IndicatorPack,
-  result: IndicatorResultResponse | undefined,
-): IndicadorResumo {
+function itemForPack(pack: IndicatorPack, result: PackResult | undefined): IndicadorResumo {
   const category = categoryForFamily(pack.family)
   return {
     codigo: pack.id,
@@ -93,8 +105,8 @@ function itemForPack(
 }
 
 /** The newest result per pack; `/results` lists newest first. */
-function latestResultByPack(results: IndicatorResultResponse[]) {
-  const resultByPack = new Map<string, IndicatorResultResponse>()
+function latestResultByPack<R extends PackResult>(results: R[]) {
+  const resultByPack = new Map<string, R>()
   for (const result of results) {
     if (!resultByPack.has(result.indicatorPack)) resultByPack.set(result.indicatorPack, result)
   }
@@ -104,7 +116,7 @@ function latestResultByPack(results: IndicatorResultResponse[]) {
 /** The catalog, with each pack's status and value in the chosen competência when one is published. */
 export function normalizeIndicatorPacks(
   packs: IndicatorPack[],
-  results: IndicatorResultResponse[] = [],
+  results: PackResult[] = [],
 ): IndicadoresLista {
   const resultByPack = latestResultByPack(results)
   const itens = packs.map((pack) => itemForPack(pack, resultByPack.get(pack.id)))
@@ -124,53 +136,221 @@ export function normalizeIndicatorPacks(
 
 const RELEASED_STATUSES = new Set(['COMPUTED', 'NO_DENOMINATOR'])
 
-/**
- * Builds the panel from the API surfaces that exist today. The API has no aggregate panel route,
- * so values that cannot be derived from the catalog/results contract remain explicitly unavailable.
- */
-export function normalizePainelResumo(
-  packs: IndicatorPack[],
-  results: IndicatorResultResponse[],
-  referencePeriod: string,
-): PainelResumo {
-  const resultByPack = latestResultByPack(results)
+const checkLabels: Record<CheckCode, string> = {
+  SOURCE_CONNECTION: 'Conexão com o PEC',
+  MUNICIPAL_ISOLATION: 'Isolamento municipal',
+  PEC_COVERAGE: 'Cobertura de competências',
+  SCHEDULER: 'Agendador',
+  RESULTS_PUBLISHED: 'Resultado da competência',
+}
 
-  // Released: passed the release gates, with a value (COMPUTED) or a zero denominator
-  // (NO_DENOMINATOR). A BLOCKED result is computed and published but held back by the gates, so it
-  // is counted apart, never as released.
-  const released = (pack: IndicatorPack) =>
-    RELEASED_STATUSES.has(resultByPack.get(pack.id)?.status ?? '')
-  const releasedCount = packs.filter(released).length
-  const blockedCount = packs.filter(
-    (pack) => resultByPack.get(pack.id)?.status === 'BLOCKED',
-  ).length
-  const pendingPacks = packs.filter((pack) => !released(pack))
-  const releasedPercent =
-    packs.length === 0 ? null : Math.round((releasedCount / packs.length) * 100)
-  const alertas: PainelResumo['alertas'] = pendingPacks.map((pack) => {
-    const result = resultByPack.get(pack.id)
-    const description =
-      result?.limitations[0] ??
-      pack.blockedGates[0] ??
-      `Nenhum resultado publicado para ${referencePeriod}.`
+export const checkStatusLabels: Record<CheckStatus, string> = {
+  OK: 'Conforme',
+  ATTENTION: 'Atenção',
+  FAILED: 'Falhou',
+  NOT_CHECKED: 'Não verificado',
+}
 
-    return {
-      id: `indicator-${pack.id}`,
-      severidade: result?.status === 'BLOCKED' ? 'warning' : 'info',
-      titulo: `${indicatorDisplayName(pack.id)} indisponível`,
-      descricao: description,
-      data: referencePeriod,
-      hora: '—',
+/** Where each check is looked at and redone. */
+export const checkScreens: Record<CheckCode, string> = {
+  SOURCE_CONNECTION: '/configuracoes',
+  MUNICIPAL_ISOLATION: '/configuracoes/isolamento-municipal',
+  PEC_COVERAGE: '/execucao?aba=agendamento',
+  SCHEDULER: '/execucao?aba=agendamento',
+  RESULTS_PUBLISHED: '/execucao',
+}
+
+export function checkLabel(check: Pick<OverviewCheck, 'code' | 'sourceId'>, sources: number) {
+  const label = checkLabels[check.code]
+  return check.sourceId && sources > 1 ? `${label} (${check.sourceId})` : label
+}
+
+const severities: Record<OverviewAlert['severity'], Alerta['severidade']> = {
+  ERROR: 'error',
+  WARNING: 'warning',
+  INFO: 'info',
+}
+
+function optionalCompetencia(period: string | null): string {
+  return period ? competenciaLabel(period) : ''
+}
+
+function executionPath(referencePeriod: string | null, indicatorPack?: string | null): string {
+  const params = new URLSearchParams()
+  if (referencePeriod) params.set('competencia', referencePeriod)
+  if (indicatorPack) params.set('indicador', indicatorPack)
+  const query = params.toString()
+  return query ? `/execucao?${query}` : '/execucao'
+}
+
+/** One derived alert (ADR 0029) in words, with the screen where it is dealt with. */
+export function overviewAlert(alert: OverviewAlert, index: number): Alerta {
+  const at = alert.at ? new Date(alert.at) : null
+  const base = {
+    id: `${alert.code}-${alert.subject ?? alert.sourceId ?? ''}-${index}`,
+    severidade: severities[alert.severity],
+    data: at ? at.toLocaleDateString('pt-BR') : optionalCompetencia(alert.referencePeriod),
+    hora: at ? at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+  }
+  const source = alert.sourceId ? ` Fonte ${alert.sourceId}.` : ''
+  const check = alert.subject as CheckCode
+  switch (alert.code) {
+    case 'RESULT_BLOCKED':
+      return {
+        ...base,
+        titulo: `${indicatorDisplayName(alert.subject ?? '')} bloqueado`,
+        descricao: `Calculado em ${optionalCompetencia(alert.referencePeriod)}, mas retido pelos portões de liberação.`,
+        to: `/indicadores/${alert.subject ?? ''}`,
+      }
+    case 'RUN_FAILED':
+      return {
+        ...base,
+        titulo: `Execução de ${indicatorDisplayName(alert.subject ?? '')} falhou`,
+        descricao: `${optionalCompetencia(alert.referencePeriod)}: ${alert.detail ? failureReason(alert.detail) : 'sem motivo registrado.'}`,
+        to: executionPath(alert.referencePeriod, alert.subject),
+      }
+    case 'PENDING_PERIODS': {
+      const count = Number(alert.detail ?? '0')
+      return {
+        ...base,
+        titulo:
+          count === 1
+            ? '1 competência com dados sem resultado'
+            : `${count} competências com dados sem resultado`,
+        descricao: `A mais antiga é ${optionalCompetencia(alert.referencePeriod)}. O agendador calcula uma por vez; você pode executá-la agora.${source}`,
+        to: executionPath(alert.referencePeriod),
+      }
     }
-  })
+    case 'CHECK_MISSING':
+      return {
+        ...base,
+        titulo: `${checkLabels[check]}: ainda não verificado`,
+        descricao: `Nenhuma verificação registrada para a configuração atual.${source}`,
+        to: checkScreens[check],
+      }
+    case 'CHECK_FAILED':
+      return {
+        ...base,
+        titulo: `${checkLabels[check]}: falhou`,
+        descricao: `A última verificação falhou; refaça-a para ver o motivo.${source}`,
+        to: checkScreens[check],
+      }
+    case 'CHECK_ATTENTION':
+      return { ...base, ...attention(check, alert), to: checkScreens[check] }
+  }
+}
+
+function attention(check: CheckCode, alert: OverviewAlert): Pick<Alerta, 'titulo' | 'descricao'> {
+  switch (check) {
+    case 'RESULTS_PUBLISHED':
+      return {
+        titulo: 'Nenhum resultado publicado',
+        descricao: alert.referencePeriod
+          ? `Não há resultado publicado em ${optionalCompetencia(alert.referencePeriod)}.`
+          : 'O município ainda não tem nenhum resultado publicado. Verifique a cobertura do PEC e execute uma competência.',
+      }
+    case 'SCHEDULER':
+      return {
+        titulo: 'Agendador desligado',
+        descricao: 'Nenhuma competência é calculada automaticamente para esta fonte.',
+      }
+    case 'PEC_COVERAGE':
+      return {
+        titulo: 'Nenhuma competência com dados',
+        descricao:
+          'A última cobertura não encontrou atendimentos do município nos últimos 24 meses.',
+      }
+    case 'MUNICIPAL_ISOLATION':
+      return {
+        titulo: 'Atendimentos de outros municípios na base',
+        descricao: `Na competência ${optionalCompetencia(alert.referencePeriod)}; a extração os deixa de fora.`,
+      }
+    case 'SOURCE_CONNECTION':
+      return { titulo: checkLabels[check], descricao: 'Verifique a conexão.' }
+  }
+}
+
+const SERIES_COLORS = ['#1b64da', '#16a34a', '#f59e0b', '#9333ea', '#0891b2', '#dc2626']
+
+const runStatus: Record<RunResponse['state'], ExecucaoResumo['status']> = {
+  QUEUED: 'andamento',
+  RUNNING: 'andamento',
+  STAGED: 'andamento',
+  CANCEL_REQUESTED: 'andamento',
+  CANCELLED: 'cancelada',
+  SUCCEEDED: 'concluida',
+  FAILED: 'falha',
+}
+
+function pendingReason(indicator: OverviewIndicator): string {
+  if (indicator.status === 'BLOCKED') {
+    return indicator.limitations[0] ?? 'Retido pelos portões de liberação.'
+  }
+  if (indicator.status) return 'Resultado publicado com ressalvas.'
+  if (!indicator.executionEnabled) return indicator.blockedGates[0] ?? 'Execução desabilitada.'
+  return 'Sem resultado publicado na competência.'
+}
+
+/** The catalog screens' input, from the overview's indicators. */
+export function overviewPacks(overview: OverviewResponse): {
+  packs: IndicatorPack[]
+  results: PackResult[]
+} {
+  return {
+    packs: overview.indicators.map((i) => ({
+      id: i.indicatorPack,
+      ruleVersion: i.ruleVersion,
+      family: i.family,
+      unit: i.unit,
+      dependsOn: [],
+      executionEnabled: i.executionEnabled,
+      blockedGates: i.blockedGates,
+    })),
+    results: overview.indicators.flatMap((i) =>
+      i.status
+        ? [
+            {
+              indicatorPack: i.indicatorPack,
+              status: i.status,
+              value: i.value,
+              publishedAt: i.publishedAt,
+            },
+          ]
+        : [],
+    ),
+  }
+}
+
+/** The Painel from `GET /overview` (ADR 0029): one read, nothing assumed. */
+export function normalizeOverview(overview: OverviewResponse): PainelResumo {
+  const { indicators, checks } = overview
+  const released = (i: OverviewIndicator) => RELEASED_STATUSES.has(i.status ?? '')
+  const releasedCount = indicators.filter(released).length
+  const blockedCount = indicators.filter((i) => i.status === 'BLOCKED').length
+  const pendingPacks = indicators.filter((i) => !released(i))
+  const releasedPercent =
+    indicators.length === 0 ? null : Math.round((releasedCount / indicators.length) * 100)
+  const okChecks = checks.filter((c) => c.status === 'OK').length
+  const pending = overview.pendingPeriods
+  const sources = new Set(checks.flatMap((c) => (c.sourceId ? [c.sourceId] : []))).size
+
+  const periods = [...new Set(overview.history.map((h) => h.referencePeriod))].sort((a, b) =>
+    a.localeCompare(b),
+  )
+  const plotted = [
+    ...new Set(overview.history.filter((h) => h.value !== null).map((h) => h.indicatorPack)),
+  ]
+  const { published, completeSnapshot } = overview.quality
 
   return {
+    ultimaAtualizacao: overview.lastUpdate ? formatInstant(overview.lastUpdate) : null,
+    competenciaPendente: pending[0]?.referencePeriod ?? null,
     kpis: [
       {
         id: 'indicadores',
         icone: 'indicadores',
         label: 'Indicadores liberados',
-        valor: `${releasedCount} / ${packs.length}`,
+        valor: `${releasedCount} / ${indicators.length}`,
         chip: releasedPercent === null ? undefined : { label: '', valor: `${releasedPercent}%` },
         tendencia:
           blockedCount > 0
@@ -178,15 +358,29 @@ export function normalizePainelResumo(
                 texto: `${blockedCount} ${blockedCount === 1 ? 'bloqueado' : 'bloqueados'} por portões de liberação`,
                 tom: 'down',
               }
-            : { texto: `Competência ${referencePeriod}`, tom: 'up' },
+            : {
+                texto: overview.referencePeriod
+                  ? `Competência ${competenciaLabel(overview.referencePeriod)}`
+                  : 'Nenhuma competência publicada',
+                tom: overview.referencePeriod ? 'up' : 'down',
+              },
       },
       {
         id: 'cobertura',
         icone: 'cobertura',
-        label: 'Cobertura da população',
-        valor: 'Indisponível',
+        label: 'Competências pendentes',
+        valor: String(pending.length),
+        chip: pending[0]
+          ? { label: 'Mais antiga', valor: competenciaLabel(pending[0].referencePeriod) }
+          : undefined,
+        tomValor: pending.length > 0 ? 'error' : 'default',
       },
-      { id: 'cadastros', icone: 'cadastros', label: 'Cadastros ativos', valor: 'Indisponível' },
+      {
+        id: 'cadastros',
+        icone: 'cadastros',
+        label: 'Verificações conformes',
+        valor: `${okChecks} / ${checks.length}`,
+      },
       {
         id: 'pendencias',
         icone: 'pendencias',
@@ -196,16 +390,54 @@ export function normalizePainelResumo(
         tomValor: pendingPacks.length > 0 ? 'error' : 'default',
       },
     ],
-    evolucao: { series: [], pontos: [] },
-    qualidade: {
-      percentual: null,
-      titulo: 'Resumo indisponível',
-      descricao: 'A API atual não fornece um agregado de qualidade dos dados.',
+    evolucao: {
+      series: plotted.map((pack, index) => ({
+        key: pack,
+        label: indicatorDisplayName(pack),
+        cor: SERIES_COLORS[index % SERIES_COLORS.length] ?? '#1b64da',
+      })),
+      pontos:
+        plotted.length === 0
+          ? []
+          : periods.map((period) => {
+              const ponto: SeriePonto = { mes: competenciaLabel(period) }
+              for (const h of overview.history) {
+                const value = h.referencePeriod === period ? numberFromApi(h.value) : null
+                if (value !== null) ponto[h.indicatorPack] = value
+              }
+              return ponto
+            }),
     },
-    integridade: [],
-    alertas,
-    maiorPendencia: [],
-    ultimasExecucoes: [],
+    qualidade:
+      published === 0
+        ? {
+            percentual: null,
+            titulo: 'Sem resultado publicado',
+            descricao: 'Publique uma competência para ver a qualidade das extrações usadas.',
+          }
+        : {
+            percentual: Math.round((completeSnapshot / published) * 100),
+            titulo: 'Extrações completas e consistentes',
+            descricao: `${completeSnapshot} de ${published} resultado(s) da competência vêm de uma extração completa, lida como um só snapshot.`,
+          },
+    integridade: checks.map((c) => ({
+      label: checkLabel(c, sources),
+      valor: checkStatusLabels[c.status],
+      ok: c.status === 'OK',
+    })),
+    alertas: overview.alerts.map((alert, index) => overviewAlert(alert, index)),
+    maiorPendencia: pendingPacks.map((i) => ({
+      codigo: i.indicatorPack,
+      indicador: indicatorDisplayName(i.indicatorPack),
+      motivo: pendingReason(i),
+      status: i.status ? statusFromApi(i.status) : 'pendente',
+    })),
+    ultimasExecucoes: (overview.recentRuns ?? []).map((r) => ({
+      jobId: r.jobId,
+      dataHora: formatInstant(r.finishedAt ?? r.createdAt ?? ''),
+      competencia: competenciaLabel(r.referencePeriod),
+      status: runStatus[r.state],
+    })),
   }
 }
 
@@ -532,8 +764,12 @@ function stageStatus(
 ): ExecucaoAtual['etapas'][number]['status'] {
   if (response.state === 'SUCCEEDED') return 'concluido'
   if (terminalRunStates.has(response.state)) {
-    const lastCompletedStage = response.resultId ? 3 : response.startedAt ? 2 : 1
-    return stage <= lastCompletedStage ? 'concluido' : 'pendente'
+    // Enqueuing always happened; the run stopped in processing unless a result exists. That stage
+    // shows how it ended, and the later ones never ran.
+    const stoppedAt = response.resultId ? 4 : 2
+    if (stage < stoppedAt) return 'concluido'
+    if (stage === stoppedAt) return response.state === 'CANCELLED' ? 'cancelado' : 'falhou'
+    return 'nao_executado'
   }
   const currentStage = stageForRunState[response.state]
   if (stage < currentStage) return 'concluido'
@@ -637,6 +873,8 @@ export function normalizeIndicatorResult(result: IndicatorResultResponse): Indic
 
   return {
     codigo: result.indicatorPack,
+    resultId: result.resultId,
+    competencia: result.referencePeriod,
     nome: indicatorDisplayName(result.indicatorPack),
     status,
     descricao: `Resultado publicado para a competência ${result.referencePeriod}.`,

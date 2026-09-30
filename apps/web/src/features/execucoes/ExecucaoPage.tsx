@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { USE_MOCKS } from '@/api/client'
 import { useFontesExecucao, useFontesPec, useUltimaExecucao } from '@/api/hooks'
 import { useScope } from '@/app/scope-context'
@@ -24,7 +25,11 @@ export function ExecucaoPage() {
   const podeExecutar = USE_MOCKS || (!!ibge && municipalities.includes(ibge))
   const fontes = useFontesExecucao(ibge)
   const ultima = useUltimaExecucao(ibge, podeExecutar)
-  const [tab, setTab] = useState('unica')
+  // Links from the Painel, the alerts and Indicadores open a tab or pre-fill the next run.
+  const [searchParams] = useSearchParams()
+  const [tab, setTab] = useState(
+    searchParams.get('aba') === 'agendamento' ? 'agendamento' : 'unica',
+  )
   const [sourceId, setSourceId] = useState<string>()
   const [acompanhando, setAcompanhando] = useState<string>()
 
@@ -72,6 +77,10 @@ export function ExecucaoPage() {
           fonte={fonte}
           ultima={ultima.data ?? null}
           podeExecutar={podeExecutar}
+          sugestao={{
+            referencePeriod: searchParams.get('competencia') ?? undefined,
+            indicatorPack: searchParams.get('indicador') ?? undefined,
+          }}
           acompanhando={acompanhando ?? ultima.data?.jobId}
           onAcompanhar={setAcompanhando}
           onVerCobertura={() => setTab('agendamento')}

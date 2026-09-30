@@ -5,7 +5,7 @@ import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
-import { ChevronRight, EllipsisVertical, SlidersHorizontal } from 'lucide-react'
+import { ChevronRight, SlidersHorizontal } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { useCompetencia, useIndicadores } from '@/api/hooks'
 import type { IndicadorResumo } from '@/api/types'
@@ -21,6 +21,7 @@ import { PillTabs } from '@/components/ui/Tabs'
 import { formatReferencePeriod } from '@/app/display-context'
 import { formatPercent } from '@/lib/format'
 import { colors } from '@/theme/tokens'
+import { AcoesIndicador } from './AcoesIndicador'
 import { matchesIndicatorTab } from './filter'
 
 const PAGE_SIZE = 10
@@ -74,6 +75,8 @@ export function IndicadoresListPage() {
   const [busca, setBusca] = useState('')
   const [status, setStatus] = useState('Todos')
   const [page, setPage] = useState(1)
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     if (!data) return []
@@ -161,15 +164,8 @@ export function IndicadoresListPage() {
       header: '',
       align: 'center',
       width: 56,
-      render: () => (
-        <IconButton
-          size="small"
-          aria-label="Ações"
-          onClick={(e) => e.stopPropagation()}
-          sx={{ color: colors.primary }}
-        >
-          <EllipsisVertical size={18} />
-        </IconButton>
+      render: (r) => (
+        <AcoesIndicador codigo={r.codigo} competencia={competencia} onErro={setErro} />
       ),
     },
   ]
@@ -246,6 +242,9 @@ export function IndicadoresListPage() {
           />
           <IconButton
             aria-label="Filtros"
+            aria-expanded={filtrosAbertos}
+            aria-controls="filtros-indicadores"
+            onClick={() => setFiltrosAbertos((aberto) => !aberto)}
             sx={{
               border: `1px solid ${colors.border}`,
               borderRadius: '10px',
@@ -260,11 +259,17 @@ export function IndicadoresListPage() {
         </Box>
       )}
 
-      {phone && (
-        <Box sx={{ display: 'grid', gap: 1, mb: 1.5 }}>
+      {phone && filtrosAbertos && (
+        <Box id="filtros-indicadores" sx={{ display: 'grid', gap: 1, mb: 1.5 }}>
           {competenciaSelect}
           {statusSelect}
         </Box>
+      )}
+
+      {erro && (
+        <Typography role="alert" color="error" sx={{ mb: 1.5 }}>
+          {erro}
+        </Typography>
       )}
 
       <PillTabs

@@ -38,6 +38,7 @@ import { SectionCard } from '@/components/ui/SectionCard'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { UnderlineTabs } from '@/components/ui/Tabs'
 import { detailTabContent, type DetailTabContent } from './detail-tabs'
+import { EvidenciasResultado } from './EvidenciasResultado'
 import { formatInt, formatPercent } from '@/lib/format'
 import { colors } from '@/theme/tokens'
 
@@ -172,6 +173,9 @@ function IndicatorDetailTabContent({
   }
 
   if (content === 'evidencias') {
+    if (data.resultId) {
+      return <EvidenciasResultado resultId={data.resultId} competencia={data.competencia} />
+    }
     return (
       <SectionCard
         title="Evidências"
@@ -293,7 +297,11 @@ export function IndicadorDetailPage() {
               size="large"
               startIcon={<RefreshCw size={20} />}
               sx={{ minHeight: 52, px: 3, fontSize: 16 }}
-              onClick={() => void navigate('/execucao')}
+              onClick={() => {
+                const executar = new URLSearchParams({ indicador: data.codigo })
+                if (data.competencia) executar.set('competencia', data.competencia)
+                void navigate(`/execucao?${executar.toString()}`)
+              }}
             >
               Executar novamente
             </Button>
@@ -473,7 +481,9 @@ export function IndicadorDetailPage() {
                           Principais evidências / motivos de pendência {infoIcon}
                         </Box>
                       }
-                      action={<LinkButton>Ver todas</LinkButton>}
+                      action={
+                        <LinkButton onClick={() => setTab('evidencias')}>Ver todas</LinkButton>
+                      }
                     >
                       <DataTable
                         columns={evidenciaColumns}
@@ -519,6 +529,7 @@ export function IndicadorDetailPage() {
                       variant="outlined"
                       fullWidth
                       startIcon={<ExternalLink size={16} />}
+                      onClick={() => setTab('metodologia')}
                       sx={{ mt: 0.25, fontSize: 13, minHeight: 36 }}
                     >
                       Ver metodologia completa

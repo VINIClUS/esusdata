@@ -3,9 +3,9 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
+import { useQueryClient } from '@tanstack/react-query'
 import { Clock, RefreshCw } from 'lucide-react'
-import { USE_MOCKS } from '@/api/client'
-import { demoContext } from '@/api/fixtures/context'
+import { useUltimaAtualizacao } from '@/api/hooks'
 import { colors } from '@/theme/tokens'
 
 interface PageHeaderProps {
@@ -17,7 +17,10 @@ interface PageHeaderProps {
   chip?: ReactNode
 }
 
+/** The newest publication in the scope, and "Atualizar": every screen's data read again. */
 export function LastUpdateCard() {
+  const queryClient = useQueryClient()
+  const { data, isFetching } = useUltimaAtualizacao()
   return (
     <Paper sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pl: 1.5, pr: 1.25, py: 1 }}>
       <Box
@@ -39,7 +42,7 @@ export function LastUpdateCard() {
           Última atualização dos dados
         </Typography>
         <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.navy }}>
-          {USE_MOCKS ? demoContext.ultimaAtualizacao : 'Não disponível'}
+          {data ?? 'Nada publicado ainda'}
         </Typography>
       </Box>
       <Button
@@ -47,6 +50,8 @@ export function LastUpdateCard() {
         color="primary"
         size="small"
         startIcon={<RefreshCw size={16} />}
+        disabled={isFetching}
+        onClick={() => void queryClient.invalidateQueries()}
         sx={{ ml: 1, minHeight: 38 }}
       >
         Atualizar

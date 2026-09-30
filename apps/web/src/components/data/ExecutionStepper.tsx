@@ -8,6 +8,9 @@ const circle = {
   concluido: { bg: colors.success, color: '#fff' },
   em_execucao: { bg: colors.primary, color: '#fff' },
   pendente: { bg: '#e6ecf5', color: colors.textSecondary },
+  falhou: { bg: colors.error, color: '#fff' },
+  cancelado: { bg: '#e6ecf5', color: colors.textSecondary },
+  nao_executado: { bg: '#e6ecf5', color: colors.textSecondary },
 }
 
 export function ExecutionStepper({ steps }: { steps: EtapaExecucao[] }) {

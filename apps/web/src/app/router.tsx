@@ -12,6 +12,8 @@ import { FonteDeDadosPage } from '@/features/fontes/FonteDeDadosPage'
 import { IsolamentoPage } from '@/features/isolamento/IsolamentoPage'
 import { RelatoriosPage } from '@/features/relatorios/RelatoriosPage'
 import { AjudaPage } from '@/features/ajuda/AjudaPage'
+import { AlertasPage } from '@/features/alertas/AlertasPage'
+import { QualidadePage } from '@/features/qualidade/QualidadePage'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -22,6 +24,8 @@ export const router = createBrowserRouter([
     children: [
       { path: '/', element: <Navigate to="/painel" replace /> },
       { path: '/painel', element: <PainelPage /> },
+      { path: '/alertas', element: <AlertasPage /> },
+      { path: '/qualidade', element: <QualidadePage /> },
       { path: '/indicadores', element: <IndicadoresListPage /> },
       { path: '/indicadores/:codigo', element: <IndicadorDetailPage /> },
       { path: '/execucao', element: <ExecucaoPage /> },

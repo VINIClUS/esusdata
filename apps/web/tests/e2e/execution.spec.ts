@@ -119,3 +119,26 @@ test('duas abas pedem a mesma competência: um job só, acompanhado até a falha
   await expectNoA11yViolations(page)
   await screenshot(page, testInfo, 'execucao-falha')
 })
+
+test('o Painel mostra a falha real, a execução e as verificações, e leva a cada tela', async ({}, testInfo) => {
+  const { page } = session
+  await page.goto('/painel')
+  await expect(page.getByText('Execução de C1 – Mais acesso falhou').first()).toBeVisible()
+  await expect(page.getByText('Falhou', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('Nada publicado ainda')).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await expectNoA11yViolations(page)
+  await screenshot(page, testInfo, 'painel-apos-falha')
+
+  await page.getByRole('link', { name: 'Ver todos' }).first().click()
+  await expect(page).toHaveURL('/alertas')
+  await expect(page.getByText('Nenhum resultado publicado', { exact: true })).toBeVisible()
+  await expectNoA11yViolations(page)
+  await screenshot(page, testInfo, 'alertas')
+
+  await page.goto('/qualidade')
+  await expect(page.getByRole('row', { name: /Cobertura de competências/ })).toContainText('Falhou')
+  await expect(page.getByRole('row', { name: /Conexão com o PEC/ })).toContainText('Não verificado')
+  await expectNoA11yViolations(page)
+  await screenshot(page, testInfo, 'qualidade')
+})
