@@ -120,21 +120,21 @@ pub struct DiagnoseEnvelope {
     pub budget: SessionBudget,
 }
 
-/// The `{"type":"check_isolation",...}` message — pinned by
-/// `ExecPlaneIsolationCheck.writeIsolationEnvelope`. The source's identity (to find what to probe)
-/// and the competência to count, never the municipality: comparing the counts with the registered
-/// IBGE is Java's job, so this process only reports what the base holds.
+/// The `{"type":"check_isolation",...}` and `{"type":"check_coverage",...}` messages — pinned by
+/// `ExecPlaneAggregateRead.writeEnvelope`. The source's identity (to find what to probe) and the
+/// period to count, never the municipality: comparing the counts with the registered IBGE is
+/// Java's job, so this process only reports what the base holds.
 #[derive(Deserialize)]
-pub struct IsolationEnvelope {
+pub struct AggregateEnvelope {
     #[serde(rename = "type")]
     #[expect(
         dead_code,
-        reason = "part of the check_isolation wire contract, not read by this process"
+        reason = "part of the check_isolation/check_coverage wire contract, not read by this process"
     )]
     pub message_type: String,
     #[expect(
         dead_code,
-        reason = "part of the check_isolation wire contract, not read by this process"
+        reason = "part of the check_isolation/check_coverage wire contract, not read by this process"
     )]
     pub source_id: String,
     pub host: String,
@@ -151,12 +151,12 @@ pub struct IsolationEnvelope {
     /// Same meaning as `AcquireEnvelope::tls_root_cert`.
     #[serde(default)]
     pub tls_root_cert: Option<String>,
-    pub budget: IsolationBudget,
+    pub budget: AggregateBudget,
 }
 
-/// The session budget plus a ceiling on result rows — one per distinct `co_ibge` in the period.
+/// The session budget plus a ceiling on result rows — one per aggregate group of the period.
 #[derive(Deserialize)]
-pub struct IsolationBudget {
+pub struct AggregateBudget {
     #[serde(flatten)]
     pub session: SessionBudget,
     pub max_rows: i64,
@@ -167,8 +167,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn isolation_envelope_parses_the_java_shape() {
-        let envelope: IsolationEnvelope = serde_json::from_str(
+    fn aggregate_envelope_parses_the_java_shape() {
+        let envelope: AggregateEnvelope = serde_json::from_str(
             r#"{"type":"check_isolation","source_id":"s","host":"127.0.0.1","port":5432,
                 "database":"esus","user":"u","password":"p","pec_version":"5.5.28",
                 "read_model":"PEC_DW","installation_role":"PRONTUARIO","adapter_version":"0.1.0",
@@ -184,8 +184,8 @@ mod tests {
     }
 
     #[test]
-    fn isolation_envelope_without_a_period_is_rejected() {
-        let parsed: Result<IsolationEnvelope, _> = serde_json::from_str(
+    fn aggregate_envelope_without_a_period_is_rejected() {
+        let parsed: Result<AggregateEnvelope, _> = serde_json::from_str(
             r#"{"type":"check_isolation","source_id":"s","host":"h","port":1,"database":"d",
                 "user":"u","password":"p","pec_version":"5.5.28","read_model":"PEC_DW",
                 "installation_role":"PRONTUARIO","adapter_version":"0.1.0",

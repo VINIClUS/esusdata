@@ -3,6 +3,7 @@ package esusdata.source;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.auth.model.Role;
+import esusdata.source.model.LastCoverage;
 import esusdata.source.model.LastDiagnostic;
 import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceRecord;
@@ -11,6 +12,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.annotation.DirtiesContext;
 
@@ -363,6 +365,86 @@ class SourceApiTest extends ApiFixtureSupport {
                             .build(),
                     HttpResponse.BodyHandlers.ofString());
         }
+    }
+
+    @Test
+    void aCoverageCheckOfAnUnreachableSourceIsStoredAndShownToTheTechnicalAdmin() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String cookie = reauthenticatedSessionCookie(admin);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+        assertThat(get(cookie, "/api/v1/sources").body()).contains("\"lastCoverage\":null");
+
+        HttpResponse<String> response = coverageCheck(cookie, sourceId);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body())
+                .contains("\"outcome\":\"DESTINATION_NOT_ALLOWED\"")
+                .contains("\"periods\":[]")
+                .doesNotContain("PEC_DB_PASSWORD");
+        assertThat(get(cookie, "/api/v1/sources").body()).contains("\"lastCoverage\":{\"windowFrom\":");
+    }
+
+    @Test
+    void aCoverageCheckRequiresRecentReauthenticationAndIsAnOpaque404ElsewhereInScope() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+        String otherSource = "src-other-" + System.nanoTime();
+        registerSource(otherSource, MUNICIPALITY_B);
+
+        assertThat(coverageCheck(sessionCookie(admin), sourceId).statusCode()).isEqualTo(401);
+        HttpResponse<String> other = coverageCheck(reauthenticatedSessionCookie(admin), otherSource);
+        assertThat(other.statusCode()).isEqualTo(404);
+        assertThat(other.body()).doesNotContain(otherSource);
+    }
+
+    @Test
+    void aLateCoverageOfAReplacedConfigurationNeverOverwritesTheCurrentOne() {
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+        SourceRecord v1 = sourceRepository.findById(sourceId).orElseThrow();
+        sourceRepository.upsert(new SourceRecord(
+                v1.id(),
+                2,
+                v1.sourceFamily(),
+                v1.pecInstallationRole(),
+                v1.sourceLocationKind(),
+                v1.host(),
+                v1.port(),
+                v1.databaseName(),
+                "outro_usuario",
+                v1.secretRef(),
+                v1.municipalityIbge(),
+                v1.pecVersion(),
+                v1.readModel(),
+                v1.createdAt()));
+
+        sourceRepository.recordCoverage(
+                sourceId,
+                new LastCoverage(
+                        2,
+                        "2024-09",
+                        "2026-10",
+                        "CHECKED",
+                        List.of(new LastCoverage.PeriodCount("2026-03", 10_029)),
+                        "2026-09-30T12:00:00Z"));
+        sourceRepository.recordCoverage(
+                sourceId,
+                new LastCoverage(1, "2024-09", "2026-10", "CONNECTION_FAILED", List.of(), "2026-09-30T12:00:01Z"));
+
+        LastCoverage stored = sourceRepository.findLastCoverages().get(sourceId);
+        assertThat(stored.sourceConfigurationVersion()).isEqualTo(2);
+        assertThat(stored.periods()).containsExactly(new LastCoverage.PeriodCount("2026-03", 10_029));
+        assertThat(stored.appliesTo(sourceRepository.findById(sourceId).orElseThrow()))
+                .isTrue();
+    }
+
+    private HttpResponse<String> coverageCheck(String sessionCookie, String sourceId) throws Exception {
+        return authenticatedPost(
+                sessionCookie, URI.create(BASE_URL + "/api/v1/sources/" + sourceId + "/coverage-check"), "{}");
     }
 
     private HttpResponse<String> isolationCheck(String sessionCookie, String sourceId, String body) throws Exception {

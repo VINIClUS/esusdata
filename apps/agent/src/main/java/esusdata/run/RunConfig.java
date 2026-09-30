@@ -16,6 +16,7 @@ import esusdata.result.model.ResultStagingArea;
 import esusdata.run.acquisition.Acquisition;
 import esusdata.run.acquisition.ExecPlaneAcquisition;
 import esusdata.run.acquisition.ExecPlaneConnectivityCheck;
+import esusdata.run.acquisition.ExecPlaneCoverageCheck;
 import esusdata.run.acquisition.ExecPlaneIsolationCheck;
 import esusdata.run.acquisition.ExecPlaneTransport;
 import esusdata.run.extract.ExtractStore;
@@ -34,6 +35,8 @@ import esusdata.run.worker.RunExecutor;
 import esusdata.source.JdbcSourceRepository;
 import esusdata.source.SourceConnectionProperties;
 import esusdata.source.SourceConnectivityCheck;
+import esusdata.source.SourceCoverageCheck;
+import esusdata.source.SourceCoverageService;
 import esusdata.source.SourceDiagnosticsService;
 import esusdata.source.SourceIsolationCheck;
 import esusdata.source.SourceIsolationService;
@@ -171,6 +174,16 @@ public class RunConfig {
             SourceIsolationCheck sourceIsolationCheck,
             Clock clock) {
         return new SourceIsolationService(sourceRepository, allowedDestinations, sourceIsolationCheck, clock);
+    }
+
+    @Bean
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
+    public SourceCoverageService sourceCoverageService(
+            SourceRepository sourceRepository,
+            AllowedDestinations allowedDestinations,
+            SourceCoverageCheck sourceCoverageCheck,
+            Clock clock) {
+        return new SourceCoverageService(sourceRepository, allowedDestinations, sourceCoverageCheck, clock);
     }
 
     @Bean
@@ -366,6 +379,19 @@ public class RunConfig {
                 execPlaneTransport,
                 properties.extractsDirectory(),
                 clock,
+                executionPlaneProperties.exitGrace());
+    }
+
+    /** ADR 0027: the coverage check shares the isolation check's binary, handshake and session. */
+    @Bean
+    public SourceCoverageCheck sourceCoverageCheck(
+            ExecPlaneProperties executionPlaneProperties,
+            PecSecretResolver pecSecretResolver,
+            ExecPlaneTransport execPlaneTransport) {
+        return new ExecPlaneCoverageCheck(
+                executionPlaneCommand(executionPlaneProperties),
+                pecSecretResolver,
+                execPlaneTransport,
                 executionPlaneProperties.exitGrace());
     }
 

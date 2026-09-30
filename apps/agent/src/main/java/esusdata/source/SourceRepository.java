@@ -1,5 +1,6 @@
 package esusdata.source;
 
+import esusdata.source.model.LastCoverage;
 import esusdata.source.model.LastDiagnostic;
 import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceRecord;
@@ -40,4 +41,13 @@ public interface SourceRepository {
 
     /** Every stored last isolation check, whatever its version, keyed by source id. */
     Map<String, LastIsolationCheck> findLastIsolationChecks();
+
+    /**
+     * Overwrites the source's last coverage check (ADR 0027), under the same rule as {@link
+     * #recordDiagnostic}: only while the source still has {@code coverage.sourceConfigurationVersion()}.
+     */
+    void recordCoverage(String sourceId, LastCoverage coverage);
+
+    /** Every stored last coverage check, whatever its version, keyed by source id. */
+    Map<String, LastCoverage> findLastCoverages();
 }

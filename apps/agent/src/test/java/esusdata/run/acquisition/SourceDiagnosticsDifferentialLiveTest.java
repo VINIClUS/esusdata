@@ -8,6 +8,7 @@ import esusdata.source.SourceDiagnosticsService;
 import esusdata.source.SourceDiagnosticsService.Diagnostics;
 import esusdata.source.SourceDiagnosticsService.Outcome;
 import esusdata.source.SourceRepository;
+import esusdata.source.model.LastCoverage;
 import esusdata.source.model.LastDiagnostic;
 import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceRecord;
@@ -101,6 +102,18 @@ class SourceDiagnosticsDifferentialLiveTest {
 
         @Override
         public Map<String, LastIsolationCheck> findLastIsolationChecks() {
+            return Map.of();
+        }
+
+        @Override
+        public void recordCoverage(String sourceId, LastCoverage coverage) {
+
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Map<String, LastCoverage> findLastCoverages() {
+
             return Map.of();
         }
     };

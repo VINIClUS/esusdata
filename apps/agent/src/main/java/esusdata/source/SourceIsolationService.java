@@ -4,12 +4,8 @@ import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceNotFoundException;
 import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
-import esusdata.source.pec.PecConnectionProperties;
 import esusdata.source.pec.PecSourceIdentity;
 import esusdata.source.pec.ReadBudget;
-import esusdata.source.pec.SourceAcquisitionLimiter;
-import esusdata.source.pec.SourceBudgetExceededException;
-import java.net.InetAddress;
 import java.time.Clock;
 import java.time.YearMonth;
 import java.util.HashSet;
@@ -147,47 +143,16 @@ public final class SourceIsolationService {
         }
     }
 
-    private static Checked checked(SourceIsolationCheck.Result result) {
-        Outcome outcome = switch (result.status()) {
-            case CHECKED -> Outcome.CHECKED;
-            case COMPATIBILITY_MISMATCH -> Outcome.COMPATIBILITY_MISMATCH;
-            case SOURCE_BUDGET_EXCEEDED -> Outcome.SOURCE_BUDGET_EXCEEDED;
-            // Same SQLSTATE classes as the diagnostic: the session is the same one.
-            case FAILED ->
-                Outcome.valueOf(SourceDiagnosticsService.classifySqlState(result.sqlState())
-                        .name());
-        };
-        return new Checked(outcome, result.counts());
-    }
-
-    // javac's try lint / PMD: the permit is held for the block's scope and released on close, never read.
-    @SuppressWarnings({"try", "PMD.UnusedLocalVariable"})
     private Checked run(SourceRecord source, YearMonth referencePeriod) {
-        InetAddress validatedAddress;
-        try {
-            validatedAddress = allowedDestinations.assertAllowed(source.host(), source.port());
-        } catch (AllowedDestinations.DestinationNotAllowedException e) {
-            return new Checked(Outcome.DESTINATION_NOT_ALLOWED);
+        SourceAggregateReads.Attempt<SourceIsolationCheck.Result> attempt = SourceAggregateReads.attempt(
+                source,
+                allowedDestinations,
+                (properties, identity, validatedHost) -> isolationCheck.check(
+                        properties, identity, validatedHost, referencePeriod, ReadBudget.initialEngineeringProposal()));
+        if (attempt.refusal() != null) {
+            return new Checked(attempt.refusal());
         }
-        PecConnectionProperties properties = new PecConnectionProperties(
-                source.id(),
-                source.host(),
-                source.port(),
-                source.databaseName(),
-                source.dbUser(),
-                source.secretRef(),
-                source.municipalityIbge());
-        PecSourceIdentity identity = new PecSourceIdentity(
-                source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole());
-        try (SourceAcquisitionLimiter.Permit permit = SourceAcquisitionLimiter.acquireOrFail(source.id())) {
-            return checked(isolationCheck.check(
-                    properties,
-                    identity,
-                    validatedAddress.getHostAddress(),
-                    referencePeriod,
-                    ReadBudget.initialEngineeringProposal()));
-        } catch (SourceBudgetExceededException e) {
-            return new Checked(Outcome.SOURCE_BUSY);
-        }
+        SourceIsolationCheck.Result result = attempt.result();
+        return new Checked(SourceAggregateReads.outcomeOf(result.status(), result.sqlState()), result.counts());
     }
 }

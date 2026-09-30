@@ -1,5 +1,6 @@
 package esusdata.source;
 
+import esusdata.source.model.LastCoverage;
 import esusdata.source.model.LastDiagnostic;
 import esusdata.source.model.LastIsolationCheck;
 import esusdata.source.model.SourceRecord;
@@ -11,6 +12,8 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Persists {@code sources} rows. {@code secret_ref} is a reference/state string only — the secret
@@ -18,9 +21,11 @@ import org.springframework.jdbc.core.RowMapper;
  */
 public final class JdbcSourceRepository implements SourceRepository {
 
+    private static final String CONFIGURATION_VERSION = "source_configuration_version";
+
     private static final RowMapper<SourceRecord> MAPPER = (rs, rowNum) -> new SourceRecord(
             rs.getString("id"),
-            rs.getInt("source_configuration_version"),
+            rs.getInt(CONFIGURATION_VERSION),
             rs.getString("source_family"),
             rs.getString("pec_installation_role"),
             rs.getString("source_location_kind"),
@@ -35,13 +40,25 @@ public final class JdbcSourceRepository implements SourceRepository {
             rs.getString("created_at"));
 
     private static final RowMapper<LastDiagnostic> DIAGNOSTIC_MAPPER = (rs, rowNum) -> new LastDiagnostic(
-            rs.getInt("source_configuration_version"),
+            rs.getInt(CONFIGURATION_VERSION),
             rs.getString("outcome"),
             rs.getString("detail"),
             rs.getString("tested_at"));
 
+    private static final String CHECKED = "CHECKED";
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final TypeReference<List<LastCoverage.PeriodCount>> PERIODS = new TypeReference<>() {};
+
+    private static final RowMapper<LastCoverage> COVERAGE_MAPPER = (rs, rowNum) -> new LastCoverage(
+            rs.getInt(CONFIGURATION_VERSION),
+            rs.getString("window_from"),
+            rs.getString("window_to_exclusive"),
+            rs.getString("outcome"),
+            periods(rs.getString("periods_json")),
+            rs.getString("checked_at"));
+
     private static final RowMapper<LastIsolationCheck> ISOLATION_MAPPER = (rs, rowNum) -> new LastIsolationCheck(
-            rs.getInt("source_configuration_version"),
+            rs.getInt(CONFIGURATION_VERSION),
             rs.getString("reference_period"),
             rs.getString("outcome"),
             nullableLong(rs, "registered_count"),
@@ -177,5 +194,42 @@ public final class JdbcSourceRepository implements SourceRepository {
                         (rs, rowNum) -> Map.entry(rs.getString("source_id"), ISOLATION_MAPPER.mapRow(rs, rowNum)))
                 .stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    @Override
+    public void recordCoverage(String sourceId, LastCoverage coverage) {
+        jdbc.update(
+                """
+                INSERT INTO source_period_coverage (source_id, source_configuration_version, window_from,
+                    window_to_exclusive, outcome, periods_json, checked_at)
+                SELECT id, source_configuration_version, ?, ?, ?, ?, ?
+                FROM sources WHERE id = ? AND source_configuration_version = ?
+                ON CONFLICT(source_id) DO UPDATE SET
+                    source_configuration_version = excluded.source_configuration_version,
+                    window_from = excluded.window_from, window_to_exclusive = excluded.window_to_exclusive,
+                    outcome = excluded.outcome, periods_json = excluded.periods_json,
+                    checked_at = excluded.checked_at
+                """,
+                coverage.windowFrom(),
+                coverage.windowToExclusive(),
+                coverage.outcome(),
+                CHECKED.equals(coverage.outcome()) ? JSON.writeValueAsString(coverage.periods()) : null,
+                coverage.checkedAt(),
+                sourceId,
+                coverage.sourceConfigurationVersion());
+    }
+
+    @Override
+    public Map<String, LastCoverage> findLastCoverages() {
+        return jdbc
+                .query(
+                        "select * from source_period_coverage",
+                        (rs, rowNum) -> Map.entry(rs.getString("source_id"), COVERAGE_MAPPER.mapRow(rs, rowNum)))
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    private static List<LastCoverage.PeriodCount> periods(String json) {
+        return json == null ? List.of() : JSON.readValue(json, PERIODS);
     }
 }

@@ -1,3 +1,5 @@
+mod aggregate;
+mod coverage;
 mod envelope;
 mod extract;
 mod isolation;
@@ -50,17 +52,18 @@ fn run() -> Result<i32, Box<dyn Error>> {
         Some("check_isolation") => {
             isolation::check_isolation(serde_json::from_value(message)?, lines)
         }
+        Some("check_coverage") => coverage::check_coverage(serde_json::from_value(message)?, lines),
         other => {
             eprintln!(
-                "observatorio-execplane: expected 'acquire', 'diagnose' or 'check_isolation', got: {other:?}"
+                "observatorio-execplane: expected 'acquire', 'diagnose', 'check_isolation' or 'check_coverage', got: {other:?}"
             );
             Ok(3)
         }
     }
 }
 
-/// Opens the one kind of session this process ever uses, for `acquire`, `diagnose` and
-/// `check_isolation`.
+/// Opens the one kind of session this process ever uses, for `acquire`, `diagnose`,
+/// `check_isolation` and `check_coverage`.
 /// `Ok(None)` means the failure was already reported on stdout and the process should exit 1.
 fn connect_session(
     host: &str,
@@ -580,6 +583,27 @@ mod tests {
             if entry["capability"] == CAPABILITY {
                 assert_eq!(entry["query_checksum"], checksum.as_str());
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod matrix_checksum_tests {
+    /// Every packaged matrix entry of `capability` pins the checksum of the query this binary embeds.
+    pub fn assert_matrix_checksum(capability: &str, checksum: &str) {
+        let matrix: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../contracts/compatibility/pec-adapters.json"
+        ))
+        .unwrap();
+        let entries: Vec<_> = matrix["tested_with"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["capability"] == capability)
+            .collect();
+        assert!(!entries.is_empty());
+        for entry in entries {
+            assert_eq!(entry["query_checksum"], checksum);
         }
     }
 }
