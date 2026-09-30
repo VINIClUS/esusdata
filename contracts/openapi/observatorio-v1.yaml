@@ -451,6 +451,93 @@ paths:
         "404":
           description: Unknown source, or caller lacks MANAGE_SOURCE for its municipality.
 
+  /api/v1/run-sources:
+    get:
+      tags: [runs]
+      summary: >-
+        The municipality's PEC sources as the Execução screen needs them (ADR 0028): the
+        competências the last coverage found (ADR 0027), whether each already has a published
+        result, and the source's competência scheduler. RUN_INDICATOR or MANAGE_SOURCE.
+      parameters:
+        - name: municipalityIbge
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: One entry per PEC source of the municipality.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RunSource" }
+        "404":
+          description: Caller holds neither RUN_INDICATOR nor MANAGE_SOURCE for the municipality.
+
+  /api/v1/sources/{id}/schedule:
+    put:
+      tags: [runs]
+      summary: >-
+        Switches the competência scheduler on or off for one source (ADR 0028). RUN_INDICATOR or
+        MANAGE_SOURCE and a recent reauth.
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: The source's scheduler after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Schedule" }
+        "400":
+          description: enabled is missing.
+        "401":
+          description: The session has no recent reauthentication.
+        "404":
+          description: Unknown or non-PEC source, or caller lacks both permissions for its municipality.
+
+  /api/v1/sources/{id}/schedule/run-now:
+    post:
+      tags: [runs]
+      summary: >-
+        "Verificar agora": one scheduler tick for this source now — refreshes its coverage and
+        enqueues at most the oldest settled competência without a result, under a manager of the
+        municipality. RUN_INDICATOR or MANAGE_SOURCE and a recent reauth.
+      security:
+        - sessionCookie: []
+          csrfCookie: []
+          csrfHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: What the tick concluded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Schedule" }
+        "401":
+          description: The session has no recent reauthentication.
+        "404":
+          description: Unknown or non-PEC source, or caller lacks both permissions for its municipality.
+
   /api/v1/sources/{id}/requirements:
     get:
       tags: [sources]
@@ -1056,6 +1143,44 @@ components:
               referencePeriod: { type: string, example: "2026-03" }
               count: { type: integer, format: int64 }
         checkedAt: { type: string, format: date-time }
+
+    RunSource:
+      type: object
+      properties:
+        sourceId: { type: string }
+        pecVersion: { type: string }
+        coverageOutcome:
+          type: string
+          nullable: true
+          description: Null until a coverage check ran against the current configuration.
+        coverageCheckedAt: { type: string, format: date-time, nullable: true }
+        periods:
+          type: array
+          description: Competências with atendimentos of the municipality, newest first.
+          items:
+            type: object
+            properties:
+              referencePeriod: { type: string, example: "2026-03" }
+              count: { type: integer, format: int64 }
+              published: { type: boolean }
+        schedule: { $ref: "#/components/schemas/Schedule" }
+
+    Schedule:
+      type: object
+      properties:
+        schedulerEnabled: { type: boolean, description: The installation-wide switch. }
+        enabled: { type: boolean, description: This source's switch. }
+        intervalHours: { type: integer }
+        settleDays: { type: integer }
+        nextTickAt: { type: string, format: date-time, nullable: true }
+        lastTickAt: { type: string, format: date-time, nullable: true }
+        lastOutcome:
+          type: string
+          nullable: true
+          enum: [ENQUEUED, UP_TO_DATE, JOB_ACTIVE, NO_MANAGER, COVERAGE_FAILED, SOURCE_BUSY, DISABLED]
+        lastDetail: { type: string, nullable: true }
+        lastJobId: { type: string, nullable: true }
+        lastPeriod: { type: string, nullable: true }
 
     LastDiagnostic:
       type: object
