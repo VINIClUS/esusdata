@@ -1,4 +1,7 @@
+import { useState } from 'react'
+import { Link as RouterLink, useNavigate } from 'react-router'
 import Box from '@mui/material/Box'
+import IconButton from '@mui/material/IconButton'
 import Button from '@mui/material/Button'
 import Grid from '@mui/material/Grid'
 import Typography from '@mui/material/Typography'
@@ -6,17 +9,16 @@ import {
   Bell,
   ChartColumn,
   ChevronRight,
-  CircleAlert,
   Database,
   ExternalLink,
-  Info,
   Play,
   TriangleAlert,
   Users,
   type LucideIcon,
 } from 'lucide-react'
 import { usePainelResumo } from '@/api/hooks'
-import type { Alerta, ExecucaoResumo, IndicadorPendencia, Kpi } from '@/api/types'
+import { AlertRow } from './AlertRow'
+import type { ExecucaoResumo, IndicadorPendencia, Kpi } from '@/api/types'
 import { DonutChart } from '@/components/charts/DonutChartCard'
 import { LineChartCard } from '@/components/charts/LineChartCard'
 import { Checklist } from '@/components/data/ChecklistCard'
@@ -38,36 +40,22 @@ const kpiIcons: Record<Kpi['icone'], LucideIcon> = {
   pendencias: TriangleAlert,
 }
 
-const alertIcon = {
-  error: { icon: TriangleAlert, color: colors.error },
-  warning: { icon: TriangleAlert, color: colors.warning },
-  info: { icon: Info, color: colors.primary },
-  success: { icon: CircleAlert, color: colors.success },
-}
-
 const pendenciaColumns: Column<IndicadorPendencia>[] = [
   {
     key: 'indicador',
     header: 'Indicador',
     render: (r) => (
-      <Typography sx={{ fontSize: 12.5, color: colors.navy, lineHeight: 1.3 }}>
+      <Typography sx={{ fontSize: 12.5, color: colors.navy, lineHeight: 1.3, fontWeight: 600 }}>
         {r.indicador}
       </Typography>
     ),
   },
   {
-    key: 'pendencias',
-    header: 'Pendências',
-    align: 'center',
+    key: 'motivo',
+    header: 'Motivo',
     render: (r) => (
-      <Typography
-        sx={{
-          fontSize: 13.5,
-          fontWeight: 700,
-          color: r.status === 'regular' ? colors.navy : colors.error,
-        }}
-      >
-        {r.pendencias}
+      <Typography sx={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.3 }}>
+        {r.motivo}
       </Typography>
     ),
   },
@@ -79,71 +67,35 @@ const pendenciaColumns: Column<IndicadorPendencia>[] = [
   },
 ]
 
+const runTones: Record<ExecucaoResumo['status'], { label: string; color: string }> = {
+  concluida: { label: 'Concluída', color: colors.success },
+  falha: { label: 'Falhou', color: colors.error },
+  andamento: { label: 'Em andamento', color: colors.primary },
+  cancelada: { label: 'Cancelada', color: colors.textSecondary },
+}
+
 const execucaoColumns: Column<ExecucaoResumo>[] = [
   { key: 'data', header: 'Data e hora', render: (r) => r.dataHora },
   { key: 'comp', header: 'Competência', render: (r) => r.competencia },
   {
     key: 'status',
     header: 'Status',
-    render: () => (
+    render: (r) => (
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
           gap: 1,
-          color: colors.success,
+          color: runTones[r.status].color,
           fontWeight: 600,
         }}
       >
-        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: colors.success }} />
-        Concluída
+        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: runTones[r.status].color }} />
+        {runTones[r.status].label}
       </Box>
     ),
   },
 ]
-
-function AlertRow({ alerta }: { alerta: Alerta }) {
-  const def = alertIcon[alerta.severidade]
-  const Icon = def.icon
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1.5,
-        py: 1,
-        borderBottom: `1px solid ${colors.border}`,
-        '&:last-of-type': { borderBottom: 0 },
-      }}
-    >
-      <Box sx={{ color: def.color, display: 'flex', flexShrink: 0 }}>
-        <Icon size={22} fill={def.color} color="#fff" strokeWidth={2} />
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color: colors.navy }}>
-          {alerta.titulo}
-        </Typography>
-        <Typography sx={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.35 }}>
-          {alerta.descricao}
-        </Typography>
-      </Box>
-      <Box
-        sx={{
-          textAlign: 'right',
-          fontSize: 12,
-          color: colors.textSecondary,
-          lineHeight: 1.35,
-          flexShrink: 0,
-        }}
-      >
-        {alerta.data}
-        <br />
-        {alerta.hora}
-      </Box>
-      <ChevronRight size={18} color={colors.primary} />
-    </Box>
-  )
-}
 
 function UnavailableValue({ children }: { children: string }) {
   return (
@@ -153,8 +105,12 @@ function UnavailableValue({ children }: { children: string }) {
   )
 }
 
+const ALERTAS_NO_PAINEL = 4
+
 export function PainelPage() {
   const { data, error, isError, isPending } = usePainelResumo()
+  const navigate = useNavigate()
+  const [meses, setMeses] = useState(8)
   if (isPending) return <PageSkeleton title="Painel Principal" />
   if (isError) {
     return (
@@ -210,8 +166,9 @@ export function PainelPage() {
             action={
               <FilterSelect
                 ariaLabel="Período do gráfico"
-                value="Últimos 8 meses"
+                value={`Últimos ${meses} meses`}
                 options={['Últimos 8 meses', 'Últimos 12 meses']}
+                onChange={(v) => setMeses(v.includes('12') ? 12 : 8)}
                 size="sm"
               />
             }
@@ -219,13 +176,15 @@ export function PainelPage() {
           >
             {data.evolucao.pontos.length > 0 && data.evolucao.series.length > 0 ? (
               <LineChartCard
-                data={data.evolucao.pontos}
+                data={data.evolucao.pontos.slice(-meses)}
                 series={data.evolucao.series}
                 xKey="mes"
                 height={172}
               />
             ) : (
-              <UnavailableValue>Histórico indisponível na API atual.</UnavailableValue>
+              <UnavailableValue>
+                Nenhum resultado calculado nas últimas competências.
+              </UnavailableValue>
             )}
           </SectionCard>
         </Grid>
@@ -238,7 +197,7 @@ export function PainelPage() {
           >
             <Box sx={{ mt: 0.5 }}>
               {data.qualidade.percentual === null ? (
-                <UnavailableValue>Qualidade indisponível na API atual.</UnavailableValue>
+                <UnavailableValue>Sem resultado publicado na competência.</UnavailableValue>
               ) : (
                 <DonutChart
                   size={140}
@@ -260,10 +219,19 @@ export function PainelPage() {
             </Box>
             <Box sx={{ mt: 2 }}>
               <Callout
-                variant="success"
+                variant={data.qualidade.percentual === 100 ? 'success' : 'info'}
                 dense
                 title={data.qualidade.titulo}
-                action={<ChevronRight size={18} color={colors.success} />}
+                action={
+                  <IconButton
+                    component={RouterLink}
+                    to="/qualidade"
+                    size="small"
+                    aria-label="Detalhes da qualidade dos dados"
+                  >
+                    <ChevronRight size={18} color={colors.primary} />
+                  </IconButton>
+                }
               >
                 {data.qualidade.descricao}
               </Callout>
@@ -283,12 +251,13 @@ export function PainelPage() {
                 divided
               />
             ) : (
-              <UnavailableValue>Verificações indisponíveis na API atual.</UnavailableValue>
+              <UnavailableValue>Nenhuma fonte do PEC cadastrada.</UnavailableValue>
             )}
             <Button
               variant="outlined"
               color="primary"
               fullWidth
+              onClick={() => void navigate('/qualidade')}
               startIcon={<ExternalLink size={16} />}
               endIcon={<ChevronRight size={16} />}
               sx={{
@@ -309,13 +278,15 @@ export function PainelPage() {
             icon={<Bell size={22} />}
             title="Alertas recentes"
             subtitle="Atenção aos itens que precisam de sua análise."
-            action={<LinkButton>Ver todos</LinkButton>}
+            action={<LinkButton to="/alertas">Ver todos</LinkButton>}
             sx={{ height: '100%' }}
           >
             {data.alertas.length > 0 ? (
-              data.alertas.map((a) => <AlertRow key={a.id} alerta={a} />)
+              data.alertas
+                .slice(0, ALERTAS_NO_PAINEL)
+                .map((a) => <AlertRow key={a.id} alerta={a} />)
             ) : (
-              <UnavailableValue>Nenhum alerta publicado.</UnavailableValue>
+              <UnavailableValue>Nenhum alerta.</UnavailableValue>
             )}
           </SectionCard>
         </Grid>
@@ -332,12 +303,13 @@ export function PainelPage() {
               <DataTable
                 columns={pendenciaColumns}
                 rows={data.maiorPendencia}
-                getRowKey={(r) => r.indicador}
+                getRowKey={(r) => r.codigo}
+                onRowClick={(r) => void navigate(`/indicadores/${r.codigo}`)}
                 dense
                 sx={{ '& td': { py: 0.55, fontSize: 12.5 }, '& th': { py: 0.9 } }}
               />
             ) : (
-              <UnavailableValue>Pendências detalhadas indisponíveis.</UnavailableValue>
+              <UnavailableValue>Nenhum indicador pendente.</UnavailableValue>
             )}
           </SectionCard>
         </Grid>
@@ -354,7 +326,7 @@ export function PainelPage() {
               <DataTable
                 columns={execucaoColumns}
                 rows={data.ultimasExecucoes}
-                getRowKey={(r) => r.dataHora}
+                getRowKey={(r) => r.jobId}
                 dense
                 sx={{
                   '& td': { py: 0.6, fontSize: 12.5, whiteSpace: 'nowrap' },
@@ -362,12 +334,19 @@ export function PainelPage() {
                 }}
               />
             ) : (
-              <UnavailableValue>Execuções indisponíveis na API atual.</UnavailableValue>
+              <UnavailableValue>Nenhuma execução registrada.</UnavailableValue>
             )}
             <Button
               fullWidth
               variant="outlined"
               color="primary"
+              onClick={() =>
+                void navigate(
+                  data.competenciaPendente
+                    ? `/execucao?competencia=${data.competenciaPendente}`
+                    : '/execucao',
+                )
+              }
               startIcon={
                 <Box
                   sx={{

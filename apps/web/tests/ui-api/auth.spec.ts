@@ -1,10 +1,11 @@
 import { expectNoA11yViolations } from '../support/a11y.ts'
 import { IBGE, XSRF, expect, test, type ApiStub } from './api.ts'
+import { overview } from './data.ts'
 
 /** A municipality with nothing published yet: the painel renders without results. */
 function emptyMunicipality(api: ApiStub) {
-  api.get('/indicator-packs', { json: [] })
   api.get(`/results/periods?municipalityIbge=${IBGE}`, { json: [] })
+  api.get(`/overview?municipalityIbge=${IBGE}`, { json: overview([], { referencePeriod: null }) })
 }
 
 async function fillLogin(page: import('@playwright/test').Page, user: string, password: string) {

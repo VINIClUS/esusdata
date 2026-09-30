@@ -5,7 +5,7 @@ import { findIndicadorDetalhe } from '../src/api/fixtures/indicadores.ts'
 import {
   normalizeIndicatorPacks,
   normalizeIndicatorResult,
-  normalizePainelResumo,
+  normalizeOverview,
   indicatorResultsPath,
   formatInstant,
 } from '../src/api/normalizers.ts'
@@ -206,7 +206,7 @@ test('normalizes a backend run response into the execution page model', () => {
   assert.equal(execution.log.length > 0, true)
 })
 
-test('keeps unstarted stages pending when a run is cancelled before processing', () => {
+test('a run cancelled before processing shows where it stopped, not stages still to come', () => {
   const execution = normalizers.normalizeRunResponse({
     jobId: 'job-2',
     runId: 'run-2',
@@ -231,7 +231,7 @@ test('keeps unstarted stages pending when a run is cancelled before processing',
 
   assert.deepEqual(
     execution.etapas.map((stage) => stage.status),
-    ['concluido', 'pendente', 'pendente', 'pendente'],
+    ['concluido', 'cancelado', 'nao_executado', 'nao_executado'],
   )
 })
 
@@ -536,95 +536,221 @@ test('keeps a blocked result unavailable instead of turning it into zero', () =>
   assert.deepEqual(detail.distribuicao, [])
 })
 
-test('derives the real-mode panel from the catalog and published results', () => {
-  const painel = normalizePainelResumo(
-    [
-      {
-        id: 'c1-mais-acesso',
-        ruleVersion: 'c1-mais-acesso@0.1.0',
-        family: 'PREVINE_BRASIL_QUALIDADE',
-        unit: 'percentual',
-        dependsOn: [],
-        executionEnabled: false,
-        blockedGates: ['Portão A (fonte e vigência) incompleto'],
-      },
-    ],
-    [
-      {
-        resultId: 'blocked-1',
-        indicatorPack: 'c1-mais-acesso',
-        referencePeriod: '2026-08',
-        status: 'BLOCKED',
-        value: null,
-        unit: 'percentual',
-        numerator: '2',
-        denominator: '3',
-        denominatorKind: 'PROGRAMADOS_MAIS_ESPONTANEOS',
-        classification: null,
-        dataCutoff: '2026-08-16',
-        limitations: ['Portão A (fonte e vigência) incompleto'],
-        scope: { municipalityIbge: '3541307' },
-        publishedAt: null,
-      },
-    ],
-    '2026-08',
+/** A GET /overview body (ADR 0029) with the given parts. */
+function overview(parts = {}) {
+  return {
+    municipalityIbge: '3541307',
+    referencePeriod: '2026-08',
+    lastUpdate: null,
+    indicators: [],
+    history: [],
+    quality: { published: 0, completeSnapshot: 0 },
+    checks: [],
+    alerts: [],
+    pendingPeriods: [],
+    recentRuns: null,
+    ...parts,
+  }
+}
+
+function indicator(indicatorPack, status, extra = {}) {
+  return {
+    indicatorPack,
+    ruleVersion: '0.1.0',
+    family: 'C1',
+    unit: 'percentual',
+    executionEnabled: true,
+    blockedGates: [],
+    resultId: status ? `r-${indicatorPack}` : null,
+    status,
+    value: status === 'COMPUTED' ? '50' : null,
+    limitations: [],
+    publishedAt: status ? '2026-09-01T12:00:00Z' : null,
+    ...extra,
+  }
+}
+
+test('the panel counts released, blocked and pending packs from the overview', () => {
+  const painel = normalizeOverview(
+    overview({
+      indicators: [
+        indicator('c1-a', 'COMPUTED'),
+        indicator('c1-b', 'NO_DENOMINATOR'),
+        indicator('c1-c', 'BLOCKED', { limitations: ['Portão A (fonte e vigência) incompleto'] }),
+        indicator('c1-d', null),
+      ],
+    }),
   )
 
   const indicadores = painel.kpis.find((kpi) => kpi.id === 'indicadores')
-  assert.equal(indicadores?.label, 'Indicadores liberados')
-  assert.equal(indicadores?.valor, '0 / 1')
+  assert.equal(indicadores?.valor, '2 / 4')
   assert.deepEqual(indicadores?.tendencia, {
     texto: '1 bloqueado por portões de liberação',
     tom: 'down',
   })
-  assert.equal(painel.kpis.find((kpi) => kpi.id === 'pendencias')?.valor, '1')
-  assert.equal(painel.alertas[0].descricao, 'Portão A (fonte e vigência) incompleto')
-  assert.deepEqual(painel.evolucao.pontos, [])
-  assert.equal(painel.qualidade.percentual, null)
+  assert.equal(painel.kpis.find((kpi) => kpi.id === 'pendencias')?.valor, '2')
+  assert.deepEqual(
+    painel.maiorPendencia.map((p) => [p.codigo, p.motivo, p.status]),
+    [
+      ['c1-c', 'Portão A (fonte e vigência) incompleto', 'bloqueado'],
+      ['c1-d', 'Sem resultado publicado na competência.', 'pendente'],
+    ],
+  )
 })
 
-test('a zero denominator passed the release gates: released, not pending', () => {
-  const pack = (id) => ({
-    id,
-    ruleVersion: `${id}@0.1.0`,
-    family: 'C1',
-    unit: 'percentual',
-    dependsOn: [],
-    executionEnabled: true,
-    blockedGates: [],
-  })
-  const published = (indicatorPack, status) => ({
-    resultId: `r-${indicatorPack}`,
-    indicatorPack,
-    referencePeriod: '2026-03',
-    status,
-    value: status === 'COMPUTED' ? '50' : null,
-    unit: 'percentual',
-    numerator: '0',
-    denominator: '0',
-    denominatorKind: 'PROGRAMADOS_MAIS_ESPONTANEOS',
-    classification: null,
-    dataCutoff: null,
-    limitations: status === 'BLOCKED' ? ['Portão A (fonte e vigência) incompleto'] : [],
-    scope: { municipalityIbge: '3541307' },
-    publishedAt: null,
-  })
-
-  const painel = normalizePainelResumo(
-    [pack('c1-a'), pack('c1-b'), pack('c1-c')],
-    [
-      published('c1-a', 'COMPUTED'),
-      published('c1-b', 'NO_DENOMINATOR'),
-      published('c1-c', 'BLOCKED'),
-    ],
-    '2026-03',
+test('a new installation: nothing published, the pending competência is what to run next', () => {
+  const painel = normalizeOverview(
+    overview({
+      referencePeriod: null,
+      indicators: [indicator('c1-mais-acesso', null)],
+      checks: [
+        { code: 'PEC_COVERAGE', sourceId: 'pec', status: 'OK', at: null, referencePeriod: null },
+        {
+          code: 'RESULTS_PUBLISHED',
+          sourceId: null,
+          status: 'ATTENTION',
+          at: null,
+          referencePeriod: null,
+        },
+      ],
+      alerts: [
+        {
+          code: 'CHECK_ATTENTION',
+          severity: 'WARNING',
+          subject: 'RESULTS_PUBLISHED',
+          referencePeriod: null,
+          sourceId: null,
+          detail: null,
+          at: null,
+        },
+        {
+          code: 'PENDING_PERIODS',
+          severity: 'INFO',
+          subject: null,
+          referencePeriod: '2024-10',
+          sourceId: 'pec',
+          detail: '23',
+          at: null,
+        },
+      ],
+      pendingPeriods: [
+        { sourceId: 'pec', referencePeriod: '2024-10', count: 900 },
+        { sourceId: 'pec', referencePeriod: '2024-11', count: 950 },
+      ],
+    }),
   )
 
-  assert.equal(painel.kpis.find((kpi) => kpi.id === 'indicadores')?.valor, '2 / 3')
-  assert.equal(painel.kpis.find((kpi) => kpi.id === 'pendencias')?.valor, '1')
+  assert.equal(painel.ultimaAtualizacao, null)
+  assert.equal(painel.competenciaPendente, '2024-10')
+  assert.equal(painel.qualidade.percentual, null)
+  assert.equal(painel.kpis.find((kpi) => kpi.id === 'cobertura')?.valor, '2')
+  assert.equal(painel.kpis.find((kpi) => kpi.id === 'cadastros')?.valor, '1 / 2')
   assert.deepEqual(
-    painel.alertas.map((alerta) => alerta.id),
-    ['indicator-c1-c'],
+    painel.alertas.map((a) => [a.titulo, a.to]),
+    [
+      ['Nenhum resultado publicado', '/execucao'],
+      ['23 competências com dados sem resultado', '/execucao?competencia=2024-10'],
+    ],
+  )
+  assert.deepEqual(painel.integridade, [
+    { label: 'Cobertura de competências', valor: 'Conforme', ok: true },
+    { label: 'Resultado da competência', valor: 'Atenção', ok: false },
+  ])
+})
+
+test('history plots only computed values: a blocked competência is a gap, never 0', () => {
+  const painel = normalizeOverview(
+    overview({
+      history: [
+        { referencePeriod: '2026-07', indicatorPack: 'c1-a', status: 'COMPUTED', value: '61.5' },
+        { referencePeriod: '2026-08', indicatorPack: 'c1-a', status: 'BLOCKED', value: null },
+      ],
+      quality: { published: 2, completeSnapshot: 2 },
+    }),
+  )
+
+  assert.deepEqual(
+    painel.evolucao.series.map((serie) => serie.key),
+    ['c1-a'],
+  )
+  assert.deepEqual(painel.evolucao.pontos, [{ mes: '07/2026', 'c1-a': 61.5 }, { mes: '08/2026' }])
+  assert.equal(painel.qualidade.percentual, 100)
+})
+
+test('recent runs keep their real state, and a failed run alert explains the code', () => {
+  const painel = normalizeOverview(
+    overview({
+      recentRuns: [
+        {
+          jobId: 'j1',
+          indicatorPack: 'c1-mais-acesso',
+          referencePeriod: '2026-03',
+          state: 'FAILED',
+          createdAt: '2026-09-30T12:00:00Z',
+          finishedAt: '2026-09-30T12:01:00Z',
+          failureCode: 'DESTINATION_NOT_ALLOWED',
+        },
+        {
+          jobId: 'j2',
+          indicatorPack: 'c1-mais-acesso',
+          referencePeriod: '2026-02',
+          state: 'RUNNING',
+          createdAt: '2026-09-30T12:00:00Z',
+          finishedAt: null,
+          failureCode: null,
+        },
+      ],
+      alerts: [
+        {
+          code: 'RUN_FAILED',
+          severity: 'ERROR',
+          subject: 'c1-mais-acesso',
+          referencePeriod: '2026-03',
+          sourceId: null,
+          detail: 'DESTINATION_NOT_ALLOWED',
+          at: '2026-09-30T12:01:00Z',
+        },
+      ],
+    }),
+  )
+
+  assert.deepEqual(
+    painel.ultimasExecucoes.map((r) => r.status),
+    ['falha', 'andamento'],
+  )
+  assert.equal(
+    painel.alertas[0].descricao,
+    '03/2026: O endereço do PEC não está liberado na configuração do Esusdata.',
+  )
+  assert.equal(painel.alertas[0].to, '/execucao?competencia=2026-03&indicador=c1-mais-acesso')
+})
+
+test('a failed run marks the stage it stopped in, and the later ones as never run', () => {
+  const etapas = normalizers.normalizeRunResponse({
+    jobId: 'j',
+    runId: 'r',
+    state: 'FAILED',
+    attempt: 1,
+    maxAttempts: 3,
+    municipalityIbge: '3541307',
+    indicatorPack: 'c1-mais-acesso',
+    ruleVersion: '0.1.0',
+    referencePeriod: '2026-03',
+    sourceId: 'pec',
+    extractionId: null,
+    createdAt: '2026-09-30T12:00:00Z',
+    startedAt: '2026-09-30T12:00:01Z',
+    finishedAt: '2026-09-30T12:00:02Z',
+    lastProgressAt: null,
+    failureCode: 'DESTINATION_NOT_ALLOWED',
+    failureDetail: 'Destination 192.0.2.10:5433 is not in the approved allowlist',
+    resultId: null,
+    attempts: [],
+  }).etapas
+
+  assert.deepEqual(
+    etapas.map((e) => e.status),
+    ['concluido', 'falhou', 'nao_executado', 'nao_executado'],
   )
 })
 

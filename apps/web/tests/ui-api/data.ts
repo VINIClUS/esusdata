@@ -3,6 +3,8 @@ import type {
   ExportResponse,
   IndicatorPack,
   IndicatorResultResponse,
+  OverviewIndicator,
+  OverviewResponse,
   RunResponse,
   RunSourceResponse,
   SourceResponse,
@@ -142,6 +144,49 @@ export function runSource(overrides: Partial<RunSourceResponse> = {}): RunSource
       lastJobId: null,
       lastPeriod: null,
     },
+    ...overrides,
+  }
+}
+
+/** One catalog pack in GET /overview, with its result in the competência when `status` is given. */
+export function overviewIndicator(
+  indicatorPack: string,
+  status: string | null = null,
+  value: string | null = null,
+  overrides: Partial<OverviewIndicator> = {},
+): OverviewIndicator {
+  return {
+    indicatorPack,
+    ruleVersion: '1.0.0',
+    family: 'C1',
+    unit: 'PERCENT',
+    executionEnabled: true,
+    blockedGates: [],
+    resultId: status ? `r-${indicatorPack}` : null,
+    status,
+    value,
+    limitations: status === 'BLOCKED' ? ['Portão A (fonte e vigência) incompleto'] : [],
+    publishedAt: status ? '2026-04-02T12:00:00Z' : null,
+    ...overrides,
+  }
+}
+
+/** A GET /overview body (ADR 0029): empty sections unless given. */
+export function overview(
+  indicators: OverviewIndicator[],
+  overrides: Partial<OverviewResponse> = {},
+): OverviewResponse {
+  return {
+    municipalityIbge: IBGE,
+    referencePeriod: PERIOD,
+    lastUpdate: indicators.some((i) => i.status) ? '2026-04-02T12:00:00Z' : null,
+    indicators,
+    history: [],
+    quality: { published: 0, completeSnapshot: 0 },
+    checks: [],
+    alerts: [],
+    pendingPeriods: [],
+    recentRuns: [],
     ...overrides,
   }
 }

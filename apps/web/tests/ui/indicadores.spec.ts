@@ -141,7 +141,7 @@ test.describe('detalhe do indicador', () => {
   test('"Executar novamente" leva à execução e "Voltar" à lista', async ({ page }) => {
     await page.goto('/indicadores/PB-01?mock-login=1')
     await page.getByRole('button', { name: 'Executar novamente' }).click()
-    await expect(page).toHaveURL('/execucao')
+    await expect(page).toHaveURL(/^http:\/\/[^/]+\/execucao\?indicador=PB-01/)
     await page.goto('/indicadores/PB-01')
     await page.getByRole('link', { name: 'Voltar aos indicadores' }).click()
     await expect(page).toHaveURL('/indicadores')

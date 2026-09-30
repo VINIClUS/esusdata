@@ -56,7 +56,10 @@ test.describe('navegação no desktop', () => {
 
   test('o painel leva às listas completas', async ({ page }) => {
     await page.goto('/painel?mock-login=1')
-    await page.getByRole('link', { name: 'Ver todos' }).click()
+    await page.getByRole('link', { name: 'Ver todos' }).first().click()
+    await expect(page).toHaveURL('/alertas')
+    await page.goto('/painel')
+    await page.getByRole('link', { name: 'Ver todos' }).nth(1).click()
     await expect(page).toHaveURL('/indicadores')
     await page.goto('/painel')
     await page.getByRole('link', { name: 'Ver todas' }).click()

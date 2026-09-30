@@ -77,6 +77,7 @@ export function ExecucaoUnica({
   fonte,
   ultima,
   podeExecutar,
+  sugestao,
   acompanhando,
   onAcompanhar,
   onVerCobertura,
@@ -85,6 +86,8 @@ export function ExecucaoUnica({
   fonte: RunSourceResponse
   ultima: RunResponse | null
   podeExecutar: boolean
+  /** Parameters a link asked for; a competência the PEC has no data for is ignored. */
+  sugestao: Parametros
   acompanhando: string | undefined
   onAcompanhar: (jobId: string) => void
   onVerCobertura: () => void
@@ -92,7 +95,12 @@ export function ExecucaoUnica({
   const queryClient = useQueryClient()
   const pacotes = usePacotesIndicadores(podeExecutar)
   const { data: run } = useExecucao(acompanhando, ultima)
-  const [parametros, setParametros] = useState<Parametros>({})
+  const [parametros, setParametros] = useState<Parametros>(() => ({
+    referencePeriod: fonte.periods.some((p) => p.referencePeriod === sugestao.referencePeriod)
+      ? sugestao.referencePeriod
+      : undefined,
+    indicatorPack: sugestao.indicatorPack,
+  }))
   const [editando, setEditando] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)

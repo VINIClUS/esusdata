@@ -1,4 +1,5 @@
-export type EtapaStatus = 'concluido' | 'em_execucao' | 'pendente'
+export type EtapaStatus =
+  'concluido' | 'em_execucao' | 'pendente' | 'falhou' | 'cancelado' | 'nao_executado'
 
 export interface EtapaExecucao {
   numero: number

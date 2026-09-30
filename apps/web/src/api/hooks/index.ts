@@ -1,23 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { USE_MOCKS, ApiError, apiFetch, apiFetchBlob, ensureApiReady, resolveMock } from '../client'
 import { execucaoFixture, fontesExecucaoFixture, pacotesFixture } from '../fixtures/execucao'
 import { fonteFixture, requisitosFixture } from '../fixtures/fonteDados'
 import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadores'
 import { isolamentoSourcesFixture } from '../fixtures/isolamento'
-import { painelFixture } from '../fixtures/painel'
+import { demoContext } from '../fixtures/context'
+import { overviewFixture, painelFixture } from '../fixtures/painel'
 import { exportPeriodsFixture, exportsFixture } from '../fixtures/relatorios'
 import { useScope } from '@/app/scope-context'
 import {
   exportContentPath,
   exportsPath,
+  formatInstant,
   indicatorResultsPath,
   isPecSource,
   isRunTerminal,
   normalizeIndicatorPacks,
   normalizeExport,
   normalizeIndicatorResult,
-  normalizePainelResumo,
+  normalizeOverview,
+  overviewPacks,
   normalizeRequirements,
   normalizeSource,
   pickSource,
@@ -25,6 +28,7 @@ import {
 } from '../normalizers'
 import type {
   CreateRunRequest,
+  EvidencePage,
   Exportacao,
   ExportResponse,
   Fonte,
@@ -32,7 +36,7 @@ import type {
   IndicadorDetalhe,
   IndicatorResultResponse,
   IsolationCheckResponse,
-  PainelResumo,
+  OverviewResponse,
   RequisitoFonte,
   RunResponse,
   RunSchedule,
@@ -72,32 +76,10 @@ function resolveApiIndicadorDetalhe(
   })
 }
 
-/** Every pack's results in the scope's competência; none without a municipality and a period. */
-async function resultsForPacks(
-  packs: IndicatorPack[],
-  { municipalityIbge, referencePeriod }: ApiScope,
-): Promise<IndicatorResultResponse[]> {
-  if (!municipalityIbge || !referencePeriod) return []
-  return (
-    await Promise.all(
-      packs.map((pack) =>
-        apiFetch<IndicatorResultResponse[]>(
-          indicatorResultsPath({ municipalityIbge, indicatorPack: pack.id, referencePeriod }),
-        ),
-      ),
-    )
-  ).flat()
-}
-
-async function resolveApiPainelResumo(scope: ApiScope): Promise<PainelResumo> {
-  const packs = await apiFetch<IndicatorPack[]>('/indicator-packs')
-  const results = await resultsForPacks(packs, scope)
-  return normalizePainelResumo(packs, results, scope.referencePeriod || 'período atual')
-}
-
-async function resolveApiIndicadores(scope: ApiScope) {
-  const packs = await apiFetch<IndicatorPack[]>('/indicator-packs')
-  return normalizeIndicatorPacks(packs, await resultsForPacks(packs, scope))
+function overviewPath({ municipalityIbge, referencePeriod }: ApiScope): string {
+  const params = new URLSearchParams({ municipalityIbge: municipalityIbge ?? '' })
+  if (referencePeriod) params.set('referencePeriod', referencePeriod)
+  return `/overview?${params.toString()}`
 }
 
 async function resolveApiFonte(municipalityIbge: string | undefined): Promise<Fonte> {
@@ -106,16 +88,54 @@ async function resolveApiFonte(municipalityIbge: string | undefined): Promise<Fo
   return normalizeSource(source)
 }
 
-export function usePainelResumo() {
+function overviewPacksList(overview: OverviewResponse) {
+  const { packs, results } = overviewPacks(overview)
+  return normalizeIndicatorPacks(packs, results)
+}
+
+/**
+ * `GET /overview` (ADR 0029) for the scope, shaped by `select`: the Painel, the catalog with the
+ * competência's results, the checks and the alerts all come from this one read. Keyed under
+ * ['painel'] so "Atualizar" and a finished run refresh every screen built from it.
+ */
+function useOverviewSelect<T>(select: (overview: OverviewResponse) => T) {
   const { municipalityIbge, referencePeriod, isLoading } = useScope()
   return useQuery({
-    queryKey: ['painel', municipalityIbge, referencePeriod],
-    queryFn: () =>
-      USE_MOCKS
-        ? resolveMock(painelFixture)
-        : resolveApiPainelResumo({ municipalityIbge, referencePeriod }),
+    queryKey: ['painel', 'overview', municipalityIbge, referencePeriod],
+    queryFn: (): Promise<OverviewResponse> => {
+      if (USE_MOCKS) return resolveMock(overviewFixture)
+      if (!municipalityIbge) return Promise.reject(new Error(NO_MUNICIPALITY))
+      return apiFetch<OverviewResponse>(overviewPath({ municipalityIbge, referencePeriod }))
+    },
+    select,
     enabled: !isLoading,
   })
+}
+
+const asIs = (overview: OverviewResponse) => overview
+// The demo keeps its own richer Painel and catalog; the overview fixture feeds the other screens.
+const demoPainel = () => painelFixture
+const demoIndicadores = () => indicadoresFixture
+
+const lastUpdateOf = (overview: OverviewResponse) =>
+  overview.lastUpdate ? formatInstant(overview.lastUpdate) : null
+const demoLastUpdate = () => demoContext.ultimaAtualizacao
+
+/** The newest publication in the scope, for the header's "Última atualização dos dados". */
+export function useUltimaAtualizacao() {
+  return useOverviewSelect(USE_MOCKS ? demoLastUpdate : lastUpdateOf)
+}
+
+export function useVisaoGeral() {
+  return useOverviewSelect(asIs)
+}
+
+export function usePainelResumo() {
+  return useOverviewSelect(USE_MOCKS ? demoPainel : normalizeOverview)
+}
+
+export function useIndicadores() {
+  return useOverviewSelect(USE_MOCKS ? demoIndicadores : overviewPacksList)
 }
 
 /** The pack catalog alone, for screens that only list the indicators by name. */
@@ -131,15 +151,24 @@ export function useCatalogoIndicadores() {
   })
 }
 
-export function useIndicadores() {
-  const { municipalityIbge, referencePeriod, isLoading } = useScope()
-  return useQuery({
-    queryKey: ['indicadores', 'lista', municipalityIbge, referencePeriod],
-    queryFn: () =>
-      USE_MOCKS
-        ? resolveMock(indicadoresFixture)
-        : resolveApiIndicadores({ municipalityIbge, referencePeriod }),
-    enabled: !isLoading,
+/**
+ * The published result's evidence rows, a page at a time (the API's opaque cursor). Each page read
+ * is audited by the API, so a page is only fetched when asked for.
+ */
+export function useEvidencias(resultId: string | undefined) {
+  const { municipalityIbge } = useScope()
+  return useInfiniteQuery({
+    queryKey: ['results', 'evidence', resultId, municipalityIbge],
+    queryFn: ({ pageParam }): Promise<EvidencePage> => {
+      const params = new URLSearchParams({ municipalityIbge: municipalityIbge ?? '' })
+      if (pageParam) params.set('cursor', pageParam)
+      return apiFetch<EvidencePage>(
+        `/results/${encodeURIComponent(resultId ?? '')}/evidence?${params.toString()}`,
+      )
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor,
+    enabled: !USE_MOCKS && !!resultId && !!municipalityIbge,
   })
 }
 

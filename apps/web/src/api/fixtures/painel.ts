@@ -1,5 +1,5 @@
 // DEMO DATA — dados de demonstração; não usar como referência clínica ou operacional.
-import type { PainelResumo } from '../types'
+import type { OverviewResponse, PainelResumo } from '../types'
 
 export const painelFixture: PainelResumo = {
   kpis: [
@@ -109,23 +109,209 @@ export const painelFixture: PainelResumo = {
     },
   ],
   maiorPendencia: [
-    { indicador: 'Pré-natal adequado', pendencias: 86, status: 'critico' },
-    { indicador: 'Cobertura de exame citopatológico', pendencias: 64, status: 'critico' },
-    { indicador: 'Acompanhamento de diabéticos', pendencias: 42, status: 'atencao' },
-    { indicador: 'Acompanhamento de hipertensos', pendencias: 38, status: 'atencao' },
-    { indicador: 'Vacinação em menores de 1 ano', pendencias: 26, status: 'atencao' },
-    { indicador: 'Consulta odontológica', pendencias: 18, status: 'regular' },
-    { indicador: 'Hipertensão com PA controlada', pendencias: 12, status: 'regular' },
-    { indicador: 'Diabetes com HbA1c solicitada', pendencias: 8, status: 'regular' },
+    {
+      codigo: 'PB-01',
+      indicador: 'Pré-natal adequado',
+      motivo: '86 pendências · Abaixo da meta na competência',
+      status: 'critico',
+    },
+    {
+      codigo: 'PB-02',
+      indicador: 'Cobertura de exame citopatológico',
+      motivo: '64 pendências · Abaixo da meta na competência',
+      status: 'critico',
+    },
+    {
+      codigo: 'PB-03',
+      indicador: 'Acompanhamento de diabéticos',
+      motivo: '42 pendências · Perto do limite da meta',
+      status: 'atencao',
+    },
+    {
+      codigo: 'PB-04',
+      indicador: 'Acompanhamento de hipertensos',
+      motivo: '38 pendências · Perto do limite da meta',
+      status: 'atencao',
+    },
+    {
+      codigo: 'PB-05',
+      indicador: 'Vacinação em menores de 1 ano',
+      motivo: '26 pendências · Perto do limite da meta',
+      status: 'atencao',
+    },
+    {
+      codigo: 'PB-06',
+      indicador: 'Consulta odontológica',
+      motivo: '18 pendências · Dentro da meta',
+      status: 'regular',
+    },
+    {
+      codigo: 'PB-07',
+      indicador: 'Hipertensão com PA controlada',
+      motivo: '12 pendências · Dentro da meta',
+      status: 'regular',
+    },
+    {
+      codigo: 'PB-08',
+      indicador: 'Diabetes com HbA1c solicitada',
+      motivo: '8 pendências · Dentro da meta',
+      status: 'regular',
+    },
   ],
   ultimasExecucoes: [
-    { dataHora: '16/08/2026 10:05', competencia: 'Ago/2026', status: 'concluida' },
-    { dataHora: '10/08/2026 16:32', competencia: 'Jul/2026', status: 'concluida' },
-    { dataHora: '12/07/2026 11:26', competencia: 'Jun/2026', status: 'concluida' },
-    { dataHora: '15/06/2026 09:14', competencia: 'Mai/2026', status: 'concluida' },
-    { dataHora: '13/05/2026 14:22', competencia: 'Abr/2026', status: 'concluida' },
-    { dataHora: '14/04/2026 10:03', competencia: 'Mar/2026', status: 'concluida' },
-    { dataHora: '12/03/2026 16:40', competencia: 'Fev/2026', status: 'concluida' },
-    { dataHora: '16/02/2026 11:18', competencia: 'Jan/2026', status: 'concluida' },
+    {
+      jobId: 'job-demo-1',
+      dataHora: '16/08/2026 10:05',
+      competencia: 'Ago/2026',
+      status: 'concluida',
+    },
+    {
+      jobId: 'job-demo-2',
+      dataHora: '10/08/2026 16:32',
+      competencia: 'Jul/2026',
+      status: 'concluida',
+    },
+    {
+      jobId: 'job-demo-3',
+      dataHora: '12/07/2026 11:26',
+      competencia: 'Jun/2026',
+      status: 'concluida',
+    },
+    {
+      jobId: 'job-demo-4',
+      dataHora: '15/06/2026 09:14',
+      competencia: 'Mai/2026',
+      status: 'concluida',
+    },
+    {
+      jobId: 'job-demo-5',
+      dataHora: '13/05/2026 14:22',
+      competencia: 'Abr/2026',
+      status: 'concluida',
+    },
+    {
+      jobId: 'job-demo-6',
+      dataHora: '14/04/2026 10:03',
+      competencia: 'Mar/2026',
+      status: 'concluida',
+    },
+    {
+      jobId: 'job-demo-7',
+      dataHora: '12/03/2026 16:40',
+      competencia: 'Fev/2026',
+      status: 'concluida',
+    },
+    {
+      jobId: 'job-demo-8',
+      dataHora: '16/02/2026 11:18',
+      competencia: 'Jan/2026',
+      status: 'concluida',
+    },
+  ],
+}
+
+export const overviewFixture: OverviewResponse = {
+  municipalityIbge: '3538704',
+  referencePeriod: '2026-08',
+  lastUpdate: '2026-09-19T13:14:10Z',
+  indicators: [
+    {
+      indicatorPack: 'c1-mais-acesso',
+      ruleVersion: '1.0.0',
+      family: 'C1',
+      unit: 'PERCENT',
+      executionEnabled: true,
+      blockedGates: [],
+      resultId: 'r-demo',
+      status: 'BLOCKED',
+      value: null,
+      limitations: ['Portão A (fonte e vigência) incompleto'],
+      publishedAt: '2026-09-19T13:14:10Z',
+    },
+  ],
+  history: [
+    {
+      referencePeriod: '2026-06',
+      indicatorPack: 'c1-mais-acesso',
+      status: 'COMPUTED',
+      value: '58.2',
+    },
+    {
+      referencePeriod: '2026-07',
+      indicatorPack: 'c1-mais-acesso',
+      status: 'COMPUTED',
+      value: '61.4',
+    },
+    { referencePeriod: '2026-08', indicatorPack: 'c1-mais-acesso', status: 'BLOCKED', value: null },
+  ],
+  quality: { published: 1, completeSnapshot: 1 },
+  checks: [
+    {
+      code: 'SOURCE_CONNECTION',
+      sourceId: 'pec-demo',
+      status: 'OK',
+      at: '2026-09-19T13:00:00Z',
+      referencePeriod: null,
+    },
+    {
+      code: 'MUNICIPAL_ISOLATION',
+      sourceId: 'pec-demo',
+      status: 'OK',
+      at: '2026-09-19T13:05:00Z',
+      referencePeriod: '2026-08',
+    },
+    {
+      code: 'PEC_COVERAGE',
+      sourceId: 'pec-demo',
+      status: 'OK',
+      at: '2026-09-19T13:05:00Z',
+      referencePeriod: null,
+    },
+    {
+      code: 'SCHEDULER',
+      sourceId: 'pec-demo',
+      status: 'OK',
+      at: '2026-09-19T13:05:00Z',
+      referencePeriod: '2026-08',
+    },
+    {
+      code: 'RESULTS_PUBLISHED',
+      sourceId: null,
+      status: 'OK',
+      at: null,
+      referencePeriod: '2026-08',
+    },
+  ],
+  alerts: [
+    {
+      code: 'RESULT_BLOCKED',
+      severity: 'WARNING',
+      subject: 'c1-mais-acesso',
+      referencePeriod: '2026-08',
+      sourceId: null,
+      detail: null,
+      at: null,
+    },
+    {
+      code: 'PENDING_PERIODS',
+      severity: 'INFO',
+      subject: null,
+      referencePeriod: '2026-09',
+      sourceId: 'pec-demo',
+      detail: '1',
+      at: null,
+    },
+  ],
+  pendingPeriods: [{ sourceId: 'pec-demo', referencePeriod: '2026-09', count: 3120 }],
+  recentRuns: [
+    {
+      jobId: 'job-demo',
+      indicatorPack: 'c1-mais-acesso',
+      referencePeriod: '2026-08',
+      state: 'SUCCEEDED',
+      createdAt: '2026-09-19T13:12:00Z',
+      finishedAt: '2026-09-19T13:14:10Z',
+      failureCode: null,
+    },
   ],
 }

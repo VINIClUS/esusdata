@@ -72,6 +72,9 @@ export interface InfoAdicional {
 
 export interface IndicadorDetalhe {
   codigo: string
+  /** The published result behind the detail (API mode); its evidence is paged from the API. */
+  resultId?: string
+  competencia?: string
   nome: string
   status: StatusKey
   descricao: string
@@ -93,4 +96,22 @@ export interface IndicadorDetalhe {
   metodologia: MetodologiaItem[]
   evidencias: EvidenciaMotivo[]
   infoAdicionais: InfoAdicional[]
+}
+
+/** `GET /results/{id}/evidence`: one minimal evidence row (no name, CPF or CNS). */
+export interface EvidenceEntry {
+  sourceEntityType: string
+  sourceRecordId: string
+  careDate: string | null
+  modality: string | null
+  cnes: string | null
+  ine: string | null
+  cbo: string | null
+  decision: string
+  criterionVersion: string
+}
+
+export interface EvidencePage {
+  items: EvidenceEntry[]
+  nextCursor: string | null
 }
