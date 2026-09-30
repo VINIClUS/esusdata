@@ -3,11 +3,15 @@ package esusdata.run.schedule;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.auth.model.Role;
+import esusdata.source.model.LastCoverage;
+import esusdata.source.model.SourceRecord;
 import esusdata.web.ApiFixtureSupport;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.annotation.DirtiesContext;
 
@@ -89,6 +93,60 @@ class ScheduleApiTest extends ApiFixtureSupport {
         assertThat(get(sessionCookie(manager), "/api/v1/run-sources?municipalityIbge=" + MUNICIPALITY)
                         .body())
                 .contains("\"coverageOutcome\":\"DESTINATION_NOT_ALLOWED\"");
+    }
+
+    @Test
+    void theStoredCoverageListsItsCompetenciasForTheExecutionScreen() throws Exception {
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, MUNICIPALITY);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+        sourceRepository.recordCoverage(
+                sourceId,
+                new LastCoverage(
+                        1,
+                        "2024-09",
+                        "2026-10",
+                        "CHECKED",
+                        List.of(new LastCoverage.PeriodCount("2026-03", 10_029)),
+                        "2026-09-30T12:00:00Z"));
+
+        HttpResponse<String> response =
+                get(sessionCookie(manager), "/api/v1/run-sources?municipalityIbge=" + MUNICIPALITY);
+
+        assertThat(response.body())
+                .contains("\"coverageOutcome\":\"CHECKED\"")
+                .contains("{\"referencePeriod\":\"2026-03\",\"count\":10029,\"published\":false}");
+    }
+
+    @Test
+    void aSwitchWithoutEnabledIsRefusedAndANonPecSourceIsTheOpaque404() throws Exception {
+        String admin = createUser("admin-" + System.nanoTime());
+        grantMunicipality(admin, Role.TECHNICAL_ADMIN, MUNICIPALITY);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, MUNICIPALITY);
+        String datasetId = "dataset-" + System.nanoTime();
+        sourceRepository.upsert(new SourceRecord(
+                datasetId,
+                1,
+                "EXTERNAL_DATASET",
+                null,
+                null,
+                "127.0.0.1", // NOPMD - AvoidUsingHardCodedIP: loopback test server
+                5432,
+                "esus",
+                "esus_leitura",
+                "PEC_DB_PASSWORD",
+                MUNICIPALITY,
+                null,
+                null,
+                Instant.EPOCH.toString()));
+        String cookie = reauthenticatedSessionCookie(admin);
+
+        assertThat(authenticatedPut(cookie, URI.create(BASE_URL + "/api/v1/sources/" + sourceId + "/schedule"), "{}")
+                        .statusCode())
+                .isEqualTo(400);
+        assertThat(putSchedule(cookie, datasetId, false).statusCode()).isEqualTo(404);
     }
 
     private HttpResponse<String> runNow(String cookie, String sourceId) throws Exception {

@@ -1,17 +1,24 @@
 package esusdata.run.schedule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import esusdata.auth.ScopeResolver;
 import esusdata.result.model.ResultRepository;
+import esusdata.run.job.ActiveJobExistsException;
 import esusdata.run.job.Job;
+import esusdata.run.job.JobRepository;
 import esusdata.run.job.JobState;
 import esusdata.run.worker.JobRunnerTestFixture;
 import esusdata.source.SourceCoverageCheck;
 import esusdata.source.SourceCoverageService;
+import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
+import esusdata.source.pec.SourceAcquisitionLimiter;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
@@ -33,6 +40,9 @@ class CoverageSchedulerTest {
 
     private static final String MUNICIPALITY = "3541307";
     private static final String SOURCE = "src-1";
+    private static final String BROKEN = "src-0";
+    private static final CoverageScheduler.Settings SETTINGS =
+            new CoverageScheduler.Settings(true, Duration.ofHours(6), Duration.ofMinutes(2), 5);
 
     @TempDir
     Path dataDir;
@@ -58,8 +68,16 @@ class CoverageSchedulerTest {
     }
 
     private CoverageScheduler scheduler(AllowedDestinations destinations) {
+        return scheduler(destinations, fixture.jobRepository, SETTINGS);
+    }
+
+    private CoverageScheduler scheduler(
+            AllowedDestinations destinations, JobRepository jobs, CoverageScheduler.Settings settings) {
         SourceCoverageCheck check = (properties, identity, host, from, toExclusive, budget) -> {
             coverageReads.incrementAndGet();
+            if (BROKEN.equals(identity.sourceId())) {
+                throw new IllegalStateException("broken source");
+            }
             return SourceCoverageCheck.Result.checked(List.of(
                     new SourceCoverageCheck.PeriodCount(MUNICIPALITY, "2026-03", 10_029),
                     new SourceCoverageCheck.PeriodCount(MUNICIPALITY, "2026-04", 9_458),
@@ -68,16 +86,20 @@ class CoverageSchedulerTest {
         return new CoverageScheduler(
                 fixture.sourceRepository,
                 new SourceCoverageService(fixture.sourceRepository, destinations, check, clock),
-                fixture.jobRepository,
+                jobs,
                 results,
                 new ScopeResolver(fixture.jdbc),
                 schedules,
                 clock,
-                new CoverageScheduler.Settings(true, Duration.ofHours(6), Duration.ofMinutes(2), 5));
+                settings);
+    }
+
+    private static AllowedDestinations loopback() {
+        return new AllowedDestinations(Set.of(new AllowedDestinations.HostPort("127.0.0.1", 5432)));
     }
 
     private CoverageScheduler scheduler() {
-        return scheduler(new AllowedDestinations(Set.of(new AllowedDestinations.HostPort("127.0.0.1", 5432))));
+        return scheduler(loopback());
     }
 
     private ScheduleState tick(CoverageScheduler scheduler) {
@@ -179,5 +201,101 @@ class CoverageSchedulerTest {
 
         assertThat(off.isRunning()).isFalse();
         assertThat(off.nextTickAt()).isEmpty();
+    }
+
+    @Test
+    // javac's try lint / PMD: the permit is held for the block's scope and released on close, never read.
+    @SuppressWarnings({"try", "PMD.UnusedLocalVariable"})
+    void aBusySourceIsRetriedNextTickWithoutStoringACoverage() {
+        fixture.registerPrincipal("manager-1", MUNICIPALITY);
+
+        ScheduleState state;
+        try (SourceAcquisitionLimiter.Permit held = SourceAcquisitionLimiter.acquireOrFail(SOURCE)) {
+            state = tick(scheduler());
+        }
+
+        assertThat(state.lastOutcome()).isEqualTo("SOURCE_BUSY");
+        assertThat(coverageReads).hasValue(0);
+        assertThat(fixture.sourceRepository.findLastCoverages()).doesNotContainKey(SOURCE);
+    }
+
+    @Test
+    void aManualRunThatWinsTheRaceIsRecordedAsTheActiveJob() {
+        fixture.registerPrincipal("manager-1", MUNICIPALITY);
+        JobRepository jobs = spy(fixture.jobRepository);
+        doThrow(new ActiveJobExistsException("job-manual")).when(jobs).enqueue(any());
+
+        ScheduleState state = tick(scheduler(loopback(), jobs, SETTINGS));
+
+        assertThat(state.lastOutcome()).isEqualTo("JOB_ACTIVE");
+        assertThat(state.lastJobId()).isEqualTo("job-manual");
+        assertThat(state.lastPeriod()).isEqualTo("2026-04");
+    }
+
+    @Test
+    void aTickCoversEveryPecSourceAndOneBrokenSourceDoesNotStopTheRest() {
+        fixture.registerPrincipal("manager-1", MUNICIPALITY);
+        fixture.registerSource(BROKEN, MUNICIPALITY);
+        fixture.sourceRepository.upsert(new SourceRecord(
+                "dataset-1",
+                1,
+                "EXTERNAL_DATASET",
+                null,
+                null,
+                "127.0.0.1", // NOPMD - AvoidUsingHardCodedIP: loopback test server
+                5432,
+                "esus",
+                "esus_leitura",
+                "PEC_DB_PASSWORD",
+                MUNICIPALITY,
+                null,
+                null,
+                Instant.EPOCH.toString()));
+
+        scheduler().tick();
+
+        // The dataset is not read at all; the broken source throws and the next one still runs.
+        assertThat(coverageReads).hasValue(2);
+        assertThat(schedules.find(SOURCE).lastOutcome()).isEqualTo("ENQUEUED");
+        assertThat(schedules.find("dataset-1").lastOutcome()).isNull();
+    }
+
+    @Test
+    void startedItSchedulesTheFirstTickAfterTheInitialDelayAndStopCancelsIt() {
+        CoverageScheduler scheduler = scheduler(
+                loopback(),
+                fixture.jobRepository,
+                new CoverageScheduler.Settings(true, Duration.ofHours(6), Duration.ofHours(1), 5));
+
+        scheduler.start();
+        scheduler.start();
+
+        assertThat(scheduler.isRunning()).isTrue();
+        assertThat(scheduler.nextTickAt()).contains(clock.instant().plus(Duration.ofHours(1)));
+        scheduler.stop();
+        assertThat(scheduler.isRunning()).isFalse();
+        assertThat(scheduler.nextTickAt()).isEmpty();
+        scheduler.stop();
+    }
+
+    @Test
+    void theBackgroundTickRunsOnItsOwnThreadAndRecordsItsOutcome() throws InterruptedException {
+        CoverageScheduler scheduler = scheduler(
+                loopback(),
+                fixture.jobRepository,
+                new CoverageScheduler.Settings(true, Duration.ofHours(6), Duration.ofMillis(1), 5));
+
+        scheduler.start();
+        try {
+            Instant deadline = Instant.now().plusSeconds(10);
+            while (schedules.find(SOURCE).lastOutcome() == null && Instant.now().isBefore(deadline)) {
+                Thread.sleep(20);
+            }
+        } finally {
+            scheduler.stop();
+        }
+
+        // No manager in the municipality: the tick ran and said so.
+        assertThat(schedules.find(SOURCE).lastOutcome()).isEqualTo("NO_MANAGER");
     }
 }
