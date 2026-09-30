@@ -48,4 +48,14 @@ class SchedulePlannerTest {
         assertThat(SchedulePlanner.next(List.of(), Set.of(), Set.of(), LocalDate.of(2026, 10, 10), 5))
                 .isEmpty();
     }
+
+    @Test
+    void pendingListsEverySettledUnpublishedCompetenciaOldestFirstIgnoringRecentFailures() {
+        LocalDate today = LocalDate.of(2026, 9, 10);
+        assertThat(SchedulePlanner.pending(List.of(SEPTEMBER, AUGUST, APRIL, MARCH), Set.of(APRIL), today, 5))
+                .containsExactly(MARCH, AUGUST);
+        // A recent failure holds only the scheduler back: the competência is still pending.
+        assertThat(SchedulePlanner.next(List.of(AUGUST, MARCH), Set.of(), Set.of(MARCH), today, 5))
+                .contains(AUGUST);
+    }
 }

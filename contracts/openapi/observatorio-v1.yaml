@@ -451,6 +451,35 @@ paths:
         "404":
           description: Unknown source, or caller lacks MANAGE_SOURCE for its municipality.
 
+  /api/v1/overview:
+    get:
+      tags: [results]
+      summary: >-
+        What the Painel shows about one municipality (ADR 0029): the catalog with the competência's
+        results, 12 competências of history, integrity checks of its PEC sources, derived alerts,
+        the competências the scheduler still has to compute and, for who may run indicators, the
+        recent jobs. READ_CLINICAL municipality-wide, like GET /results. Codes and counts only.
+      parameters:
+        - name: municipalityIbge
+          in: query
+          required: true
+          schema: { type: string }
+        - name: referencePeriod
+          in: query
+          required: false
+          description: yyyy-MM; defaults to the newest published competência.
+          schema: { type: string }
+      responses:
+        "200":
+          description: The overview; sections are empty, never absent, on a new installation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Overview" }
+        "400":
+          description: referencePeriod is not yyyy-MM.
+        "404":
+          description: Caller lacks municipality-wide READ_CLINICAL for the municipality.
+
   /api/v1/run-sources:
     get:
       tags: [runs]
@@ -1144,6 +1173,87 @@ components:
               count: { type: integer, format: int64 }
         checkedAt: { type: string, format: date-time }
 
+    Overview:
+      type: object
+      required: [municipalityIbge, indicators, history, quality, checks, alerts, pendingPeriods]
+      properties:
+        municipalityIbge: { type: string }
+        referencePeriod: { type: string, nullable: true, description: "null while nothing is published and none was asked" }
+        lastUpdate: { type: string, nullable: true, format: date-time }
+        indicators:
+          type: array
+          items:
+            type: object
+            properties:
+              indicatorPack: { type: string }
+              ruleVersion: { type: string }
+              family: { type: string }
+              unit: { type: string }
+              executionEnabled: { type: boolean }
+              blockedGates: { type: array, items: { type: string } }
+              resultId: { type: string, nullable: true }
+              status: { type: string, nullable: true, description: "the published result's status; null when not published" }
+              value: { type: string, nullable: true }
+              limitations: { type: array, items: { type: string } }
+              publishedAt: { type: string, format: date-time, nullable: true }
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              referencePeriod: { type: string }
+              indicatorPack: { type: string }
+              status: { type: string }
+              value: { type: string, nullable: true, description: "null unless COMPUTED" }
+        quality:
+          type: object
+          properties:
+            published: { type: integer }
+            completeSnapshot: { type: integer }
+        checks:
+          type: array
+          items:
+            type: object
+            properties:
+              code: { type: string, enum: [SOURCE_CONNECTION, MUNICIPAL_ISOLATION, PEC_COVERAGE, SCHEDULER, RESULTS_PUBLISHED] }
+              sourceId: { type: string, nullable: true }
+              status: { type: string, enum: [OK, ATTENTION, FAILED, NOT_CHECKED] }
+              at: { type: string, nullable: true, format: date-time }
+              referencePeriod: { type: string, nullable: true }
+        alerts:
+          type: array
+          items:
+            type: object
+            properties:
+              code: { type: string, enum: [CHECK_FAILED, CHECK_ATTENTION, CHECK_MISSING, RESULT_BLOCKED, RUN_FAILED, PENDING_PERIODS] }
+              severity: { type: string, enum: [ERROR, WARNING, INFO] }
+              subject: { type: string, nullable: true, description: "check code or indicator pack" }
+              referencePeriod: { type: string, nullable: true }
+              sourceId: { type: string, nullable: true }
+              detail: { type: string, nullable: true, description: "a failure code, or the count of pending competências" }
+              at: { type: string, nullable: true, format: date-time }
+        pendingPeriods:
+          type: array
+          items:
+            type: object
+            properties:
+              sourceId: { type: string }
+              referencePeriod: { type: string }
+              count: { type: integer, format: int64 }
+        recentRuns:
+          type: array
+          nullable: true
+          description: null unless the caller holds RUN_INDICATOR in the municipality.
+          items:
+            type: object
+            properties:
+              jobId: { type: string }
+              indicatorPack: { type: string }
+              referencePeriod: { type: string }
+              state: { type: string }
+              createdAt: { type: string, nullable: true }
+              finishedAt: { type: string, nullable: true }
+              failureCode: { type: string, nullable: true }
     RunSource:
       type: object
       properties:

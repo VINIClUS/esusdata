@@ -3,7 +3,7 @@ package esusdata.run.schedule;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Collection;
-import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -32,11 +32,24 @@ public final class SchedulePlanner {
             Set<YearMonth> recentlyFailed,
             LocalDate today,
             int settleDays) {
+        return pending(covered, published, today, settleDays).stream()
+                .filter(period -> !recentlyFailed.contains(period))
+                .findFirst();
+    }
+
+    /**
+     * Every competência the scheduler still has to compute, oldest first: settled, with data and
+     * not published. The Painel shows this same list, so what it calls pending is exactly what the
+     * scheduler will enqueue, in order.
+     */
+    public static List<YearMonth> pending(
+            Collection<YearMonth> covered, Set<YearMonth> published, LocalDate today, int settleDays) {
         return covered.stream()
                 .filter(period -> isSettled(period, today, settleDays))
                 .filter(period -> !published.contains(period))
-                .filter(period -> !recentlyFailed.contains(period))
-                .min(Comparator.naturalOrder());
+                .sorted()
+                .distinct()
+                .toList();
     }
 
     /** Closed, and {@code settleDays} into the next month (day 1 counts as the first day). */
