@@ -99,10 +99,12 @@ export function ExecucaoUnica({
   const [limpas, setLimpas] = useState<{ jobId: string; linhas: number } | null>(null)
   const intencao = useRef<{ chave: string; idempotencyKey: string } | null>(null)
 
-  const executaveis: IndicatorPack[] = (pacotes.data ?? []).filter((p) => p.executionEnabled)
+  // Every listed pack runs, as it does for the scheduler; one without an approved rule (ENG-34)
+  // publishes a BLOCKED result with its reasons, never a value, and the form says so.
+  const disponiveis: IndicatorPack[] = pacotes.data ?? []
   const referencePeriod = parametros.referencePeriod ?? defaultPeriod(fonte.periods)
   const periodo = fonte.periods.find((p) => p.referencePeriod === referencePeriod)
-  const pacote = executaveis.find((p) => p.id === parametros.indicatorPack) ?? executaveis[0]
+  const pacote = disponiveis.find((p) => p.id === parametros.indicatorPack) ?? disponiveis[0]
   const ativa = run !== undefined && !isRunTerminal(run)
 
   async function executar() {
@@ -315,11 +317,11 @@ export function ExecucaoUnica({
               label="Indicador"
               fullWidth
               value={pacote ? indicatorDisplayName(pacote.id) : ''}
-              options={executaveis.map((p) => indicatorDisplayName(p.id))}
+              options={disponiveis.map((p) => indicatorDisplayName(p.id))}
               onChange={(label) =>
                 setParametros((p) => ({
                   ...p,
-                  indicatorPack: executaveis.find((x) => indicatorDisplayName(x.id) === label)?.id,
+                  indicatorPack: disponiveis.find((x) => indicatorDisplayName(x.id) === label)?.id,
                 }))
               }
             />
@@ -334,6 +336,15 @@ export function ExecucaoUnica({
               { label: 'Indicador', value: pacote ? indicatorDisplayName(pacote.id) : '—' },
             ]}
           />
+        )}
+        {podeExecutar && fonte.periods.length > 0 && pacote && !pacote.executionEnabled && (
+          <Box sx={{ mt: 1.5 }}>
+            <Callout variant="warning" title="O resultado sai bloqueado">
+              {indicatorDisplayName(pacote.id)} ainda não tem a regra aprovada para publicar valor
+              {pacote.blockedGates.length > 0 ? ` (${pacote.blockedGates.join('; ')})` : ''}. A
+              execução lê o PEC e publica o resultado como bloqueado, com esses motivos.
+            </Callout>
+          </Box>
         )}
         {aviso && (
           <Typography role="status" sx={{ mt: 1.5 }}>

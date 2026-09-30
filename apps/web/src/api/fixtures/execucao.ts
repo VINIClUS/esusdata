@@ -57,7 +57,13 @@ export const pacotesFixture: IndicatorPack[] = [
     family: 'C1',
     unit: 'PERCENT',
     dependsOn: [],
-    executionEnabled: true,
-    blockedGates: [],
+    // As the real catalog ships it (ENG-34): runs publish a BLOCKED result with these reasons.
+    executionEnabled: false,
+    blockedGates: [
+      'Portão A (fonte e vigência) incompleto',
+      'Portão B (modelo de cálculo) incompleto',
+      'Portão D (reconciliação) incompleto',
+      'Portão E (piloto e operação) incompleto',
+    ],
   },
 ]

@@ -81,6 +81,34 @@ test.describe('execução única', () => {
     await expect(page.getByRole('button', { name: 'Cancelar execução' })).toBeEnabled()
   })
 
+  test('um pacote sem regra aprovada executa e avisa que o resultado sai bloqueado', async ({
+    page,
+    api,
+  }) => {
+    // The real catalog today: C1 listed, not released (ENG-34), and the scheduler runs it anyway.
+    manager(api)
+    api.get('/indicator-packs', {
+      json: [
+        {
+          ...pack('c1-mais-acesso'),
+          executionEnabled: false,
+          blockedGates: ['Portão A (fonte e vigência) incompleto'],
+        },
+      ],
+    })
+    const queued = run({ jobId: 'job-5', state: 'QUEUED', finishedAt: null, resultId: null })
+    api.post('/runs', { status: 202, json: queued })
+    api.get('/runs/job-5', { json: queued })
+    api.runEvents('job-5', queued)
+    await page.goto('/execucao')
+    await expect(page.getByText('O resultado sai bloqueado')).toBeVisible()
+    await expect(page.getByText(/Portão A \(fonte e vigência\) incompleto/)).toBeVisible()
+    await expectSettled(page)
+    await page.getByRole('button', { name: 'Executar' }).click()
+    await expect(page.getByText('Execução na fila').first()).toBeVisible()
+    expect(api.callsTo('POST', '/runs')[0]?.body).toMatchObject({ indicatorPack: 'c1-mais-acesso' })
+  })
+
   test('Editar troca a competência antes de executar', async ({ page, api }) => {
     manager(api)
     const accepted = run({ jobId: 'job-3', referencePeriod: '2026-01' })
