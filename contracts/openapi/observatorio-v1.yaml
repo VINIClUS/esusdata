@@ -506,10 +506,16 @@ paths:
         "404":
           description: Caller lacks RUN_INDICATOR for the requested municipality.
         "409":
-          description: Idempotency-Key reused with a different payload (IDEMPOTENCY_KEY_CONFLICT).
+          description: >-
+            Idempotency-Key reused with a different payload (IDEMPOTENCY_KEY_CONFLICT), or another
+            live job for the same source, município, pack and competência is still active
+            (ACTIVE_JOB_EXISTS, ADR 0026; `jobId` names it).
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ApiError" }
+              schema:
+                oneOf:
+                  - { $ref: "#/components/schemas/ApiError" }
+                  - { $ref: "#/components/schemas/ActiveJobError" }
 
   /api/v1/runs/{id}:
     get:
@@ -818,6 +824,14 @@ components:
       properties:
         code: { type: string }
         message: { type: string }
+
+    ActiveJobError:
+      type: object
+      required: [code, message, jobId]
+      properties:
+        code: { type: string, enum: [ACTIVE_JOB_EXISTS] }
+        message: { type: string }
+        jobId: { type: string }
 
     LoginRequest:
       type: object

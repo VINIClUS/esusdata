@@ -1,6 +1,10 @@
 observatorio:
   data:
     directory: ${OBSERVATORIO_DATA_DIR:${user.home}/.local/share/observatorio-aps}
+  # Stamped into every published result (results.app_build). Maven resource filtering replaces
+  # the token with the project version.
+  app:
+    build: "@project.version@"
 
 logging:
   level:

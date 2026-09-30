@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.IntSupplier;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -19,6 +20,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * never treat that as success.
  */
 public final class JdbcJobRepository implements JobRepository {
+
+    /** Leading column of V7's {@code idx_jobs_active_competencia}, as SQLite names it. */
+    private static final String ACTIVE_INDEX_COLUMN = "jobs.source_id";
 
     private static final RowMapper<Job> MAPPER = (rs, rowNum) -> new Job(
             rs.getString("job_id"),
@@ -64,6 +68,27 @@ public final class JdbcJobRepository implements JobRepository {
 
     @Override
     public Job enqueue(EnqueueRequest request) {
+        try {
+            insert(request);
+        } catch (DataAccessException refused) {
+            if (!SqliteUniqueViolation.on(refused, ACTIVE_INDEX_COLUMN)) {
+                throw refused;
+            }
+            // V7's partial index refused a second active job for the competência (ADR 0026).
+            // The winner can finish between the refusal and this read; then there is nothing to
+            // point at, and the original failure is the honest answer.
+            Job active = findActive(
+                            request.sourceId(),
+                            request.municipalityIbge(),
+                            request.indicatorPack(),
+                            request.referencePeriod())
+                    .orElseThrow(() -> refused);
+            throw new ActiveJobExistsException(active.jobId(), refused);
+        }
+        return findById(request.jobId()).orElseThrow();
+    }
+
+    private void insert(EnqueueRequest request) {
         jdbc.update(
                 """
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
@@ -89,7 +114,18 @@ public final class JdbcJobRepository implements JobRepository {
                         ? null
                         : request.idempotencyExpiresAt().toString(),
                 request.requestedScopeJson());
-        return findById(request.jobId()).orElseThrow();
+    }
+
+    @Override
+    public Optional<Job> findActive(
+            String sourceId, String municipalityIbge, String indicatorPack, String referencePeriod) {
+        return jdbc.query("""
+                        select * from jobs
+                         where source_id = ? and municipality_ibge = ? and indicator_pack = ?
+                           and reference_period = ? and extraction_id is null
+                           and state in ('QUEUED', 'RUNNING', 'STAGED', 'CANCEL_REQUESTED')
+                        """, MAPPER, sourceId, municipalityIbge, indicatorPack, referencePeriod).stream()
+                .findFirst();
     }
 
     @Override

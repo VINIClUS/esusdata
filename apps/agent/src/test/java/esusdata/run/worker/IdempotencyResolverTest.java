@@ -2,9 +2,12 @@ package esusdata.run.worker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import esusdata.run.job.ActiveJobExistsException;
 import esusdata.run.job.EnqueueRequest;
 import esusdata.run.job.Job;
 import esusdata.run.job.JobRepository;
@@ -203,5 +206,68 @@ class IdempotencyResolverTest {
 
         Job second = racingResolver.resolve(request("job-2", "user-a", "key-1", "hash-x"));
         assertThat(second.jobId()).isEqualTo(first.jobId());
+    }
+
+    /** A LIVE_READ_ONLY request (no extraction) — the kind V7's active-job index guards. */
+    private EnqueueRequest live(String jobId, String principal, String key, String hash) {
+        return new EnqueueRequest(
+                jobId,
+                "run-" + jobId,
+                "3541307",
+                "c1-mais-acesso",
+                "c1-mais-acesso@0.1.0",
+                "2026-03",
+                3,
+                "src-1",
+                null,
+                principal,
+                key,
+                hash,
+                clock.instant().plusSeconds(3600),
+                null,
+                clock.instant());
+    }
+
+    /** ADR 0026: two clicks, two tabs or the scheduler each bring their own key — one job only. */
+    @Test
+    void aSecondKeyForAnActiveCompetenciaIsRefusedNamingTheActiveJob() {
+        Job first = resolver.resolve(live("job-1", "user-a", "key-1", "hash-x"));
+
+        assertThatThrownBy(() -> resolver.resolve(live("job-2", "user-b", "key-2", "hash-x")))
+                .isInstanceOfSatisfying(
+                        ActiveJobExistsException.class,
+                        e -> assertThat(e.activeJobId()).isEqualTo(first.jobId()));
+        assertThat(fixture.jobRepository.findById("job-2")).isEmpty();
+    }
+
+    @Test
+    void aTerminalJobNoLongerBlocksTheCompetencia() {
+        resolver.resolve(live("job-1", "user-a", "key-1", "hash-x"));
+        assertThat(fixture.jobRepository.cancelQueued("job-1", clock.instant())).isTrue();
+
+        Job second = resolver.resolve(live("job-2", "user-a", "key-2", "hash-x"));
+
+        assertThat(second.jobId()).isEqualTo("job-2");
+    }
+
+    /**
+     * Same-key race where SQLite reports the active-job index instead of the idempotency one:
+     * the loser still adopts the key's winner rather than answering 409.
+     */
+    @Test
+    void sameKeyRaceTrippingTheActiveIndexStillAdoptsTheWinner() {
+        Job first = resolver.resolve(live("job-1", "user-a", "key-1", "hash-x"));
+
+        JobRepository racy = spy(fixture.jobRepository);
+        when(racy.findByIdempotency("user-a", "key-1"))
+                .thenReturn(java.util.Optional.empty())
+                .thenCallRealMethod();
+        doThrow(new ActiveJobExistsException(first.jobId())).when(racy).enqueue(any());
+        IdempotencyResolver racingResolver = new IdempotencyResolver(racy, clock);
+
+        assertThat(racingResolver
+                        .resolve(live("job-2", "user-a", "key-1", "hash-x"))
+                        .jobId())
+                .isEqualTo(first.jobId());
     }
 }
