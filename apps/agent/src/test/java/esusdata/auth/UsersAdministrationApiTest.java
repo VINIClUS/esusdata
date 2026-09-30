@@ -11,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.annotation.DirtiesContext;
+import tools.jackson.databind.ObjectMapper;
 
 /** The users screen's API: every account with its active grants, and undoing a block. */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -80,7 +81,8 @@ class UsersAdministrationApiTest extends ApiFixtureSupport {
                 URI.create(BASE_URL + "/api/v1/users"),
                 "{\"username\":\"novo-" + System.nanoTime() + "\",\"displayName\":\"Novo\"}");
         assertThat(created.statusCode()).isEqualTo(201);
-        String userId = created.body().replaceAll(".*\"userId\":\"([^\"]+)\".*", "$1");
+        String userId =
+                new ObjectMapper().readTree(created.body()).get("userId").asString();
 
         authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/users/" + userId + "/block"), null);
         authenticatedPost(cookie, URI.create(BASE_URL + "/api/v1/users/" + userId + "/unblock"), null);
