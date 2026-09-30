@@ -1,12 +1,4 @@
-import {
-  ChartColumn,
-  ChartLine,
-  Database,
-  FileText,
-  House,
-  Settings,
-  type LucideIcon,
-} from 'lucide-react'
+import { ChartColumn, ChartLine, Database, House, Settings, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -37,13 +29,6 @@ export const navItems: NavItem[] = [
     shortLabel: 'Execução',
     icon: Database,
     match: (p) => p.startsWith('/execucao'),
-  },
-  {
-    to: '/base-de-dados',
-    label: 'Base de Dados',
-    shortLabel: 'Base',
-    icon: FileText,
-    match: (p) => p.startsWith('/base-de-dados'),
   },
   {
     to: '/relatorios',

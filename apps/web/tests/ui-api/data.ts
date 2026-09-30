@@ -75,6 +75,7 @@ export function source(overrides: Partial<SourceResponse> = {}): SourceResponse 
     createdAt: '2026-03-01T12:00:00Z',
     lastDiagnostic: null,
     lastIsolationCheck: null,
+    lastCoverage: null,
     ...overrides,
   }
 }

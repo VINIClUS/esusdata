@@ -13,7 +13,7 @@ import { colors, layout } from '@/theme/tokens'
 const primary = navItems.filter((n) =>
   ['/painel', '/indicadores', '/execucao', '/relatorios'].includes(n.to),
 )
-const secondary = navItems.filter((n) => ['/base-de-dados', '/configuracoes'].includes(n.to))
+const secondary = navItems.filter((n) => n.to === '/configuracoes')
 
 export function BottomNavBar() {
   const { pathname } = useLocation()

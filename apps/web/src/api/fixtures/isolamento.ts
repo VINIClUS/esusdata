@@ -27,5 +27,6 @@ export const isolamentoSourcesFixture: SourceResponse[] = [
       unidentifiedCount: 0,
       checkedAt: '2026-09-19T13:05:00Z',
     },
+    lastCoverage: null,
   },
 ]

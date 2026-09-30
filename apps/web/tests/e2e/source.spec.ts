@@ -29,6 +29,7 @@ test('a tela mostra a fonte cadastrada pela API', async () => {
 
 test('os requisitos vêm da API; sem diagnóstico, a conexão não está confirmada', async () => {
   const { page } = session
+  await page.getByRole('tab', { name: 'Teste e Validação' }).click()
   await expect(page.getByText('Versão e modelo do PEC na matriz de compatibilidade')).toBeVisible()
   const requirements = (await (
     await page.request.get('/api/v1/sources/pec-e2e/requirements')
@@ -58,7 +59,40 @@ test('uma senha errada não roda o teste', async () => {
   const { page } = session
   await page.getByLabel('Senha da sua conta Esusdata').fill('wrong-password')
   await page.getByRole('button', { name: 'Testar fonte cadastrada' }).click()
-  await expect(
-    page.getByText('Senha incorreta ou teste indisponível. Tente novamente.'),
-  ).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveText('Senha incorreta. Tente novamente.')
+})
+
+test('a cobertura também é recusada fora da allowlist, e a recusa fica guardada', async () => {
+  const { page } = session
+  await expect(page.getByText(/Nenhuma cobertura verificada nesta versão/)).toBeVisible()
+  await page.getByLabel('Senha da sua conta Esusdata').fill(ADMIN_PASSWORD)
+  await page.getByRole('button', { name: 'Verificar cobertura' }).click()
+  await expect(page.getByText('Destino da fonte não autorizado nesta instalação.')).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('Destino da fonte não autorizado nesta instalação.')).toBeVisible()
+})
+
+test('salvar a conexão cria a versão 2, e o teste e a cobertura da versão 1 deixam de valer', async ({}, testInfo) => {
+  const { page } = session
+  await page.getByRole('tab', { name: 'Conexão' }).click()
+  await expect(page.getByText(/versão 1 da configuração/)).toBeVisible()
+  await page.getByLabel('Host', { exact: true }).fill('192.0.2.20')
+  await expect(page.getByText('Salvar cria a versão 2')).toBeVisible()
+  await page.getByLabel('Senha da sua conta Esusdata').fill(ADMIN_PASSWORD)
+  await page.getByRole('button', { name: 'Salvar alterações' }).click()
+  await expect(page.getByText(/Configuração salva como versão 2/)).toBeVisible()
+  await screenshot(page, testInfo, 'source-saved-desktop')
+  const [stored] = (await (await page.request.get('/api/v1/sources')).json()) as {
+    host: string
+    sourceConfigurationVersion: number
+    secretRef: string
+  }[]
+  expect(stored).toMatchObject({
+    host: '192.0.2.20',
+    sourceConfigurationVersion: 2,
+    secretRef: 'PEC_DB_PASSWORD',
+  })
+  await page.getByRole('tab', { name: 'Teste e Validação' }).click()
+  await expect(page.getByText('Esta versão da configuração ainda não foi testada.')).toBeVisible()
+  await expect(page.getByText(/Nenhuma cobertura verificada nesta versão/)).toBeVisible()
 })

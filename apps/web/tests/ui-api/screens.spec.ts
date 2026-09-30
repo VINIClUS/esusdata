@@ -180,7 +180,7 @@ test.describe('painel', () => {
     await expect(page.getByText('C1 – Mais acesso bloqueado')).toHaveCount(0)
     api.get('/sources', { json: [] })
     await page.getByText('Conexão com o PEC: falhou').click()
-    await expect(page).toHaveURL('/configuracoes')
+    await expect(page).toHaveURL('/configuracoes?aba=teste')
 
     await page.goto('/painel')
     await page.getByRole('button', { name: 'Ver detalhes da qualidade dos dados' }).click()
@@ -402,11 +402,68 @@ test.describe('fonte de dados', () => {
     { code: 'MUNICIPAL_SCOPE', ok: true },
   ]
 
-  test('mostra a fonte, os requisitos e testa com reautenticação', async ({ page, api }) => {
+  function fonte(api: ApiStub) {
     manager(api)
     api.get('/sources', { json: [source()] })
     api.get('/sources/pec-a/requirements', { json: requirements })
     api.post('/auth/reauth', { status: 204 })
+  }
+
+  test('Conexão edita a fonte e salva como nova versão, com o cadastro completo', async ({
+    page,
+    api,
+  }) => {
+    fonte(api)
+    api.post('/sources', (request) => {
+      const saved = source({
+        ...(request.postDataJSON() as object),
+        sourceConfigurationVersion: 2,
+      })
+      // The page reads the new version back from GET /sources.
+      api.get('/sources', { json: [saved] })
+      return { status: 201, json: saved }
+    })
+    await page.goto('/configuracoes')
+    await expect(page.getByLabel('Host', { exact: true })).toHaveValue('192.0.2.10')
+    await expect(page.getByLabel('Senha do banco (referência)')).toHaveValue('PEC_DB_PASSWORD')
+    await expect(page.getByText(/versão 1 da configuração/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Salvar alterações' })).toBeDisabled()
+    await expectSettled(page, 'Configuração da Fonte de Dados')
+
+    await page.getByLabel('Porta', { exact: true }).fill('70000')
+    await expect(page.getByRole('alert')).toHaveText('Informe uma porta entre 1 e 65535.')
+    await page.getByLabel('Porta', { exact: true }).fill('5432')
+    await page.getByLabel('Host', { exact: true }).fill('192.0.2.20')
+    await expect(page.getByText('Salvar cria a versão 2')).toBeVisible()
+    await expectNoA11yViolations(page)
+    await page.getByLabel('Senha da sua conta Esusdata').fill('minha-senha')
+    await page.getByRole('button', { name: 'Salvar alterações' }).click()
+    await expect(page.getByText(/Configuração salva como versão 2/)).toBeVisible()
+    await expect(page.getByText(/versão 2 da configuração/)).toBeVisible()
+    expect(api.callsTo('POST', '/auth/reauth')[0]?.body).toEqual({ password: 'minha-senha' })
+    // Every registered field goes back, so re-registering keeps what the form does not show.
+    expect(api.callsTo('POST', '/sources')[0]?.body).toEqual({
+      id: 'pec-a',
+      sourceFamily: 'PEC_POSTGRESQL',
+      pecInstallationRole: 'PRONTUARIO',
+      sourceLocationKind: 'PRIMARY',
+      host: '192.0.2.20',
+      port: 5432,
+      databaseName: 'esus',
+      dbUser: 'esus_leitura',
+      secretRef: 'PEC_DB_PASSWORD',
+      municipalityIbge: IBGE,
+      pecVersion: '5.5.28',
+      readModel: 'PEC_DW',
+    })
+    await expect(page.getByLabel('Senha da sua conta Esusdata')).toHaveValue('')
+  })
+
+  test('Teste e Validação testa com reautenticação e mostra os requisitos', async ({
+    page,
+    api,
+  }) => {
+    fonte(api)
     api.post('/sources/pec-a/test', () => {
       // The API stores the diagnostic; the page reads it back from GET /sources.
       api.get('/sources', {
@@ -434,12 +491,12 @@ test.describe('fonte de dados', () => {
       }
     })
     await page.goto('/configuracoes')
-    await expect(page.getByLabel('Host', { exact: true })).toHaveValue('192.0.2.10')
-    await expect(page.getByLabel('Porta', { exact: true })).toHaveValue('5433')
-    await expect(page.getByLabel('Usuário', { exact: true })).toHaveValue('esus_leitura')
+    await page.getByRole('tab', { name: 'Teste e Validação' }).click()
+    await expect(page).toHaveURL('/configuracoes?aba=teste')
     await expect(
       page.getByText('Versão e modelo do PEC na matriz de compatibilidade'),
     ).toBeVisible()
+    await expect(page.getByText('Esta versão da configuração ainda não foi testada.')).toBeVisible()
     await expectSettled(page, 'Configuração da Fonte de Dados')
 
     await page.getByLabel('Senha da sua conta Esusdata').fill('minha-senha')
@@ -451,21 +508,61 @@ test.describe('fonte de dados', () => {
     await expectNoA11yViolations(page)
   })
 
-  test('senha errada na reautenticação', async ({ page, api }) => {
-    manager(api)
-    api.get('/sources', { json: [source()] })
-    api.get('/sources/pec-a/requirements', { json: requirements })
+  test('Verificar cobertura lista as competências com atendimentos', async ({ page, api }) => {
+    fonte(api)
+    const coverage = {
+      windowFrom: '2024-09',
+      windowToExclusive: '2026-10',
+      outcome: 'CHECKED' as const,
+      periods: [
+        { referencePeriod: '2026-03', count: 10_029 },
+        { referencePeriod: '2026-02', count: 9_500 },
+      ],
+      checkedAt: '2026-09-30T12:00:00Z',
+    }
+    api.post('/sources/pec-a/coverage-check', () => {
+      api.get('/sources', { json: [source({ lastCoverage: coverage })] })
+      return { json: coverage }
+    })
+    await page.goto('/configuracoes?aba=teste')
+    await expect(page.getByText(/Nenhuma cobertura verificada nesta versão/)).toBeVisible()
+    await page.getByLabel('Senha da sua conta Esusdata').fill('minha-senha')
+    await page.getByRole('button', { name: 'Verificar cobertura' }).click()
+    const meses = page.getByRole('list', { name: 'Competências com atendimentos' })
+    await expect(meses.getByRole('listitem')).toHaveText([
+      '03/2026 · 10.029 atendimentos',
+      '02/2026 · 9.500 atendimentos',
+    ])
+    await expect(page.getByText('2 competências com atendimentos do município.')).toBeVisible()
+    expect(api.callsTo('POST', '/sources/pec-a/coverage-check')).toHaveLength(1)
+    await expectNoA11yViolations(page)
+    await page.getByRole('button', { name: 'Validar isolamento' }).click()
+    await expect(page).toHaveURL('/configuracoes/isolamento-municipal')
+  })
+
+  test('senha errada não testa, não verifica e não salva', async ({ page, api }) => {
+    fonte(api)
     api.post('/auth/reauth', {
       status: 401,
       json: { code: 'AUTHENTICATION_FAILED', message: 'Senha incorreta' },
     })
-    await page.goto('/configuracoes')
+    await page.goto('/configuracoes?aba=teste')
     await page.getByLabel('Senha da sua conta Esusdata').fill('errada')
     await page.getByRole('button', { name: 'Testar fonte cadastrada' }).click()
-    await expect(
-      page.getByText('Senha incorreta ou teste indisponível. Tente novamente.'),
-    ).toBeVisible()
+    await expect(page.getByRole('alert')).toHaveText('Senha incorreta. Tente novamente.')
+    await page.getByLabel('Senha da sua conta Esusdata').fill('errada')
+    await page.getByRole('button', { name: 'Verificar cobertura' }).click()
+    await expect(page.getByRole('alert')).toHaveText('Senha incorreta. Tente novamente.')
+    await page.getByRole('tab', { name: 'Conexão' }).click()
+    await page.getByLabel('Usuário', { exact: true }).fill('outro_usuario')
+    await page.getByLabel('Senha da sua conta Esusdata').fill('errada')
+    await page.getByRole('button', { name: 'Salvar alterações' }).click()
+    await expect(page.getByRole('alert')).toHaveText('Senha incorreta. Tente novamente.')
+    // The draft survives the refusal.
+    await expect(page.getByLabel('Usuário', { exact: true })).toHaveValue('outro_usuario')
     expect(api.callsTo('POST', '/sources/pec-a/test')).toHaveLength(0)
+    expect(api.callsTo('POST', '/sources/pec-a/coverage-check')).toHaveLength(0)
+    expect(api.callsTo('POST', '/sources')).toHaveLength(0)
   })
 
   test('nenhuma fonte cadastrada', async ({ page, api }) => {

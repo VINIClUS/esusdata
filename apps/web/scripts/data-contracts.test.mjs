@@ -291,6 +291,7 @@ const registeredSource = (id, municipalityIbge) => ({
   createdAt: '2026-09-27T12:00:00Z',
   lastDiagnostic: null,
   lastIsolationCheck: null,
+  lastCoverage: null,
 })
 
 test('shows the source of the selected municipality, else the first one listed', () => {
@@ -320,6 +321,7 @@ test('normalizes a never-tested source without inventing a password or a last te
     createdAt: '2026-09-27T12:00:00Z',
     lastDiagnostic: null,
     lastIsolationCheck: null,
+    lastCoverage: null,
   })
 
   assert.deepEqual(fonte, {
@@ -329,8 +331,63 @@ test('normalizes a never-tested source without inventing a password or a last te
     porta: '5433',
     nomeBanco: 'esus',
     usuario: 'esus_leitura',
+    secretRef: 'PEC_DB_PASSWORD',
+    municipioIbge: '3541307',
+    versao: 2,
+    // An edit resends every registered field, so re-registering keeps what the form does not show.
+    cadastro: {
+      id: 'pec-principal',
+      sourceFamily: 'PEC_POSTGRESQL',
+      pecInstallationRole: 'PRONTUARIO',
+      sourceLocationKind: 'PRIMARY',
+      host: '192.0.2.10',
+      port: 5433,
+      databaseName: 'esus',
+      dbUser: 'esus_leitura',
+      secretRef: 'PEC_DB_PASSWORD',
+      municipalityIbge: '3541307',
+      pecVersion: '5.5.28',
+      readModel: 'PEC_DW',
+    },
     ultimoTeste: null,
+    cobertura: null,
   })
+})
+
+test('shows the coverage as competências with atendimentos, or why nothing was counted', () => {
+  const coverage = (outcome, periods = []) => ({
+    windowFrom: '2024-09',
+    windowToExclusive: '2026-10',
+    outcome,
+    periods,
+    checkedAt: '2026-09-30T12:00:00Z',
+  })
+
+  assert.deepEqual(
+    normalizers.normalizeCoverage(
+      coverage('CHECKED', [
+        { referencePeriod: '2026-03', count: 10029 },
+        { referencePeriod: '2026-02', count: 1 },
+      ]),
+    ),
+    {
+      ok: true,
+      mensagem: '2 competências com atendimentos do município.',
+      verificadaEm: '2026-09-30T12:00:00Z',
+      competencias: [
+        { periodo: '2026-03', label: '03/2026 · 10.029 atendimentos' },
+        { periodo: '2026-02', label: '02/2026 · 1 atendimento' },
+      ],
+    },
+  )
+  assert.equal(
+    normalizers.normalizeCoverage(coverage('CHECKED')).mensagem,
+    'Nenhuma competência com atendimentos do município nos últimos 24 meses.',
+  )
+  const refused = normalizers.normalizeCoverage(coverage('DESTINATION_NOT_ALLOWED'))
+  assert.equal(refused.ok, false)
+  assert.equal(refused.mensagem, 'Destino da fonte não autorizado nesta instalação.')
+  assert.match(normalizers.normalizeCoverage(coverage('SOURCE_BUSY')).mensagem, /em uso/)
 })
 
 test('shows the stored last diagnostic as the last test, failed unless CONNECTED', () => {
