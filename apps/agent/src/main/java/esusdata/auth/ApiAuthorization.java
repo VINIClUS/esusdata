@@ -48,6 +48,19 @@ public final class ApiAuthorization {
     }
 
     /**
+     * The municipal aggregate, for routes two roles legitimately share — the competência scheduler
+     * belongs to both the manager who runs indicators and the admin who manages the source. The
+     * denial is recorded under {@code either}.
+     */
+    public void requireObjectScopeForEither(
+            AuthenticatedSession session, String municipalityIbge, Permission either, Permission or) {
+        if (!scopeResolver.hasPermission(session.userId(), either, municipalityIbge)
+                && !scopeResolver.hasPermission(session.userId(), or, municipalityIbge)) {
+            deny(session, either, municipalityIbge);
+        }
+    }
+
+    /**
      * For narrowing a listing: which municipalities {@link #requireObjectScope} would let through,
      * with the caller's grants read once for the whole listing.
      */

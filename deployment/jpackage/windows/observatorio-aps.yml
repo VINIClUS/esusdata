@@ -12,6 +12,10 @@ observatorio:
     # ADR 0016: the Rust execution plane ships inside the app image and is the only acquisition
     # path — the service refuses to start without it.
     binary: ${observatorio.install-dir}/observatorio-execplane.exe
+  # ADR 0028: an installed service computes every settled competência the PEC holds on its own,
+  # one job per tick. Each source can still be switched off in the Execução screen.
+  scheduler:
+    enabled: true
 
 # §1.4: individual installation by default.
 server:

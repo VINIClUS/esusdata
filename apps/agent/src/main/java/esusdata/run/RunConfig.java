@@ -1,6 +1,7 @@
 package esusdata.run;
 
 import esusdata.auth.GrantRevalidator;
+import esusdata.auth.ScopeResolver;
 import esusdata.config.SqliteConfig;
 import esusdata.config.SqliteProperties;
 import esusdata.result.JdbcEvidenceRepository;
@@ -26,6 +27,8 @@ import esusdata.run.job.JdbcAcquisitionGuardStore;
 import esusdata.run.job.JdbcJobRepository;
 import esusdata.run.job.JobRepository;
 import esusdata.run.job.RetryPolicy;
+import esusdata.run.schedule.CoverageScheduler;
+import esusdata.run.schedule.JdbcScheduleRepository;
 import esusdata.run.worker.AcquisitionGuard;
 import esusdata.run.worker.CancellationRegistry;
 import esusdata.run.worker.IdempotencyResolver;
@@ -330,6 +333,44 @@ public class RunConfig {
                 clock,
                 processInstanceId,
                 Duration.ofMillis(pollIntervalMs));
+    }
+
+    // --- competência scheduler (ADR 0028) --------------------------------------------------
+
+    @Bean
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
+    public JdbcScheduleRepository scheduleRepository(JdbcTemplate sqliteJdbcTemplate) {
+        return new JdbcScheduleRepository(sqliteJdbcTemplate);
+    }
+
+    /**
+     * Off unless {@code observatorio.scheduler.enabled}: the packaged platform defaults turn it on,
+     * tests and a bare {@code java -jar} never spawn the execution plane on their own. Like
+     * {@link JobWorker}, a SmartLifecycle started after the context refreshed.
+     */
+    @Bean
+    @DependsOn("jobRecoveryReport")
+    public CoverageScheduler coverageScheduler(
+            SourceRepository sourceRepository,
+            SourceCoverageService sourceCoverageService,
+            JobRepository jobRepository,
+            ResultRepository resultRepository,
+            ScopeResolver scopeResolver,
+            JdbcScheduleRepository scheduleRepository,
+            Clock clock,
+            @Value("${observatorio.scheduler.enabled:false}") boolean enabled,
+            @Value("${observatorio.scheduler.interval:PT6H}") Duration interval,
+            @Value("${observatorio.scheduler.initial-delay:PT2M}") Duration initialDelay,
+            @Value("${observatorio.scheduler.settle-days:5}") int settleDays) {
+        return new CoverageScheduler(
+                sourceRepository,
+                sourceCoverageService,
+                jobRepository,
+                resultRepository,
+                scopeResolver,
+                scheduleRepository,
+                clock,
+                new CoverageScheduler.Settings(enabled, interval, initialDelay, settleDays));
     }
 
     /**

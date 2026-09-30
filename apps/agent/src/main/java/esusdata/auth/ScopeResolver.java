@@ -168,4 +168,24 @@ public final class ScopeResolver {
                 || permission == Permission.MANAGE_ACCESS
                 || permission == Permission.AUDIT;
     }
+
+    /**
+     * The ACTIVE users holding {@code permission} over the whole municipality, oldest grant first —
+     * for work that must run under a real, currently authorized principal ({@code GrantRevalidator}
+     * re-checks it before acquisition and publication), such as the competência scheduler.
+     * Team-scoped grants never qualify: the municipal aggregate needs a municipality-wide grant.
+     */
+    public List<String> activeUsersWithMunicipalPermission(Permission permission, String municipalityIbge) {
+        return jdbc.queryForList("""
+                select g.user_id
+                  from user_grants g
+                  join role_permissions rp on rp.role_id = g.role_id
+                  join users u on u.user_id = g.user_id
+                 where rp.permission = ? and g.revoked_at is null and u.state = 'ACTIVE'
+                   and g.scope_kind = 'MUNICIPALITY' and g.municipality_ibge = ?
+                   and g.cnes is null and g.ine is null
+                 group by g.user_id
+                 order by min(g.granted_at), g.user_id
+                """, String.class, permission.dbValue(), municipalityIbge);
+    }
 }

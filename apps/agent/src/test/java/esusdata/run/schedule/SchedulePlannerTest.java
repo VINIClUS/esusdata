@@ -1,0 +1,51 @@
+package esusdata.run.schedule;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+
+class SchedulePlannerTest {
+
+    private static final YearMonth MARCH = YearMonth.of(2026, 3);
+    private static final YearMonth APRIL = YearMonth.of(2026, 4);
+    private static final YearMonth AUGUST = YearMonth.of(2026, 8);
+    private static final YearMonth SEPTEMBER = YearMonth.of(2026, 9);
+
+    @Test
+    void theOldestUnpublishedSettledCompetenciaGoesFirst() {
+        assertThat(SchedulePlanner.next(
+                        List.of(SEPTEMBER, APRIL, MARCH), Set.of(MARCH), Set.of(), LocalDate.of(2026, 10, 10), 5))
+                .contains(APRIL);
+    }
+
+    @Test
+    void aCompetenciaIsSettledOnlyFromTheSettleDayOfTheNextMonth() {
+        assertThat(SchedulePlanner.isSettled(AUGUST, LocalDate.of(2026, 9, 4), 5))
+                .isFalse();
+        assertThat(SchedulePlanner.isSettled(AUGUST, LocalDate.of(2026, 9, 5), 5))
+                .isTrue();
+        assertThat(SchedulePlanner.isSettled(SEPTEMBER, LocalDate.of(2026, 9, 30), 0))
+                .isFalse();
+        assertThat(SchedulePlanner.isSettled(SEPTEMBER, LocalDate.of(2026, 10, 1), 0))
+                .isTrue();
+    }
+
+    @Test
+    void theCurrentAndUnsettledMonthsArePublishedOrFailedOnesAreNeverPicked() {
+        LocalDate today = LocalDate.of(2026, 9, 3);
+        assertThat(SchedulePlanner.next(List.of(AUGUST, SEPTEMBER), Set.of(), Set.of(), today, 5))
+                .isEmpty();
+        assertThat(SchedulePlanner.next(List.of(MARCH, APRIL), Set.of(MARCH), Set.of(APRIL), today, 5))
+                .isEmpty();
+    }
+
+    @Test
+    void nothingCoveredIsNothingToDo() {
+        assertThat(SchedulePlanner.next(List.of(), Set.of(), Set.of(), LocalDate.of(2026, 10, 10), 5))
+                .isEmpty();
+    }
+}

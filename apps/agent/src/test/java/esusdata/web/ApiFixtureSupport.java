@@ -305,6 +305,11 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 sessionCookie, URI.create(BASE_URL + "/api/v1/runs"), "POST", jsonBody, idempotencyKey);
     }
 
+    public HttpResponse<String> authenticatedPut(String sessionCookie, URI uri, String jsonBody)
+            throws IOException, InterruptedException {
+        return authenticatedRequest(sessionCookie, uri, "PUT", jsonBody, null);
+    }
+
     public HttpResponse<String> authenticatedDelete(String sessionCookie, URI uri)
             throws IOException, InterruptedException {
         return authenticatedRequest(sessionCookie, uri, "DELETE", null, null);
