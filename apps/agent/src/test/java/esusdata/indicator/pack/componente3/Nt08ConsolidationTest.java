@@ -282,7 +282,7 @@ class Nt08ConsolidationTest {
         assertNoScore(unit, IndicatorStatus.NO_DENOMINATOR, "C3", C3);
         // the six others stay classified on their own
         PACKS.stream()
-                .filter(p -> !p.equals(C3))
+                .filter(p -> !C3.equals(p))
                 .forEach(p -> assertThat(indicator(unit, p).status()).as(p).isEqualTo(IndicatorStatus.COMPUTED));
     }
 
