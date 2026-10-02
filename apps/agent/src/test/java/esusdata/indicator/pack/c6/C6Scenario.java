@@ -244,7 +244,8 @@ final class C6Scenario {
                 .filter(e -> key.equals(e.subjectKey()))
                 .filter(e -> code.equals(e.component()))
                 .filter(e -> e.decision() == EvidenceDecision.PRACTICE_MET
-                        || e.decision() == EvidenceDecision.PRACTICE_NOT_MET)
+                        || e.decision() == EvidenceDecision.PRACTICE_NOT_MET
+                        || e.decision() == EvidenceDecision.PRACTICE_AMBIGUOUS)
                 .toList();
         assertThat(rows).as("practice %s row of %s", code, key).hasSize(1);
         return rows.get(0);

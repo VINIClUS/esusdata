@@ -45,18 +45,12 @@ final class C6Evidence {
 
     private static void practice(List<EvidenceItem> items, Assessment a, Practice p, String reference) {
         boolean met = a.met(p);
-        boolean informative = a.eap() && p == Practice.C;
-        String reason = informative ? C6Pack.EAP_INFORMATIVE : p.reason(met);
+        boolean ambiguous = a.eap() && p == Practice.C;
+        String reason = ambiguous ? C6Pack.EAP_AMBIGUOUS : p.reason(met);
         BigInteger points = met ? C6Pack.spec(p).weight() : BigInteger.ZERO;
         List<Support> supports = a.practices().get(p);
         String date = met ? supports.get(supports.size() - 1).date().toString() : reference;
-        items.add(person(
-                a.subject(),
-                date,
-                p.name(),
-                met ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET,
-                reason,
-                informative ? null : points));
+        items.add(person(a.subject(), date, p.name(), decision(met, ambiguous), reason, ambiguous ? null : points));
         for (Support event : supports) {
             items.add(new EvidenceItem(
                     EvidenceSubjectKind.PERSON,
@@ -72,6 +66,13 @@ final class C6Evidence {
                     event.cbo(),
                     event.model()));
         }
+    }
+
+    private static EvidenceDecision decision(boolean met, boolean ambiguous) {
+        if (ambiguous) {
+            return EvidenceDecision.PRACTICE_AMBIGUOUS;
+        }
+        return met ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
     }
 
     private static EvidenceItem person(

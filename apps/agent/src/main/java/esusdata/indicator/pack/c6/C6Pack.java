@@ -64,12 +64,12 @@ public final class C6Pack implements IndicatorRule {
     public static final String RULE_VERSION = ID + "@0.1.0";
 
     /** The reason code of the visits practice of an eAP tipo 76 person while P07 is open. */
-    static final String EAP_INFORMATIVE = "C_INFORMATIVA_EAP76_AMB_C6_01";
+    static final String EAP_AMBIGUOUS = "C_AMBIGUA_EAP76_AMB_C6_01";
 
     static final String EAP_AMBIGUITY = "AMB-C6-01: a boa prática (C) «não será condicionante de pontuação para eAP, "
             + "tipo 76» (item 24 b, p. 2) admite três leituras (crédito integral, renormalização sobre 75 ou só não "
             + "exigir); resultado sem valor até a P07 (MET-23). A, B e D seguem nos componentes; o componente C "
-            + "conta as visitas de todos, mas é só informativo para a eAP.";
+            + "fica RULE_AMBIGUITY com as contagens exatas e a prática C da pessoa, PRACTICE_AMBIGUOUS.";
 
     private static final List<String> STANDING_LIMITATIONS = List.of(
             "Dados fora do PEC local: doses só na RNDS/RIA (lacuna L4) não aparecem e a falta de integração não é "
@@ -264,17 +264,21 @@ public final class C6Pack implements IndicatorRule {
     private static IndicatorResult result(List<Assessment> group, EvaluationContext context) {
         BigInteger subjects = BigInteger.valueOf(group.size());
         BigInteger total = BigInteger.ZERO;
-        List<ResultComponent> components = new ArrayList<>();
-        for (Practice p : Practice.values()) {
-            long met = group.stream().filter(a -> a.met(p)).count();
-            components.add(ResultComponent.of(spec(p), BigInteger.valueOf(met), subjects));
-        }
         boolean ambiguous = false;
         long withoutTeam = 0;
         for (Assessment a : group) {
             total = total.add(a.points());
             ambiguous |= a.eap();
             withoutTeam += a.subject().ine() == null ? 1 : 0;
+        }
+        List<ResultComponent> components = new ArrayList<>();
+        for (Practice p : Practice.values()) {
+            BigInteger met =
+                    BigInteger.valueOf(group.stream().filter(a -> a.met(p)).count());
+            components.add(
+                    ambiguous && p == Practice.C
+                            ? ambiguousComponent(met, subjects)
+                            : ResultComponent.of(spec(p), met, subjects));
         }
         List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
         if (withoutTeam > 0) {
@@ -288,6 +292,12 @@ public final class C6Pack implements IndicatorRule {
         Optional<ExactRatio> value = Scores.meanPoints(total, subjects);
         IndicatorStatus status = value.isPresent() ? IndicatorStatus.COMPUTED : IndicatorStatus.NO_DENOMINATOR;
         return build(status, value.orElse(null), total, subjects, components, limitations, context);
+    }
+
+    /** C of a group with eAP tipo 76 people (AMB-C6-01): exact counts, no value. */
+    private static ResultComponent ambiguousComponent(BigInteger met, BigInteger subjects) {
+        ComponentSpec c = spec(Practice.C);
+        return new ResultComponent(c.code(), c.kind(), c.weight(), met, subjects, null, IndicatorStatus.RULE_AMBIGUITY);
     }
 
     private static IndicatorResult build(

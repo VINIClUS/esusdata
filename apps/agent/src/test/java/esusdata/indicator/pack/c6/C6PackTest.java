@@ -472,10 +472,13 @@ class C6PackTest {
         assertComponent(outcome.result(), "B", 1, 2);
         assertComponent(outcome.result(), "C", 0, 2);
         assertComponent(outcome.result(), "D", 2, 2);
+        assertThat(component(outcome.result(), "C").status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        assertThat(component(outcome.result(), "C").value()).isNull();
+        assertThat(component(outcome.result(), "A").status()).isEqualTo(IndicatorStatus.COMPUTED);
         for (String key : List.of(X, Y)) {
             EvidenceItem c = practiceRow(outcome, key, "C");
-            assertThat(c.decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
-            assertThat(c.reasonCode()).isEqualTo("C_INFORMATIVA_EAP76_AMB_C6_01");
+            assertThat(c.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
+            assertThat(c.reasonCode()).isEqualTo("C_AMBIGUA_EAP76_AMB_C6_01");
             assertThat(c.points()).isNull();
             assertThat(points(outcome, key)).isNull();
         }
@@ -492,13 +495,15 @@ class C6PackTest {
     }
 
     @Test
-    void met23_eap76PersonWithVisitsKeepsCAsInformativeMet() {
+    void met23_eap76PersonWithVisitsHasCAmbiguousWithItsVisitsAsSupport() {
         RuleOutcome outcome = scenario().team(INE_A, "76").elder(X).practiceC(X).compute();
 
         EvidenceItem c = practiceRow(outcome, X, "C");
-        assertThat(c.decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
-        assertThat(c.reasonCode()).isEqualTo("C_INFORMATIVA_EAP76_AMB_C6_01");
+        assertThat(c.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
+        assertThat(c.reasonCode()).isEqualTo("C_AMBIGUA_EAP76_AMB_C6_01");
         assertThat(c.points()).isNull();
+        assertThat(supportingRows(outcome, X)).hasSize(2);
+        assertComponent(outcome.result(), "C", 1, 1);
     }
 
     @Test
