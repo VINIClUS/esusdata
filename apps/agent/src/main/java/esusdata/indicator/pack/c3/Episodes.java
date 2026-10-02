@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.c3;
 
 import esusdata.indicator.model.CanonicalCareEvent;
+import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalPregnancyOutcome;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -27,28 +28,44 @@ final class Episodes {
     static List<Episode> of(PersonRecords person) {
         NavigableMap<LocalDate, EventRef> candidates = candidates(person.individualCare());
         NavigableSet<LocalDate> outcomes = outcomeDates(person.outcomes());
+        NavigableSet<LocalDate> resolutions = resolutionDates(person.conditions());
         List<Episode> episodes = new ArrayList<>();
         while (!candidates.isEmpty()) {
             LocalDate first = candidates.firstKey();
             EventRef anchor = candidates.firstEntry().getValue();
-            LocalDate outcome = outcomeWithin(outcomes, first, GestationWindow.MAX_PREGNANCY_DAYS);
-            GestationWindow primary =
-                    outcome == null ? GestationWindow.substitute(first) : GestationWindow.recorded(first, outcome);
+            GestationWindow primary = window(first, outcomes, resolutions);
             NavigableMap<LocalDate, EventRef> members = candidates.headMap(primary.end(), true);
             LocalDate last = members.lastKey();
             List<GestationWindow> readings = new ArrayList<>();
             readings.add(primary);
+            boolean substitute = primary.endSource() == GestationWindow.EndSource.SUBSTITUTE_294;
             if (last.isAfter(first)) {
                 readings.add(
-                        outcome == null ? GestationWindow.substitute(last) : GestationWindow.recorded(last, outcome));
+                        substitute
+                                ? GestationWindow.substitute(last)
+                                : new GestationWindow(last, primary.end(), primary.endSource()));
             }
-            // AMB-C3-05: an outcome recorded in (c0 + 294, c0 + 336].
-            boolean late =
-                    outcome == null && outcomeWithin(outcomes, primary.end(), GestationWindow.PUERPERIUM_DAYS) != null;
+            // AMB-C3-05: an outcome or LPC resolution only in (c0 + 294, c0 + 336].
+            boolean late = substitute
+                    && (within(outcomes, primary.end(), GestationWindow.PUERPERIUM_DAYS) != null
+                            || within(resolutions, primary.end(), GestationWindow.PUERPERIUM_DAYS) != null);
             episodes.add(new Episode(person.personKey() + "#" + first, readings, anchor, late));
             members.clear();
         }
         return episodes;
+    }
+
+    /** The end D by precedence: recorded outcome, LPC resolution, DUM + 294 (EMENDA 1). */
+    private static GestationWindow window(
+            LocalDate dum, NavigableSet<LocalDate> outcomes, NavigableSet<LocalDate> resolutions) {
+        LocalDate outcome = within(outcomes, dum, GestationWindow.MAX_PREGNANCY_DAYS);
+        if (outcome != null) {
+            return new GestationWindow(dum, outcome, GestationWindow.EndSource.RECORDED_OUTCOME);
+        }
+        LocalDate resolved = within(resolutions, dum, GestationWindow.MAX_PREGNANCY_DAYS);
+        return resolved == null
+                ? GestationWindow.substitute(dum)
+                : new GestationWindow(dum, resolved, GestationWindow.EndSource.LPC_RESOLUTION);
     }
 
     /** Each candidate DUM with the first record (in evidence order) that gives it. */
@@ -90,8 +107,26 @@ final class Episodes {
         return dates;
     }
 
-    /** The first outcome in {@code (from, from + days]}, or {@code null}. */
-    private static LocalDate outcomeWithin(NavigableSet<LocalDate> outcomes, LocalDate from, int days) {
+    /**
+     * The resolution dates of pregnancy conditions (24 f, exact code) marked resolved in the LPC:
+     * the PEC writes the outcome date there (gap L2).
+     */
+    private static NavigableSet<LocalDate> resolutionDates(List<CanonicalCondition> conditions) {
+        NavigableSet<LocalDate> dates = new TreeSet<>();
+        for (CanonicalCondition condition : conditions) {
+            LocalDate date = C3Dates.parse(condition.resolvedDate());
+            boolean resolved = condition.status() != null
+                    && C3Codes.CONDITION_RESOLVED.equals(condition.status().strip());
+            CodeMatch match = CodeMatch.of(condition, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID);
+            if (date != null && resolved && match == CodeMatch.EXACT) {
+                dates.add(date);
+            }
+        }
+        return dates;
+    }
+
+    /** The first date in {@code (from, from + days]}, or {@code null}. */
+    private static LocalDate within(NavigableSet<LocalDate> outcomes, LocalDate from, int days) {
         LocalDate next = outcomes.higher(from);
         return next != null && !next.isAfter(from.plusDays(days)) ? next : null;
     }

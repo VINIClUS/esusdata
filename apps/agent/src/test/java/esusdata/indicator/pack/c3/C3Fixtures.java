@@ -3,6 +3,7 @@ package esusdata.indicator.pack.c3;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.indicator.model.CanonicalCareEvent;
+import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.CanonicalHomeVisit;
@@ -63,6 +64,7 @@ final class C3Fixtures {
     static final String DENTIST = "223208";
     static final String PHARMACIST = "223405";
     static final String NURSING_TECHNICIAN = "322205";
+    static final String ORAL_HEALTH_TECHNICIAN = "322405";
 
     static final String PREGNANCY_CIAP = "W78";
     static final String PUERPERIUM_CID = "Z39";
@@ -87,8 +89,11 @@ final class C3Fixtures {
     /** Six prenatal consultation days besides the anchor (all before DUM+294). */
     static final List<Integer> MORE_PRENATAL_DAYS = List.of(126, 154, 182, 210, 238, 266);
 
-    private static final Set<EvidenceDecision> PRACTICE_DECISIONS =
-            Set.of(EvidenceDecision.PRACTICE_MET, EvidenceDecision.PRACTICE_NOT_MET, EvidenceDecision.PRACTICE_EXEMPT);
+    private static final Set<EvidenceDecision> PRACTICE_DECISIONS = Set.of(
+            EvidenceDecision.PRACTICE_MET,
+            EvidenceDecision.PRACTICE_NOT_MET,
+            EvidenceDecision.PRACTICE_EXEMPT,
+            EvidenceDecision.PRACTICE_AMBIGUOUS);
 
     private C3Fixtures() {}
 
@@ -113,6 +118,7 @@ final class C3Fixtures {
         CanonicalDataset.Builder builder = CanonicalDataset.builder()
                 .window(Capabilities.CITIZEN, care)
                 .window(Capabilities.INDIVIDUAL_REGISTRATION, DateWindow.lastCivilMonths(competencia, 24))
+                .window(Capabilities.CONDITION_LIST, care)
                 .window(Capabilities.CARE_ENCOUNTER, care)
                 .window(Capabilities.DENTAL_ENCOUNTER, care)
                 .window(Capabilities.PROCEDURE_PERFORMED, care)
@@ -184,6 +190,12 @@ final class C3Fixtures {
     /** A dose of {@code code}; {@code date} may be {@code null} (a transcription without date). */
     static CanonicalImmunization dose(
             String personKey, LocalDate date, String code, String cbo, boolean transcription) {
+        return dose(personKey, date, code, cbo, transcription, date);
+    }
+
+    /** A dose applied on {@code date} (may be {@code null}) and registered on {@code registered}. */
+    static CanonicalImmunization dose(
+            String personKey, LocalDate date, String code, String cbo, boolean transcription, LocalDate registered) {
         return new CanonicalImmunization(
                 CanonicalFixtures.ref(transcription ? "rnds_ria" : "tb_fat_vacinacao_vacina"),
                 IBGE,
@@ -195,7 +207,8 @@ final class C3Fixtures {
                 transcription,
                 cbo,
                 CNES,
-                INE);
+                INE,
+                registered == null ? null : registered.toString());
     }
 
     /** A dTpa (57) applied by a nurse. */
@@ -248,6 +261,43 @@ final class C3Fixtures {
     /** Blood pressure written in the MIP by a nurse. */
     static CanonicalMeasurement bloodPressure(String personKey, LocalDate date, String cbo) {
         return measurement(personKey, date, null, null, "120", "80", cbo, MIP);
+    }
+
+    /** A participant's weight and height in a collective activity (MIAC). */
+    static CanonicalMeasurement collectiveActivity(
+            String personKey, LocalDate date, String cbo, String activityType, String... practices) {
+        return new CanonicalMeasurement(
+                CanonicalFixtures.ref("tb_fat_atvdd_coletiva_part"),
+                IBGE,
+                personKey,
+                date.toString(),
+                "62.5",
+                "160",
+                null,
+                null,
+                cbo,
+                "MIAC",
+                activityType,
+                List.of(practices));
+    }
+
+    /**
+     * A problem/condition (LPC) of {@code system} ({@code CIAP2}/{@code CID10}) recorded on {@code
+     * recorded} with {@code status} ("0" active, "1" latent, "2" resolved) and {@code resolved}.
+     */
+    static CanonicalCondition condition(
+            String personKey, String system, String code, LocalDate recorded, String status, LocalDate resolved) {
+        return new CanonicalCondition(
+                CanonicalFixtures.ref("tb_fat_atd_ind_problemas"),
+                IBGE,
+                personKey,
+                system,
+                code,
+                recorded.toString(),
+                status,
+                resolved == null ? null : resolved.toString(),
+                "PROFESSIONAL",
+                NURSE);
     }
 
     /** Weight and height written together in the MIP by a nurse. */
@@ -417,9 +467,9 @@ final class C3Fixtures {
         assertThat(row.points()).isEqualTo(BigInteger.ZERO);
     }
 
-    /** An undecided practice: NOT_MET with reason {@code AMBIGUIDADE_AMB_C3_<amb>} and no points. */
+    /** An undecided practice: PRACTICE_AMBIGUOUS with reason {@code AMBIGUIDADE_AMB_C3_<amb>} and no points. */
     static void assertAmbiguous(EvidenceItem row, String amb) {
-        assertThat(row.decision()).as("practice %s", row.component()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+        assertThat(row.decision()).as("practice %s", row.component()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
         assertThat(row.reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_" + amb);
         assertThat(row.points()).isNull();
     }

@@ -3,8 +3,10 @@ package esusdata.indicator.pack.c3;
 import esusdata.indicator.model.CboGroups;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * The code tables of the C3 ficha (Nota Metodológica C3, SEI 0054619475, junho/2026), transcribed
@@ -150,6 +152,31 @@ final class C3Codes {
     /** "57 - Vacina dTpa adulto": "1 dose a cada gestação, a partir da vigésima semana". */
     static final String DTPA_ADULT = "57";
 
+    // ---- MIAC (24 e, p.3; Quadros 04 e 08) ----
+
+    /** "Atividade código 05 e 06" (24 e; Quadros 04 e 08). */
+    static final List<String> MIAC_ACTIVITY_TYPES = List.of("05", "06");
+
+    /** "Práticas em Saúde códigos 01, 02, 04" (24 e): the MIAC in general, used for C. */
+    static final List<String> MIAC_PRACTICES = List.of("01", "02", "04");
+
+    /** "Práticas em Saúde código 01" (Quadro 04, p.7): D. */
+    static final List<String> MIAC_PRACTICES_ANTHROPOMETRY = List.of("01");
+
+    /** "Práticas em Saúde códigos 02 e 04" (Quadro 08, p.8): K. */
+    static final List<String> MIAC_PRACTICES_ORAL_HEALTH = List.of("02", "04");
+
+    // ---- Lista de problemas e condições (LPC) ----
+
+    /** What {@code condition_list} is asked for: the CIAP-2 of 24 f (gestação, puerpério) and 24 g. */
+    static final List<String> CONDITION_CIAP = distinct(PREGNANCY_CIAP, PUERPERIUM_CIAP, EXCLUSION_CIAP);
+
+    /** The CID-10 of 24 f and 24 g, without the dot: the query matches by category prefix. */
+    static final List<String> CONDITION_CID = distinct(PREGNANCY_CID, PUERPERIUM_CID, EXCLUSION_CID);
+
+    /** Condition status "2" (resolvido): its resolution date is the pregnancy outcome candidate (L2). */
+    static final String CONDITION_RESOLVED = "2";
+
     // ---- Equipes (24 b, p.2) ----
 
     /** CNES team type 76, eAP: E and J "consideram a pontuação integral" (24 b). */
@@ -165,6 +192,22 @@ final class C3Codes {
 
     private C3Codes() {}
 
+    /** True when a LEDI code is in the list, "5" and "05" being the same code. */
+    static boolean ledi(String code, List<String> list) {
+        String value = withoutLeadingZeros(code);
+        return !value.isEmpty()
+                && list.stream().anyMatch(c -> withoutLeadingZeros(c).equals(value));
+    }
+
+    /** True when any of the LEDI codes is in the list. */
+    static boolean anyLedi(List<String> codes, List<String> list) {
+        return codes.stream().anyMatch(c -> ledi(c, list));
+    }
+
+    private static String withoutLeadingZeros(String code) {
+        return code == null ? "" : code.strip().replaceFirst("^0+(?=.)", "");
+    }
+
     /** A CID-10 or CIAP-2 code as compared here: no dot, no spaces, upper case. */
     static String normalized(String code) {
         return code == null ? "" : code.replaceAll("[.\\s]", "").toUpperCase(Locale.ROOT);
@@ -172,6 +215,15 @@ final class C3Codes {
 
     private static List<String> cid(String... codes) {
         return Arrays.stream(codes).map(C3Codes::normalized).toList();
+    }
+
+    @SafeVarargs
+    private static List<String> distinct(List<String>... lists) {
+        Set<String> all = new LinkedHashSet<>();
+        for (List<String> list : lists) {
+            all.addAll(list);
+        }
+        return List.copyOf(all);
     }
 
     @SafeVarargs

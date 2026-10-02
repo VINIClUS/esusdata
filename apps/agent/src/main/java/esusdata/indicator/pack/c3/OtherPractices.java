@@ -2,6 +2,7 @@ package esusdata.indicator.pack.c3;
 
 import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalImmunization;
+import esusdata.indicator.model.CanonicalMeasurement;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,19 +42,32 @@ final class OtherPractices {
         return Tally.decide(1, marks);
     }
 
-    /** K: an individual dental encounter (MIAOI) by a dentist or TSB during the pregnancy. */
+    /**
+     * K: an individual dental encounter (MIAOI), or a collective activity (MIAC) with activity
+     * 05/06 and practice 02/04 — only one of them being AMB-C3-19 — by a dentist or TSB during the
+     * pregnancy.
+     */
     static PracticeOutcome dental(PersonRecords person, GestationWindow window) {
         List<TallyMark> marks = new ArrayList<>();
         for (CanonicalCareEvent event : person.dentalCare()) {
-            EventRef ref = EventRef.of(event);
-            if (ref.date() != null && C3Codes.DENTAL_CBO.matches(event.cbo())) {
-                GestationWindow.Phase phase = window.phaseOf(ref.date());
-                if (phase.pregnant()) {
-                    marks.add(TallyMark.of(ref, phase.inPregnancy(null)));
-                }
+            if (C3Codes.DENTAL_CBO.matches(event.cbo())) {
+                addPregnancy(marks, EventRef.of(event), null, window);
+            }
+        }
+        for (CanonicalMeasurement activity : person.measurements()) {
+            MiacMatch miac = MiacMatch.of(activity, C3Codes.MIAC_PRACTICES_ORAL_HEALTH);
+            if (miac.counts() && C3Codes.DENTAL_CBO.matches(activity.cbo())) {
+                addPregnancy(marks, EventRef.of(activity), miac.ambiguity(null), window);
             }
         }
         return Tally.decide(1, marks);
+    }
+
+    private static void addPregnancy(
+            List<TallyMark> marks, EventRef event, Ambiguity ambiguity, GestationWindow window) {
+        if (window.inPregnancy(event.date())) {
+            marks.add(TallyMark.of(event, window.phaseOf(event.date()).inPregnancy(ambiguity)));
+        }
     }
 
     /** The dose's mark, or {@code null} when it falls outside every reading of the window. */

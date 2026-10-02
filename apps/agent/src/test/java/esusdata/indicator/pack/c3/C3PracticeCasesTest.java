@@ -13,6 +13,7 @@ import static esusdata.indicator.pack.c3.C3Fixtures.MIP;
 import static esusdata.indicator.pack.c3.C3Fixtures.MORE_PRENATAL_DAYS;
 import static esusdata.indicator.pack.c3.C3Fixtures.NURSE;
 import static esusdata.indicator.pack.c3.C3Fixtures.NURSING_TECHNICIAN;
+import static esusdata.indicator.pack.c3.C3Fixtures.ORAL_HEALTH_TECHNICIAN;
 import static esusdata.indicator.pack.c3.C3Fixtures.OUTCOME;
 import static esusdata.indicator.pack.c3.C3Fixtures.PERFORMED;
 import static esusdata.indicator.pack.c3.C3Fixtures.PHARMACIST;
@@ -27,6 +28,7 @@ import static esusdata.indicator.pack.c3.C3Fixtures.assertMet;
 import static esusdata.indicator.pack.c3.C3Fixtures.assertNotMet;
 import static esusdata.indicator.pack.c3.C3Fixtures.bloodPressure;
 import static esusdata.indicator.pack.c3.C3Fixtures.care;
+import static esusdata.indicator.pack.c3.C3Fixtures.collectiveActivity;
 import static esusdata.indicator.pack.c3.C3Fixtures.computeNovember;
 import static esusdata.indicator.pack.c3.C3Fixtures.conventionPack;
 import static esusdata.indicator.pack.c3.C3Fixtures.dental;
@@ -63,8 +65,7 @@ import org.junit.jupiter.api.Test;
  * 8s, so A is met), has no recorded outcome (D = DUM+294 = 2025-10-22) and runs without a
  * trimester convention, so G/H are decided only when an agent has no evidence at all (AMB-C3-02).
  *
- * <p>Cases the canonical model cannot express are not tests here: CT-C3-59/60 (MIAC activity and
- * "Práticas em Saúde" codes are not canonical fields), CT-C3-61 (the dentist's own team
+ * <p>Cases the canonical model cannot express are not tests here: CT-C3-61 (the dentist's own team
  * allocation is not a field of the dental encounter), CT-C3-23 as written (a home visit carries no
  * blood pressure, lacuna L6 — the ACS reading is expressed as an MIP measurement instead).
  */
@@ -300,6 +301,29 @@ class C3PracticeCasesTest {
         assertMet(practice(computeNovember(new C3Pack(), records), "D"), 9);
     }
 
+    @Test
+    void amb19_aCollectiveActivityWithActivityAndPracticeCodesCountsForD() {
+        List<Record> records = measuredConsults(6, false, true);
+        records.add(collectiveActivity(P1, dum(250), NURSE, "05", "01"));
+        assertMet(practice(computeNovember(new C3Pack(), records), "D"), 9);
+    }
+
+    @Test
+    void amb19_activityCodesWithoutLeadingZeroAreTheSameCodes() {
+        List<Record> records = measuredConsults(6, false, true);
+        records.add(collectiveActivity(P1, dum(250), NURSE, "6", "1"));
+        assertMet(practice(computeNovember(new C3Pack(), records), "D"), 9);
+    }
+
+    @Test
+    void amb19_aCollectiveActivityMeetingOnlyTheActivityCodeIsAmbiguousForD() {
+        List<Record> records = measuredConsults(6, false, true);
+        records.add(collectiveActivity(P1, dum(250), NURSE, "05", "02"));
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
+        assertAmbiguous(practice(outcome, "D"), "19");
+        assertRuleAmbiguity(outcome);
+    }
+
     // ---- E: at least 3 ACS/TACS visits after the first prenatal consultation ----
 
     @Test
@@ -422,8 +446,17 @@ class C3PracticeCasesTest {
 
     @Test
     void amb17_aTranscriptionWithoutDateIsAmbiguous() {
-        RuleOutcome outcome = computeNovember(new C3Pack(), withDose(dose(P1, null, DTPA, NURSE, true)));
+        RuleOutcome outcome =
+                computeNovember(new C3Pack(), withDose(dose(P1, null, DTPA, NURSE, true, LocalDate.of(2025, 11, 5))));
         assertAmbiguous(practice(outcome, "F"), "17");
+    }
+
+    @Test
+    void amb17_aTranscriptionCountsByItsApplicationDateNotItsRegistrationDate() {
+        // applied on DUM+196, typed in after the pregnancy ended (EMENDA 1, item 4)
+        RuleOutcome outcome = computeNovember(
+                new C3Pack(), withDose(dose(P1, dum(196), DTPA, NURSE, true, LocalDate.of(2025, 11, 5))));
+        assertMet(practice(outcome, "F"), 9);
     }
 
     @Test
@@ -452,7 +485,8 @@ class C3PracticeCasesTest {
     void ct46_noHepatitisCInTheWholePregnancyFailsGWhateverTheTrimester() {
         RuleOutcome outcome = computeNovember(new C3Pack(), withTests(dum(56), SYPHILIS, HIV, HEPATITIS_B));
         assertNotMet(practice(outcome, "G"));
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+        // H still depends on where the syphilis and HIV tests fall (AMB-C3-02)
+        assertAmbiguous(practice(outcome, "H"), "02");
     }
 
     @Test
@@ -615,6 +649,24 @@ class C3PracticeCasesTest {
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
         assertNotMet(practice(outcome, "K"));
         assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+    }
+
+    @Test
+    void ct59_anOralHealthCollectiveActivityMeetsK() {
+        List<Record> records = withAnchorOn(dum(56));
+        records.add(collectiveActivity(P1, dum(140), ORAL_HEALTH_TECHNICIAN, "05", "02"));
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
+        assertMet(practice(outcome, "K"), 9);
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+    }
+
+    @Test
+    void ct60_aCollectiveActivityWithOnlyPractice01IsAmbiguousForK() {
+        List<Record> records = withAnchorOn(dum(56));
+        records.add(collectiveActivity(P1, dum(140), ORAL_HEALTH_TECHNICIAN, "05", "01"));
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
+        assertAmbiguous(practice(outcome, "K"), "19");
+        assertRuleAmbiguity(outcome);
     }
 
     @Test

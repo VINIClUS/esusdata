@@ -54,6 +54,8 @@ final class RecordIndex {
                 group(data.registrations(), CanonicalRegistration::personKey, CanonicalRegistration::sourceRef);
         Map<String, List<CanonicalPerson>> persons =
                 group(data.persons(), CanonicalPerson::personKey, CanonicalPerson::sourceRef);
+        Map<String, List<CanonicalCondition>> conditions =
+                group(data.conditions(), CanonicalCondition::personKey, CanonicalCondition::sourceRef);
 
         SortedMap<String, PersonRecords> index = new TreeMap<>();
         for (Map.Entry<String, List<CanonicalCareEvent>> entry : care.entrySet()) {
@@ -74,7 +76,8 @@ final class RecordIndex {
                             immunizations.getOrDefault(key, List.of()),
                             outcomes.getOrDefault(key, List.of()),
                             registrations.getOrDefault(key, List.of()),
-                            persons.getOrDefault(key, List.of())));
+                            persons.getOrDefault(key, List.of()),
+                            conditions.getOrDefault(key, List.of())));
         }
         return index;
     }

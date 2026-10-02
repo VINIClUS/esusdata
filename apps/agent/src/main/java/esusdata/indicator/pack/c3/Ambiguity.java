@@ -35,7 +35,9 @@ enum Ambiguity {
     /** dTpa after the end of the pregnancy or without an application date. */
     AMB_C3_17,
     /** Tests: HTLV and MIAI records by CBO 2234/3222. */
-    AMB_C3_18;
+    AMB_C3_18,
+    /** MIAC with only one of the two code conditions (activity type, health practice). */
+    AMB_C3_19;
 
     /** The transcription's id, e.g. {@code AMB-C3-01}. */
     String id() {

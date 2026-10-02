@@ -67,7 +67,7 @@ final class EvidenceRows {
                 new Decided(EvidenceDecision.PRACTICE_EXEMPT, C3Reasons.EAP_TIPO_76_PONTUACAO_INTEGRAL, weight);
             case NOT_MET -> new Decided(EvidenceDecision.PRACTICE_NOT_MET, C3Reasons.NAO_CUMPRIDA, BigInteger.ZERO);
             case AMBIGUOUS ->
-                new Decided(EvidenceDecision.PRACTICE_NOT_MET, C3Reasons.ambiguity(outcome.ambiguity()), null);
+                new Decided(EvidenceDecision.PRACTICE_AMBIGUOUS, C3Reasons.ambiguity(outcome.ambiguity()), null);
         };
         return new EvidenceItem(
                 EvidenceSubjectKind.EPISODE,

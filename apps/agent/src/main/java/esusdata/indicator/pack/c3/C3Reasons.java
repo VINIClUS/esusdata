@@ -15,6 +15,7 @@ final class C3Reasons {
     static final String EXCLUIDO_ABORTO = "EXCLUIDO_ABORTO";
     static final String ELEGIVEL_DESFECHO_REGISTRADO = "ELEGIVEL_DESFECHO_REGISTRADO";
     static final String ELEGIVEL_DATA_SUBSTITUTIVA_294D = "ELEGIVEL_DATA_SUBSTITUTIVA_294D";
+    static final String ELEGIVEL_DESFECHO_RESOLUCAO_LPC = "ELEGIVEL_DESFECHO_RESOLUCAO_LPC";
     static final String MARCO_DUM = "MARCO_DUM";
 
     // ---- practices ----
@@ -44,6 +45,7 @@ final class C3Reasons {
     static final String AMBIGUIDADE_AMB_C3_16 = "AMBIGUIDADE_AMB_C3_16";
     static final String AMBIGUIDADE_AMB_C3_17 = "AMBIGUIDADE_AMB_C3_17";
     static final String AMBIGUIDADE_AMB_C3_18 = "AMBIGUIDADE_AMB_C3_18";
+    static final String AMBIGUIDADE_AMB_C3_19 = "AMBIGUIDADE_AMB_C3_19";
 
     static final String EVIDENCIA_AMBIGUA_AMB_C3_01 = "EVIDENCIA_AMBIGUA_AMB_C3_01";
     static final String EVIDENCIA_AMBIGUA_AMB_C3_02 = "EVIDENCIA_AMBIGUA_AMB_C3_02";
@@ -58,6 +60,7 @@ final class C3Reasons {
     static final String EVIDENCIA_AMBIGUA_AMB_C3_16 = "EVIDENCIA_AMBIGUA_AMB_C3_16";
     static final String EVIDENCIA_AMBIGUA_AMB_C3_17 = "EVIDENCIA_AMBIGUA_AMB_C3_17";
     static final String EVIDENCIA_AMBIGUA_AMB_C3_18 = "EVIDENCIA_AMBIGUA_AMB_C3_18";
+    static final String EVIDENCIA_AMBIGUA_AMB_C3_19 = "EVIDENCIA_AMBIGUA_AMB_C3_19";
 
     private C3Reasons() {}
 

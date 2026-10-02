@@ -60,6 +60,7 @@ public final class C3Pack implements IndicatorRule {
             List.of(
                     Capabilities.CITIZEN,
                     Capabilities.INDIVIDUAL_REGISTRATION,
+                    Capabilities.CONDITION_LIST,
                     Capabilities.CARE_ENCOUNTER,
                     Capabilities.DENTAL_ENCOUNTER,
                     Capabilities.PROCEDURE_PERFORMED,
@@ -210,7 +211,7 @@ public final class C3Pack implements IndicatorRule {
         return Bands.QUALIDADE_C2_C7.classify(value);
     }
 
-    /** The code lists each capability binds (24 h, Quadro 07, 24 i); the rest bind none. */
+    /** The code lists each capability binds (24 f/g, 24 h, Quadro 07, 24 i); the rest bind none. */
     private static SortedMap<String, List<String>> codes(String capability) {
         SortedMap<String, List<String>> lists = new TreeMap<>();
         switch (capability) {
@@ -218,6 +219,10 @@ public final class C3Pack implements IndicatorRule {
             case Capabilities.EXAM_REQUEST_EVALUATION -> lists.put(Capabilities.PROCEDURE_CODES, C3Codes.TEST_SIGTAP);
             case Capabilities.IMMUNIZATION_HISTORY ->
                 lists.put(Capabilities.IMMUNOBIOLOGICAL_CODES, List.of(C3Codes.DTPA_ADULT));
+            case Capabilities.CONDITION_LIST -> {
+                lists.put(Capabilities.CIAP_CODES, C3Codes.CONDITION_CIAP);
+                lists.put(Capabilities.CID_CODES, C3Codes.CONDITION_CID);
+            }
             default -> {
                 // no code bind
             }

@@ -20,13 +20,12 @@ final class C3Limitations {
                     + " individual local vigente no corte (item 14, p.1; lacuna L8).",
             "O tipo de equipe não está no DW: sem tipo comprovado, a pontuação integral de E e J para eAP"
                     + " tipo 76 não é aplicada (24 b, p.2; lacuna L1; AMB-C3-13).",
-            "A data de desfecho da gestação não está no DW: sem desfecho registrado, a gestação termina em"
-                    + " DUM+294 (item 17, p.2; lacuna L2; MET-21).",
-            "A pressão arterial da visita domiciliar não é lida (Quadro 03, p.6; lacuna L6); registros do"
-                    + " MIAC, sem códigos de atividade, contam só como ambíguos (AMB-C3-14, AMB-C3-15,"
-                    + " AMB-C3-19).",
-            "Em K, procedimentos do MIP (sem lista SIGTAP na ficha) e registros do MIAC não são avaliados;"
-                    + " conta o atendimento odontológico individual (Quadro 08, p.8).",
+            "A data de desfecho da gestação não está no DW: usa-se a data de resolução da condição de"
+                    + " gravidez na LPC (manual do PEC) e, sem ela, DUM+294 (item 17, p.2; lacuna L2; MET-21).",
+            "A pressão arterial da visita domiciliar não é lida (Quadro 03, p.6; lacuna L6).",
+            "O MIAC conta com atividade 05/06 e a prática em saúde do quadro; só uma das duas condições"
+                    + " fica RULE_AMBIGUITY (24 e, p.3; Quadros 04 e 08; AMB-C3-19).",
+            "Em K, procedimentos do MIP não são avaliados: a ficha não lista SIGTAP para eles (Quadro 08," + " p.8).",
             "Os códigos rápidos ABP de pré-natal e de puerpério não são enumerados pela ficha e não são"
                     + " usados (24 f, p.3; AMB-C3-10).",
             "Os itens CIAP-2 \"48\" e \"49\" da lista de puerpério não são mapeados (24 f, p.3; AMB-C3-09).",

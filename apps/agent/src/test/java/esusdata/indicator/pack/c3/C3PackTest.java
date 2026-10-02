@@ -56,6 +56,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -101,7 +102,7 @@ class C3PackTest {
     }
 
     @Test
-    void requirements_readNineCapabilitiesWithThePacksOwnCodeLists() {
+    void requirements_readTenCapabilitiesWithThePacksOwnCodeLists() {
         DataRequirements r = new C3Pack().requirements(NOVEMBER);
         assertThat(r.canonicalSchemaVersion()).isEqualTo(DataRequirements.V2);
         assertThat(r.parts())
@@ -109,6 +110,7 @@ class C3PackTest {
                 .containsExactlyInAnyOrder(
                         Capabilities.CITIZEN,
                         Capabilities.INDIVIDUAL_REGISTRATION,
+                        Capabilities.CONDITION_LIST,
                         Capabilities.CARE_ENCOUNTER,
                         Capabilities.DENTAL_ENCOUNTER,
                         Capabilities.PROCEDURE_PERFORMED,
@@ -116,7 +118,17 @@ class C3PackTest {
                         Capabilities.HOME_VISIT,
                         Capabilities.MEASUREMENT_RECORD,
                         Capabilities.IMMUNIZATION_HISTORY);
-        assertThat(new C3Pack().descriptor().requiredCapabilities()).hasSize(9);
+        // EMENDA 1: condition_list right after individual_registration
+        assertThat(new C3Pack().descriptor().requiredCapabilities())
+                .hasSize(10)
+                .containsSubsequence(Capabilities.INDIVIDUAL_REGISTRATION, Capabilities.CONDITION_LIST);
+        PartRequirement conditions = part(r, Capabilities.CONDITION_LIST);
+        assertThat(new HashSet<>(conditions.arrayParams().get(Capabilities.CIAP_CODES)))
+                .isEqualTo(union(C3Codes.PREGNANCY_CIAP, C3Codes.PUERPERIUM_CIAP, C3Codes.EXCLUSION_CIAP));
+        assertThat(new HashSet<>(conditions.arrayParams().get(Capabilities.CID_CODES)))
+                .isEqualTo(union(C3Codes.PREGNANCY_CID, C3Codes.PUERPERIUM_CID, C3Codes.EXCLUSION_CID))
+                .contains("O021", "Z303")
+                .doesNotContain("O02.1");
 
         assertThat(part(r, Capabilities.PROCEDURE_PERFORMED).arrayParams().get(Capabilities.PROCEDURE_CODES))
                 .hasSize(32)
@@ -146,7 +158,8 @@ class C3PackTest {
                 Capabilities.EXAM_REQUEST_EVALUATION,
                 Capabilities.HOME_VISIT,
                 Capabilities.MEASUREMENT_RECORD,
-                Capabilities.IMMUNIZATION_HISTORY)) {
+                Capabilities.IMMUNIZATION_HISTORY,
+                Capabilities.CONDITION_LIST)) {
             PartRequirement p = part(r, capability);
             // DUM up to 336 days before the first day of the competência
             assertThat(p.periodStart()).as(capability).isEqualTo(LocalDate.of(2024, 11, 1));
@@ -451,7 +464,8 @@ class C3PackTest {
         List<String> practiceCodes = outcome.evidence().stream()
                 .filter(e -> e.decision() == EvidenceDecision.PRACTICE_MET
                         || e.decision() == EvidenceDecision.PRACTICE_NOT_MET
-                        || e.decision() == EvidenceDecision.PRACTICE_EXEMPT)
+                        || e.decision() == EvidenceDecision.PRACTICE_EXEMPT
+                        || e.decision() == EvidenceDecision.PRACTICE_AMBIGUOUS)
                 .map(e -> e.subjectKey() + "/" + e.component())
                 .toList();
         String key = episodeKey(P1, DUM);
@@ -555,6 +569,15 @@ class C3PackTest {
                 .filter(p -> p.capability().equals(capability))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    @SafeVarargs
+    private static Set<String> union(List<String>... lists) {
+        Set<String> all = new HashSet<>();
+        for (List<String> list : lists) {
+            all.addAll(list);
+        }
+        return all;
     }
 
     private static BigInteger nine() {

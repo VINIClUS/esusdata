@@ -5,16 +5,27 @@ import java.time.temporal.ChronoUnit;
 
 /**
  * One reading of a pregnancy's dates (item 17, 4.1): the DUM and the end D used — the recorded
- * outcome, or DUM + 294 days when there is none (MET-21). The day D itself and the day D + 42 are
+ * outcome, else the resolution of the pregnancy condition in the LPC (gap L2), else DUM + 294 days
+ * (MET-21). The day D itself and the day D + 42 are
  * the boundaries the ficha leaves open (AMB-C3-04).
  */
-record GestationWindow(LocalDate dum, LocalDate end, boolean recordedOutcome) {
+record GestationWindow(LocalDate dum, LocalDate end, EndSource endSource) {
 
     /** "42 semanas máximas de gestação (total de 294 dias)" (4.1, p.5). */
     static final int MAX_PREGNANCY_DAYS = 294;
 
     /** "o total de 42 dias após o término da gestação" (item 17, p.2). */
     static final int PUERPERIUM_DAYS = 42;
+
+    /** Where the end D comes from, in the order of precedence. */
+    enum EndSource {
+        /** A recorded "Data de desfecho da gestação" (item 17). */
+        RECORDED_OUTCOME,
+        /** The resolution date of the pregnancy condition in the LPC (PEC manual; gap L2). */
+        LPC_RESOLUTION,
+        /** DUM + 294 days, without any outcome (item 17, 4.1). */
+        SUBSTITUTE_294
+    }
 
     /** Where a date falls in this reading. */
     enum Phase {
@@ -51,11 +62,7 @@ record GestationWindow(LocalDate dum, LocalDate end, boolean recordedOutcome) {
     }
 
     static GestationWindow substitute(LocalDate dum) {
-        return new GestationWindow(dum, dum.plusDays(MAX_PREGNANCY_DAYS), false);
-    }
-
-    static GestationWindow recorded(LocalDate dum, LocalDate outcome) {
-        return new GestationWindow(dum, outcome, true);
+        return new GestationWindow(dum, dum.plusDays(MAX_PREGNANCY_DAYS), EndSource.SUBSTITUTE_294);
     }
 
     Phase phaseOf(LocalDate date) {

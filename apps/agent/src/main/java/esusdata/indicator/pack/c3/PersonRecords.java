@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.c3;
 
 import esusdata.indicator.model.CanonicalCareEvent;
+import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalHomeVisit;
 import esusdata.indicator.model.CanonicalImmunization;
 import esusdata.indicator.model.CanonicalMeasurement;
@@ -12,7 +13,8 @@ import java.util.List;
 
 /**
  * Every canonical record of one person (opaque {@code personKey}), each source record once
- * (MET-32). {@code individualCare} is the MIAI ({@code INDIVIDUAL}), {@code dentalCare} the MIAOI.
+ * (MET-32). {@code individualCare} is the MIAI ({@code INDIVIDUAL}), {@code dentalCare} the MIAOI,
+ * {@code conditions} the LPC.
  */
 record PersonRecords(
         String personKey,
@@ -24,7 +26,8 @@ record PersonRecords(
         List<CanonicalImmunization> immunizations,
         List<CanonicalPregnancyOutcome> outcomes,
         List<CanonicalRegistration> registrations,
-        List<CanonicalPerson> persons) {
+        List<CanonicalPerson> persons,
+        List<CanonicalCondition> conditions) {
     PersonRecords {
         individualCare = List.copyOf(individualCare);
         dentalCare = List.copyOf(dentalCare);
@@ -35,5 +38,6 @@ record PersonRecords(
         outcomes = List.copyOf(outcomes);
         registrations = List.copyOf(registrations);
         persons = List.copyOf(persons);
+        conditions = List.copyOf(conditions);
     }
 }

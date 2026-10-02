@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.c3;
 
 import esusdata.indicator.model.CanonicalCareEvent;
+import esusdata.indicator.model.CanonicalCondition;
 import java.util.List;
 
 /**
@@ -12,6 +13,9 @@ enum CodeMatch {
     EXACT,
     PREFIX,
     NONE;
+
+    private static final String CIAP2 = "CIAP2";
+    private static final String CID10 = "CID10";
 
     /** The best match of any of the event's codes against the two lists. */
     static CodeMatch of(CanonicalCareEvent event, List<String> ciapList, List<String> cidList) {
@@ -42,6 +46,19 @@ enum CodeMatch {
             }
         }
         return NONE;
+    }
+
+    /** A condition of the LPC by its code system ({@code CIAP2} exact, {@code CID10} as CID-10). */
+    static CodeMatch of(CanonicalCondition condition, List<String> ciapList, List<String> cidList) {
+        String system =
+                condition.codeSystem() == null ? "" : condition.codeSystem().strip();
+        if (CIAP2.equalsIgnoreCase(system)) {
+            return ciapList.contains(C3Codes.normalized(condition.code())) ? EXACT : NONE;
+        }
+        if (CID10.equalsIgnoreCase(system)) {
+            return cid(condition.code(), cidList);
+        }
+        return any(condition.code(), ciapList, cidList);
     }
 
     /** One code of unknown system (an outcome record) against both lists. */
