@@ -20,7 +20,6 @@ import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.ValueKind;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.SortedMap;
@@ -77,25 +76,30 @@ public final class C7Pack implements IndicatorRule {
             "Tipo de equipe eSF 70 / eAP 76 e SCNES (item 24, b) sem fonte no DW (lacuna L1): a equipe não é validada.",
             "AMB-C7-09: só médicos (2251, 2252, 2253, 2231) e enfermeiros (2235) dos Quadros 02, 04 e 05 contam em A, C "
                     + "e D; a lista maior do item 24, d e a habilitação de CBO na tabela SIGTAP não são aplicadas.",
-            "AMB-C7-16: códigos AB (ABEX001, ABP022, ABP023) e registro rápido contam só quando a fonte os entrega no "
-                    + "código do evento; não vão como parâmetro da consulta (pedido registrado).",
+            "AMB-C7-16: em A e D, os códigos AB (ABEX001, ABP022, ABP023) e o registro rápido contam só quando a "
+                    + "fonte os entrega no código do procedimento ou exame; não vão como parâmetro da consulta e o ABP "
+                    + "do bloco Avaliação do atendimento só é lido para C (pedidos S-C7-01/02).",
             "Calendário do Siaps (item 11; NT nº 8/2026, item 2.7): o PEC local contém registros não enviados ou "
                     + "enviados fora do prazo, que o Siaps não contaria.",
             "AMB-C7-03/04: idade em anos completos no último dia da competência, limites inclusivos, aniversário de "
                     + "29/02 em 01/03 (Lei nº 810/1949); janelas de N meses civis terminando na competência.",
             "AMB-C7-10/11/14/15: C conta todo atendimento individual (domiciliar não distinguido) com CIAP-2, CID-10 "
-                    + "ou ABP da alínea g por casamento exato; consultas 03.01.01.* não cumprem C; um registro pode "
-                    + "cumprir C e A ou D.",
+                    + "ou ABP da alínea g por casamento exato; consultas 03.01.01.* não cumprem C.",
             "AMB-C7-12: sexo e identidade de gênero pelos códigos LEDI (149 Homem transgênero, 150 Mulher "
                     + "transgênero), correspondência com o PEC não verificada; outro sexo ou sem registro fica fora.",
             "AMB-C7-07: dose transcrita usa a data de aplicação para a idade de B.",
             "AMB-C7-05/06/08: quando ocorrem (homem transgênero de 9 a 14 anos; dose HPV além de 60 meses; "
-                    + "02.02.10.025-1 anterior a 2026-01), o subgrupo fica sem valor e o resultado RULE_AMBIGUITY.");
+                    + "02.02.10.025-1 anterior a 2026-01), o subgrupo fica sem valor e o resultado RULE_AMBIGUITY.",
+            "Pessoa com registros divergentes (nascimento, sexo, identidade) ou com versões do cadastro do mesmo "
+                    + "dia em conflito fica fora, com motivo próprio — nenhuma versão é escolhida pela ordem.");
 
-    /** Versões do cadastro lidas para resolver o vínculo (as mesmas da fundação). */
+    /**
+     * Registration versions read to resolve the link: the "Dimensão Cadastro, Últimos 24 meses" of
+     * the Componente II (NT nº 8/2026, Figura 1) — the ficha itself refers to the NT nº 30/2025.
+     */
     private static final int REGISTRATION_MONTHS = 24;
 
-    /** Doses de B: aos 9 anos de quem tem 14 no fim da competência (até 72 meses civis). */
+    /** B: a dose at 9 of whoever is 14 at the end of the competência — up to 72 civil months back. */
     private static final int DOSE_MONTHS = 72;
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
@@ -131,48 +135,48 @@ public final class C7Pack implements IndicatorRule {
         return DESCRIPTOR;
     }
 
-    /**
-     * O mínimo que a ficha pede, em meses civis: cadastro (24 meses, vínculo), atendimentos de C (12),
-     * procedimentos e exames de A e D (36, ou 60 a partir de 2026-01 pelo 02.02.10.025-1) e doses de B
-     * (72: a dose aos 9 anos de quem tem 14). Cada parte só lê as idades das subpopulações que a usam.
-     */
     @Override
     public DataRequirements requirements(YearMonth competencia) {
+        return new DataRequirements(DataRequirements.V2, parts(competencia));
+    }
+
+    /**
+     * The least the ficha needs, in civil months: registration versions (24, the link), encounters
+     * of C (12), procedures and exams of A and D (36, or 60 from 2026-01 for 02.02.10.025-1) and
+     * doses of B (72). Each part reads only the ages of the subgroups that use it. {@code citizen}
+     * binds no period; it carries the dose window only because a part needs one.
+     */
+    static List<PartRequirement> parts(YearMonth competencia) {
         LocalDate end = competencia.atEndOfMonth();
         DateWindow cohort = births(end, C7Cohort.MIN_AGE, C7Cohort.MAX_AGE);
-        int procedureMonths =
-                competencia.isBefore(C7Codes.HPV_MOLECULAR_DESDE) ? C7Practices.MONTHS_A : C7Practices.MONTHS_60;
+        DateWindow doses = DateWindow.lastCivilMonths(competencia, DOSE_MONTHS);
+        int procedureMonths = competencia.isBefore(C7Codes.HPV_MOLECULAR_DESDE)
+                ? C7Subgroup.A.months()
+                : C7Subgroup.HPV_MOLECULAR_MONTHS;
         DateWindow procedures = DateWindow.lastCivilMonths(competencia, procedureMonths);
-        DateWindow adults = births(end, 25, C7Cohort.MAX_AGE);
-        List<PartRequirement> parts = new ArrayList<>();
-        parts.add(PartRequirement.personScoped(
-                Capabilities.CITIZEN, DateWindow.lastCivilMonths(competencia, DOSE_MONTHS), cohort, new TreeMap<>()));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.INDIVIDUAL_REGISTRATION,
-                DateWindow.lastCivilMonths(competencia, REGISTRATION_MONTHS),
-                cohort,
-                new TreeMap<>()));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.CARE_ENCOUNTER,
-                DateWindow.lastCivilMonths(competencia, C7Practices.MONTHS_C),
-                births(end, 14, C7Cohort.MAX_AGE),
-                new TreeMap<>()));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.PROCEDURE_PERFORMED,
-                procedures,
-                adults,
-                codes(Capabilities.PROCEDURE_CODES, C7Codes.procedureCodes(competencia))));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.EXAM_REQUEST_EVALUATION,
-                procedures,
-                adults,
-                codes(Capabilities.PROCEDURE_CODES, C7Codes.procedureCodes(competencia))));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.IMMUNIZATION_HISTORY,
-                DateWindow.lastCivilMonths(competencia, DOSE_MONTHS),
-                births(end, C7Cohort.MIN_AGE, 14),
-                codes(Capabilities.IMMUNOBIOLOGICAL_CODES, C7Codes.B_VACINAS_HPV)));
-        return new DataRequirements(DataRequirements.V2, parts);
+        DateWindow screened = births(end, C7Subgroup.A.minAge(), C7Subgroup.D.maxAge());
+        SortedMap<String, List<String>> procedureCodes =
+                codes(Capabilities.PROCEDURE_CODES, C7Codes.procedureCodes(competencia));
+        return List.of(
+                PartRequirement.personScoped(Capabilities.CITIZEN, doses, cohort, new TreeMap<>()),
+                PartRequirement.personScoped(
+                        Capabilities.INDIVIDUAL_REGISTRATION,
+                        DateWindow.lastCivilMonths(competencia, REGISTRATION_MONTHS),
+                        cohort,
+                        new TreeMap<>()),
+                PartRequirement.personScoped(
+                        Capabilities.CARE_ENCOUNTER,
+                        DateWindow.lastCivilMonths(competencia, C7Subgroup.C.months()),
+                        births(end, C7Subgroup.C.minAge(), C7Subgroup.C.maxAge()),
+                        new TreeMap<>()),
+                PartRequirement.personScoped(Capabilities.PROCEDURE_PERFORMED, procedures, screened, procedureCodes),
+                PartRequirement.personScoped(
+                        Capabilities.EXAM_REQUEST_EVALUATION, procedures, screened, procedureCodes),
+                PartRequirement.personScoped(
+                        Capabilities.IMMUNIZATION_HISTORY,
+                        doses,
+                        births(end, C7Subgroup.B.minAge(), C7Subgroup.B.maxAge()),
+                        codes(Capabilities.IMMUNOBIOLOGICAL_CODES, C7Codes.B_VACINAS_HPV)));
     }
 
     @Override
@@ -182,7 +186,7 @@ public final class C7Pack implements IndicatorRule {
 
     @Override
     public Optional<Classification> classify(ExactRatio value) {
-        return Bands.QUALIDADE_C2_C7.classify(value);
+        return BANDS.classify(value);
     }
 
     /**

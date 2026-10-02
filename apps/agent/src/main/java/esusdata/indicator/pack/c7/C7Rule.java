@@ -7,6 +7,7 @@ import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CanonicalRegistration;
 import esusdata.indicator.model.ComponentSpec;
+import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
@@ -14,6 +15,7 @@ import esusdata.indicator.model.EvidenceSubjectKind;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
+import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.Scores;
@@ -25,11 +27,13 @@ import esusdata.indicator.pack.c7.C7Practices.Fact;
 import esusdata.indicator.pack.c7.C7Practices.Outcome;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.function.Function;
 
 /**
@@ -43,11 +47,18 @@ public final class C7Rule {
 
     static final String EVENTO_SUSTENTA_PRATICA = "EVENTO_SUSTENTA_PRATICA";
 
+    /** A record that made the practice ambiguous for the person (AMB-C7-06/08). */
+    static final String EVENTO_AMBIGUO = "EVENTO_AMBIGUO";
+
     private C7Rule() {}
 
     /** The ungated outcome: municipal result, one per team (INE) and the evidence. */
     public static RuleOutcome compute(CanonicalDataset data, EvaluationContext context) {
         validateScope(data, context.municipalityIbge());
+        List<String> missing = uncoveredCapabilities(data, context);
+        if (!missing.isEmpty()) {
+            return new RuleOutcome(unsupported(missing, context), List.of(), List.of());
+        }
         List<Member> members = C7Cohort.resolve(
                 data.persons(), data.registrations(), context.competencia().atEndOfMonth());
         C7Practices practices = new C7Practices(data, context.competencia());
@@ -71,14 +82,17 @@ public final class C7Rule {
     }
 
     /** A person with the decision of each subgroup of their age (empty when not eligible). */
-    private record Evaluated(Member member, Map<String, Decision> decisions) {}
+    private record Evaluated(Member member, Map<C7Subgroup, Decision> decisions) {}
+
+    /** One subgroup's counts and the reason codes of the cases the ficha leaves open in it. */
+    private record Count(ResultComponent component, SortedSet<String> ambiguities) {}
 
     private static Evaluated evaluate(Member m, C7Practices practices) {
-        Map<String, Decision> decisions = new LinkedHashMap<>();
+        Map<C7Subgroup, Decision> decisions = new EnumMap<>(C7Subgroup.class);
         if (m.eligible()) {
-            for (ComponentSpec spec : C7Pack.COMPONENTS) {
-                if (C7Practices.inSubgroup(spec.code(), m.age())) {
-                    decisions.put(spec.code(), practices.decide(spec.code(), m));
+            for (C7Subgroup subgroup : C7Subgroup.values()) {
+                if (subgroup.includes(m.age())) {
+                    decisions.put(subgroup, practices.decide(subgroup, m));
                 }
             }
         }
@@ -89,14 +103,18 @@ public final class C7Rule {
         List<ResultComponent> components = new ArrayList<>(C7Pack.COMPONENTS.size());
         List<String> limitations = new ArrayList<>();
         for (ComponentSpec spec : C7Pack.COMPONENTS) {
-            ResultComponent component = component(spec, group);
-            components.add(component);
-            if (component.status() != IndicatorStatus.COMPUTED) {
-                limitations.add(undefinedReason(spec.code(), component.status()));
+            Count count = count(spec, group);
+            components.add(count.component());
+            if (count.component().status() == IndicatorStatus.NO_DENOMINATOR) {
+                limitations.add("AMB-C7-01: subpopulação " + spec.code() + " sem denominador; a ficha não define "
+                        + "o escore (P10) — sem zerar nem renormalizar as demais.");
+            } else if (!count.ambiguities().isEmpty()) {
+                limitations.add("Subpopulação " + spec.code() + " com caso que a ficha não define ("
+                        + String.join(", ", count.ambiguities()) + "): escore indisponível até esclarecimento.");
             }
         }
-        IndicatorStatus status;
         Optional<ExactRatio> value = Scores.weightedSum(components);
+        IndicatorStatus status;
         if (components.stream().allMatch(c -> c.status() == IndicatorStatus.NO_DENOMINATOR)) {
             status = IndicatorStatus.NO_DENOMINATOR;
             limitations.clear();
@@ -125,45 +143,43 @@ public final class C7Rule {
     }
 
     /** Exact counts of one subgroup; any open case of the ficha makes it {@code RULE_AMBIGUITY}. */
-    private static ResultComponent component(ComponentSpec spec, List<Evaluated> group) {
+    private static Count count(ComponentSpec spec, List<Evaluated> group) {
+        C7Subgroup subgroup = C7Subgroup.valueOf(spec.code());
         BigInteger numerator = BigInteger.ZERO;
         BigInteger denominator = BigInteger.ZERO;
-        boolean ambiguous = false;
+        SortedSet<String> ambiguities = new TreeSet<>();
         for (Evaluated e : group) {
-            Decision d = e.decisions().get(spec.code());
+            Decision d = e.decisions().get(subgroup);
             if (d == null) {
                 continue;
             }
-            switch (d.outcome()) {
-                case MET -> {
-                    numerator = numerator.add(BigInteger.ONE);
-                    denominator = denominator.add(BigInteger.ONE);
-                }
-                case NOT_MET -> denominator = denominator.add(BigInteger.ONE);
-                case AMBIGUOUS_PRACTICE -> {
-                    denominator = denominator.add(BigInteger.ONE);
-                    ambiguous = true;
-                }
-                case AMBIGUOUS_DENOMINATOR -> ambiguous = true;
+            if (d.outcome() != Outcome.AMBIGUOUS_DENOMINATOR) {
+                denominator = denominator.add(BigInteger.ONE);
+            }
+            if (d.outcome() == Outcome.MET) {
+                numerator = numerator.add(BigInteger.ONE);
+            } else if (d.outcome() != Outcome.NOT_MET) {
+                ambiguities.add(ambiguityId(d.reason()));
             }
         }
-        if (!ambiguous) {
-            return ResultComponent.of(spec, numerator, denominator);
+        if (ambiguities.isEmpty()) {
+            return new Count(ResultComponent.of(spec, numerator, denominator), ambiguities);
         }
-        return new ResultComponent(
-                spec.code(), spec.kind(), spec.weight(), numerator, denominator, null, IndicatorStatus.RULE_AMBIGUITY);
+        return new Count(
+                new ResultComponent(
+                        spec.code(),
+                        spec.kind(),
+                        spec.weight(),
+                        numerator,
+                        denominator,
+                        null,
+                        IndicatorStatus.RULE_AMBIGUITY),
+                ambiguities);
     }
 
-    private static String undefinedReason(String code, IndicatorStatus status) {
-        if (status == IndicatorStatus.NO_DENOMINATOR) {
-            return "AMB-C7-01: subpopulação " + code + " sem denominador; a ficha não define o escore "
-                    + "(P10) — sem zerar nem renormalizar as demais.";
-        }
-        String cases = "A".equals(code)
-                ? "AMB-C7-08 (02.02.10.025-1 anterior à competência 2026-01)"
-                : "AMB-C7-05 (homem transgênero de 9 a 14 anos) ou AMB-C7-06 (dose HPV além de 60 meses)";
-        return "Subpopulação " + code + " com caso que a ficha não define, " + cases
-                + ": escore indisponível até esclarecimento (ver evidência).";
+    /** {@code AMB_C7_08_HPV_…} → {@code AMB-C7-08}, the id of the transcription. */
+    private static String ambiguityId(String reasonCode) {
+        return reasonCode.substring(0, "AMB_C7_NN".length()).replace('_', '-');
     }
 
     private static List<EvidenceItem> evidence(List<Evaluated> evaluated) {
@@ -171,18 +187,20 @@ public final class C7Rule {
         for (Evaluated e : evaluated) {
             Member m = e.member();
             items.add(row(m, null, m.eligible() ? EvidenceDecision.ELIGIBLE : EvidenceDecision.EXCLUDED, m.reason()));
-            for (Map.Entry<String, Decision> entry : e.decisions().entrySet()) {
+            for (Map.Entry<C7Subgroup, Decision> entry : e.decisions().entrySet()) {
                 Decision d = entry.getValue();
-                items.add(row(m, entry.getKey(), decisionOf(d.outcome()), d.reason()));
+                String component = entry.getKey().name();
+                items.add(row(m, component, decisionOf(d.outcome()), d.reason()));
+                String supportReason = d.outcome() == Outcome.MET ? EVENTO_SUSTENTA_PRATICA : EVENTO_AMBIGUO;
                 for (Fact f : d.support()) {
                     items.add(new EvidenceItem(
                             EvidenceSubjectKind.PERSON,
                             m.personKey(),
                             f.sourceRef(),
                             f.date().toString(),
-                            entry.getKey(),
+                            component,
                             EvidenceDecision.SUPPORTING_EVENT,
-                            EVENTO_SUSTENTA_PRATICA,
+                            supportReason,
                             null,
                             f.cnes(),
                             f.ine(),
@@ -219,6 +237,52 @@ public final class C7Rule {
                 null);
     }
 
+    /**
+     * Capabilities the competência needs that the dataset says it did not read, or read for a
+     * shorter period: a capability never read must not look like a practice nobody did (null ≠ 0).
+     * A dataset that declares no window at all is trusted as validated by the run (ADR 0030).
+     */
+    private static List<String> uncoveredCapabilities(CanonicalDataset data, EvaluationContext context) {
+        if (data.windows().isEmpty()) {
+            return List.of();
+        }
+        List<String> missing = new ArrayList<>();
+        for (PartRequirement part : C7Pack.parts(context.competencia())) {
+            Optional<DateWindow> read = data.windowOf(part.capability());
+            boolean covered = read.isPresent()
+                    && !read.get().start().isAfter(part.periodStart())
+                    && !read.get().endExclusive().isBefore(part.periodEndExclusive());
+            if (!covered) {
+                missing.add(part.capability());
+            }
+        }
+        return missing;
+    }
+
+    private static IndicatorResult unsupported(List<String> missing, EvaluationContext context) {
+        List<String> limitations = new ArrayList<>();
+        limitations.add("Capacidade não lida ou lida com janela menor que a pedida: " + String.join(", ", missing)
+                + " — sem valor, nunca zero.");
+        limitations.addAll(C7Pack.STANDING_LIMITATIONS);
+        return new IndicatorResult(
+                IndicatorStatus.UNSUPPORTED_SOURCE,
+                null,
+                null,
+                null,
+                null,
+                null,
+                context.referencePeriod(),
+                C7Pack.RULE_VERSION,
+                context.dataCutoff().toString(),
+                context.municipalityIbge(),
+                limitations,
+                C7Pack.CALCULATION_POLICY_VERSION,
+                ValueKind.COMPOSITE_SCORE,
+                null,
+                List.of(),
+                true);
+    }
+
     /** Every record must belong to the authorized municipality; anything else is refused. */
     private static void validateScope(CanonicalDataset data, String municipality) {
         check(data.persons(), CanonicalPerson::municipalityIbge, municipality);
@@ -230,9 +294,10 @@ public final class C7Rule {
 
     private static <T> void check(List<T> rows, Function<T, String> municipalityOf, String municipality) {
         for (T row : rows) {
-            if (!municipality.equals(municipalityOf.apply(row))) {
+            String recorded = municipalityOf.apply(row);
+            if (!municipality.equals(recorded)) {
                 throw new IllegalArgumentException(
-                        "record municipality does not match requested municipality: " + municipalityOf.apply(row));
+                        "record municipality does not match requested municipality: " + recorded);
             }
         }
     }

@@ -12,6 +12,7 @@ import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CanonicalRegistration;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ComponentKind;
+import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
@@ -19,6 +20,7 @@ import esusdata.indicator.model.EvidenceSubjectKind;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
+import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.SourceRef;
@@ -265,7 +267,7 @@ class C7RuleTest {
     }
 
     @Test
-    void ct03_hpvDoseAtFifteenDoesNotCountWhileAtFourteenItDoes() {
+    void ct03_fifteenYearOldIsOutOfBWhileADoseAtFourteenCounts() {
         RuleOutcome outcome = new Scenario()
                 .woman("age14", d("2011-07-01"))
                 .woman("age15", d("2011-06-30"))
@@ -629,6 +631,293 @@ class C7RuleTest {
     // ---- scenarios ----
 
     /** CT01: P1–P7, all women of team 1, competência 2026-06. */
+    // ---- Item 4.1.1: "Registro de sexo feminino" whatever the identity, except 4.2 ----
+    @Test
+    void ct05_femininoWithAnyIdentityButMulherTransIsEligibleAndOnlyFemininoOrTransManEnter() {
+        RuleOutcome outcome = new Scenario()
+                .person("girlHomemTrans", d("2014-01-10"), FEMININO, HOMEM_TRANS)
+                .person("manMulherTrans", d("1996-01-10"), MASCULINO, MULHER_TRANS)
+                .person("indeterminado", d("1996-01-10"), "INDETERMINADO", null)
+                .person("noSex", d("1996-01-10"), null, null)
+                .compute(JUN_2026);
+
+        assertThat(personReasons(outcome))
+                .containsEntry("girlHomemTrans", "ELEGIVEL_SEXO_FEMININO")
+                .containsEntry("manMulherTrans", "EXCLUIDO_SEXO_NAO_ELEGIVEL")
+                .containsEntry("indeterminado", "EXCLUIDO_SEXO_NAO_ELEGIVEL")
+                .containsEntry("noSex", "EXCLUIDO_SEXO_NAO_ELEGIVEL");
+        assertComponent(outcome.result(), "B", 0, 1, IndicatorStatus.COMPUTED);
+    }
+
+    // ---- Item 15 and the registration's own state, version by version ----
+    @Test
+    void item15_registrationVersionInForceDecidesTheLink() {
+        LocalDate thirty = d("1996-01-10");
+        LocalDate update = d("2025-01-01");
+        RuleOutcome outcome = new Scenario()
+                .woman("deadOnRecord", thirty)
+                .add(version("deadOnRecord", update, INE_1, "135", false, false, false))
+                .woman("refused", thirty)
+                .add(version("refused", update, INE_1, null, false, false, true))
+                .woman("simplified", thirty)
+                .add(version("simplified", update, INE_1, null, true, false, false))
+                .woman("noTeam", thirty)
+                .add(version("noTeam", update, " ", null, false, false, false))
+                .woman("sameDay", thirty)
+                .add(version("sameDay", update, INE_2, null, false, false, false))
+                .add(version("sameDay", update, INE_2, null, false, false, false))
+                .woman("sameDayStates", thirty)
+                .add(version("sameDayStates", update, INE_1, null, false, false, false))
+                .add(version("sameDayStates", update, INE_1, "136", false, false, false))
+                .woman("laterVersion", thirty)
+                .add(version("laterVersion", d("2026-07-01"), INE_1, "136", false, false, false))
+                .add(new CanonicalPerson(
+                        CanonicalFixtures.ref("tb_fat_cad_individual"),
+                        CanonicalFixtures.IBGE,
+                        "diesLater",
+                        thirty.toString(),
+                        FEMININO,
+                        null,
+                        "2026-07-02"))
+                .add(CanonicalFixtures.registration("diesLater", LINK_DATE, cnes(INE_1), INE_1))
+                .compute(JUN_2026);
+
+        assertThat(personReasons(outcome))
+                .containsEntry("deadOnRecord", "EXCLUIDO_OBITO")
+                .containsEntry("refused", "EXCLUIDO_RECUSA_CADASTRO")
+                .containsEntry("simplified", "EXCLUIDO_CADASTRO_SIMPLIFICADO")
+                .containsEntry("noTeam", "EXCLUIDO_SEM_VINCULO")
+                .containsEntry("sameDay", "ELEGIVEL_SEXO_FEMININO")
+                .containsEntry("sameDayStates", "EXCLUIDO_VINCULO_CONFLITANTE")
+                .containsEntry("laterVersion", "ELEGIVEL_SEXO_FEMININO")
+                .containsEntry("diesLater", "ELEGIVEL_SEXO_FEMININO");
+        assertThat(outcome.teams()).extracting(TeamResult::ine).containsExactly(INE_1, INE_2);
+    }
+
+    // ---- MET-32 for people: rows of one key are one person; divergent rows are never resolved by order ----
+    @Test
+    void met32_duplicatePersonRowsAreOnePersonAndDivergentOnesAreExcluded() {
+        LocalDate thirty = d("1996-01-10");
+        RuleOutcome outcome = new Scenario()
+                .woman("twice", thirty)
+                .add(CanonicalFixtures.person("twice", thirty, FEMININO))
+                .woman("diverges", thirty)
+                .add(CanonicalFixtures.person("diverges", thirty, MASCULINO))
+                .woman("deathOnSecond", thirty)
+                .add(new CanonicalPerson(
+                        CanonicalFixtures.ref("tb_fat_cad_individual"),
+                        CanonicalFixtures.IBGE,
+                        "deathOnSecond",
+                        thirty.toString(),
+                        FEMININO,
+                        null,
+                        "2026-05-01"))
+                .compute(JUN_2026);
+
+        assertThat(personReasons(outcome))
+                .containsOnly(
+                        Map.entry("twice", "ELEGIVEL_SEXO_FEMININO"),
+                        Map.entry("diverges", "EXCLUIDO_PESSOA_CONFLITANTE"),
+                        Map.entry("deathOnSecond", "EXCLUIDO_OBITO"));
+        assertComponent(outcome.result(), "A", 0, 1, IndicatorStatus.COMPUTED);
+    }
+
+    // ---- AMB-C7-08 inside 36 months too, with the record that made it ambiguous in the evidence ----
+    @Test
+    void met25_hpvMolecularInside36MonthsButBefore2026IsAmbiguousAndShowsItsRecord() {
+        CanonicalProcedureEvent exam = exam("p", d("2025-06-15"), HPV_MOLECULAR);
+        RuleOutcome outcome =
+                new Scenario().woman("p", d("1986-01-10")).add(exam).compute(JUN_2026);
+
+        assertComponent(outcome.result(), "A", 0, 1, IndicatorStatus.RULE_AMBIGUITY);
+        assertThat(practiceRow(outcome, "p", "A").reasonCode()).isEqualTo(AMB_08);
+        assertThat(rows(outcome, e -> e.decision() == EvidenceDecision.SUPPORTING_EVENT))
+                .singleElement()
+                .satisfies(e -> {
+                    assertThat(e.sourceRef()).isEqualTo(exam.sourceRef());
+                    assertThat(e.reasonCode()).isEqualTo("EVENTO_AMBIGUO");
+                });
+        assertThat(outcome.result().limitations())
+                .anyMatch(l -> l.startsWith("Subpopulação A") && l.contains("AMB-C7-08"));
+    }
+
+    // ---- Gates never turn an undefined result into BLOCKED-with-value or zero ----
+    @Test
+    void gate_ruleAmbiguityAndNoDenominatorPassThroughWithEveryGate() {
+        C7Pack pack = new C7Pack();
+        IndicatorResult ambiguous = pack.evaluate(
+                        new Scenario().woman("adult", d("1986-01-10")).build(), context(JUN_2026))
+                .result();
+        IndicatorResult empty = pack.evaluate(CanonicalDataset.builder().build(), context(JUN_2026))
+                .result();
+
+        assertThat(ambiguous.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        assertThat(empty.status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
+        for (IndicatorResult result : List.of(ambiguous, empty)) {
+            assertThat(result.valueExact()).isNull();
+            assertThat(result.limitations())
+                    .contains(
+                            "Portão A (fonte e vigência) incompleto",
+                            "Portão B (modelo de cálculo) incompleto",
+                            "Portão C (adaptador) incompleto",
+                            "Portão D (reconciliação) incompleto",
+                            "Portão E (piloto e operação) incompleto");
+        }
+    }
+
+    // ---- Every kind of record is checked against the authorized municipality ----
+    @Test
+    void recordOfAnyKindFromAnotherMunicipalityIsRejected() {
+        String other = "3550308";
+        List<Record> foreign = List.of(
+                new CanonicalRegistration(
+                        CanonicalFixtures.ref("tb_fat_cad_individual"),
+                        other,
+                        "p",
+                        "2025-01-01",
+                        null,
+                        INE_1,
+                        false,
+                        false,
+                        false,
+                        null,
+                        null,
+                        null,
+                        null),
+                new CanonicalProcedureEvent(
+                        CanonicalFixtures.ref("tb_fat_proced_atend_proced"),
+                        other,
+                        "p",
+                        "2026-01-10",
+                        MAMOGRAFIA,
+                        "REQUESTED",
+                        MEDICO,
+                        null,
+                        null,
+                        "MIAI"),
+                new CanonicalImmunization(
+                        CanonicalFixtures.ref("tb_fat_vacinacao_vacina"),
+                        other,
+                        "p",
+                        "2026-01-10",
+                        "67",
+                        "1",
+                        null,
+                        false,
+                        null,
+                        null,
+                        null));
+        for (Record r : foreign) {
+            CanonicalDataset data =
+                    new Scenario().woman("p", d("1996-01-10")).add(r).build();
+            assertThatThrownBy(() -> C7Rule.compute(data, context(JUN_2026)))
+                    .as(r.getClass().getSimpleName())
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        CanonicalCareEvent care = ssr("p", d("2026-01-10"), "W11");
+        CanonicalDataset data = new Scenario()
+                .woman("p", d("1996-01-10"))
+                .add(new CanonicalCareEvent(
+                        care.sourceRef(),
+                        other,
+                        care.personKey(),
+                        care.careDate(),
+                        care.form(),
+                        care.cbo(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        false,
+                        care.ciapCodes(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null))
+                .build();
+        assertThatThrownBy(() -> C7Rule.compute(data, context(JUN_2026))).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // ---- null ≠ zero: a capability the run did not read (or read too short) is never a practice nobody did ----
+    @Test
+    void capabilityNotReadOrReadTooShortIsUnsupportedSourceNeverZero() {
+        Map<String, DateWindowPart> needed = C7Pack.parts(JUN_2026).stream()
+                .collect(Collectors.toMap(
+                        PartRequirement::capability, p -> new DateWindowPart(p.periodStart(), p.periodEndExclusive())));
+
+        Scenario complete = met24();
+        needed.forEach((capability, w) -> complete.window(capability, w.start(), w.end()));
+        assertThat(complete.compute(JUN_2026).result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+
+        Scenario noDoses = met24();
+        needed.forEach((capability, w) -> {
+            if (!"immunization_history".equals(capability)) {
+                noDoses.window(capability, w.start(), w.end());
+            }
+        });
+        RuleOutcome missing = noDoses.compute(JUN_2026);
+        assertThat(missing.result().status()).isEqualTo(IndicatorStatus.UNSUPPORTED_SOURCE);
+        assertThat(missing.result().valueExact()).isNull();
+        assertThat(missing.result().components()).isEmpty();
+        assertThat(missing.result().limitations()).anyMatch(l -> l.contains("immunization_history"));
+
+        Scenario shortCare = met24();
+        needed.forEach((capability, w) -> shortCare.window(
+                capability, "care_encounter".equals(capability) ? w.start().plusMonths(1) : w.start(), w.end()));
+        assertThat(new C7Pack()
+                        .evaluate(shortCare.build(), context(JUN_2026))
+                        .result()
+                        .status())
+                .isEqualTo(IndicatorStatus.UNSUPPORTED_SOURCE);
+    }
+
+    // ---- ENG-27 at the old edge: born 29/02 completes 70 on 01/03 in a non-leap year ----
+    @Test
+    void eng27_bornOnLeapDayIs69OnFebruary28AndLeavesInMarch() {
+        Scenario scenario = new Scenario().woman("leap", d("1956-02-29"));
+
+        RuleOutcome february = scenario.compute(YearMonth.of(2026, 2));
+        assertThat(subgroups(february, "leap")).containsExactly("C", "D");
+
+        RuleOutcome march = scenario.compute(YearMonth.of(2026, 3));
+        assertThat(personReasons(march)).containsEntry("leap", "EXCLUIDO_FORA_FAIXA_ETARIA");
+        assertThat(march.result().status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
+    }
+
+    private record DateWindowPart(LocalDate start, LocalDate end) {}
+
+    private static CanonicalRegistration version(
+            String key,
+            LocalDate date,
+            String ine,
+            String exitReason,
+            boolean simplified,
+            boolean inactive,
+            boolean refused) {
+        return new CanonicalRegistration(
+                CanonicalFixtures.ref("tb_fat_cad_individual"),
+                CanonicalFixtures.IBGE,
+                key,
+                date.toString(),
+                cnes(ine),
+                ine,
+                simplified,
+                inactive,
+                refused,
+                exitReason,
+                null,
+                null,
+                null);
+    }
+
     private static Scenario met24() {
         return new Scenario()
                 .woman("p1", d("1971-01-15"))
@@ -830,6 +1119,11 @@ class C7RuleTest {
             for (Record r : records) {
                 builder.add(Objects.requireNonNull(r));
             }
+            return this;
+        }
+
+        Scenario window(String capability, LocalDate start, LocalDate endExclusive) {
+            builder.window(capability, new DateWindow(start, endExclusive));
             return this;
         }
 

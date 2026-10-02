@@ -6,7 +6,6 @@ import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalRegistration;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -26,8 +25,8 @@ final class C7Cohort {
      */
     static final AnniversaryRule ANNIVERSARY = AnniversaryRule.NEXT_DAY;
 
-    static final int MIN_AGE = 9;
-    static final int MAX_AGE = 69;
+    static final int MIN_AGE = C7Subgroup.B.minAge();
+    static final int MAX_AGE = C7Subgroup.C.maxAge();
 
     static final String ELEGIVEL_SEXO_FEMININO = "ELEGIVEL_SEXO_FEMININO";
     static final String ELEGIVEL_HOMEM_TRANSGENERO = "ELEGIVEL_HOMEM_TRANSGENERO";
@@ -41,6 +40,7 @@ final class C7Cohort {
     static final String EXCLUIDO_RECUSA_CADASTRO = "EXCLUIDO_RECUSA_CADASTRO";
     static final String EXCLUIDO_CADASTRO_SIMPLIFICADO = "EXCLUIDO_CADASTRO_SIMPLIFICADO";
     static final String EXCLUIDO_VINCULO_CONFLITANTE = "EXCLUIDO_VINCULO_CONFLITANTE";
+    static final String EXCLUIDO_PESSOA_CONFLITANTE = "EXCLUIDO_PESSOA_CONFLITANTE";
 
     private C7Cohort() {}
 
@@ -61,31 +61,37 @@ final class C7Cohort {
             String cnes,
             String ine) {}
 
-    /** Decides every person once (the first record of a key wins), sorted by key. */
+    /**
+     * Decides every person once, sorted by key. Rows of the same key that disagree on birth, sex or
+     * gender identity are not resolved by order: the person is excluded as conflicting; a death date
+     * on any of them counts.
+     */
     static List<Member> resolve(
             List<CanonicalPerson> persons, List<CanonicalRegistration> registrations, LocalDate reference) {
         Map<String, List<CanonicalRegistration>> versions = new TreeMap<>();
         for (CanonicalRegistration r : registrations) {
             versions.computeIfAbsent(r.personKey(), k -> new ArrayList<>()).add(r);
         }
-        Map<String, CanonicalPerson> unique = new TreeMap<>();
+        Map<String, List<CanonicalPerson>> byKey = new TreeMap<>();
         for (CanonicalPerson p : persons) {
-            unique.putIfAbsent(p.personKey(), p);
+            byKey.computeIfAbsent(p.personKey(), k -> new ArrayList<>()).add(p);
         }
-        List<Member> members = new ArrayList<>(unique.size());
-        for (CanonicalPerson p : unique.values()) {
-            members.add(decide(p, versions.getOrDefault(p.personKey(), List.of()), reference));
+        List<Member> members = new ArrayList<>(byKey.size());
+        for (List<CanonicalPerson> rows : byKey.values()) {
+            members.add(decide(rows, versions.getOrDefault(rows.get(0).personKey(), List.of()), reference));
         }
         return members;
     }
 
-    private static Member decide(CanonicalPerson person, List<CanonicalRegistration> versions, LocalDate reference) {
+    private static Member decide(
+            List<CanonicalPerson> rows, List<CanonicalRegistration> versions, LocalDate reference) {
+        CanonicalPerson person = rows.get(0);
         LocalDate birth = LocalDate.parse(person.birthDate());
         long age = birth.isAfter(reference) ? -1 : AgeAt.completedYears(birth, reference, ANNIVERSARY);
         boolean transMan = C7Codes.SEXO_MASCULINO.equals(person.sex())
                 && C7Codes.IDENTIDADE_HOMEM_TRANSGENERO.equals(person.genderIdentity());
         Link link = link(versions, reference);
-        String reason = exclusion(person, age, link, reference);
+        String reason = conflicting(rows) ? EXCLUIDO_PESSOA_CONFLITANTE : exclusion(rows, age, link, reference);
         boolean eligible = reason == null;
         if (eligible) {
             reason = transMan ? ELEGIVEL_HOMEM_TRANSGENERO : ELEGIVEL_SEXO_FEMININO;
@@ -93,16 +99,37 @@ final class C7Cohort {
         return new Member(person.personKey(), birth, age, transMan, eligible, reason, link.cnes(), link.ine());
     }
 
+    private static boolean conflicting(List<CanonicalPerson> rows) {
+        CanonicalPerson first = rows.get(0);
+        for (CanonicalPerson p : rows) {
+            if (!Objects.equals(p.birthDate(), first.birthDate())
+                    || !Objects.equals(p.sex(), first.sex())
+                    || !Objects.equals(p.genderIdentity(), first.genderIdentity())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean diedBy(List<CanonicalPerson> rows, LocalDate reference) {
+        for (CanonicalPerson p : rows) {
+            if (p.deathDate() != null && !LocalDate.parse(p.deathDate()).isAfter(reference)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The first reason, in the ficha's order (entrada, then interrupção), or null when eligible. */
-    private static String exclusion(CanonicalPerson person, long age, Link link, LocalDate reference) {
+    private static String exclusion(List<CanonicalPerson> rows, long age, Link link, LocalDate reference) {
         if (age < MIN_AGE || age > MAX_AGE) {
             return EXCLUIDO_FORA_FAIXA_ETARIA;
         }
-        String sex = sexReason(person);
+        String sex = sexReason(rows.get(0));
         if (sex != null) {
             return sex;
         }
-        if (person.deathDate() != null && !LocalDate.parse(person.deathDate()).isAfter(reference)) {
+        if (diedBy(rows, reference)) {
             return EXCLUIDO_OBITO;
         }
         return link.exclusion();
@@ -126,7 +153,10 @@ final class C7Cohort {
         return EXCLUIDO_SEXO_NAO_ELEGIVEL;
     }
 
-    /** The registration in force on {@code reference}: the latest version up to that day. */
+    /**
+     * The registration in force on {@code reference}: the latest version up to that day. Versions of
+     * that same day that disagree on team or state are conflicting (§1.7.3: never pick one by order).
+     */
     private static Link link(List<CanonicalRegistration> versions, LocalDate reference) {
         LocalDate latest = null;
         List<CanonicalRegistration> current = new ArrayList<>();
@@ -146,14 +176,15 @@ final class C7Cohort {
         if (current.isEmpty()) {
             return new Link(null, null, EXCLUIDO_SEM_VINCULO);
         }
-        current.sort(Comparator.comparing(r -> r.sourceRef().recordId()));
         CanonicalRegistration chosen = current.get(0);
+        String exclusion = versionExclusion(chosen);
         for (CanonicalRegistration r : current) {
-            if (!Objects.equals(r.ine(), chosen.ine())) {
+            if (!Objects.equals(blankToNull(r.ine()), blankToNull(chosen.ine()))
+                    || !Objects.equals(versionExclusion(r), exclusion)) {
                 return new Link(null, null, EXCLUIDO_VINCULO_CONFLITANTE);
             }
         }
-        return new Link(chosen.cnes(), blankToNull(chosen.ine()), versionExclusion(chosen));
+        return new Link(chosen.cnes(), blankToNull(chosen.ine()), exclusion);
     }
 
     /** Item 15 (p. 2) and the registration's own state; null when the version links the person. */

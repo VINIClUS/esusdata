@@ -3,20 +3,20 @@ package esusdata.indicator.pack.c7;
 import esusdata.indicator.model.CboGroups;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Code tables of the C7 ficha (nota metodológica SEI 0054641718, junho/2026), literal and with the
  * page of the PDF they come from ({@code docs/metodologia/c7-prevencao-cancer.md}). SIGTAP goes as
- * digits only; CBO as the ficha writes it; CID-10 without the dot, as the ficha lists it. Version
- * {@link #VERSION} changes whenever a list does.
+ * digits only; CBO as the ficha writes it; CID-10 without the dot, as the ficha lists it. A change
+ * to any list is a new {@link C7Pack#RULE_VERSION}.
  */
 public final class C7Codes {
-
-    public static final String VERSION = "c7-codes@2026-06";
 
     /**
      * Quadros 02, 04 e 05 (pp. 5–6): "2251, 2252, 2253, 2231" Médicos; "2235" Enfermeiros. The
@@ -81,6 +81,7 @@ public final class C7Codes {
      */
     public static final String SEXO_FEMININO = "FEMININO";
 
+    /** Sex as {@code CanonicalPerson} carries it; the source of the record is AMB-C7-12. */
     public static final String SEXO_MASCULINO = "MASCULINO";
 
     /** LEDI {@code identidadeGeneroCidadao} 149: "Homem transgênero" (itens 4.1.2, p. 5). */
@@ -95,6 +96,8 @@ public final class C7Codes {
     /** LEDI {@code MotivoSaida} 135: "Óbito". */
     public static final String SAIDA_OBITO = "135";
 
+    private static final Pattern SEPARATORS = Pattern.compile("[-.\\s]");
+
     static final Set<String> A_36_MESES = normalizedSet(A_SIGTAP_36_MESES, A_CODIGOS_AB);
     static final Set<String> D_CODIGOS = normalizedSet(D_SIGTAP, D_CODIGOS_AB);
     static final Set<String> B_VACINAS = normalizedSet(B_VACINAS_HPV);
@@ -104,7 +107,7 @@ public final class C7Codes {
 
     /** Codes compared as the ficha writes them: no dots, hyphens or spaces, upper case. */
     static String normalized(String code) {
-        return code == null ? "" : code.replaceAll("[-.\\s]", "").toUpperCase(Locale.ROOT);
+        return code == null ? "" : SEPARATORS.matcher(code).replaceAll("").toUpperCase(Locale.ROOT);
     }
 
     /** SIGTAP codes bound as {@code procedure_codes}: digits only, A (36 and 60 months) and D. */
@@ -118,9 +121,9 @@ public final class C7Codes {
     }
 
     @SafeVarargs
-    private static Set<String> normalizedSet(List<String>... lists) {
+    static Set<String> normalizedSet(Collection<String>... lists) {
         Set<String> set = new HashSet<>();
-        for (List<String> list : lists) {
+        for (Collection<String> list : lists) {
             for (String code : list) {
                 set.add(normalized(code));
             }

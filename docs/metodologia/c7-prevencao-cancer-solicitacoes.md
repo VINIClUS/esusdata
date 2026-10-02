@@ -59,3 +59,24 @@ limitação permanente em `C7Pack.STANDING_LIMITATIONS`.
 - **Por quê.** AMB-C7-05, AMB-C7-06 e AMB-C7-08 afetam o valor de um subgrupo só quando o caso
   ocorre; o componente fica sem valor e o resultado `RULE_AMBIGUITY` (Tech Spec §4.2).
 - **Impacto.** Exibição dos componentes de C7.
+
+## S-C7-07 — Janelas lidas no `CanonicalDataset` da execução
+
+- **O quê.** Que o `RunExecutor` registre no `CanonicalDataset` a janela de cada capacidade lida
+  (`Builder.window`), como o v1 já faz (`ofEncounters`).
+- **Por quê.** "`null` ≠ zero: ausência de fonte, de denominador ou de capacidade nunca vira 0"
+  (`como-adicionar.md`). O C7 confere essas janelas com `requirements` e devolve
+  `UNSUPPORTED_SOURCE` quando falta uma capacidade ou a janela é menor. Um dataset que não declara
+  nenhuma janela é aceito como validado pela execução (ADR 0030), e aí a conferência não acontece.
+- **Impacto.** Sem as janelas, uma parte não lida faria B, C ou A/D saírem 0/d em vez de sem valor.
+
+## S-C7-08 — Decisão metodológica para AMB-C7-06 e AMB-C7-08 (para a equipe)
+
+- **O quê.** Esclarecimento oficial (ou decisão documentada da equipe) para a janela da dose de HPV
+  (ficha sem janela × NT nº 8/2026, Figura 2, "Últimos 60 meses") e para a vigência do
+  02.02.10.025-1 (registros anteriores a 2026-01).
+- **Por quê.** O esquema usual dá a dose aos 9 anos. Quem tem 14 anos e tomou a dose aos 9 a tem há
+  mais de 60 meses, então a AMB-C7-06 ocorre em quase todo município. Nesse caso B, e com ele o C7,
+  fica `RULE_AMBIGUITY`. Com a AMB-C7-08 é igual até 2030, para quem só tem exame molecular anterior
+  a 2026.
+- **Impacto.** Disponibilidade do valor do C7 depois que os portões forem concluídos.
