@@ -1,7 +1,6 @@
 package esusdata.indicator.pack.c5;
 
 import esusdata.indicator.model.CboGroups;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -24,7 +23,9 @@ public final class C5Codes {
     /**
      * Item 24 f (p. 3), in the ficha's order and spelling: «CID-10: I10; I11; I11.0; I11.9; I12;
      * I12.0; I12.9; I13; I13.0; I13.1; I13.2; I13.9; I15; I15.0; I15.1; I15.2; I15.8; I15.9; O10;
-     * O10.0; O10.1; O10.2; O10.3; O10.4; O10.9; O11.»
+     * O10.0; O10.1; O10.2; O10.3; O10.4; O10.9; O11.» Bound as {@code cid_codes} exactly so: the
+     * query matches by category (a listed code matches every DW code that starts with it, without
+     * the dot), and the rule then keeps only the literal codes (AMB-C5-04).
      */
     public static final List<String> CID_HIPERTENSAO = List.of(
             "I10", "I11", "I11.0", "I11.9", "I12", "I12.0", "I12.9", "I13", "I13.0", "I13.1", "I13.2", "I13.9", "I15",
@@ -127,18 +128,6 @@ public final class C5Codes {
             return false;
         }
         return NEIGHBOR_PREFIXES.stream().anyMatch(key::startsWith);
-    }
-
-    /**
-     * The {@code cid_codes} bind: the 26 codes as the ficha writes them, then the undotted spelling
-     * of those that have a dot, without repeats, in a stable order.
-     */
-    public static List<String> cidBindCodes() {
-        Set<String> codes = new LinkedHashSet<>(CID_HIPERTENSAO);
-        for (String code : CID_HIPERTENSAO) {
-            codes.add(undotted(code));
-        }
-        return List.copyOf(codes);
     }
 
     private static String undotted(String code) {

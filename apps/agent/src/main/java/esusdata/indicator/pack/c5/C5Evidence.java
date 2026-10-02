@@ -23,22 +23,44 @@ final class C5Evidence {
         return personRow(decision, cutoff, null, EvidenceDecision.EXCLUDED, decision.reasonCode(), null);
     }
 
-    /** An eligible person: the decision with its total points, then each practice and its records. */
+    /**
+     * An eligible person: the decision with its total points ({@code null} when a practice is
+     * undecided), then each practice and its records.
+     */
     static List<EvidenceItem> eligible(C5Results.Scored person, List<ComponentSpec> specs, LocalDate cutoff) {
         C5Cohort.Decision decision = person.decision();
         List<EvidenceItem> rows = new ArrayList<>();
         rows.add(personRow(decision, cutoff, null, EvidenceDecision.ELIGIBLE, decision.reasonCode(), person.points()));
         for (ComponentSpec spec : specs) {
             C5Practices.Outcome practice = person.practice(spec.code());
-            BigInteger points = practice.met() ? spec.weight() : BigInteger.ZERO;
-            EvidenceDecision verdict =
-                    practice.met() ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
-            rows.add(personRow(decision, cutoff, practice.code(), verdict, practice.reasonCode(), points));
+            rows.add(personRow(
+                    decision,
+                    cutoff,
+                    practice.code(),
+                    verdict(practice),
+                    practice.reasonCode(),
+                    points(practice, spec)));
             for (C5Event event : practice.support()) {
                 rows.add(supporting(decision.personKey(), practice.code(), event));
             }
         }
         return rows;
+    }
+
+    /** Met, not met, or undecided by the ficha (AMB-C5-01) — never folded into not met. */
+    private static EvidenceDecision verdict(C5Practices.Outcome practice) {
+        if (practice.ambiguous()) {
+            return EvidenceDecision.PRACTICE_AMBIGUOUS;
+        }
+        return practice.met() ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
+    }
+
+    /** The practice's weight when met, 0 when not, and none ({@code null}) when undecided. */
+    private static BigInteger points(C5Practices.Outcome practice, ComponentSpec spec) {
+        if (practice.ambiguous()) {
+            return null;
+        }
+        return practice.met() ? spec.weight() : BigInteger.ZERO;
     }
 
     private static EvidenceItem personRow(

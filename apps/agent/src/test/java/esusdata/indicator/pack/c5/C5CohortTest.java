@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.c5;
 
 import static esusdata.indicator.pack.c5.C5TestData.CBO_ACS;
+import static esusdata.indicator.pack.c5.C5TestData.CBO_DENTIST;
 import static esusdata.indicator.pack.c5.C5TestData.CBO_DOCTOR;
 import static esusdata.indicator.pack.c5.C5TestData.CBO_NURSE;
 import static esusdata.indicator.pack.c5.C5TestData.CIAP2;
@@ -32,6 +33,7 @@ import static esusdata.indicator.pack.c5.C5TestData.assertNoRepeatedSupport;
 import static esusdata.indicator.pack.c5.C5TestData.assertPractices;
 import static esusdata.indicator.pack.c5.C5TestData.bloodPressureMeasurement;
 import static esusdata.indicator.pack.c5.C5TestData.condition;
+import static esusdata.indicator.pack.c5.C5TestData.conditionBy;
 import static esusdata.indicator.pack.c5.C5TestData.conditionWithoutBasis;
 import static esusdata.indicator.pack.c5.C5TestData.consultation;
 import static esusdata.indicator.pack.c5.C5TestData.deceased;
@@ -243,6 +245,43 @@ class C5CohortTest {
 
         assertPractices(outcome, P1);
         assertPractices(outcome, P2);
+    }
+
+    @Test
+    void tC5_item5_conditionEvaluatedOnlyByDentistOrWithoutCboDoesNotEnter() {
+        // Item 5 (p. 1): «realizada por enfermeira(o) e/ou médica(o) da APS» — Quadro 02 CBOs.
+        RuleOutcome outcome = scenario()
+                .linked(P1)
+                .add(conditionBy(P1, CID10, "I10", HYPERTENSION_DATE, CBO_DENTIST))
+                .linked(P2)
+                .add(conditionBy(P2, CID10, "I10", HYPERTENSION_DATE, null))
+                .linked(P3)
+                .add(conditionBy(P3, CIAP2, "K86", HYPERTENSION_DATE, CBO_NURSE))
+                .linked(P4)
+                .add(conditionBy(P4, CID10, "I10", HYPERTENSION_DATE, CBO_DENTIST))
+                .add(conditionBy(P4, CID10, "I10", LocalDate.of(2020, 1, 1), CBO_DOCTOR))
+                .ungated();
+
+        assertExcluded(outcome, P1, NO_CONDITION_IN_PERIOD);
+        assertExcluded(outcome, P2, NO_CONDITION_IN_PERIOD);
+        assertPractices(outcome, P3);
+        assertPractices(outcome, P4); // a doctor also evaluated it
+    }
+
+    @Test
+    void conditions_lediStatusCodesZeroActiveOneLatentTwoResolved() {
+        RuleOutcome outcome = scenario()
+                .linked(P1)
+                .add(condition(P1, CID10, "I10", HYPERTENSION_DATE, "0"))
+                .linked(P2)
+                .add(condition(P2, CID10, "I10", HYPERTENSION_DATE, "1"))
+                .linked(P3)
+                .add(condition(P3, CID10, "I10", HYPERTENSION_DATE, "2"))
+                .ungated();
+
+        assertPractices(outcome, P1);
+        assertPractices(outcome, P2); // latent does not resolve
+        assertExcluded(outcome, P3, ALL_RESOLVED);
     }
 
     @Test

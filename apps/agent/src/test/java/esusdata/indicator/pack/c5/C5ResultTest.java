@@ -15,18 +15,21 @@ import static esusdata.indicator.pack.c5.C5TestData.assertComponents;
 import static esusdata.indicator.pack.c5.C5TestData.assertExactValue;
 import static esusdata.indicator.pack.c5.C5TestData.assertExcluded;
 import static esusdata.indicator.pack.c5.C5TestData.assertPractices;
+import static esusdata.indicator.pack.c5.C5TestData.decisionOf;
 import static esusdata.indicator.pack.c5.C5TestData.exitRegistration;
 import static esusdata.indicator.pack.c5.C5TestData.hypertension;
 import static esusdata.indicator.pack.c5.C5TestData.link;
 import static esusdata.indicator.pack.c5.C5TestData.practiceOf;
 import static esusdata.indicator.pack.c5.C5TestData.scenario;
 import static esusdata.indicator.pack.c5.C5TestData.selfReportedRegistration;
+import static esusdata.indicator.pack.c5.C5TestData.supportingOf;
 import static esusdata.indicator.pack.c5.C5TestData.team;
 import static esusdata.indicator.pack.c5.C5TestData.teamOf;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.EvidenceDecision;
+import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
@@ -108,16 +111,48 @@ class C5ResultTest {
         RuleOutcome ungated = scenario.ungated();
         assertAmbiguous(ungated.result(), 3);
         assertComponents(ungated.result(), 3, 3, 2, 2, 1);
+        assertOnlyDAmbiguous(ungated.result());
         assertAmbiguous(teamOf(ungated, INE).result(), 2);
         assertComponents(teamOf(ungated, INE).result(), 2, 2, 1, 1, 0);
+        assertOnlyDAmbiguous(teamOf(ungated, INE).result());
         IndicatorResult eSf = teamOf(ungated, INE_2).result();
         assertThat(eSf.status()).isEqualTo(IndicatorStatus.COMPUTED);
         assertExactValue(eSf.valueExact(), 100, 1);
+        assertThat(eSf.components()).extracting(ResultComponent::status).containsOnly(IndicatorStatus.COMPUTED);
+        for (String key : List.of(P1, P2)) {
+            assertUndecidedD(ungated, key);
+        }
+        assertThat(decisionOf(ungated, P3).points()).isEqualTo(BigInteger.valueOf(100));
+        assertThat(practiceOf(ungated, P3, "D").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
 
         RuleOutcome gated = scenario.evaluate();
         assertThat(gated.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
         assertThat(teamOf(gated, INE).result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
         assertThat(teamOf(gated, INE_2).result().status()).isEqualTo(IndicatorStatus.BLOCKED);
+    }
+
+    /** A, B and C computed; D undecided (AMB-C5-01) with exact counts and no value. */
+    private static void assertOnlyDAmbiguous(IndicatorResult result) {
+        assertThat(result.components()).allSatisfy(component -> {
+            boolean isD = "D".equals(component.code());
+            assertThat(component.status())
+                    .as("status of %s", component.code())
+                    .isEqualTo(isD ? IndicatorStatus.RULE_AMBIGUITY : IndicatorStatus.COMPUTED);
+            assertThat(component.value() == null)
+                    .as("value of %s is null", component.code())
+                    .isEqualTo(isD);
+        });
+    }
+
+    /** The person's D row is PRACTICE_AMBIGUOUS without points, and the person has no total. */
+    private static void assertUndecidedD(RuleOutcome outcome, String key) {
+        EvidenceItem practiceD = practiceOf(outcome, key, "D");
+        assertThat(practiceD.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
+        assertThat(practiceD.reasonCode()).isEqualTo("AMB-C5-01");
+        assertThat(practiceD.points()).isNull();
+        EvidenceItem decision = decisionOf(outcome, key);
+        assertThat(decision.decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
+        assertThat(decision.points()).isNull();
     }
 
     private static void assertAmbiguous(IndicatorResult result, long denominator) {
@@ -151,13 +186,18 @@ class C5ResultTest {
                 .add(team(INE, CNES, "76"))
                 .eligible(P1)
                 .withPracticesAbc(P1)
+                .eligible(P2)
+                .withAllPractices(P2)
                 .ungated();
 
         IndicatorResult result = outcome.result();
-        assertAmbiguous(result, 1);
-        assertComponents(result, 1, 1, 1, 1, 0);
+        assertAmbiguous(result, 2);
+        assertComponents(result, 2, 2, 2, 2, 1); // D numerator: people whose D was observed
+        assertOnlyDAmbiguous(result);
         assertThat(result.components()).extracting(ResultComponent::weight).containsOnly(BigInteger.valueOf(25));
-        assertThat(practiceOf(outcome, P1, "D").decision()).isNotEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertUndecidedD(outcome, P1);
+        assertUndecidedD(outcome, P2);
+        assertThat(supportingOf(outcome, P2, "D")).hasSize(2); // the visits stay as information
     }
 
     @Test

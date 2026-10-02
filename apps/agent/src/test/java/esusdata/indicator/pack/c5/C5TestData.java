@@ -127,10 +127,10 @@ final class C5TestData {
     // ---- conditions ----
 
     static CanonicalCondition condition(String key, String system, String code, LocalDate recorded, String status) {
-        return CanonicalFixtures.condition(key, system, code, recorded, status);
+        return CanonicalFixtures.conditionEvaluatedBy(key, system, code, recorded, status, CBO_DOCTOR);
     }
 
-    /** {@code I10} evaluated by a professional in 2019 and still active. */
+    /** {@code I10} evaluated by a doctor in 2019 and still active (item 5: médica(o) e/ou enfermeira(o)). */
     static CanonicalCondition hypertension(String key) {
         return condition(key, CID10, "I10", HYPERTENSION_DATE, ACTIVE);
     }
@@ -147,10 +147,16 @@ final class C5TestData {
                 HYPERTENSION_DATE.toString(),
                 status,
                 resolvedOn == null ? null : resolvedOn.toString(),
-                PROFESSIONAL);
+                PROFESSIONAL,
+                CBO_DOCTOR);
     }
 
-    /** An active condition whose source does not say whether it was evaluated or reported. */
+    /** A professional condition evaluated by {@code cbo} ({@code null} when the source does not say). */
+    static CanonicalCondition conditionBy(String key, String system, String code, LocalDate recorded, String cbo) {
+        return CanonicalFixtures.conditionEvaluatedBy(key, system, code, recorded, ACTIVE, cbo);
+    }
+
+    /** An active condition, evaluated by a doctor, whose source does not say whether it was evaluated or reported. */
     static CanonicalCondition conditionWithoutBasis(String key, String system, String code, LocalDate recorded) {
         return new CanonicalCondition(
                 CanonicalFixtures.ref(CONDITION_TABLE),
@@ -161,7 +167,8 @@ final class C5TestData {
                 recorded.toString(),
                 ACTIVE,
                 null,
-                null);
+                null,
+                CBO_DOCTOR);
     }
 
     /** A condition the person reported (basis {@code SELF_REPORTED}), active. */
@@ -189,7 +196,8 @@ final class C5TestData {
                 HYPERTENSION_DATE.toString(),
                 ACTIVE,
                 null,
-                PROFESSIONAL);
+                PROFESSIONAL,
+                CBO_DOCTOR);
     }
 
     // ---- registrations, people and teams ----

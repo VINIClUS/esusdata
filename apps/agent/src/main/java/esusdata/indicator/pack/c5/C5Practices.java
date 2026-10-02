@@ -58,10 +58,23 @@ final class C5Practices {
     private final Map<String, List<CanonicalMeasurement>> measurements;
     private final Map<String, List<CanonicalHomeVisit>> visits;
 
-    /** One practice's decision, with the records behind it in evidence order. */
-    record Outcome(String code, boolean met, String reasonCode, List<C5Event> support) {
+    /**
+     * One practice's decision, with the records behind it in evidence order. An {@code ambiguous}
+     * practice is one the ficha does not decide for the person (AMB-C5-01): {@code met} then only
+     * says whether it was observed, and it earns no points.
+     */
+    record Outcome(String code, boolean met, String reasonCode, List<C5Event> support, boolean ambiguous) {
         Outcome {
             support = List.copyOf(support);
+        }
+
+        Outcome(String code, boolean met, String reasonCode, List<C5Event> support) {
+            this(code, met, reasonCode, support, false);
+        }
+
+        /** The same observation, undecided by the ficha for {@code reason}; its records stay as support. */
+        Outcome undecided(String reason) {
+            return new Outcome(code, met, reason, support, true);
         }
     }
 

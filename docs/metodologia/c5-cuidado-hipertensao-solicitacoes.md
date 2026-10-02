@@ -6,6 +6,8 @@ alternativa local declarada como limitação permanente do descritor.
 
 ## SOL-C5-01 — CBO do profissional no registro de condição (`CanonicalCondition`)
 
+**Atendida na emenda 9526ac6.** O pacote agora só identifica a pessoa por condição com `basis` `PROFESSIONAL` (ou nulo) **e** `cbo` dos grupos do Quadro 02 (médica(o)/enfermeira(o)); CBO nulo ou de outro profissional sai `EXCLUIDO_SEM_CONDICAO_AVALIADA`. A limitação correspondente saiu do descritor.
+
 - **O quê:** acrescentar `cbo` (texto, opcional) à capacidade `condition_list` e ao registro
   `CanonicalCondition` — o CBO de quem avaliou o problema no atendimento (FAI: `co_dim_cbo` do
   atendimento dono de `tb_fat_atd_ind_problemas`).
@@ -28,6 +30,8 @@ alternativa local declarada como limitação permanente do descritor.
 
 ## SOL-C5-03 — Vocabulário normalizado de situação da condição e de motivo de saída
 
+**Atendida na emenda 9526ac6.** O contrato fixa `status` `0` ativo, `1` latente, `2` resolvido e `exitReason` `135` óbito, `136` mudança de território; o pacote usa esses códigos (com testes) e continua aceitando os textuais (`RESOLVIDO`, `CONCLUIDO`, `MUDANCA_TERRITORIO`, «Óbito» …).
+
 - **O quê:** fixar no contrato das capacidades os valores de `CanonicalCondition.status`
   (sugestão: `ATIVO`, `LATENTE`, `RESOLVIDO`, a partir do LEDI 0/1/2) e de
   `CanonicalRegistration.exitReason` (sugestão: `OBITO`, `MUDANCA_TERRITORIO`, a partir do LEDI
@@ -41,6 +45,8 @@ alternativa local declarada como limitação permanente do descritor.
 - **Impacto:** denominador (interrupções). Comum a C4.
 
 ## SOL-C5-04 — Formato do CID-10 no bind `cid_codes`
+
+**Atendida na emenda 9526ac6.** A consulta casa `cid_codes` pela categoria, sem ponto; o pacote envia exatamente os 26 códigos literais da ficha (com ponto, na ordem do item 24 f) e em Java mantém a correspondência exata (AMB-C5-04), com o diagnóstico dos vizinhos não listados.
 
 - **O quê:** a consulta `condition_list` deve normalizar o CID-10 (com ou sem ponto) dos dois lados,
   ou o contrato deve dizer qual formato o PEC grava.

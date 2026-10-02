@@ -12,8 +12,8 @@ import java.util.regex.Pattern;
 
 /**
  * The hypertension condition of each person as of the cutoff (item 14, p. 1; item 4.1, p. 3–4; item
- * 15, p. 2). Only a professional evaluation of a listed code recorded «desde 2013» identifies the
- * person; a self-reported condition does not (the ficha never cites it). Each code is decided by its
+ * 15, p. 2). Only a listed code evaluated «por enfermeira(o) e/ou médica(o) da APS» (item 5, p. 1:
+ * basis professional and a CBO of Quadro 02) and recorded «desde 2013» identifies the person; a self-reported condition does not (the ficha never cites it). Each code is decided by its
  * latest row; the person is interrupted only when every eligible code is «resolvidos» or
  * «concluídos» (AMB-C5-04).
  */
@@ -93,7 +93,8 @@ final class C5Conditions {
                 && !recorded.isBefore(SINCE)
                 && !recorded.isAfter(cutoff)
                 && isEligible(c)
-                && isProfessional(c);
+                && isProfessional(c)
+                && C5Codes.CBO_CONSULTA.matches(c.cbo());
     }
 
     private static boolean isResolved(CanonicalCondition c, LocalDate cutoff) {

@@ -86,8 +86,6 @@ public final class C5Pack implements IndicatorRule {
             "Conformidade da identificação com o CadSUS (item 24 a) não conferida.",
             "Corte de envio no 20º dia útil e envio tardio da gestão local (itens 11 e 33) fora do alcance.",
             "Lacuna L12: situação vigente do problema lida pela última linha de cada código.",
-            "Condição sem CBO do profissional no registro canônico: não se confere «médica(o) e/ou"
-                    + " enfermeira(o)» do item 5.",
             "Lacuna L6: PA da visita domiciliar (MIVDT) sem campo no registro canônico; não entra na prática B.",
             "Lacuna L5: o DW não tem PA de participante de atividade coletiva; o MIAC (AMB-C5-06) só"
                     + " comprova B se a medição vier com PA.",
@@ -193,7 +191,7 @@ public final class C5Pack implements IndicatorRule {
                 C5Cohort.decide(data, cutoff, teamTypes).values()) {
             if (decision.eligible()) {
                 C5Results.Scored person =
-                        C5Results.Scored.of(decision, practices.evaluate(decision.personKey()), specs);
+                        C5Results.Scored.of(decision, practicesOf(decision, practices, teamTypes), specs);
                 eligible.add(person);
                 evidence.addAll(C5Evidence.eligible(person, specs, cutoff));
             } else {
@@ -202,12 +200,24 @@ public final class C5Pack implements IndicatorRule {
         }
         List<String> limitations = limitations(data);
         C5Results.Scope scope = new C5Results.Scope(DESCRIPTOR, context);
-        boolean anyEap76 =
-                eligible.stream().anyMatch(p -> teamTypes.isEap76(p.decision().ine()));
         return new RuleOutcome(
-                C5Results.of(scope, eligible, limitations, anyEap76),
-                teams(scope, eligible, limitations, teamTypes),
-                evidence);
+                C5Results.of(scope, eligible, limitations), teams(scope, eligible, limitations), evidence);
+    }
+
+    /**
+     * Practices A–D of an eligible person. In an eAP tipo 76 team practice D «não será condicionante
+     * de pontuação» (item 24 b, p. 2), which the ficha does not turn into points (AMB-C5-01, P07,
+     * MET-23): D stays observed but undecided, never credited, dropped or counted as not met.
+     */
+    private static List<C5Practices.Outcome> practicesOf(
+            C5Cohort.Decision decision, C5Practices practices, C5Teams teamTypes) {
+        List<C5Practices.Outcome> outcomes = practices.evaluate(decision.personKey());
+        if (!teamTypes.isEap76(decision.ine())) {
+            return outcomes;
+        }
+        return outcomes.stream()
+                .map(o -> C5Practices.D.equals(o.code()) ? o.undecided(C5Results.AMB_C5_01) : o)
+                .toList();
     }
 
     @Override
@@ -217,7 +227,7 @@ public final class C5Pack implements IndicatorRule {
 
     /** One team (INE of the link) per group of eligible people, by INE, without a team last. */
     private static List<TeamResult> teams(
-            C5Results.Scope scope, List<C5Results.Scored> eligible, List<String> limitations, C5Teams teamTypes) {
+            C5Results.Scope scope, List<C5Results.Scored> eligible, List<String> limitations) {
         SortedMap<String, List<C5Results.Scored>> byTeam =
                 new TreeMap<>(Comparator.nullsLast(Comparator.naturalOrder()));
         for (C5Results.Scored person : eligible) {
@@ -227,11 +237,8 @@ public final class C5Pack implements IndicatorRule {
         List<TeamResult> teams = new ArrayList<>(byTeam.size());
         for (Map.Entry<String, List<C5Results.Scored>> team : byTeam.entrySet()) {
             List<C5Results.Scored> members = team.getValue();
-            boolean ambiguous = teamTypes.isEap76(team.getKey());
             teams.add(new TeamResult(
-                    team.getKey(),
-                    members.get(0).decision().cnes(),
-                    C5Results.of(scope, members, limitations, ambiguous)));
+                    team.getKey(), members.get(0).decision().cnes(), C5Results.of(scope, members, limitations)));
         }
         return teams;
     }
@@ -285,7 +292,7 @@ public final class C5Pack implements IndicatorRule {
             lists.put(Capabilities.PROCEDURE_CODES, C5Codes.PROCEDURE_CODES);
         } else if (Capabilities.CONDITION_LIST.equals(capability)) {
             lists.put(Capabilities.CIAP_CODES, C5Codes.CIAP_HIPERTENSAO);
-            lists.put(Capabilities.CID_CODES, C5Codes.cidBindCodes());
+            lists.put(Capabilities.CID_CODES, C5Codes.CID_HIPERTENSAO);
         }
         return lists;
     }

@@ -28,9 +28,15 @@ final class C5Results {
     static final String EAP76_AMBIGUITY =
             "AMB-C5-01: prática D não condicionante para eAP tipo 76; resultado sem escore até P07 (MET-23).";
 
+    /** The reason code of the eAP tipo 76 practice D the ficha does not decide (AMB-C5-01). */
+    static final String AMB_C5_01 = "AMB-C5-01";
+
     private static final int DISPLAY_SCALE = 4;
 
-    /** One eligible person with practices A–D and the points earned. */
+    /**
+     * One eligible person with practices A–D and the points earned — {@code null}, never 0, when a
+     * practice is undecided (AMB-C5-01).
+     */
     record Scored(C5Cohort.Decision decision, List<C5Practices.Outcome> practices, BigInteger points) {
         Scored {
             practices = List.copyOf(practices);
@@ -39,12 +45,20 @@ final class C5Results {
         /** Scores each practice by the descriptor's spec of the same code, never by position. */
         static Scored of(C5Cohort.Decision decision, List<C5Practices.Outcome> practices, List<ComponentSpec> specs) {
             List<ComponentSpec> met = new ArrayList<>();
+            boolean undecided = false;
             for (ComponentSpec spec : specs) {
-                if (practice(practices, spec.code()).met()) {
+                C5Practices.Outcome practice = practice(practices, spec.code());
+                undecided |= practice.ambiguous();
+                if (practice.met()) {
                     met.add(spec);
                 }
             }
-            return new Scored(decision, practices, Scores.points(met));
+            return new Scored(decision, practices, undecided ? null : Scores.points(met));
+        }
+
+        /** Some practice of this person is undecided by the ficha, so the person has no points. */
+        boolean ambiguous() {
+            return practices.stream().anyMatch(C5Practices.Outcome::ambiguous);
         }
 
         /** The decision of practice {@code code}; every practice of the descriptor is decided. */
@@ -66,13 +80,16 @@ final class C5Results {
     private C5Results() {}
 
     /**
-     * The result of {@code people}. With {@code ambiguous} (someone of an eAP tipo 76 team) the
-     * value, band and numerator stay unavailable as {@code RULE_AMBIGUITY}; counts and practices stay.
+     * The result of {@code people}. When someone has an undecided practice (an eAP tipo 76 team,
+     * AMB-C5-01) the value, band and numerator stay unavailable as {@code RULE_AMBIGUITY}; the
+     * denominator and the components stay, the undecided one as {@code RULE_AMBIGUITY} too.
      */
-    static IndicatorResult of(Scope scope, List<Scored> people, List<String> limitations, boolean ambiguous) {
+    static IndicatorResult of(Scope scope, List<Scored> people, List<String> limitations) {
         BigInteger total = BigInteger.ZERO;
+        boolean ambiguous = false;
         for (Scored person : people) {
-            total = total.add(person.points());
+            ambiguous |= person.ambiguous();
+            total = person.points() == null ? total : total.add(person.points());
         }
         BigInteger eligible = BigInteger.valueOf(people.size());
         List<ResultComponent> components = components(scope.descriptor().components(), people);
@@ -92,11 +109,19 @@ final class C5Results {
         List<ResultComponent> components = new ArrayList<>(specs.size());
         BigInteger eligible = BigInteger.valueOf(people.size());
         for (ComponentSpec spec : specs) {
-            long met =
-                    people.stream().filter(p -> p.practice(spec.code()).met()).count();
-            components.add(ResultComponent.of(spec, BigInteger.valueOf(met), eligible));
+            BigInteger met = BigInteger.valueOf(
+                    people.stream().filter(p -> p.practice(spec.code()).met()).count());
+            boolean undecided =
+                    people.stream().anyMatch(p -> p.practice(spec.code()).ambiguous());
+            components.add(undecided ? undecided(spec, met, eligible) : ResultComponent.of(spec, met, eligible));
         }
         return components;
+    }
+
+    /** A practice the ficha does not decide for someone: exact counts of what was observed, no value. */
+    private static ResultComponent undecided(ComponentSpec spec, BigInteger observed, BigInteger eligible) {
+        return new ResultComponent(
+                spec.code(), spec.kind(), spec.weight(), observed, eligible, null, IndicatorStatus.RULE_AMBIGUITY);
     }
 
     private static IndicatorResult build(

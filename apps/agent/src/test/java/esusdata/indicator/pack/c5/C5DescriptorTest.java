@@ -118,16 +118,10 @@ class C5DescriptorTest {
         assertThat(conditions.arrayParams()).containsOnlyKeys(Capabilities.CIAP_CODES, Capabilities.CID_CODES);
         assertThat(conditions.arrayParams().get(Capabilities.CIAP_CODES))
                 .containsExactlyInAnyOrderElementsOf(CIAP_LITERALS);
-        List<String> undotted = CID_LITERALS.stream()
-                .filter(code -> code.contains("."))
-                .map(code -> code.replace(".", ""))
-                .toList();
+        // The query matches cid_codes by category (amendment 9526ac6): the bind is the literal list.
         assertThat(conditions.arrayParams().get(Capabilities.CID_CODES))
-                .containsAll(CID_LITERALS)
-                .containsAll(undotted)
-                .contains("I110")
-                .doesNotHaveDuplicates()
-                .hasSize(CID_LITERALS.size() + undotted.size());
+                .hasSize(26)
+                .containsExactlyElementsOf(CID_LITERALS);
 
         for (String capability : List.of(
                 Capabilities.CITIZEN,
