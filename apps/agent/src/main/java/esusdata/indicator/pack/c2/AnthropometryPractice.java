@@ -45,7 +45,7 @@ final class AnthropometryPractice {
             LocalDate date, boolean weight, boolean height, String pairKey, boolean loneCode, Support support) {}
 
     /** What all records of one day add up to. */
-    private static final class Day {
+    private static final class DayTally {
         private boolean weight;
         private boolean height;
         private boolean loneCode;
@@ -75,10 +75,10 @@ final class AnthropometryPractice {
     }
 
     private static int pairDays(ChildClock clock, List<Measure> measures, Set<Reading> readings) {
-        Map<LocalDate, Day> days = new TreeMap<>();
+        Map<LocalDate, DayTally> days = new TreeMap<>();
         for (Measure m : measures) {
             if (clock.upToMonths(m.date(), TWO_YEARS_IN_MONTHS, readings)) {
-                Day day = days.computeIfAbsent(m.date(), d -> new Day());
+                DayTally day = days.computeIfAbsent(m.date(), d -> new DayTally());
                 day.weight |= m.weight();
                 day.height |= m.height();
                 day.loneCode |= m.loneCode();
@@ -88,7 +88,7 @@ final class AnthropometryPractice {
             }
         }
         int count = 0;
-        for (Day day : days.values()) {
+        for (DayTally day : days.values()) {
             count += day.count(readings);
         }
         return count;
@@ -96,6 +96,17 @@ final class AnthropometryPractice {
 
     private static List<Measure> measures(ChildRecords child) {
         List<Measure> measures = new ArrayList<>();
+        addEncounters(child, measures);
+        addVisits(child, measures);
+        addMeasurements(child, measures);
+        for (CanonicalProcedureEvent p : child.procedures()) {
+            addProcedure(child, measures, p);
+        }
+        return measures;
+    }
+
+    /** MIAI: "registros de Peso e Altura do campo específico do PEC". */
+    private static void addEncounters(ChildRecords child, List<Measure> measures) {
         for (CanonicalCareEvent e : child.encounters()) {
             if (!"DENTAL".equals(e.form()) && C2Codes.ANTHROPOMETRY.matches(e.cbo())) {
                 Support support =
@@ -103,6 +114,10 @@ final class AnthropometryPractice {
                 addValues(child, measures, support, e.weightKg(), e.heightCm());
             }
         }
+    }
+
+    /** MIVDT: "registros de peso e altura no campo específico". */
+    private static void addVisits(ChildRecords child, List<Measure> measures) {
         for (CanonicalHomeVisit v : child.visits()) {
             if (C2Codes.ANTHROPOMETRY.matches(v.cbo())) {
                 Support support =
@@ -110,6 +125,10 @@ final class AnthropometryPractice {
                 addValues(child, measures, support, v.weightKg(), v.heightCm());
             }
         }
+    }
+
+    /** MIP and MIAC values written outside an encounter; a collective activity row may carry no CBO. */
+    private static void addMeasurements(ChildRecords child, List<Measure> measures) {
         for (CanonicalMeasurement m : child.measurements()) {
             boolean model = MIP.equals(m.origin()) || MIAC.equals(m.origin());
             if (model && (m.cbo() == null || C2Codes.ANTHROPOMETRY.matches(m.cbo()))) {
@@ -118,10 +137,6 @@ final class AnthropometryPractice {
                 addValues(child, measures, support, m.weightKg(), m.heightCm());
             }
         }
-        for (CanonicalProcedureEvent p : child.procedures()) {
-            addProcedure(child, measures, p);
-        }
-        return measures;
     }
 
     /** A record with weight and/or height values in its own fields. */
