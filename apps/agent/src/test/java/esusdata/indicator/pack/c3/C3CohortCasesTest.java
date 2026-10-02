@@ -119,8 +119,8 @@ class C3CohortCasesTest {
 
         assertNotMet(practice(outcome, EP1, "I"));
         assertNotMet(practice(outcome, EP1, "J"));
-        // the puerperal code outside every episode window is its own undecided subject (AMB-C3-03)
-        assertThat(episodeRow(outcome, P1 + "#sem-dum").reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_03");
+        // a late puerperal code after a known DUM belongs to that pregnancy: no subject without DUM
+        assertThat(outcome.evidence()).noneMatch(e -> (P1 + "#sem-dum").equals(e.subjectKey()));
         // D+42 = DUM+336 = 2025-12-03 falls in December
         assertThat(outcome.result().consolidationEligible()).isTrue();
     }

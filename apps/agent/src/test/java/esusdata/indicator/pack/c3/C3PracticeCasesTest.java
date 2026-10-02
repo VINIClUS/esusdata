@@ -585,8 +585,8 @@ class C3PracticeCasesTest {
     void ct53_aConsultationOnDPlus43DoesNotMeetI() {
         RuleOutcome outcome = computeNovember(new C3Pack(), withOutcomeAnd(puerperal(P1, OUTCOME.plusDays(43))));
         assertNotMet(practice(outcome, "I"));
-        // the puerperal code outside every episode window becomes its own undecided subject (AMB-C3-03)
-        assertThat(episodeRow(outcome, P1 + "#sem-dum").reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_03");
+        // a late puerperal code after a known DUM belongs to that pregnancy: no subject without DUM
+        assertThat(outcome.evidence()).noneMatch(e -> (P1 + "#sem-dum").equals(e.subjectKey()));
     }
 
     @Test

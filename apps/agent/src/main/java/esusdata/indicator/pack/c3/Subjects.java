@@ -54,25 +54,40 @@ final class Subjects {
         return subjects;
     }
 
-    /** The earliest 24 f code that no episode's {@code [DUM, D + 42]} covers, or {@code null}. */
+    /**
+     * The earliest 24 f code that no episode explains, or {@code null}. A pregnancy code is explained
+     * by an episode's {@code [DUM, D + 42]}; a code only of the puerperium list, recorded after a known
+     * DUM, is a late puerperal record of that pregnancy, not a pregnancy without a DUM.
+     */
     private LocalDate codeWithoutDum(PersonRecords person, List<Episode> episodes) {
         LocalDate floor = cohort.firstDay().minusDays(CODE_REACH_DAYS);
         LocalDate earliest = null;
         for (CanonicalCareEvent event : person.individualCare()) {
             LocalDate date = C3Dates.parse(event.careDate());
-            boolean candidate = date != null && !date.isBefore(floor) && hasPhaseCode(event);
-            if (candidate && !covered(date, episodes) && (earliest == null || date.isBefore(earliest))) {
+            boolean candidate = date != null && !date.isBefore(floor) && unexplained(event, date, episodes);
+            if (candidate && (earliest == null || date.isBefore(earliest))) {
                 earliest = date;
             }
         }
         return earliest;
     }
 
-    private static boolean hasPhaseCode(CanonicalCareEvent event) {
-        return CodeMatch.of(event, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID)
+    private static boolean unexplained(CanonicalCareEvent event, LocalDate date, List<Episode> episodes) {
+        if (CodeMatch.of(event, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID).found()) {
+            return !covered(date, episodes);
+        }
+        return CodeMatch.of(event, C3Codes.PUERPERIUM_CIAP, C3Codes.PUERPERIUM_CID)
                         .found()
-                || CodeMatch.of(event, C3Codes.PUERPERIUM_CIAP, C3Codes.PUERPERIUM_CID)
-                        .found();
+                && !afterSomeDum(date, episodes);
+    }
+
+    private static boolean afterSomeDum(LocalDate date, List<Episode> episodes) {
+        for (Episode episode : episodes) {
+            if (!date.isBefore(episode.primary().dum())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean covered(LocalDate date, List<Episode> episodes) {
