@@ -19,7 +19,7 @@ import java.util.List;
 public final class ComponentIII {
 
     public static final String ID = "componente-iii-nota-final";
-    public static final String RULE_VERSION = ID + "@0.1.0";
+    public static final String RULE_VERSION = ID + "@0.2.0";
 
     /** NT 8/2026: weights 1/2/2/1/1/1/2 over C1–C7 for eSF/eAP. */
     public static final PackDescriptor DESCRIPTOR = new PackDescriptor(
@@ -43,7 +43,26 @@ public final class ComponentIII {
                     indicator("c6-cuidado-pessoa-idosa", "C6 — Cuidado da pessoa idosa", 1),
                     indicator("c7-prevencao-cancer", "C7 — Cuidado da mulher na prevenção do câncer", 2)),
             ReleaseGates.noneComplete(),
-            List.of("Consolidação em implementação (ADR 0030): a nota ainda não é calculada."),
+            List.of(
+                    "Dependência dos portões de C1–C7: a Nota Final só existe quando os resultados mensais dos sete"
+                            + " indicadores do quadrimestre estão publicados e calculados; um mês bloqueado, ausente ou"
+                            + " sem valor deixa a unidade sem nota, nunca zero nem peso redistribuído (MET-17).",
+                    "AMB-CIII-01: os meses dos quadrimestres (jan–abr, mai–ago, set–dez) seguem a convenção da"
+                            + " Tech Spec (MET-05); a NT 8/2026 não os define.",
+                    "AMB-CIII-03/04: a média quadrimestral é classificada sobre o valor exato, sem arredondar, pelas"
+                            + " faixas da ficha de cada indicador, que prevalecem sobre os exemplos do Quadro 1.",
+                    "AMB-CIII-06/07: indicador sem mês elegível (C2/C3) ou com mês monitorado sem denominador (C1,"
+                            + " C4–C7) fica indisponível e a unidade fica sem Nota Final.",
+                    "AMB-CIII-08: a suspensão de pagamento (item 4.1.1) não é aplicada; os meses válidos para"
+                            + " pagamento são informação externa ao PEC.",
+                    "AMB-CIII-09/10: a classificação financeira da Portaria GM/MS nº 10.994/2026 lê"
+                            + " \"quadrimestre\" como o quadrimestre avaliado; o regime de Q3/2026 é derivado.",
+                    "AMB-CIII-12: o resultado mensal local não reproduz o prazo de envio ao Siaps nem a extração no"
+                            + " 20º dia útil e pode divergir do Siaps.",
+                    "AMB-CIII-13: equipes novas (item 2.6 e § 7º da Portaria) não são tratadas: a contagem do"
+                            + " \"segundo recálculo\" não está definida.",
+                    "Pesos do Quadro 2 (eSF/eAP) aplicados a toda equipe: o tipo de equipe não está na fonte (L1);"
+                            + " eSB e eMulti têm quadros próprios, fora do escopo."),
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.engineeringDefault(),
             List.of(
@@ -65,7 +84,7 @@ public final class ComponentIII {
      * so finishing the consolidation never touches the service.
      */
     public static ComponentIIIConsolidation consolidation() {
-        return new PendingComponentIII();
+        return new Nt08Consolidation();
     }
 
     private static ComponentSpec indicator(String pack, String label, long weight) {
