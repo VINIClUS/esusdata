@@ -74,7 +74,9 @@ por quadrimestre.
 - **Extrato v2**: um arquivo JSONL gzip por job, linhas `{"part":n,"kind":"…","record":{…}}`, todas
   as partes lidas numa só transação `REPEATABLE READ READ ONLY` (§1.9.3). O manifesto lista as
   partes (`ManifestPart`: capacidade, versão, checksum da consulta, tipo, janela, parâmetros e seu
-  checksum, contagem). Extratos v1 continuam legíveis e o C1 continua v1.
+  checksum, contagem). Extratos v1 continuam legíveis e o C1 continua v1. Os checksums dos
+  parâmetros e o checksum composto do manifesto têm uma definição só (`ManifestChecksums`), usada por
+  quem publica e por quem reproduz o extrato.
 - **Capacidades da fundação** (todas `NOT_TESTED` até a validação ao vivo, ADR 0023), escolhidas
   pelo dicionário oficial do DW (`docs/discovery/2026-10-02-dw-dicionario-c2-c7.md`): `citizen`,
   `individual_registration`, `care_encounter`, `dental_encounter`, `home_visit`,
@@ -104,6 +106,19 @@ por quadrimestre.
   ou bloqueado deixa a unidade sem nota — sem zero e sem redistribuir peso (MET-17). A classificação
   financeira da transição (Portaria 10.994/2026) sai separada da metodológica.
 - A exportação CSV troca `valor_percentual` por `valor` + `unidade` (emenda à ADR 0024).
+
+### Emenda aditiva antes da fase B (2026-10-02)
+
+Pedidos das sessões dos pacotes, todos aditivos (os construtores antigos dos registros continuam):
+`EvidenceDecision.PRACTICE_AMBIGUOUS`; `cbo` de quem avaliou em `condition_list`/`CanonicalCondition`;
+`registration_date` em `immunization_history`/`CanonicalImmunization` (transcrição tardia);
+`activity_type_code` e `health_practice_codes` em `measurement_record`/`CanonicalMeasurement` (filtro de
+atividade coletiva das fichas); `ExactRatio.reduced()`. As convenções de códigos e vocabulários que as
+consultas entregam ficam no guia `docs/indicadores/como-adicionar.md` (códigos AB em `procedure_codes`,
+CID-10 pela categoria, códigos LEDI). Continuam como limitação, sem fonte documentada no DW ou sem
+ganho no resultado: tipo de equipe (L1), data de desfecho da gestação (L2 — o C3 pode ler a resolução
+da condição na lista de problemas), PA da visita (L6), marcação de puericultura (L7), procedimento por
+CBO sem lista SIGTAP e binds de código no `care_encounter` (só volume).
 
 ## O que isso afirma, e o que não afirma
 

@@ -26,6 +26,30 @@ class ContractRecordsTest {
     }
 
     @Test
+    void amendedRecordsKeepTheirOriginalConstructors() {
+        SourceRef ref = new SourceRef("src", "tb", "1");
+        CanonicalCondition condition =
+                new CanonicalCondition(ref, "3541307", "p", "CID10", "E11", "2026-01-01", "0", null, "PROFESSIONAL");
+        assertThat(condition.cbo()).isNull();
+
+        CanonicalImmunization dose =
+                new CanonicalImmunization(ref, "3541307", "p", "2026-01-01", "42", "1", null, false, null, null, null);
+        assertThat(dose.registrationDate()).isNull();
+
+        CanonicalMeasurement measurement =
+                new CanonicalMeasurement(ref, "3541307", "p", "2026-01-01", "70", "160", null, null, null, "MIP");
+        assertThat(measurement.activityTypeCode()).isNull();
+        assertThat(measurement.healthPracticeCodes()).isEmpty();
+
+        List<String> practices = new java.util.ArrayList<>(List.of("2"));
+        CanonicalMeasurement copied = new CanonicalMeasurement(
+                ref, "3541307", "p", "2026-01-01", "70", "160", null, null, null, "MIAC", "05", practices);
+        practices.add("30");
+        assertThat(copied.healthPracticeCodes()).containsExactly("2");
+        assertThat(EvidenceDecision.values()).contains(EvidenceDecision.PRACTICE_AMBIGUOUS);
+    }
+
+    @Test
     void aComponentWithoutDenominatorIsUndefinedNotZero() {
         ResultComponent empty = ResultComponent.of(PRACTICE, BigInteger.ZERO, BigInteger.ZERO);
         assertThat(empty.status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);

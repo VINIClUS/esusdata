@@ -1,7 +1,7 @@
 {
   "capability": "immunization_history",
   "adapter_version": "0.1.0",
-  "description": "Doses dos imunobiológicos pedidos (MIV), com dose, estratégia e registro anterior.",
+  "description": "Doses dos imunobiológicos pedidos (MIV), com dose, estratégia e registro anterior. registration_date é o dia do registro no PEC (difere da aplicação na transcrição tardia).",
   "record_kind": "immunization",
   "entity_type_column": "source_entity_type",
   "record_id_column": "source_record_id",
@@ -93,6 +93,11 @@
     {
       "name": "ine",
       "type": "text",
+      "required": false
+    },
+    {
+      "name": "registration_date",
+      "type": "date",
       "required": false
     }
   ]
