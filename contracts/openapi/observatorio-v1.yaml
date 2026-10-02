@@ -1640,7 +1640,7 @@ components:
         decision:
           type: string
           nullable: true
-          enum: [IN_NUMERATOR, DENOMINATOR_ONLY, EXCLUDED_UNMAPPED, ELIGIBLE, EXCLUDED, PRACTICE_MET, PRACTICE_NOT_MET, PRACTICE_EXEMPT, SUPPORTING_EVENT]
+          enum: [IN_NUMERATOR, DENOMINATOR_ONLY, EXCLUDED_UNMAPPED, ELIGIBLE, EXCLUDED, PRACTICE_MET, PRACTICE_NOT_MET, PRACTICE_EXEMPT, PRACTICE_AMBIGUOUS, SUPPORTING_EVENT]
         reasonCode: { type: string, nullable: true }
         points: { type: string, nullable: true, description: Points earned for the component, as a canonical integer string. }
         criterionVersion: { type: string, nullable: true }

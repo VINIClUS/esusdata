@@ -20,6 +20,15 @@ class ExactRatioOperationsTest {
     }
 
     @Test
+    void reducesToLowestTermsWithoutChangingTheValue() {
+        assertThat(ExactRatio.of(220, 4).reduced()).isEqualTo(ExactRatio.of(55, 1));
+        assertThat(ExactRatio.of(0, 5).reduced()).isEqualTo(ExactRatio.of(0, 1));
+        assertThat(ExactRatio.of(-6, 4).reduced()).isEqualTo(ExactRatio.of(-3, 2));
+        ExactRatio lowest = ExactRatio.of(3, 7);
+        assertThat(lowest.reduced()).isSameAs(lowest);
+    }
+
+    @Test
     void ordersByValueNotByRepresentation() {
         assertThat(ExactRatio.of(1, 2).compareTo(ExactRatio.of(2, 4))).isZero();
         assertThat(ExactRatio.of(1, 2)).isNotEqualTo(ExactRatio.of(2, 4));

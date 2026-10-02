@@ -10,7 +10,9 @@ SELECT CAST(NULL AS text) AS source_entity_type,
        CAST(NULL AS text) AS systolic_mmhg,
        CAST(NULL AS text) AS diastolic_mmhg,
        CAST(NULL AS text) AS cbo,
-       CAST(NULL AS text) AS origin
+       CAST(NULL AS text) AS origin,
+       CAST(NULL AS text) AS activity_type_code,
+       CAST(NULL AS text[]) AS health_practice_codes
  WHERE FALSE
    AND CAST(? AS text) IS NULL
    AND CAST(? AS date) IS NULL
