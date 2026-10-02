@@ -81,3 +81,15 @@ Páginas: PDF da ficha C4 (SEI 0055986848), transcrição em [`c4-cuidado-diabet
   T-C4-27 («Diabetes só autorreferido no cadastro individual» → não entra). O pacote segue a ficha: o autorreferido
   só torna a pessoa candidata e ela aparece na evidência como `EXCLUDED` / `SEM_CONDICAO_AVALIADA` (ENG-36).
   Pede-se confirmação na revisão dos Portões A/B.
+
+## Respostas da integração (emenda da fundação 9526ac6)
+
+| Pedido | Resposta | O que o pacote fez |
+|---|---|---|
+| S-C4-01 | atendido: `CanonicalCondition.cbo` | a lista de problemas só qualifica com CBO de médico/enfermeiro (T-C4-26 também pela lista) |
+| S-C4-02 | adotado: `0`/`1`/`2`, `135`/`136`, `CIAP2`/`CID10`, `PROFESSIONAL`/`SELF_REPORTED` | constantes de `C4Codes` já eram essas |
+| S-C4-03 | adotado: `cid_codes` casa pela categoria | sem mudança |
+| S-C4-04 | sem fonte (L1) | limitação mantida; `teams()` continua lido; D da eAP 76 sai `PRACTICE_AMBIGUOUS` e o componente D `RULE_AMBIGUITY` |
+| S-C4-05 | (a) não (L6); (b) atendido: `activityTypeCode` no MIAC | MIAC só conta com atividade 04–07 (comparada como número) |
+| S-C4-06 | Portão C | limitação mantida |
+| S-C4-07 | confirmado: seguir a ficha | sem mudança |

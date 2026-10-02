@@ -35,8 +35,11 @@ public final class C4Reasons {
     public static final String PRACTICE_MET = "PRATICA_CUMPRIDA";
     public static final String PRACTICE_NOT_MET = "PRATICA_NAO_CUMPRIDA";
 
-    /** Practice D of a person linked to an eAP tipo 76 team: shown, not scored (AMB-C4-01). */
-    public static final String PRACTICE_INFORMATIVE_EAP = "PRATICA_INFORMATIVA_EAP76";
+    /**
+     * Practice D of a person linked to an eAP tipo 76 team: the ficha does not decide it (AMB-C4-01),
+     * so it is {@code PRACTICE_AMBIGUOUS}, without points.
+     */
+    public static final String PRACTICE_INFORMATIVE_EAP = "AMB-C4-01_PRATICA_D_EAP76";
 
     private C4Reasons() {}
 }

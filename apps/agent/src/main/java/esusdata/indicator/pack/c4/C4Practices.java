@@ -66,9 +66,24 @@ final class C4Practices {
         this.twelveMonths = upTo(DateWindow.lastCivilMonths(competencia, 12), cutoff);
     }
 
-    /** MIAI: individual care, presential, remote or at home — never a dental encounter. */
+    /** MIAI: individual care, presential, remote or at home ({@code form = INDIVIDUAL}) — never MIAO. */
     static boolean isIndividualCare(CanonicalCareEvent event) {
-        return "INDIVIDUAL".equals(event.form()) || "HOME".equals(event.form());
+        return "INDIVIDUAL".equals(event.form());
+    }
+
+    /**
+     * A measurement outside an encounter: MIP always; MIAC only for the activity types «04, 05, 06 e
+     * 07» (item 24 e, p. 3), compared as numbers so {@code 4} and {@code 04} are the same code.
+     */
+    static boolean acceptedMeasurement(CanonicalMeasurement m) {
+        if (!"MIAC".equals(m.origin())) {
+            return true;
+        }
+        String type = m.activityTypeCode();
+        if (type == null || type.isBlank() || !type.chars().allMatch(Character::isDigit)) {
+            return false;
+        }
+        return C4Codes.COLLECTIVE_ACTIVITY_TYPES.contains(Integer.parseInt(type));
     }
 
     /** The decision of every practice, in the ficha's order A–F. */
@@ -115,7 +130,8 @@ final class C4Practices {
             }
         }
         for (CanonicalMeasurement m : measured) {
-            if (hasBoth(m.systolicMmhg(), m.diastolicMmhg())
+            if (acceptedMeasurement(m)
+                    && hasBoth(m.systolicMmhg(), m.diastolicMmhg())
                     && valid(sixMonths, C4Codes.CBO_B, m.measuredDate(), m.cbo())) {
                 supports.add(support(m));
             }
@@ -143,7 +159,7 @@ final class C4Practices {
             }
         }
         for (CanonicalMeasurement m : measurements.getOrDefault(key, List.of())) {
-            if (valid(twelveMonths, C4Codes.CBO_C, m.measuredDate(), m.cbo())) {
+            if (acceptedMeasurement(m) && valid(twelveMonths, C4Codes.CBO_C, m.measuredDate(), m.cbo())) {
                 Support s = support(m);
                 day(days, s).mark(s, m.weightKg() != null, m.heightCm() != null, false);
             }

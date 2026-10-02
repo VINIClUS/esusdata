@@ -60,19 +60,20 @@ final class C4Scoring {
         for (Scored p : people) {
             total = total.add(p.observedPoints(specs));
         }
+        boolean eap76 = people.stream().anyMatch(Scored::eap76);
         List<ResultComponent> components = new ArrayList<>(specs.size());
         for (ComponentSpec spec : specs) {
             long met = people.stream()
                     .filter(p -> p.outcomes().get(spec.code()).met())
                     .count();
-            components.add(ResultComponent.of(spec, BigInteger.valueOf(met), subjects));
+            components.add(component(spec, BigInteger.valueOf(met), subjects, eap76));
         }
         List<String> limitations = new ArrayList<>(descriptor.standingLimitations());
         Optional<ExactRatio> mean = Scores.meanPoints(total, subjects);
         IndicatorStatus status = IndicatorStatus.COMPUTED;
         if (mean.isEmpty()) {
             status = IndicatorStatus.NO_DENOMINATOR;
-        } else if (people.stream().anyMatch(Scored::eap76)) {
+        } else if (eap76) {
             status = IndicatorStatus.RULE_AMBIGUITY;
             limitations.add(0, EAP_AMBIGUITY);
         }
@@ -96,6 +97,15 @@ final class C4Scoring {
                 value,
                 components,
                 true);
+    }
+
+    /** Practice D with eAP 76 people in it is undecided (AMB-C4-01): exact counts, no value. */
+    private static ResultComponent component(ComponentSpec spec, BigInteger met, BigInteger subjects, boolean eap76) {
+        if (eap76 && C4Practices.D.equals(spec.code())) {
+            return new ResultComponent(
+                    spec.code(), spec.kind(), spec.weight(), met, subjects, null, IndicatorStatus.RULE_AMBIGUITY);
+        }
+        return ResultComponent.of(spec, met, subjects);
     }
 
     /** The person row of an excluded candidate. */
@@ -122,10 +132,16 @@ final class C4Scoring {
     }
 
     private static EvidenceItem practice(Scored scored, ComponentSpec spec, Outcome outcome) {
-        EvidenceDecision decision = outcome.met() ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
         if (scored.eap76() && C4Practices.D.equals(spec.code())) {
-            return row(scored.subject(), spec.code(), null, decision, C4Reasons.PRACTICE_INFORMATIVE_EAP, null);
+            return row(
+                    scored.subject(),
+                    spec.code(),
+                    null,
+                    EvidenceDecision.PRACTICE_AMBIGUOUS,
+                    C4Reasons.PRACTICE_INFORMATIVE_EAP,
+                    null);
         }
+        EvidenceDecision decision = outcome.met() ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
         String reason = outcome.met() ? C4Reasons.PRACTICE_MET : C4Reasons.PRACTICE_NOT_MET;
         BigInteger points = outcome.met() ? spec.weight() : BigInteger.ZERO;
         return row(scored.subject(), spec.code(), null, decision, reason, points);

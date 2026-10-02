@@ -59,14 +59,13 @@ public final class C4Pack implements IndicatorRule {
                     + " (Portaria GM/MS nº 3.493/2024) e a exceção da prática D para eAP tipo 76 (AMB-C4-01) só são"
                     + " aplicadas quando houver fonte do tipo; equipe sem tipo comprovado é calculada sem a exceção"
                     + " e sem pontuação presumida.",
-            "Condição avaliada (AMB-C4-04): a lista de condições (desde 2013) não informa o CBO de quem avaliou e"
-                    + " entra sem essa conferência (S-C4-01); o atendimento individual, que confere médico/"
-                    + " enfermeiro, é lido só nos últimos 12 meses. Interrupção quando o último estado de todas as"
-                    + " condições elegíveis da lista é «Resolvido» (LEDI 2): «Latente» conta como ativa,"
-                    + " «concluído» não tem código próprio e nova avaliação em atendimento não reabre a lista.",
+            "Condição avaliada (AMB-C4-04): entra a condição da lista de problemas avaliada por médico/enfermeiro"
+                    + " desde 2013 ou o atendimento individual dos últimos 12 meses com T89/T90/E10/E11/E14."
+                    + " Interrupção quando o último estado de todas as condições elegíveis da lista é «Resolvido»"
+                    + " (LEDI 2): «Latente» conta como ativa, «concluído» não tem código próprio e nova avaliação"
+                    + " em atendimento não reabre a lista.",
             "Fontes que o DW não tem ou não descreve: pressão arterial na visita domiciliar (L6) e na atividade"
-                    + " coletiva (L5), o campo de avaliação dos pés do MIAI (AMB-C4-09), o filtro de atividade"
-                    + " coletiva códigos 04–07 (AMB-C4-10), a tabela SIGTAP de habilitação de CBO (AMB-C4-08) e a"
+                    + " coletiva (L5), o campo de avaliação dos pés do MIAI (AMB-C4-09), a tabela SIGTAP de habilitação de CBO (AMB-C4-08) e a"
                     + " lotação do profissional na equipe (AMB-C4-05 b). Consultas do MIP (03.01.01.003-0,"
                     + " 03.01.01.006-4, 03.01.01.025-0) não são lidas nem comprovam a prática A.",
             "Corte de envio: o Siaps extrai no «20º dia útil de cada mês» (item 11) e só vê o que chegou até lá;"

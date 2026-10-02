@@ -537,4 +537,20 @@ class C4PracticesTest {
         }
         assertThat(points(o, "p1")).isEqualTo(big(20));
     }
+
+    // ---- item 24 e (MIAC): only activity types 04, 05, 06 and 07 ----------------------------------
+
+    @Test
+    void item24e_collectiveActivityOfTypes04To07CountsForCButOtherTypesDoNot() {
+        RuleOutcome accepted = withBase(
+                CanonicalFixtures.collectiveActivity("p1", d(2025, 12, 1), "80", "170", ENFERMEIRO, "4", List.of()));
+        RuleOutcome otherType = withBase(
+                CanonicalFixtures.collectiveActivity("p1", d(2025, 12, 1), "80", "170", ENFERMEIRO, "01", List.of()));
+        RuleOutcome noType = withBase(
+                CanonicalFixtures.collectiveActivity("p1", d(2025, 12, 1), "80", "170", ENFERMEIRO, null, List.of()));
+
+        assertThat(met(accepted, "p1", "C")).isTrue();
+        assertThat(met(otherType, "p1", "C")).isFalse();
+        assertThat(met(noType, "p1", "C")).isFalse();
+    }
 }

@@ -465,4 +465,24 @@ class C4CohortTest {
                 null,
                 null);
     }
+
+    // ---- item 5: the problem list also needs médico/enfermeiro (CanonicalCondition.cbo) --------
+
+    @Test
+    void t_c4_26_problemListConditionEvaluatedByDentistDoesNotEnter() {
+        RuleOutcome o = ungated(data().add(registration("p1", LINKED_ON, INE_ESF))
+                .add(CanonicalFixtures.conditionEvaluatedBy("p1", "CID10", "E11", DIAGNOSED_ON, ACTIVE, DENTISTA))
+                .build());
+
+        assertThat(personRow(o, "p1").reasonCode()).isEqualTo(C4Reasons.NO_PROFESSIONAL_EVALUATION);
+    }
+
+    @Test
+    void item5_problemListConditionEvaluatedByNurseEnters() {
+        RuleOutcome o = ungated(data().add(registration("p1", LINKED_ON, INE_ESF))
+                .add(CanonicalFixtures.conditionEvaluatedBy("p1", "CIAP2", "T90", DIAGNOSED_ON, ACTIVE, ENFERMEIRO))
+                .build());
+
+        assertThat(isEligible(o, "p1")).isTrue();
+    }
 }

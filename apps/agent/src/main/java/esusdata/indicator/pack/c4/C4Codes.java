@@ -118,6 +118,9 @@ public final class C4Codes {
     public static final CboGroups CBO_F =
             CboGroups.of(MEDICO_2251, MEDICO_2252, MEDICO_2253, MEDICO_2231, ENFERMEIRO, "2234", "2236", "2239");
 
+    /** MIAC: «código 04, 05, 06 e 07, de forma específica ou compartilhada» (item 24 e, p. 3). */
+    public static final List<Integer> COLLECTIVE_ACTIVITY_TYPES = List.of(4, 5, 6, 7);
+
     /** «intervalo mínimo de 30 (trinta) dias» (item 16, p. 2), counted as date difference (AMB-C4-03). */
     public static final long MIN_VISIT_INTERVAL_DAYS = 30;
 

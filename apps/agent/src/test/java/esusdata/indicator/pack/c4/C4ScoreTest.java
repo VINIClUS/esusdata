@@ -312,6 +312,10 @@ class C4ScoreTest {
                     .extracting(ResultComponent::numerator)
                     .containsExactly(big(2), big(1), big(1), big(0), big(1), big(1));
             assertThat(r.components()).extracting(ResultComponent::denominator).containsOnly(big(2));
+            ResultComponent d = component(r, "D");
+            assertThat(d.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+            assertThat(d.value()).isNull();
+            assertThat(component(r, "A").status()).isEqualTo(IndicatorStatus.COMPUTED);
         }
         // No integral credit, no redistribution: no score per person, D informative.
         for (String key : List.of("x", "y")) {
@@ -319,7 +323,7 @@ class C4ScoreTest {
             assertThat(personRow(o, key).points()).isNull();
             EvidenceItem dRow = practiceRow(o, key, "D");
             assertThat(dRow.reasonCode()).isEqualTo(C4Reasons.PRACTICE_INFORMATIVE_EAP);
-            assertThat(dRow.decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+            assertThat(dRow.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
             assertThat(dRow.points()).isNull();
         }
         assertThat(met(o, "x", "A")).isTrue();
@@ -337,9 +341,9 @@ class C4ScoreTest {
                 .build();
 
         RuleOutcome o = ungated(data);
-        // D observed as met for "v": counted as observed (20), still informative, still no score.
+        // D observed for "v": counted in the component, but the ficha does not decide it — no points.
         EvidenceItem vD = practiceRow(o, "v", "D");
-        assertThat(vD.decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(vD.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
         assertThat(vD.reasonCode()).isEqualTo(C4Reasons.PRACTICE_INFORMATIVE_EAP);
         assertThat(vD.points()).isNull();
         assertThat(o.result().numerator()).isNull(); // no score composed: no credit, no redistribution

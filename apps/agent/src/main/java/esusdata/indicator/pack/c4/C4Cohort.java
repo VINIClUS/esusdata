@@ -24,8 +24,8 @@ import java.util.TreeSet;
  * individual registration (§1.7.3 — never by the latest encounter), and not interrupted.
  *
  * <p>The evaluation qualifies through the problem list ({@code condition_list}, professional basis,
- * no CBO in the source — S-C4-01) or through an individual encounter by a médico/enfermeiro read in
- * the 12-month window. Every person with any diabetes signal is a candidate, so the evidence
+ * evaluated by a médico/enfermeiro since 2013) or through an individual encounter by a médico/enfermeiro
+ * read in the 12-month window. Every person with any diabetes signal is a candidate, so the evidence
  * rebuilds the population including who was left out and why (ENG-36). Exclusions are checked in a
  * fixed order: no qualifying evaluation, death, change of territory, no link, team type outside 70/76,
  * all conditions resolved.
@@ -133,7 +133,7 @@ final class C4Cohort {
         if (!C4Codes.BASIS_PROFESSIONAL.equals(condition.basis()) || recorded.isAfter(cutoff)) {
             return;
         }
-        if (!recorded.isBefore(C4Codes.EVALUATED_SINCE)) {
+        if (!recorded.isBefore(C4Codes.EVALUATED_SINCE) && C4Codes.CBO_CONDITION.matches(condition.cbo())) {
             evaluated.add(condition.personKey());
         }
         String problem = condition.codeSystem() + ':' + C4Codes.normalized(condition.code());

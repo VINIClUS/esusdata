@@ -191,7 +191,8 @@ final class C4Data {
                 recorded.toString(),
                 status,
                 resolved == null ? null : resolved.toString(),
-                basis);
+                basis,
+                "PROFESSIONAL".equals(basis) ? MEDICO : null);
     }
 
     /** An individual consultation (MIAI) with one non-diabetes problem evaluated (AMB-C4-05). */
@@ -363,7 +364,9 @@ final class C4Data {
                 sys,
                 dia,
                 cbo,
-                "MIAC");
+                "MIAC",
+                "05",
+                List.of());
     }
 
     static CanonicalMeasurement bloodPressureMeasurement(String key, LocalDate date, String cbo) {
@@ -434,7 +437,8 @@ final class C4Data {
         List<EvidenceItem> rows = rowsOf(outcome, key).stream()
                 .filter(e -> code.equals(e.component()))
                 .filter(e -> e.decision() == EvidenceDecision.PRACTICE_MET
-                        || e.decision() == EvidenceDecision.PRACTICE_NOT_MET)
+                        || e.decision() == EvidenceDecision.PRACTICE_NOT_MET
+                        || e.decision() == EvidenceDecision.PRACTICE_AMBIGUOUS)
                 .toList();
         if (rows.size() != 1) {
             throw new AssertionError("expected exactly one practice " + code + " row for " + key + ", got " + rows);
