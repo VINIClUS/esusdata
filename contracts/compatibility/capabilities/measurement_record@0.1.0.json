@@ -1,7 +1,7 @@
 {
   "capability": "measurement_record",
   "adapter_version": "0.1.0",
-  "description": "Peso, altura e PA registrados fora de um atendimento: ficha de procedimentos (MIP, inclusive a escuta inicial de nível médio) e participantes de atividade coletiva (MIAC, sem PA); origin=MIP|MIAC.",
+  "description": "Peso, altura e PA registrados fora de um atendimento: ficha de procedimentos (MIP, inclusive a escuta inicial de nível médio) e participantes de atividade coletiva (MIAC, sem PA); origin=MIP|MIAC. MIAC traz o tipo de atividade e as práticas em saúde (códigos LEDI).",
   "record_kind": "measurement",
   "entity_type_column": "source_entity_type",
   "record_id_column": "source_record_id",
@@ -85,6 +85,16 @@
       "name": "origin",
       "type": "text",
       "required": true
+    },
+    {
+      "name": "activity_type_code",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "health_practice_codes",
+      "type": "text[]",
+      "required": false
     }
   ]
 }

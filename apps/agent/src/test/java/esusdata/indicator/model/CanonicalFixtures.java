@@ -148,6 +148,27 @@ public final class CanonicalFixtures {
                 null);
     }
 
+    /**
+     * A vaccine dose applied on {@code applied} and typed in as a transcription (registro anterior)
+     * on {@code registered}.
+     */
+    public static CanonicalImmunization transcribedDose(
+            String key, LocalDate applied, LocalDate registered, String immunobiological, String dose) {
+        return new CanonicalImmunization(
+                ref("tb_fat_vacinacao_vacina"),
+                IBGE,
+                key,
+                applied.toString(),
+                immunobiological,
+                dose,
+                null,
+                true,
+                null,
+                null,
+                null,
+                registered.toString());
+    }
+
     /** A condition {@code code} of {@code system} (CIAP2/CID10) recorded on {@code date} with {@code status}. */
     public static CanonicalCondition condition(String key, String system, String code, LocalDate date, String status) {
         return new CanonicalCondition(
@@ -160,6 +181,49 @@ public final class CanonicalFixtures {
                 status,
                 null,
                 "PROFESSIONAL");
+    }
+
+    /** A condition evaluated in an individual encounter by a professional of occupation {@code cbo}. */
+    public static CanonicalCondition conditionEvaluatedBy(
+            String key, String system, String code, LocalDate date, String status, String cbo) {
+        return new CanonicalCondition(
+                ref("tb_fat_atd_ind_problemas"),
+                IBGE,
+                key,
+                system,
+                code,
+                date.toString(),
+                status,
+                null,
+                "PROFESSIONAL",
+                cbo);
+    }
+
+    /**
+     * A participant's weight and height in a collective activity (MIAC) of LEDI type {@code
+     * activityType} with the health practices {@code practices}, recorded by {@code cbo}.
+     */
+    public static CanonicalMeasurement collectiveActivity(
+            String key,
+            LocalDate date,
+            String weightKg,
+            String heightCm,
+            String cbo,
+            String activityType,
+            List<String> practices) {
+        return new CanonicalMeasurement(
+                ref("tb_fat_atvdd_coletiva_part"),
+                IBGE,
+                key,
+                date.toString(),
+                weightKg,
+                heightCm,
+                null,
+                null,
+                cbo,
+                "MIAC",
+                activityType,
+                practices);
     }
 
     /** Weight and height written outside an encounter (MIP or MIAC). */

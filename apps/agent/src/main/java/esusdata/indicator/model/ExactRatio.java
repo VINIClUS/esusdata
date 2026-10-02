@@ -39,6 +39,18 @@ public record ExactRatio(BigInteger numerator, BigInteger denominator) implement
         return numerator.signum() == 0;
     }
 
+    /**
+     * The same value in lowest terms ({@code 220/4} → {@code 55/1}), for when the fraction itself is
+     * shown or persisted; comparisons never need it.
+     */
+    public ExactRatio reduced() {
+        BigInteger divisor = numerator.gcd(denominator); // ≥ 1: the denominator is positive
+        if (divisor.equals(BigInteger.ONE)) {
+            return this;
+        }
+        return new ExactRatio(numerator.divide(divisor), denominator.divide(divisor));
+    }
+
     /** {@code this + other}, exact; the result is not reduced. */
     public ExactRatio plus(ExactRatio other) {
         return new ExactRatio(

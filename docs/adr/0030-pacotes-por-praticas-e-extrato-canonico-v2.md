@@ -107,6 +107,19 @@ por quadrimestre.
   financeira da transição (Portaria 10.994/2026) sai separada da metodológica.
 - A exportação CSV troca `valor_percentual` por `valor` + `unidade` (emenda à ADR 0024).
 
+### Emenda aditiva antes da fase B (2026-10-02)
+
+Pedidos das sessões dos pacotes, todos aditivos (os construtores antigos dos registros continuam):
+`EvidenceDecision.PRACTICE_AMBIGUOUS`; `cbo` de quem avaliou em `condition_list`/`CanonicalCondition`;
+`registration_date` em `immunization_history`/`CanonicalImmunization` (transcrição tardia);
+`activity_type_code` e `health_practice_codes` em `measurement_record`/`CanonicalMeasurement` (filtro de
+atividade coletiva das fichas); `ExactRatio.reduced()`. As convenções de códigos e vocabulários que as
+consultas entregam ficam no guia `docs/indicadores/como-adicionar.md` (códigos AB em `procedure_codes`,
+CID-10 pela categoria, códigos LEDI). Continuam como limitação, sem fonte documentada no DW ou sem
+ganho no resultado: tipo de equipe (L1), data de desfecho da gestação (L2 — o C3 pode ler a resolução
+da condição na lista de problemas), PA da visita (L6), marcação de puericultura (L7), procedimento por
+CBO sem lista SIGTAP e binds de código no `care_encounter` (só volume).
+
 ## O que isso afirma, e o que não afirma
 
 - Afirma que C2–C7 e a Nota Final são **calculáveis e auditáveis** com aritmética exata, com
