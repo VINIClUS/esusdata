@@ -67,7 +67,9 @@ public final class C4Pack implements IndicatorRule {
             "Fontes que o DW não tem ou não descreve: pressão arterial na visita domiciliar (L6) e na atividade"
                     + " coletiva (L5), o campo de avaliação dos pés do MIAI (AMB-C4-09), a tabela SIGTAP de habilitação de CBO (AMB-C4-08) e a"
                     + " lotação do profissional na equipe (AMB-C4-05 b). Consultas do MIP (03.01.01.003-0,"
-                    + " 03.01.01.006-4, 03.01.01.025-0) não são lidas nem comprovam a prática A.",
+                    + " 03.01.01.006-4, 03.01.01.025-0) não são lidas nem comprovam a prática A. Códigos SIGTAP/ABEX"
+                    + " vêm só dos procedimentos do MIAI e do MIP (nunca do MIAO), cada fato uma vez; a visita"
+                    + " domiciliar só conta por ACS/TACS com motivo preenchido (item 24 e).",
             "Corte de envio: o Siaps extrai no «20º dia útil de cada mês» (item 11) e só vê o que chegou até lá;"
                     + " a leitura local pode incluir registros enviados depois.",
             "Convenções provisórias da ficha, a confirmar na reconciliação: janelas de 6 e 12 meses civis até o"
@@ -187,7 +189,7 @@ public final class C4Pack implements IndicatorRule {
         SortedMap<String, List<Scored>> byTeam = new TreeMap<>();
         SortedMap<String, String> teamCnes = new TreeMap<>();
         for (Subject subject : C4Cohort.resolve(data, cutoff)) {
-            if (subject.link() != null && subject.link().ine() != null) {
+            if (subject.countsForTeam()) {
                 // a linked team keeps its row even when nobody of it is eligible (NO_DENOMINATOR, T-C4-36)
                 byTeam.computeIfAbsent(subject.link().ine(), k -> new ArrayList<>());
                 if (subject.link().cnes() != null) {

@@ -54,7 +54,7 @@ final class C4Cohort {
             .thenComparing(CanonicalCondition::sourceRef, RECORD_ORDER);
 
     private static final Comparator<CanonicalTeam> TEAM_ORDER = Comparator.comparing(
-                    (CanonicalTeam t) -> observedDate(t), Comparator.nullsFirst(Comparator.naturalOrder()))
+                    (CanonicalTeam t) -> observedDate(t))
             .thenComparing(CanonicalTeam::sourceRef, RECORD_ORDER);
 
     private final LocalDate cutoff;
@@ -68,10 +68,19 @@ final class C4Cohort {
     /** The team a person is linked to on the cutoff, with its CNES type when the source has it. */
     record Link(String ine, String cnes, String teamType) {}
 
-    /** A candidate: eligible when {@code exclusion} is {@code null}. */
-    record Subject(String personKey, Link link, String exclusion) {
+    /**
+     * A candidate: eligible when {@code exclusion} is {@code null}. {@code link} is the team of a
+     * usable registration (null without one); {@code unknownConditionStatus} flags a latest condition
+     * status outside the LEDI 0/1/2, kept as not resolved (AMB-C4-04).
+     */
+    record Subject(String personKey, Link link, String exclusion, boolean unknownConditionStatus) {
         boolean eligible() {
             return exclusion == null;
+        }
+
+        /** The team this candidate is counted under: a usable link of type 70, 76 or unknown. */
+        boolean countsForTeam() {
+            return link != null && !C4Reasons.TEAM_TYPE_OUT_OF_SCOPE.equals(exclusion);
         }
 
         boolean eap76() {
@@ -93,8 +102,8 @@ final class C4Cohort {
         List<Subject> subjects = new ArrayList<>(cohort.candidates.size());
         for (String key : cohort.candidates) {
             CanonicalRegistration registration = cohort.latestRegistration.get(key);
-            Link link = registration == null ? null : cohort.link(registration);
-            subjects.add(new Subject(key, link, cohort.exclusion(key, registration, link)));
+            Link link = linksToTeam(registration) ? cohort.link(registration) : null;
+            subjects.add(new Subject(key, link, cohort.exclusion(key, registration, link), cohort.unknownStatus(key)));
         }
         return subjects;
     }
@@ -176,9 +185,10 @@ final class C4Cohort {
         }
     }
 
+    /** A team type counts only when observed on or before the cutoff (§1.7.3); undated types never. */
     private void readTeam(CanonicalTeam team) {
         LocalDate observed = observedDate(team);
-        if (team.ine() != null && team.teamTypeCode() != null && (observed == null || !observed.isAfter(cutoff))) {
+        if (team.ine() != null && team.teamTypeCode() != null && observed != null && !observed.isAfter(cutoff)) {
             latestTeam.merge(team.ine(), team, (a, b) -> TEAM_ORDER.compare(a, b) >= 0 ? a : b);
         }
     }
@@ -206,6 +216,13 @@ final class C4Cohort {
             return false;
         }
         return problems.values().stream().allMatch(this::resolvedOnCutoff);
+    }
+
+    private boolean unknownStatus(String key) {
+        Map<String, CanonicalCondition> problems = latestCondition.get(key);
+        return problems != null
+                && problems.values().stream()
+                        .anyMatch(c -> c.status() == null || !C4Codes.CONDITION_STATUSES.contains(c.status()));
     }
 
     private boolean resolvedOnCutoff(CanonicalCondition condition) {

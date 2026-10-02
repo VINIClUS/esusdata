@@ -16,6 +16,7 @@ import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.model.SourceRef;
 import esusdata.indicator.model.TeamResult;
 import java.math.BigInteger;
 import java.time.LocalDate;
@@ -83,15 +84,20 @@ final class C4Data {
         }
 
         DatasetBuilder add(Record... records) {
-            for (Record r : records) {
-                builder.add(r);
-            }
-            return this;
+            return addAll(Arrays.asList(records));
         }
 
+        /**
+         * Adds the records; an encounter's SIGTAP/ABEX codes also arrive as procedure events of
+         * origin MIAI, as {@code exam_request_evaluation} and {@code procedure_performed} deliver
+         * them (one per encounter and code, so a repeated encounter repeats them too).
+         */
         DatasetBuilder addAll(List<? extends Record> records) {
             for (Record r : records) {
                 builder.add(r);
+                if (r instanceof CanonicalCareEvent e) {
+                    miaiProcedures(e).forEach(builder::add);
+                }
             }
             return this;
         }
@@ -195,6 +201,24 @@ final class C4Data {
                 "PROFESSIONAL".equals(basis) ? MEDICO : null);
     }
 
+    /** The procedure events the capabilities deliver for an encounter's code arrays (origin MIAI). */
+    static List<CanonicalProcedureEvent> miaiProcedures(CanonicalCareEvent e) {
+        List<CanonicalProcedureEvent> events = new ArrayList<>();
+        e.proceduresRequested().forEach(c -> events.add(miai(e, c, "REQUESTED")));
+        e.proceduresEvaluated().forEach(c -> events.add(miai(e, c, "EVALUATED")));
+        e.proceduresPerformed().forEach(c -> events.add(miai(e, c, "PERFORMED")));
+        return events;
+    }
+
+    private static CanonicalProcedureEvent miai(CanonicalCareEvent e, String code, String stage) {
+        SourceRef ref = new SourceRef(
+                e.sourceRef().sourceId(),
+                "tb_fat_atd_ind_procedimentos",
+                e.sourceRef().recordId() + "-" + stage + "-" + code);
+        return new CanonicalProcedureEvent(
+                ref, e.municipalityIbge(), e.personKey(), e.careDate(), code, stage, e.cbo(), null, null, "MIAI");
+    }
+
     /** An individual consultation (MIAI) with one non-diabetes problem evaluated (AMB-C4-05). */
     static CanonicalCareEvent consult(String key, LocalDate date, String cbo) {
         return care(key, date, cbo).ciap("K86").build();
@@ -217,6 +241,7 @@ final class C4Data {
         private final List<String> requested = new ArrayList<>();
         private final List<String> evaluated = new ArrayList<>();
         private final List<String> performed = new ArrayList<>();
+        private boolean noProblem;
         private String weight;
         private String height;
         private String systolic;
@@ -235,6 +260,12 @@ final class C4Data {
 
         CareBuilder form(String value) {
             this.form = value;
+            return this;
+        }
+
+        /** An encounter without any problem/condition evaluated (not an MIAI per item 24 e). */
+        CareBuilder noProblem() {
+            this.noProblem = true;
             return this;
         }
 
@@ -293,6 +324,9 @@ final class C4Data {
         }
 
         CanonicalCareEvent build() {
+            if (!noProblem && ciap.isEmpty() && cid.isEmpty()) {
+                ciap.add("A98"); // any problem/condition evaluated: the MIAI of item 24 e
+            }
             return new CanonicalCareEvent(
                     CanonicalFixtures.ref("tb_fat_atendimento_individual"),
                     municipality,
@@ -369,8 +403,21 @@ final class C4Data {
                 List.of());
     }
 
+    /** Blood pressure from the MIP (the MIAC carries no blood pressure, lacuna L5). */
     static CanonicalMeasurement bloodPressureMeasurement(String key, LocalDate date, String cbo) {
-        return measurement(key, date, cbo, null, null, "128", "82");
+        return new CanonicalMeasurement(
+                CanonicalFixtures.ref("tb_fat_proced_atend"),
+                IBGE,
+                key,
+                date.toString(),
+                null,
+                null,
+                "128",
+                "82",
+                cbo,
+                "MIP",
+                null,
+                List.of());
     }
 
     /** Records that meet A, B, C, E and F (one MIAI by a physician on 2026-02-10). */

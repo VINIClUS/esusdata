@@ -109,7 +109,7 @@ class C4PracticesTest {
 
     @Test
     void quadro02_consultWithoutAnEvaluatedProblemDoesNotMeetA() {
-        RuleOutcome o = withBase(care("p1", d(2026, 1, 12), MEDICO).build());
+        RuleOutcome o = withBase(care("p1", d(2026, 1, 12), MEDICO).noProblem().build());
 
         assertThat(met(o, "p1", "A")).isFalse();
     }
@@ -294,7 +294,7 @@ class C4PracticesTest {
         assertThat(points(o, "p1")).isEqualTo(big(20));
         assertThat(supporting(o, "p1", "D"))
                 .extracting(EvidenceItem::sourceRef)
-                .contains(first.sourceRef(), third.sourceRef());
+                .containsExactly(first.sourceRef(), third.sourceRef());
     }
 
     @Test

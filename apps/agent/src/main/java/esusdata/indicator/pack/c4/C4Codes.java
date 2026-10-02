@@ -1,6 +1,5 @@
 package esusdata.indicator.pack.c4;
 
-import esusdata.indicator.model.AgeAt.AnniversaryRule;
 import esusdata.indicator.model.CboGroups;
 import java.time.LocalDate;
 import java.util.List;
@@ -60,6 +59,9 @@ public final class C4Codes {
     /** SIGTAP codes bound to {@code procedure_performed} (Quadros 03, 04, 06 e 07). */
     public static final List<String> PROCEDURE_CODES =
             List.of(BLOOD_PRESSURE, ANTHROPOMETRY, WEIGHT, HEIGHT, HBA1C, HBA1C_ABEX, DIABETIC_FOOT);
+
+    /** Practice C's SIGTAP codes (Quadro 04, p. 5). */
+    public static final List<String> ANTHROPOMETRY_CODES = List.of(ANTHROPOMETRY, WEIGHT, HEIGHT);
 
     /** Exams bound to {@code exam_request_evaluation}: «solicitada ou avaliada» (Quadro 06, p. 6). */
     public static final List<String> EXAM_CODES = List.of(HBA1C, HBA1C_ABEX);
@@ -127,6 +129,9 @@ public final class C4Codes {
     /** LEDI {@code SituacaoProblemasCondicoes}: 0 Ativo, 1 Latente, 2 Resolvido (DW {@code tb_dim_situacao_problema}). */
     public static final String RESOLVED_STATUS = "2";
 
+    /** Every LEDI situação: 0 Ativo, 1 Latente, 2 Resolvido. */
+    public static final List<String> CONDITION_STATUSES = List.of("0", "1", RESOLVED_STATUS);
+
     /** LEDI {@code MotivoSaida} 135 Óbito (DW {@code tb_dim_tipo_saida_cadastro}). */
     public static final String EXIT_DEATH = "135";
 
@@ -140,13 +145,6 @@ public final class C4Codes {
 
     /** The team types the ficha considers (item 24 b, p. 2), checked only when the source has the type. */
     public static final List<String> TEAM_TYPES = List.of(ESF_TEAM_TYPE, EAP_TEAM_TYPE);
-
-    /**
-     * The anniversary convention the pack declares (ENG-27). C4 has no age criterion and its windows
-     * are whole civil months (AMB-C4-02), so no date ever lands on a day its month lacks; the
-     * convention is recorded so a future age or "N months before" reading cannot inherit one silently.
-     */
-    public static final AnniversaryRule ANNIVERSARY_RULE = AnniversaryRule.CLAMP_TO_MONTH_END;
 
     private static final Pattern SEPARATORS = Pattern.compile("[-.\\s]");
 

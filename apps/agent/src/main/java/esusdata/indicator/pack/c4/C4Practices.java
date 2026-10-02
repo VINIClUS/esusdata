@@ -8,12 +8,12 @@ import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CboGroups;
 import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.SourceRef;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -28,8 +28,14 @@ import java.util.function.Function;
  * prove each (Quadros 02–07, p. 4–6). A practice counts once however many events support it
  * (MET-32); identical source records support it once.
  *
+ * <p>Information models (item 24 e, p. 2–3): the MIAI fields (problem/condition, blood pressure,
+ * weight, height) come from the care event, which counts only with a problem/condition evaluated;
+ * SIGTAP and ABEX codes come only from procedure events of origin MIAI or MIP — one source per fact,
+ * never the care event's code arrays too, and never MIAO; MIAC from measurements of activity types
+ * 04–07; MIVDT from visits by ACS/TACS with a «motivo da visita».
+ *
  * <p>Windows are whole civil months ending on the last day of the competência (AMB-C4-02), and no
- * event after the cutoff counts.
+ * event after the cutoff counts. C4 has no age criterion, so no anniversary convention applies.
  */
 final class C4Practices {
 
@@ -39,6 +45,19 @@ final class C4Practices {
     static final String D = "D";
     static final String E = "E";
     static final String F = "F";
+
+    static final String MIAI = "MIAI";
+    static final String MIP = "MIP";
+    static final String MIAC = "MIAC";
+    static final String MIVDT = "MIVDT";
+
+    private static final String PERFORMED = "PERFORMED";
+
+    /** «Modelo de Informação de Procedimento» and procedures of the MIAI (Quadros 03, 04, 06 e 07). */
+    private static final List<String> PROCEDURE_MODELS = List.of(MIAI, MIP);
+
+    /** «solicitada ou avaliada» (Quadro 06, p. 6) and the MIP's performed dosage. */
+    private static final List<String> EXAM_STAGES = List.of("REQUESTED", "EVALUATED", PERFORMED);
 
     private static final Comparator<Support> SUPPORT_ORDER = Comparator.comparing(Support::date)
             .thenComparing(s -> s.sourceRef().entityType())
@@ -51,8 +70,8 @@ final class C4Practices {
     private final DateWindow sixMonths;
     private final DateWindow twelveMonths;
 
-    /** One source event that supports a practice. */
-    record Support(SourceRef sourceRef, LocalDate date, String cbo) {}
+    /** One source event that supports a practice, with the information model it came from. */
+    record Support(SourceRef sourceRef, LocalDate date, String cbo, String model) {}
 
     /** A practice's decision for one person, with the events behind a met practice. */
     record Outcome(boolean met, List<Support> supports) {}
@@ -71,16 +90,25 @@ final class C4Practices {
         return "INDIVIDUAL".equals(event.form());
     }
 
+    /** MIAI as item 24 e defines it: «com identificação do Problema/Condição Avaliada». */
+    static boolean isMiai(CanonicalCareEvent event) {
+        return isIndividualCare(event)
+                && (!event.ciapCodes().isEmpty() || !event.cidCodes().isEmpty());
+    }
+
     /**
      * A measurement outside an encounter: MIP always; MIAC only for the activity types «04, 05, 06 e
      * 07» (item 24 e, p. 3), compared as numbers so {@code 4} and {@code 04} are the same code.
      */
     static boolean acceptedMeasurement(CanonicalMeasurement m) {
-        if (!"MIAC".equals(m.origin())) {
+        if (MIP.equals(m.origin())) {
             return true;
         }
         String type = m.activityTypeCode();
-        if (type == null || type.isBlank() || !type.chars().allMatch(Character::isDigit)) {
+        if (!MIAC.equals(m.origin())
+                || type == null
+                || type.isBlank()
+                || !type.chars().allMatch(Character::isDigit)) {
             return false;
         }
         return C4Codes.COLLECTIVE_ACTIVITY_TYPES.contains(Integer.parseInt(type));
@@ -91,51 +119,51 @@ final class C4Practices {
         SortedMap<String, Outcome> outcomes = new TreeMap<>();
         List<CanonicalCareEvent> care = careEvents.getOrDefault(personKey, List.of());
         List<CanonicalProcedureEvent> proc = procedures.getOrDefault(personKey, List.of());
+        List<CanonicalMeasurement> measured = measurements.getOrDefault(personKey, List.of());
+        List<CanonicalHomeVisit> personVisits = visits.getOrDefault(personKey, List.of());
         outcomes.put(A, atLeastOne(consultations(care)));
-        outcomes.put(B, atLeastOne(bloodPressure(care, proc, measurements.getOrDefault(personKey, List.of()))));
-        outcomes.put(C, anthropometry(care, proc, personKey));
-        outcomes.put(D, homeVisits(visits.getOrDefault(personKey, List.of())));
-        outcomes.put(E, atLeastOne(glycatedHemoglobin(care, proc)));
-        outcomes.put(F, atLeastOne(diabeticFoot(care, proc)));
+        outcomes.put(B, atLeastOne(bloodPressure(care, proc, measured)));
+        outcomes.put(C, anthropometry(care, proc, measured, personVisits));
+        outcomes.put(D, homeVisits(personVisits));
+        outcomes.put(E, atLeastOne(procedureSupports(proc, C4Codes.EXAM_CODES, EXAM_STAGES, C4Codes.CBO_E)));
+        outcomes.put(
+                F,
+                atLeastOne(procedureSupports(proc, List.of(C4Codes.DIABETIC_FOOT), List.of(PERFORMED), C4Codes.CBO_F)));
         return outcomes;
     }
 
-    /** A — Quadro 02: MIAI by médico/enfermeiro with a problem/condition evaluated (AMB-C4-05). */
+    /** A — Quadro 02: MIAI by médico/enfermeiro, presential or remote (AMB-C4-05). */
     private List<Support> consultations(List<CanonicalCareEvent> care) {
         List<Support> supports = new ArrayList<>();
         for (CanonicalCareEvent e : care) {
-            boolean evaluatedProblem = !e.ciapCodes().isEmpty() || !e.cidCodes().isEmpty();
-            if (isIndividualCare(e) && evaluatedProblem && valid(sixMonths, C4Codes.CBO_A, e.careDate(), e.cbo())) {
+            if (isMiai(e) && accepted(sixMonths, C4Codes.CBO_A, e.careDate(), e.cbo())) {
                 supports.add(support(e));
             }
         }
         return supports;
     }
 
-    /** B — Quadro 03: the PEC's blood-pressure field or SIGTAP 03.01.10.003-9. */
+    /** B — Quadro 03: the PEC's blood-pressure field (MIAI, MIP, MIAC) or SIGTAP 03.01.10.003-9. */
     private List<Support> bloodPressure(
             List<CanonicalCareEvent> care, List<CanonicalProcedureEvent> proc, List<CanonicalMeasurement> measured) {
         List<Support> supports = new ArrayList<>();
         for (CanonicalCareEvent e : care) {
-            boolean measuredHere = hasBoth(e.systolicMmhg(), e.diastolicMmhg())
-                    || e.proceduresPerformed().contains(C4Codes.BLOOD_PRESSURE);
-            if (isIndividualCare(e) && measuredHere && valid(sixMonths, C4Codes.CBO_B, e.careDate(), e.cbo())) {
+            if (isMiai(e)
+                    && positive(e.systolicMmhg())
+                    && positive(e.diastolicMmhg())
+                    && accepted(sixMonths, C4Codes.CBO_B, e.careDate(), e.cbo())) {
                 supports.add(support(e));
-            }
-        }
-        for (CanonicalProcedureEvent p : proc) {
-            if (C4Codes.BLOOD_PRESSURE.equals(p.sigtapCode())
-                    && valid(sixMonths, C4Codes.CBO_B, p.eventDate(), p.cbo())) {
-                supports.add(support(p));
             }
         }
         for (CanonicalMeasurement m : measured) {
             if (acceptedMeasurement(m)
-                    && hasBoth(m.systolicMmhg(), m.diastolicMmhg())
-                    && valid(sixMonths, C4Codes.CBO_B, m.measuredDate(), m.cbo())) {
+                    && positive(m.systolicMmhg())
+                    && positive(m.diastolicMmhg())
+                    && accepted(sixMonths, C4Codes.CBO_B, m.measuredDate(), m.cbo())) {
                 supports.add(support(m));
             }
         }
+        supports.addAll(sigtap(proc, List.of(C4Codes.BLOOD_PRESSURE), List.of(PERFORMED), C4Codes.CBO_B, sixMonths));
         return supports;
     }
 
@@ -143,36 +171,44 @@ final class C4Practices {
      * C — Quadro 04: weight and height «Registros realizados no mesmo dia», from any accepted
      * records of that civil date, or SIGTAP 01.01.04.002-4 alone (AMB-C4-07).
      */
-    private Outcome anthropometry(List<CanonicalCareEvent> care, List<CanonicalProcedureEvent> proc, String key) {
+    private Outcome anthropometry(
+            List<CanonicalCareEvent> care,
+            List<CanonicalProcedureEvent> proc,
+            List<CanonicalMeasurement> measured,
+            List<CanonicalHomeVisit> personVisits) {
         Map<LocalDate, AnthropometryDay> days = new HashMap<>();
-        for (CanonicalCareEvent e : care) {
-            if (isIndividualCare(e) && valid(twelveMonths, C4Codes.CBO_C, e.careDate(), e.cbo())) {
-                Support s = support(e);
-                day(days, s).mark(s, e.weightKg() != null, e.heightCm() != null, false);
-                day(days, s).markProcedures(s, e.proceduresPerformed());
-            }
-        }
+        fieldMeasures(days, care, measured, personVisits);
         for (CanonicalProcedureEvent p : proc) {
-            if (valid(twelveMonths, C4Codes.CBO_C, p.eventDate(), p.cbo())) {
-                Support s = support(p);
-                day(days, s).markProcedures(s, List.of(p.sigtapCode()));
-            }
-        }
-        for (CanonicalMeasurement m : measurements.getOrDefault(key, List.of())) {
-            if (acceptedMeasurement(m) && valid(twelveMonths, C4Codes.CBO_C, m.measuredDate(), m.cbo())) {
-                Support s = support(m);
-                day(days, s).mark(s, m.weightKg() != null, m.heightCm() != null, false);
-            }
-        }
-        for (CanonicalHomeVisit v : visits.getOrDefault(key, List.of())) {
-            if (valid(twelveMonths, C4Codes.CBO_C, v.visitDate(), v.cbo())) {
-                Support s = support(v);
-                day(days, s).mark(s, v.weightKg() != null, v.heightCm() != null, false);
+            if (procedureAccepted(p, C4Codes.ANTHROPOMETRY_CODES, List.of(PERFORMED), C4Codes.CBO_C, twelveMonths)) {
+                day(days, support(p)).procedure(p.sigtapCode());
             }
         }
         List<Support> supports = new ArrayList<>();
         days.values().stream().filter(AnthropometryDay::complete).forEach(d -> supports.addAll(d.supports.values()));
         return atLeastOne(supports);
+    }
+
+    /** C — weight and height written in the PEC's own fields of the MIAI, MIP/MIAC and MIVDT. */
+    private void fieldMeasures(
+            Map<LocalDate, AnthropometryDay> days,
+            List<CanonicalCareEvent> care,
+            List<CanonicalMeasurement> measured,
+            List<CanonicalHomeVisit> personVisits) {
+        for (CanonicalCareEvent e : care) {
+            if (isMiai(e) && accepted(twelveMonths, C4Codes.CBO_C, e.careDate(), e.cbo())) {
+                day(days, support(e)).measures(e.weightKg(), e.heightCm());
+            }
+        }
+        for (CanonicalMeasurement m : measured) {
+            if (acceptedMeasurement(m) && accepted(twelveMonths, C4Codes.CBO_C, m.measuredDate(), m.cbo())) {
+                day(days, support(m)).measures(m.weightKg(), m.heightCm());
+            }
+        }
+        for (CanonicalHomeVisit v : personVisits) {
+            if (isMivdt(v) && accepted(twelveMonths, C4Codes.CBO_D, v.visitDate(), v.cbo())) {
+                day(days, support(v)).measures(v.weightKg(), v.heightCm());
+            }
+        }
     }
 
     /**
@@ -182,7 +218,7 @@ final class C4Practices {
     private Outcome homeVisits(List<CanonicalHomeVisit> personVisits) {
         List<Support> eligibleVisits = new ArrayList<>();
         for (CanonicalHomeVisit v : personVisits) {
-            if (!v.reasonCodes().isEmpty() && valid(twelveMonths, C4Codes.CBO_D, v.visitDate(), v.cbo())) {
+            if (isMivdt(v) && accepted(twelveMonths, C4Codes.CBO_D, v.visitDate(), v.cbo())) {
                 eligibleVisits.add(support(v));
             }
         }
@@ -196,47 +232,55 @@ final class C4Practices {
         return met ? new Outcome(true, List.of(first, last)) : new Outcome(false, List.of());
     }
 
-    /** E — Quadro 06: HbA1c requested or evaluated (02.02.01.050-3 or ABEX008), AMB-C4-11. */
-    private List<Support> glycatedHemoglobin(List<CanonicalCareEvent> care, List<CanonicalProcedureEvent> proc) {
-        List<Support> supports = new ArrayList<>();
-        for (CanonicalCareEvent e : care) {
-            boolean hba1c = containsAny(e.proceduresRequested(), C4Codes.EXAM_CODES)
-                    || containsAny(e.proceduresEvaluated(), C4Codes.EXAM_CODES)
-                    || containsAny(e.proceduresPerformed(), C4Codes.EXAM_CODES);
-            if (isIndividualCare(e) && hba1c && valid(twelveMonths, C4Codes.CBO_E, e.careDate(), e.cbo())) {
-                supports.add(support(e));
-            }
-        }
-        supports.addAll(procedureSupports(proc, C4Codes.EXAM_CODES, C4Codes.CBO_E));
-        return supports;
+    /** E and F — Quadros 06 e 07: SIGTAP/ABEX codes of the 12-month window. */
+    private List<Support> procedureSupports(
+            List<CanonicalProcedureEvent> proc, List<String> codes, List<String> stages, CboGroups cbo) {
+        return sigtap(proc, codes, stages, cbo, twelveMonths);
     }
 
-    /** F — Quadro 07: «Exame do pé diabético» 03.01.04.009-5 (the MIAI field is AMB-C4-09). */
-    private List<Support> diabeticFoot(List<CanonicalCareEvent> care, List<CanonicalProcedureEvent> proc) {
-        List<Support> supports = new ArrayList<>();
-        for (CanonicalCareEvent e : care) {
-            if (isIndividualCare(e)
-                    && e.proceduresPerformed().contains(C4Codes.DIABETIC_FOOT)
-                    && valid(twelveMonths, C4Codes.CBO_F, e.careDate(), e.cbo())) {
-                supports.add(support(e));
-            }
-        }
-        supports.addAll(procedureSupports(proc, List.of(C4Codes.DIABETIC_FOOT), C4Codes.CBO_F));
-        return supports;
-    }
-
-    private List<Support> procedureSupports(List<CanonicalProcedureEvent> proc, List<String> codes, CboGroups cbo) {
+    private static List<Support> sigtap(
+            List<CanonicalProcedureEvent> proc,
+            List<String> codes,
+            List<String> stages,
+            CboGroups cbo,
+            DateWindow window) {
         List<Support> supports = new ArrayList<>();
         for (CanonicalProcedureEvent p : proc) {
-            if (codes.contains(p.sigtapCode()) && valid(twelveMonths, cbo, p.eventDate(), p.cbo())) {
+            if (procedureAccepted(p, codes, stages, cbo, window)) {
                 supports.add(support(p));
             }
         }
         return supports;
     }
 
-    private static boolean valid(DateWindow window, CboGroups cbo, String date, String occupation) {
+    /** A procedure of the MIAI or MIP (never MIAO) in an accepted stage, code, CBO and window. */
+    private static boolean procedureAccepted(
+            CanonicalProcedureEvent p, List<String> codes, List<String> stages, CboGroups cbo, DateWindow window) {
+        return PROCEDURE_MODELS.contains(p.origin())
+                && stages.contains(p.stage())
+                && codes.contains(p.sigtapCode())
+                && accepted(window, cbo, p.eventDate(), p.cbo());
+    }
+
+    /** MIVDT: «com preenchimento do ‘‘motivo da visita’’» (item 24 e, p. 3). */
+    private static boolean isMivdt(CanonicalHomeVisit v) {
+        return v.reasonCodes().stream().anyMatch(r -> r != null && !r.isBlank());
+    }
+
+    private static boolean accepted(DateWindow window, CboGroups cbo, String date, String occupation) {
         return cbo.matches(occupation) && window.contains(LocalDate.parse(date));
+    }
+
+    /** A measured value is present when it is a positive number; blank, zero or garbage is absent. */
+    static boolean positive(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        try {
+            return new BigDecimal(value.trim()).signum() > 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     private static Outcome atLeastOne(List<Support> supports) {
@@ -253,32 +297,24 @@ final class C4Practices {
         return unique.values().stream().sorted(SUPPORT_ORDER).toList();
     }
 
-    private static boolean hasBoth(String first, String second) {
-        return first != null && second != null;
-    }
-
-    private static boolean containsAny(List<String> values, List<String> codes) {
-        return !Collections.disjoint(values, codes);
-    }
-
     private static Support support(CanonicalCareEvent e) {
-        return new Support(e.sourceRef(), LocalDate.parse(e.careDate()), e.cbo());
+        return new Support(e.sourceRef(), LocalDate.parse(e.careDate()), e.cbo(), MIAI);
     }
 
     private static Support support(CanonicalMeasurement m) {
-        return new Support(m.sourceRef(), LocalDate.parse(m.measuredDate()), m.cbo());
+        return new Support(m.sourceRef(), LocalDate.parse(m.measuredDate()), m.cbo(), m.origin());
     }
 
     private static Support support(CanonicalHomeVisit v) {
-        return new Support(v.sourceRef(), LocalDate.parse(v.visitDate()), v.cbo());
+        return new Support(v.sourceRef(), LocalDate.parse(v.visitDate()), v.cbo(), MIVDT);
     }
 
     private static Support support(CanonicalProcedureEvent p) {
-        return new Support(p.sourceRef(), LocalDate.parse(p.eventDate()), p.cbo());
+        return new Support(p.sourceRef(), LocalDate.parse(p.eventDate()), p.cbo(), p.origin());
     }
 
     private static AnthropometryDay day(Map<LocalDate, AnthropometryDay> days, Support s) {
-        return days.computeIfAbsent(s.date(), d -> new AnthropometryDay());
+        return days.computeIfAbsent(s.date(), d -> new AnthropometryDay()).with(s);
     }
 
     private static DateWindow upTo(DateWindow window, LocalDate cutoff) {
@@ -300,25 +336,31 @@ final class C4Practices {
     /** What one civil date holds toward practice C. */
     private static final class AnthropometryDay {
         private final Map<SourceRef, Support> supports = new LinkedHashMap<>();
+        private Support current;
         private boolean weight;
         private boolean height;
         private boolean assessment;
 
-        void mark(Support s, boolean hasWeight, boolean hasHeight, boolean hasAssessment) {
+        AnthropometryDay with(Support s) {
+            current = s;
+            return this;
+        }
+
+        void measures(String weightKg, String heightCm) {
+            mark(positive(weightKg), positive(heightCm), false);
+        }
+
+        void procedure(String code) {
+            mark(C4Codes.WEIGHT.equals(code), C4Codes.HEIGHT.equals(code), C4Codes.ANTHROPOMETRY.equals(code));
+        }
+
+        private void mark(boolean hasWeight, boolean hasHeight, boolean hasAssessment) {
             if (hasWeight || hasHeight || hasAssessment) {
-                supports.putIfAbsent(s.sourceRef(), s);
+                supports.putIfAbsent(current.sourceRef(), current);
             }
             weight |= hasWeight;
             height |= hasHeight;
             assessment |= hasAssessment;
-        }
-
-        void markProcedures(Support s, List<String> codes) {
-            mark(
-                    s,
-                    codes.contains(C4Codes.WEIGHT),
-                    codes.contains(C4Codes.HEIGHT),
-                    codes.contains(C4Codes.ANTHROPOMETRY));
         }
 
         boolean complete() {

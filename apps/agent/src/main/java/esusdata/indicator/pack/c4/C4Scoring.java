@@ -37,6 +37,10 @@ final class C4Scoring {
             + " ficam exibidas separadamente e o escore fica indisponível até a reconciliação com o Siaps (MET-23,"
             + " P07).";
 
+    /** AMB-C4-04: a status outside 0/1/2 is diagnosed, not converted silently. */
+    static final String UNKNOWN_STATUS = "AMB-C4-04: %d pessoa(s) do denominador com situação de condição nula ou"
+            + " fora de 0/1/2 (LEDI) mantida(s) como não resolvida(s); a confirmar no Portão C.";
+
     /** One eligible person with the decision of every practice. */
     record Scored(Subject subject, SortedMap<String, Outcome> outcomes) {
 
@@ -61,6 +65,40 @@ final class C4Scoring {
             total = total.add(p.observedPoints(specs));
         }
         boolean eap76 = people.stream().anyMatch(Scored::eap76);
+        Optional<ExactRatio> mean = Scores.meanPoints(total, subjects);
+        IndicatorStatus status = status(mean, eap76);
+        ExactRatio value = status == IndicatorStatus.COMPUTED ? mean.orElseThrow() : null;
+        Optional<ExactRatio> shown = Optional.ofNullable(value);
+        // AMB-C4-01: «não compor escore» — no sum of points while the eAP 76 reading is open
+        BigInteger numerator = status == IndicatorStatus.RULE_AMBIGUITY ? null : total;
+        return new IndicatorResult(
+                status,
+                shown.map(v -> v.toScaledBigDecimal(4).toPlainString()).orElse(null),
+                numerator,
+                subjects,
+                descriptor.denominatorKind(),
+                shown.flatMap(Bands.QUALIDADE_C2_C7::classify).orElse(null),
+                context.referencePeriod(),
+                descriptor.ruleVersion(),
+                context.dataCutoff().toString(),
+                context.municipalityIbge(),
+                limitations(descriptor, people, status),
+                descriptor.calculationPolicyVersion(),
+                descriptor.valueKind(),
+                value,
+                components(specs, people, subjects, eap76),
+                true);
+    }
+
+    private static IndicatorStatus status(Optional<ExactRatio> mean, boolean eap76) {
+        if (mean.isEmpty()) {
+            return IndicatorStatus.NO_DENOMINATOR;
+        }
+        return eap76 ? IndicatorStatus.RULE_AMBIGUITY : IndicatorStatus.COMPUTED;
+    }
+
+    private static List<ResultComponent> components(
+            List<ComponentSpec> specs, List<Scored> people, BigInteger subjects, boolean eap76) {
         List<ResultComponent> components = new ArrayList<>(specs.size());
         for (ComponentSpec spec : specs) {
             long met = people.stream()
@@ -68,35 +106,22 @@ final class C4Scoring {
                     .count();
             components.add(component(spec, BigInteger.valueOf(met), subjects, eap76));
         }
-        List<String> limitations = new ArrayList<>(descriptor.standingLimitations());
-        Optional<ExactRatio> mean = Scores.meanPoints(total, subjects);
-        IndicatorStatus status = IndicatorStatus.COMPUTED;
-        if (mean.isEmpty()) {
-            status = IndicatorStatus.NO_DENOMINATOR;
-        } else if (eap76) {
-            status = IndicatorStatus.RULE_AMBIGUITY;
-            limitations.add(0, EAP_AMBIGUITY);
+        return components;
+    }
+
+    private static List<String> limitations(PackDescriptor descriptor, List<Scored> people, IndicatorStatus status) {
+        List<String> limitations = new ArrayList<>();
+        if (status == IndicatorStatus.RULE_AMBIGUITY) {
+            limitations.add(EAP_AMBIGUITY);
         }
-        ExactRatio value = status == IndicatorStatus.COMPUTED ? mean.orElseThrow() : null;
-        // AMB-C4-01: «não compor escore» — no sum of points while the eAP 76 reading is open
-        BigInteger numerator = status == IndicatorStatus.RULE_AMBIGUITY ? null : total;
-        return new IndicatorResult(
-                status,
-                value == null ? null : value.toScaledBigDecimal(4).toPlainString(),
-                numerator,
-                subjects,
-                descriptor.denominatorKind(),
-                value == null ? null : Bands.QUALIDADE_C2_C7.classify(value).orElse(null),
-                context.referencePeriod(),
-                descriptor.ruleVersion(),
-                context.dataCutoff().toString(),
-                context.municipalityIbge(),
-                limitations,
-                descriptor.calculationPolicyVersion(),
-                descriptor.valueKind(),
-                value,
-                components,
-                true);
+        long unknownStatus = people.stream()
+                .filter(p -> p.subject().unknownConditionStatus())
+                .count();
+        if (unknownStatus > 0) {
+            limitations.add(UNKNOWN_STATUS.formatted(unknownStatus));
+        }
+        limitations.addAll(descriptor.standingLimitations());
+        return limitations;
     }
 
     /** Practice D with eAP 76 people in it is undecided (AMB-C4-01): exact counts, no value. */
@@ -168,6 +193,6 @@ final class C4Scoring {
                 link == null ? null : link.cnes(),
                 link == null ? null : link.ine(),
                 support == null ? null : support.cbo(),
-                null);
+                support == null ? null : support.model());
     }
 }
