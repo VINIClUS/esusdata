@@ -47,6 +47,8 @@ import org.junit.jupiter.api.Test;
  */
 class C4PracticesTest {
 
+    private static final EvaluationContext FEB_2028 = EvaluationContext.endOfMonth(IBGE, YearMonth.of(2028, 2));
+
     /** The base person "p1" plus {@code records}, evaluated without the gate. */
     private static RuleOutcome withBase(Record... records) {
         return ungated(data().diabetic("p1").add(records).build());
@@ -450,8 +452,6 @@ class C4PracticesTest {
     }
 
     // ---- ENG-27: calendar boundaries without approximating months by days ------------------------
-
-    private static final EvaluationContext FEB_2028 = EvaluationContext.endOfMonth(IBGE, YearMonth.of(2028, 2));
 
     @Test
     void eng27_leapYearCutoffIsFebruary29AndEventsThatDayCount() {

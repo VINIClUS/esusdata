@@ -13,6 +13,7 @@ import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -39,15 +40,9 @@ final class C4Practices {
     static final String E = "E";
     static final String F = "F";
 
-    /** One source event that supports a practice. */
-    record Support(SourceRef sourceRef, LocalDate date, String cbo) {}
-
-    /** A practice's decision for one person, with the events behind a met practice. */
-    record Outcome(boolean met, List<Support> supports) {}
-
     private static final Comparator<Support> SUPPORT_ORDER = Comparator.comparing(Support::date)
             .thenComparing(s -> s.sourceRef().entityType())
-            .thenComparing(s -> s.sourceRef().recordId());
+            .thenComparing(Support::sourceRef, C4Cohort.RECORD_ORDER);
 
     private final Map<String, List<CanonicalCareEvent>> careEvents;
     private final Map<String, List<CanonicalProcedureEvent>> procedures;
@@ -55,6 +50,12 @@ final class C4Practices {
     private final Map<String, List<CanonicalMeasurement>> measurements;
     private final DateWindow sixMonths;
     private final DateWindow twelveMonths;
+
+    /** One source event that supports a practice. */
+    record Support(SourceRef sourceRef, LocalDate date, String cbo) {}
+
+    /** A practice's decision for one person, with the events behind a met practice. */
+    record Outcome(boolean met, List<Support> supports) {}
 
     C4Practices(CanonicalDataset data, YearMonth competencia, LocalDate cutoff) {
         this.careEvents = byPerson(data.careEvents(), CanonicalCareEvent::personKey);
@@ -116,7 +117,7 @@ final class C4Practices {
         for (CanonicalMeasurement m : measured) {
             if (hasBoth(m.systolicMmhg(), m.diastolicMmhg())
                     && valid(sixMonths, C4Codes.CBO_B, m.measuredDate(), m.cbo())) {
-                supports.add(new Support(m.sourceRef(), LocalDate.parse(m.measuredDate()), m.cbo()));
+                supports.add(support(m));
             }
         }
         return supports;
@@ -143,13 +144,13 @@ final class C4Practices {
         }
         for (CanonicalMeasurement m : measurements.getOrDefault(key, List.of())) {
             if (valid(twelveMonths, C4Codes.CBO_C, m.measuredDate(), m.cbo())) {
-                Support s = new Support(m.sourceRef(), LocalDate.parse(m.measuredDate()), m.cbo());
+                Support s = support(m);
                 day(days, s).mark(s, m.weightKg() != null, m.heightCm() != null, false);
             }
         }
         for (CanonicalHomeVisit v : visits.getOrDefault(key, List.of())) {
             if (valid(twelveMonths, C4Codes.CBO_C, v.visitDate(), v.cbo())) {
-                Support s = new Support(v.sourceRef(), LocalDate.parse(v.visitDate()), v.cbo());
+                Support s = support(v);
                 day(days, s).mark(s, v.weightKg() != null, v.heightCm() != null, false);
             }
         }
@@ -163,13 +164,13 @@ final class C4Practices {
      * first and last at least 30 days apart (AMB-C4-03), both in the 12-month window.
      */
     private Outcome homeVisits(List<CanonicalHomeVisit> personVisits) {
-        List<Support> valid = new ArrayList<>();
+        List<Support> eligibleVisits = new ArrayList<>();
         for (CanonicalHomeVisit v : personVisits) {
             if (!v.reasonCodes().isEmpty() && valid(twelveMonths, C4Codes.CBO_D, v.visitDate(), v.cbo())) {
-                valid.add(new Support(v.sourceRef(), LocalDate.parse(v.visitDate()), v.cbo()));
+                eligibleVisits.add(support(v));
             }
         }
-        List<Support> sorted = distinct(valid);
+        List<Support> sorted = distinct(eligibleVisits);
         if (sorted.size() < 2) {
             return new Outcome(false, List.of());
         }
@@ -241,16 +242,19 @@ final class C4Practices {
     }
 
     private static boolean containsAny(List<String> values, List<String> codes) {
-        for (String code : codes) {
-            if (values.contains(code)) {
-                return true;
-            }
-        }
-        return false;
+        return !Collections.disjoint(values, codes);
     }
 
     private static Support support(CanonicalCareEvent e) {
         return new Support(e.sourceRef(), LocalDate.parse(e.careDate()), e.cbo());
+    }
+
+    private static Support support(CanonicalMeasurement m) {
+        return new Support(m.sourceRef(), LocalDate.parse(m.measuredDate()), m.cbo());
+    }
+
+    private static Support support(CanonicalHomeVisit v) {
+        return new Support(v.sourceRef(), LocalDate.parse(v.visitDate()), v.cbo());
     }
 
     private static Support support(CanonicalProcedureEvent p) {

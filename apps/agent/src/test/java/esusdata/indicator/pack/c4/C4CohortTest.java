@@ -25,12 +25,17 @@ import static esusdata.indicator.pack.c4.C4Data.personRow;
 import static esusdata.indicator.pack.c4.C4Data.registration;
 import static esusdata.indicator.pack.c4.C4Data.resolvedCondition;
 import static esusdata.indicator.pack.c4.C4Data.rowsOf;
+import static esusdata.indicator.pack.c4.C4Data.team;
 import static esusdata.indicator.pack.c4.C4Data.ungated;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.indicator.model.CanonicalFixtures;
+import esusdata.indicator.model.CanonicalRegistration;
+import esusdata.indicator.model.CanonicalTeam;
 import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.model.SourceRef;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -397,5 +402,67 @@ class C4CohortTest {
             assertThat(personRow(o, key).points()).isNull();
         }
         assertThat(o.result().denominator()).isEqualTo(big(0));
+    }
+
+    // ---- item 24 b: only eSF 70 and eAP 76 teams, when the source has the type -------------------
+
+    @Test
+    void item24b_teamOfAnotherKnownTypeIsOutOfScope() {
+        String ine = "0000400001";
+        RuleOutcome o = ungated(data().add(registration("p1", LINKED_ON, ine))
+                .add(team(ine, CNES, "71"))
+                .add(activeCondition("p1", "CID10", "E11", DIAGNOSED_ON))
+                .build());
+
+        EvidenceItem row = personRow(o, "p1");
+        assertThat(row.decision()).isEqualTo(EvidenceDecision.EXCLUDED);
+        assertThat(row.reasonCode()).isEqualTo(C4Reasons.TEAM_TYPE_OUT_OF_SCOPE);
+        assertThat(o.result().denominator()).isEqualTo(big(0));
+    }
+
+    @Test
+    void item24b_teamTypeObservedAsATimestampIsRead() {
+        String ine = "0000400002";
+        RuleOutcome o = ungated(data().add(registration("p1", LINKED_ON, ine))
+                .add(new CanonicalTeam(
+                        CanonicalFixtures.ref("tb_dim_equipe"),
+                        CanonicalFixtures.IBGE,
+                        ine,
+                        CNES,
+                        "73",
+                        "2026-01-15T10:00:00Z"))
+                .add(activeCondition("p1", "CID10", "E11", DIAGNOSED_ON))
+                .build());
+
+        assertThat(personRow(o, "p1").reasonCode()).isEqualTo(C4Reasons.TEAM_TYPE_OUT_OF_SCOPE);
+    }
+
+    // ---- item 15 / §1.7.3: same-day registration versions, the newer source record wins -----------
+
+    @Test
+    void item15_sameDayVersionsAreOrderedByNumericRecordId() {
+        RuleOutcome o = ungated(data().add(sameDayRegistration("p1", "999", null))
+                .add(sameDayRegistration("p1", "1000", C4Codes.EXIT_TERRITORY_CHANGE))
+                .add(activeCondition("p1", "CID10", "E11", DIAGNOSED_ON))
+                .build());
+
+        assertThat(personRow(o, "p1").reasonCode()).isEqualTo(C4Reasons.TERRITORY_CHANGE);
+    }
+
+    private static CanonicalRegistration sameDayRegistration(String key, String recordId, String exitReason) {
+        return new CanonicalRegistration(
+                new SourceRef(CanonicalFixtures.SOURCE, "tb_fat_cad_individual", recordId),
+                CanonicalFixtures.IBGE,
+                key,
+                LINKED_ON.toString(),
+                CNES,
+                INE_ESF,
+                false,
+                false,
+                false,
+                exitReason,
+                null,
+                null,
+                null);
     }
 }

@@ -68,28 +68,28 @@ final class C4Data {
 
     // ---------------------------------------------------------------- dataset builder
 
-    static Data data() {
-        return new Data();
+    static DatasetBuilder data() {
+        return new DatasetBuilder();
     }
 
     /** A dataset builder that already knows the eSF 70 and eAP 76 teams (not INE_UNKNOWN). */
-    static final class Data {
+    static final class DatasetBuilder {
         private final CanonicalDataset.Builder builder = CanonicalDataset.builder();
 
-        private Data() {
+        private DatasetBuilder() {
             builder.add(team(INE_ESF, CNES, "70"));
             builder.add(team(INE_ESF_2, CNES_2, "70"));
             builder.add(team(INE_EAP, CNES, "76"));
         }
 
-        Data add(Record... records) {
+        DatasetBuilder add(Record... records) {
             for (Record r : records) {
                 builder.add(r);
             }
             return this;
         }
 
-        Data addAll(List<? extends Record> records) {
+        DatasetBuilder addAll(List<? extends Record> records) {
             for (Record r : records) {
                 builder.add(r);
             }
@@ -97,11 +97,11 @@ final class C4Data {
         }
 
         /** The base person: linked to eSF {@link #INE_ESF}, E11 evaluated in 2020 and active. */
-        Data diabetic(String key) {
+        DatasetBuilder diabetic(String key) {
             return diabetic(key, INE_ESF);
         }
 
-        Data diabetic(String key, String ine) {
+        DatasetBuilder diabetic(String key, String ine) {
             return add(registration(key, LINKED_ON, ine), activeCondition(key, "CID10", "E11", DIAGNOSED_ON));
         }
 
@@ -199,12 +199,12 @@ final class C4Data {
         return care(key, date, cbo).ciap("K86").build();
     }
 
-    static Care care(String key, LocalDate date, String cbo) {
-        return new Care(key, date, cbo);
+    static CareBuilder care(String key, LocalDate date, String cbo) {
+        return new CareBuilder(key, date, cbo);
     }
 
     /** Fluent builder for a care event (MIAI by default, presential, no codes). */
-    static final class Care {
+    static final class CareBuilder {
         private final String key;
         private final LocalDate date;
         private final String cbo;
@@ -221,73 +221,73 @@ final class C4Data {
         private String systolic;
         private String diastolic;
 
-        private Care(String key, LocalDate date, String cbo) {
+        private CareBuilder(String key, LocalDate date, String cbo) {
             this.key = key;
             this.date = date;
             this.cbo = cbo;
         }
 
-        Care municipality(String ibge) {
+        CareBuilder municipality(String ibge) {
             this.municipality = ibge;
             return this;
         }
 
-        Care form(String value) {
+        CareBuilder form(String value) {
             this.form = value;
             return this;
         }
 
-        Care remote() {
+        CareBuilder remote() {
             this.remote = true;
             return this;
         }
 
-        Care ciap(String... codes) {
+        CareBuilder ciap(String... codes) {
             ciap.addAll(Arrays.asList(codes));
             return this;
         }
 
-        Care cid(String... codes) {
+        CareBuilder cid(String... codes) {
             cid.addAll(Arrays.asList(codes));
             return this;
         }
 
-        Care requested(String... codes) {
+        CareBuilder requested(String... codes) {
             requested.addAll(Arrays.asList(codes));
             return this;
         }
 
-        Care evaluated(String... codes) {
+        CareBuilder evaluated(String... codes) {
             evaluated.addAll(Arrays.asList(codes));
             return this;
         }
 
-        Care performed(String... codes) {
+        CareBuilder performed(String... codes) {
             performed.addAll(Arrays.asList(codes));
             return this;
         }
 
-        Care weight(String kg) {
+        CareBuilder weight(String kg) {
             this.weight = kg;
             return this;
         }
 
-        Care height(String cm) {
+        CareBuilder height(String cm) {
             this.height = cm;
             return this;
         }
 
-        Care weightAndHeight() {
+        CareBuilder weightAndHeight() {
             return weight("82.5").height("168");
         }
 
-        Care bloodPressure(String sys, String dia) {
+        CareBuilder bloodPressure(String sys, String dia) {
             this.systolic = sys;
             this.diastolic = dia;
             return this;
         }
 
-        Care bloodPressure() {
+        CareBuilder bloodPressure() {
             return bloodPressure("130", "80");
         }
 

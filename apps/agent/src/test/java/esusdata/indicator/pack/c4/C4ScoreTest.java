@@ -277,17 +277,17 @@ class C4ScoreTest {
 
     @Test
     void t_c4_36_teamWithoutEligiblePeopleHasNoValue() {
-        // Contract: team results exist only for INEs of eligible people, so the team has no row at
-        // all and the municipal result is NO_DENOMINATOR (the transcription expects NO_DENOMINATOR
-        // for the team itself).
+        // The team the interrupted person was linked to keeps its row, without a value.
         RuleOutcome o = ungated(data().diabetic("moved")
                 .add(exitRegistration("moved", d(2026, 1, 5), INE_ESF, C4Codes.EXIT_TERRITORY_CHANGE))
                 .build());
 
         assertThat(o.result().status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
         assertThat(o.result().valueText()).isNull();
-        assertThat(o.teams())
-                .noneMatch(t -> INE_ESF.equals(t.ine()) && t.result().status() == IndicatorStatus.COMPUTED);
+        IndicatorResult team = teamOf(o, INE_ESF).result();
+        assertThat(team.status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
+        assertThat(team.valueText()).isNull();
+        assertThat(team.denominator()).isEqualTo(big(0));
     }
 
     // ---- T-C4-30 / MET-23 / AMB-C4-01: eAP 76 -----------------------------------------------------
@@ -305,7 +305,7 @@ class C4ScoreTest {
             assertThat(r.valueText()).isNull();
             assertThat(r.valueExact()).isNull();
             assertThat(r.classification()).isNull();
-            assertThat(r.numerator()).isEqualTo(big(100)); // observed: X 80 (A,B,C,E,F) + Y 20 (A)
+            assertThat(r.numerator()).isNull(); // AMB-C4-01: «não compor escore» — no sum of points
             assertThat(r.denominator()).isEqualTo(big(2));
             assertThat(r.components()).extracting(ResultComponent::code).containsExactlyElementsOf(CODES);
             assertThat(r.components())
@@ -342,14 +342,14 @@ class C4ScoreTest {
         assertThat(vD.decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
         assertThat(vD.reasonCode()).isEqualTo(C4Reasons.PRACTICE_INFORMATIVE_EAP);
         assertThat(vD.points()).isNull();
-        assertThat(o.result().numerator()).isEqualTo(big(100)); // 80 + 20, no 20-point credit for x
+        assertThat(o.result().numerator()).isNull(); // no score composed: no credit, no redistribution
         assertThat(component(o.result(), "D").numerator()).isEqualTo(big(1));
 
         IndicatorResult gatedResult = gated(data).result();
         assertThat(gatedResult.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
         assertThat(gatedResult.valueText()).isNull();
         assertThat(gatedResult.classification()).isNull();
-        assertThat(gatedResult.numerator()).isEqualTo(big(100));
+        assertThat(gatedResult.numerator()).isNull();
         assertThat(gatedResult.denominator()).isEqualTo(big(2));
         assertThat(gatedResult.components()).hasSize(6);
     }
@@ -364,7 +364,7 @@ class C4ScoreTest {
 
         assertThat(o.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
         assertThat(o.result().valueText()).isNull();
-        assertThat(o.result().numerator()).isEqualTo(big(180));
+        assertThat(o.result().numerator()).isNull();
         assertThat(o.result().denominator()).isEqualTo(big(2));
 
         IndicatorResult esf = teamOf(o, INE_ESF).result();

@@ -3,7 +3,6 @@ package esusdata.indicator.pack.c4;
 import esusdata.indicator.model.Bands;
 import esusdata.indicator.model.BudgetHint;
 import esusdata.indicator.model.CanonicalDataset;
-import esusdata.indicator.model.CanonicalTeam;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ComponentSpec;
@@ -26,7 +25,6 @@ import esusdata.indicator.pack.c4.C4Scoring.Scored;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -57,15 +55,22 @@ public final class C4Pack implements IndicatorRule {
             "Óbito no CadSUS, vínculo da NT nº 30/2025 e desempate da Portaria SAPS/MS nº 161/2024 são apurados no"
                     + " Siaps: o pacote usa o óbito e a saída registrados no PEC e o vínculo da última versão do"
                     + " cadastro individual até o corte, lida nos últimos 24 meses (estimativa local, lacuna L8).",
-            "Tipo de equipe (eSF 70 / eAP 76) ausente do DW (lacuna L1): a exceção da prática D para eAP tipo 76"
-                    + " (AMB-C4-01) só é aplicada quando houver fonte do tipo; equipe sem tipo comprovado é calculada"
-                    + " sem a exceção e sem pontuação presumida.",
-            "Condição avaliada (AMB-C4-04): a lista de condições não informa o CBO de quem avaliou; só o"
-                    + " atendimento individual comprova o médico/enfermeiro. Interrupção quando o último estado de"
-                    + " todas as condições elegíveis é «Resolvido» (LEDI 2); «concluído» não tem código próprio.",
+            "Tipo de equipe (eSF 70 / eAP 76) ausente do DW (lacuna L1): a validação de equipes do item 24 b"
+                    + " (Portaria GM/MS nº 3.493/2024) e a exceção da prática D para eAP tipo 76 (AMB-C4-01) só são"
+                    + " aplicadas quando houver fonte do tipo; equipe sem tipo comprovado é calculada sem a exceção"
+                    + " e sem pontuação presumida.",
+            "Condição avaliada (AMB-C4-04): a lista de condições (desde 2013) não informa o CBO de quem avaliou e"
+                    + " entra sem essa conferência (S-C4-01); o atendimento individual, que confere médico/"
+                    + " enfermeiro, é lido só nos últimos 12 meses. Interrupção quando o último estado de todas as"
+                    + " condições elegíveis da lista é «Resolvido» (LEDI 2): «Latente» conta como ativa,"
+                    + " «concluído» não tem código próprio e nova avaliação em atendimento não reabre a lista.",
             "Fontes que o DW não tem ou não descreve: pressão arterial na visita domiciliar (L6) e na atividade"
                     + " coletiva (L5), o campo de avaliação dos pés do MIAI (AMB-C4-09), o filtro de atividade"
-                    + " coletiva códigos 04–07 (AMB-C4-10) e a tabela SIGTAP de habilitação de CBO (AMB-C4-08).",
+                    + " coletiva códigos 04–07 (AMB-C4-10), a tabela SIGTAP de habilitação de CBO (AMB-C4-08) e a"
+                    + " lotação do profissional na equipe (AMB-C4-05 b). Consultas do MIP (03.01.01.003-0,"
+                    + " 03.01.01.006-4, 03.01.01.025-0) não são lidas nem comprovam a prática A.",
+            "Corte de envio: o Siaps extrai no «20º dia útil de cada mês» (item 11) e só vê o que chegou até lá;"
+                    + " a leitura local pode incluir registros enviados depois.",
             "Convenções provisórias da ficha, a confirmar na reconciliação: janelas de 6 e 12 meses civis até o"
                     + " fim da competência (AMB-C4-02); intervalo de visitas como diferença de datas ≥ 30 dias"
                     + " (AMB-C4-03); consulta sem exigir diabetes como condição avaliada (AMB-C4-05); farmacêutico"
@@ -175,29 +180,36 @@ public final class C4Pack implements IndicatorRule {
     static RuleOutcome evaluateUngated(CanonicalDataset data, EvaluationContext context) {
         C4Scope.requireMunicipality(data, context.municipalityIbge());
         LocalDate cutoff = context.dataCutoff();
-        Map<String, String> teamTypes = teamTypes(data, cutoff);
         C4Practices practices = new C4Practices(data, context.competencia(), cutoff);
         List<ComponentSpec> specs = DESCRIPTOR.components();
 
         List<EvidenceItem> evidence = new ArrayList<>();
         List<Scored> people = new ArrayList<>();
         SortedMap<String, List<Scored>> byTeam = new TreeMap<>();
+        SortedMap<String, String> teamCnes = new TreeMap<>();
         for (Subject subject : C4Cohort.resolve(data, cutoff)) {
+            if (subject.link() != null && subject.link().ine() != null) {
+                // a linked team keeps its row even when nobody of it is eligible (NO_DENOMINATOR, T-C4-36)
+                byTeam.computeIfAbsent(subject.link().ine(), k -> new ArrayList<>());
+                if (subject.link().cnes() != null) {
+                    teamCnes.putIfAbsent(subject.link().ine(), subject.link().cnes());
+                }
+            }
             if (!subject.eligible()) {
                 evidence.add(C4Scoring.excluded(subject));
                 continue;
             }
-            String ine = subject.link().ine();
-            Scored scored = new Scored(
-                    subject, practices.evaluate(subject.personKey()), C4Codes.EAP_TEAM_TYPE.equals(teamTypes.get(ine)));
+            Scored scored = new Scored(subject, practices.evaluate(subject.personKey()));
             people.add(scored);
-            byTeam.computeIfAbsent(ine, k -> new ArrayList<>()).add(scored);
+            byTeam.get(subject.link().ine()).add(scored);
             evidence.addAll(C4Scoring.eligible(scored, specs));
         }
         List<TeamResult> teams = new ArrayList<>(byTeam.size());
         for (Map.Entry<String, List<Scored>> team : byTeam.entrySet()) {
-            String cnes = team.getValue().get(0).subject().link().cnes();
-            teams.add(new TeamResult(team.getKey(), cnes, C4Scoring.result(DESCRIPTOR, context, team.getValue())));
+            teams.add(new TeamResult(
+                    team.getKey(),
+                    teamCnes.get(team.getKey()),
+                    C4Scoring.result(DESCRIPTOR, context, team.getValue())));
         }
         return new RuleOutcome(C4Scoring.result(DESCRIPTOR, context, people), teams, evidence);
     }
@@ -205,27 +217,6 @@ public final class C4Pack implements IndicatorRule {
     @Override
     public Optional<Classification> classify(ExactRatio value) {
         return Bands.QUALIDADE_C2_C7.classify(value);
-    }
-
-    /** The team type (CNES) of each INE on the cutoff, when the source has it (lacuna L1). */
-    private static Map<String, String> teamTypes(CanonicalDataset data, LocalDate cutoff) {
-        Map<String, CanonicalTeam> latest = new HashMap<>();
-        for (CanonicalTeam team : data.teams()) {
-            boolean observed = team.observedAt() == null
-                    || !LocalDate.parse(team.observedAt()).isAfter(cutoff);
-            if (observed && team.ine() != null && team.teamTypeCode() != null) {
-                latest.merge(team.ine(), team, (a, b) -> observedOrder(a).compareTo(observedOrder(b)) >= 0 ? a : b);
-            }
-        }
-        Map<String, String> types = new HashMap<>();
-        latest.forEach((ine, team) -> types.put(ine, team.teamTypeCode()));
-        return types;
-    }
-
-    private static String observedOrder(CanonicalTeam team) {
-        return (team.observedAt() == null ? "" : team.observedAt())
-                + '|'
-                + team.sourceRef().recordId();
     }
 
     /** The code lists each capability binds (Quadros 03–07 and item 24 f of the ficha). */

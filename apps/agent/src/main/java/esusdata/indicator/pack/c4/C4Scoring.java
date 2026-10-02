@@ -38,9 +38,13 @@ final class C4Scoring {
             + " P07).";
 
     /** One eligible person with the decision of every practice. */
-    record Scored(Subject subject, SortedMap<String, Outcome> outcomes, boolean eap76) {
+    record Scored(Subject subject, SortedMap<String, Outcome> outcomes) {
 
-        /** The points of the practices observed as met (Quadro 01); an eAP 76 person has no score. */
+        boolean eap76() {
+            return subject.eap76();
+        }
+
+        /** The weights of the practices observed as met (Quadro 01), D included. */
         BigInteger observedPoints(List<ComponentSpec> specs) {
             return Scores.points(
                     specs.stream().filter(s -> outcomes.get(s.code()).met()).toList());
@@ -73,10 +77,12 @@ final class C4Scoring {
             limitations.add(0, EAP_AMBIGUITY);
         }
         ExactRatio value = status == IndicatorStatus.COMPUTED ? mean.orElseThrow() : null;
+        // AMB-C4-01: «não compor escore» — no sum of points while the eAP 76 reading is open
+        BigInteger numerator = status == IndicatorStatus.RULE_AMBIGUITY ? null : total;
         return new IndicatorResult(
                 status,
                 value == null ? null : value.toScaledBigDecimal(4).toPlainString(),
-                total,
+                numerator,
                 subjects,
                 descriptor.denominatorKind(),
                 value == null ? null : Bands.QUALIDADE_C2_C7.classify(value).orElse(null),
@@ -94,7 +100,7 @@ final class C4Scoring {
 
     /** The person row of an excluded candidate. */
     static EvidenceItem excluded(Subject subject) {
-        return person(subject, EvidenceDecision.EXCLUDED, subject.exclusion(), null);
+        return row(subject, null, null, EvidenceDecision.EXCLUDED, subject.exclusion(), null);
     }
 
     /** The person row, one row per practice and the events behind each met practice. */
@@ -102,25 +108,13 @@ final class C4Scoring {
         Subject subject = scored.subject();
         List<EvidenceItem> rows = new ArrayList<>();
         BigInteger points = scored.eap76() ? null : scored.observedPoints(specs);
-        rows.add(person(subject, EvidenceDecision.ELIGIBLE, C4Reasons.ELIGIBLE, points));
+        rows.add(row(subject, null, null, EvidenceDecision.ELIGIBLE, C4Reasons.ELIGIBLE, points));
         List<EvidenceItem> supports = new ArrayList<>();
         for (ComponentSpec spec : specs) {
             Outcome outcome = scored.outcomes().get(spec.code());
             rows.add(practice(scored, spec, outcome));
             for (Support s : outcome.supports()) {
-                supports.add(new EvidenceItem(
-                        EvidenceSubjectKind.PERSON,
-                        subject.personKey(),
-                        s.sourceRef(),
-                        s.date().toString(),
-                        spec.code(),
-                        EvidenceDecision.SUPPORTING_EVENT,
-                        null,
-                        null,
-                        cnes(subject),
-                        ine(subject),
-                        s.cbo(),
-                        null));
+                supports.add(row(subject, spec.code(), s, EvidenceDecision.SUPPORTING_EVENT, null, null));
             }
         }
         rows.addAll(supports);
@@ -128,55 +122,36 @@ final class C4Scoring {
     }
 
     private static EvidenceItem practice(Scored scored, ComponentSpec spec, Outcome outcome) {
-        boolean informative = scored.eap76() && C4Practices.D.equals(spec.code());
-        String reason;
-        BigInteger points;
-        if (informative) {
-            reason = C4Reasons.PRACTICE_INFORMATIVE_EAP;
-            points = null;
-        } else {
-            reason = outcome.met() ? C4Reasons.PRACTICE_MET : C4Reasons.PRACTICE_NOT_MET;
-            points = outcome.met() ? spec.weight() : BigInteger.ZERO;
+        EvidenceDecision decision = outcome.met() ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
+        if (scored.eap76() && C4Practices.D.equals(spec.code())) {
+            return row(scored.subject(), spec.code(), null, decision, C4Reasons.PRACTICE_INFORMATIVE_EAP, null);
         }
-        Subject subject = scored.subject();
-        return new EvidenceItem(
-                EvidenceSubjectKind.PERSON,
-                subject.personKey(),
-                null,
-                null,
-                spec.code(),
-                outcome.met() ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET,
-                reason,
-                points,
-                cnes(subject),
-                ine(subject),
-                null,
-                null);
+        String reason = outcome.met() ? C4Reasons.PRACTICE_MET : C4Reasons.PRACTICE_NOT_MET;
+        BigInteger points = outcome.met() ? spec.weight() : BigInteger.ZERO;
+        return row(scored.subject(), spec.code(), null, decision, reason, points);
     }
 
-    private static EvidenceItem person(Subject subject, EvidenceDecision decision, String reason, BigInteger points) {
+    /** One evidence row about a person: the opaque key and the link, never a name, CPF or CNS. */
+    private static EvidenceItem row(
+            Subject subject,
+            String component,
+            Support support,
+            EvidenceDecision decision,
+            String reason,
+            BigInteger points) {
+        Link link = subject.link();
         return new EvidenceItem(
                 EvidenceSubjectKind.PERSON,
                 subject.personKey(),
-                null,
-                null,
-                null,
+                support == null ? null : support.sourceRef(),
+                support == null ? null : support.date().toString(),
+                component,
                 decision,
                 reason,
                 points,
-                cnes(subject),
-                ine(subject),
-                null,
+                link == null ? null : link.cnes(),
+                link == null ? null : link.ine(),
+                support == null ? null : support.cbo(),
                 null);
-    }
-
-    private static String ine(Subject subject) {
-        Link link = subject.link();
-        return link == null ? null : link.ine();
-    }
-
-    private static String cnes(Subject subject) {
-        Link link = subject.link();
-        return link == null ? null : link.cnes();
     }
 }

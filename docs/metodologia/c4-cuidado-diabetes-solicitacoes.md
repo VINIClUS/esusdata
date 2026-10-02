@@ -19,14 +19,16 @@ Páginas: PDF da ficha C4 (SEI 0055986848), transcrição em [`c4-cuidado-diabet
 
 ## S-C4-02 — Vocabulário canônico de `status` (condição) e `exit_reason` (cadastro)
 
-- **O quê**: congelar no descritor das capacidades os valores de `condition.status` e `registration.exit_reason`.
+- **O quê**: congelar no descritor das capacidades os valores de `condition.status`, `condition.code_system`
+  (o pacote espera `CIAP2` e `CID10`, como em `CanonicalCondition`), `condition.basis` (`PROFESSIONAL`) e
+  `registration.exit_reason`.
   O pacote usa os códigos LEDI que o DW grava em `nu_identificador`: situação `0` Ativo, `1` Latente, `2`
   Resolvido (`tb_dim_situacao_problema`); saída `135` Óbito, `136` Mudança de território
   (`tb_dim_tipo_saida_cadastro`).
 - **Por quê**: item 15 (p. 2) «todas as condições ou problemas marcados como "resolvidos" no PEC» e «Saída do
   cidadão do cadastro» com «Mudança de território»; item 4.1 (p. 4) «“resolvidos” ou “concluídos”».
-- **Impacto**: se o adaptador devolver outro vocabulário (ex.: `RESOLVED`), ninguém é interrompido e o
-  denominador infla em silêncio.
+- **Impacto**: se o adaptador devolver outro vocabulário (ex.: `RESOLVED`, `CID-10`), ninguém é interrompido
+  ou a coorte esvazia, em silêncio.
 - **Alternativa local**: constantes em `C4Codes` (`RESOLVED_STATUS`, `EXIT_DEATH`, `EXIT_TERRITORY_CHANGE`).
   «Concluído» não tem código LEDI; fica como «não resolvido» até o Portão C (AMB-C4-04).
 

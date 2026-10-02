@@ -22,6 +22,13 @@ public final class C4Reasons {
     /** No usable individual registration linking the person to a team on the cutoff. */
     public static final String NO_LINK = "SEM_VINCULO";
 
+    /**
+     * Linked to a team whose CNES type is known and is neither eSF 70 nor eAP 76 (item 24 b, p. 2:
+     * «Serão consideradas equipes de Saúde da Família (eSF), e equipes de Atenção Primária (eAP), tipo
+     * 70 e 76»).
+     */
+    public static final String TEAM_TYPE_OUT_OF_SCOPE = "EQUIPE_FORA_DO_ESCOPO";
+
     /** «todas as condições ou problemas marcados como "resolvidos" no PEC» (item 15, p. 2). */
     public static final String CONDITIONS_RESOLVED = "INTERROMPIDO_CONDICOES_RESOLVIDAS";
 
