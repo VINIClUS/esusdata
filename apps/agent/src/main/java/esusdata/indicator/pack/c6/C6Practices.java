@@ -29,28 +29,11 @@ import java.util.function.Function;
  */
 final class C6Practices {
 
-    /** The practices with their stable evidence reason codes. */
-    enum Practice {
-        A("A_CONSULTA_MEDICA_ENFERMAGEM", "A_SEM_CONSULTA"),
-        B("B_PESO_ALTURA_MESMO_DIA", "B_SEM_PESO_ALTURA_MESMO_DIA"),
-        C("C_DUAS_VISITAS_30_DIAS", "C_SEM_DUAS_VISITAS_30_DIAS"),
-        D("D_DOSE_INFLUENZA", "D_SEM_DOSE_INFLUENZA");
-
-        private final String metReason;
-        private final String notMetReason;
-
-        Practice(String metReason, String notMetReason) {
-            this.metReason = metReason;
-            this.notMetReason = notMetReason;
-        }
-
-        String reason(boolean met) {
-            return met ? metReason : notMetReason;
-        }
-    }
-
-    /** One source event that supports a practice, with the information model it came from. */
-    record Support(SourceRef sourceRef, LocalDate date, String cbo, String cnes, String ine, String model) {}
+    static final String MIAI = "MIAI";
+    static final String MIP = "MIP";
+    static final String MIVDT = "MIVDT";
+    static final String MIV = "MIV";
+    private static final String INDIVIDUAL_FORM = "INDIVIDUAL";
 
     /** Most recent first is the max of this order; ties fall back to the source identity. */
     private static final Comparator<Support> CHRONOLOGICAL = Comparator.comparing(Support::date)
@@ -92,8 +75,8 @@ final class C6Practices {
     /** A: the most recent individual encounter by a physician or nurse (Quadro 02). */
     private List<Support> consultation(String personKey) {
         return of(careEvents, personKey).stream()
-                .filter(e -> C6Codes.CONSULTATION_CBO.matches(e.cbo()))
-                .map(e -> support(e.sourceRef(), e.careDate(), e.cbo(), e.cnes(), e.ine(), "MIAI"))
+                .filter(e -> INDIVIDUAL_FORM.equals(e.form()) && C6Codes.CONSULTATION_CBO.matches(e.cbo()))
+                .map(e -> support(e.sourceRef(), e.careDate(), e.cbo(), e.cnes(), e.ine(), MIAI))
                 .filter(s -> window.contains(s.date()))
                 .max(CHRONOLOGICAL)
                 .map(List::of)
@@ -145,14 +128,17 @@ final class C6Practices {
     private List<Measure> measures(String personKey) {
         List<Measure> all = new ArrayList<>();
         for (CanonicalCareEvent e : of(careEvents, personKey)) {
+            if (!INDIVIDUAL_FORM.equals(e.form())) {
+                continue;
+            }
             all.add(new Measure(
-                    support(e.sourceRef(), e.careDate(), e.cbo(), e.cnes(), e.ine(), "MIAI"),
+                    support(e.sourceRef(), e.careDate(), e.cbo(), e.cnes(), e.ine(), MIAI),
                     positive(e.weightKg()),
                     positive(e.heightCm())));
         }
         for (CanonicalHomeVisit v : of(visits, personKey)) {
             all.add(new Measure(
-                    support(v.sourceRef(), v.visitDate(), v.cbo(), v.cnes(), v.ine(), "MIVDT"),
+                    support(v.sourceRef(), v.visitDate(), v.cbo(), v.cnes(), v.ine(), MIVDT),
                     positive(v.weightKg()),
                     positive(v.heightCm())));
         }
@@ -163,7 +149,7 @@ final class C6Practices {
                     positive(m.heightCm())));
         }
         for (CanonicalProcedureEvent p : of(procedures, personKey)) {
-            if ("PERFORMED".equals(p.stage())) {
+            if ("PERFORMED".equals(p.stage()) && (MIP.equals(p.origin()) || MIAI.equals(p.origin()))) {
                 String code = p.sigtapCode();
                 boolean assessment = C6Codes.SIGTAP_ANTHROPOMETRIC_ASSESSMENT.equals(code);
                 all.add(new Measure(
@@ -182,8 +168,8 @@ final class C6Practices {
     private List<Support> homeVisits(String personKey) {
         List<Support> valid = of(visits, personKey).stream()
                 .filter(v -> C6Codes.HOME_VISIT_CBO.matches(v.cbo())
-                        && !v.reasonCodes().isEmpty())
-                .map(v -> support(v.sourceRef(), v.visitDate(), v.cbo(), v.cnes(), v.ine(), "MIVDT"))
+                        && v.reasonCodes().stream().anyMatch(r -> r != null && !r.isBlank()))
+                .map(v -> support(v.sourceRef(), v.visitDate(), v.cbo(), v.cnes(), v.ine(), MIVDT))
                 .filter(s -> window.contains(s.date()))
                 .sorted(CHRONOLOGICAL)
                 .toList();
@@ -205,15 +191,39 @@ final class C6Practices {
         Map<String, Support> distinct = new LinkedHashMap<>();
         of(doses, personKey).stream()
                 .filter(d -> C6Codes.INFLUENZA_CODES.contains(d.immunobiologicalCode()))
-                .map(d -> Map.entry(
+                .map(d -> new Dose(
                         d.immunobiologicalCode(),
-                        support(d.sourceRef(), d.applicationDate(), d.cbo(), d.cnes(), d.ine(), "MIV")))
-                .filter(e -> window.contains(e.getValue().date()))
-                .sorted(Map.Entry.comparingByValue(CHRONOLOGICAL))
-                .forEach(e ->
-                        distinct.putIfAbsent(e.getKey() + "@" + e.getValue().date(), e.getValue()));
+                        support(d.sourceRef(), d.applicationDate(), d.cbo(), d.cnes(), d.ine(), MIV)))
+                .filter(d -> window.contains(d.support().date()))
+                .sorted(Comparator.comparing(Dose::support, CHRONOLOGICAL))
+                .forEach(d -> distinct.putIfAbsent(d.code() + "@" + d.support().date(), d.support()));
         return List.copyOf(distinct.values());
     }
+
+    /** The practices with their stable evidence reason codes. */
+    enum Practice {
+        A("A_CONSULTA_MEDICA_ENFERMAGEM", "A_SEM_CONSULTA"),
+        B("B_PESO_ALTURA_MESMO_DIA", "B_SEM_PESO_ALTURA_MESMO_DIA"),
+        C("C_DUAS_VISITAS_30_DIAS", "C_SEM_DUAS_VISITAS_30_DIAS"),
+        D("D_DOSE_INFLUENZA", "D_SEM_DOSE_INFLUENZA");
+
+        private final String metReason;
+        private final String notMetReason;
+
+        Practice(String metReason, String notMetReason) {
+            this.metReason = metReason;
+            this.notMetReason = notMetReason;
+        }
+
+        String reason(boolean met) {
+            return met ? metReason : notMetReason;
+        }
+    }
+
+    /** One source event that supports a practice, with the information model it came from. */
+    record Support(SourceRef sourceRef, LocalDate date, String cbo, String cnes, String ine, String model) {}
+
+    private record Dose(String code, Support support) {}
 
     private record Measure(Support support, boolean weight, boolean height) {}
 

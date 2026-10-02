@@ -36,9 +36,10 @@ final class C6Scope {
 
     private static <T> void check(List<T> records, Function<T, String> municipality, String expected) {
         for (T r : records) {
-            if (!expected.equals(municipality.apply(r))) {
+            String found = municipality.apply(r);
+            if (!expected.equals(found)) {
                 throw new IllegalArgumentException(
-                        "record municipality does not match requested municipality: " + municipality.apply(r));
+                        "record municipality does not match requested municipality: " + found);
             }
         }
     }

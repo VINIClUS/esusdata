@@ -30,17 +30,20 @@ import esusdata.indicator.pack.c6.C6Practices.Support;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.function.Function;
 
 /**
  * C6 — Cuidado da pessoa idosa (Tech Spec §2.4; ficha transcrita em {@code docs/metodologia/c6-cuidado-pessoa-idosa.md}).
@@ -54,6 +57,9 @@ public final class C6Pack implements IndicatorRule {
 
     private static final String TWELVE_MONTHS = "12 meses";
 
+    /** The ficha has no upper age; the birth bind only needs a finite start (no one is 130). */
+    private static final int OLDEST_AGE_READ = 130;
+
     public static final String ID = "c6-cuidado-pessoa-idosa";
     public static final String RULE_VERSION = ID + "@0.1.0";
 
@@ -62,15 +68,17 @@ public final class C6Pack implements IndicatorRule {
 
     static final String EAP_AMBIGUITY = "AMB-C6-01: a boa prática (C) «não será condicionante de pontuação para eAP, "
             + "tipo 76» (item 24 b, p. 2) admite três leituras (crédito integral, renormalização sobre 75 ou só não "
-            + "exigir); resultado sem valor até a P07 (MET-23). A, B e D seguem nos componentes; C é informativa.";
+            + "exigir); resultado sem valor até a P07 (MET-23). A, B e D seguem nos componentes; o componente C "
+            + "conta as visitas de todos, mas é só informativo para a eAP.";
 
     private static final List<String> STANDING_LIMITATIONS = List.of(
             "Dados fora do PEC local: doses só na RNDS/RIA (lacuna L4) não aparecem e a falta de integração não é "
                     + "ausência de vacinação; registros de profissionais de outros municípios («no país», item 4.4) "
                     + "e o «Óbito no CadSUS» (item 15) não estão no extrato.",
             "Vínculo: a ficha remete à Portaria SAPS/MS nº 161/2024 (AMB-C6-04); o vínculo é a versão completa "
-                    + "do cadastro individual local vigente no corte (lida nos últimos 24 meses), estimativa local "
-                    + "que não equivale ao vínculo do Siaps (lacuna L8). Saída 136 (mudança de território) e 135 "
+                    + "do cadastro individual local vigente no corte, lida nos 24 meses civis até a competência (quem "
+                    + "não teve versão nesse período fica sem vínculo); estimativa local que não equivale ao vínculo "
+                    + "do Siaps (lacuna L8). Saída 136 (mudança de território) e 135 "
                     + "(óbito) são códigos LEDI do dicionário do DW, não da ficha.",
             "Tipo de equipe ausente no DW (lacuna L1): a exceção eAP tipo 76 da prática C (AMB-C6-01) só é "
                     + "reconhecida quando o extrato traz o tipo; sem ele, C é exigida de todas as equipes e a "
@@ -84,8 +92,8 @@ public final class C6Pack implements IndicatorRule {
             "AMB-C6-06: consulta (A) só pelo MIAI com CBO do Quadro 02, presencial ou remota, sem códigos "
                     + "SIGTAP de consulta e sem exigir o problema/condição avaliada do item 24 e.",
             "AMB-C6-07/AMB-C6-11: peso e altura (B) na mesma data civil, em qualquer combinação de MIAI, MIP, "
-                    + "MIAC, MIVDT e SIGTAP 0101040083/0101040075, ou 0101040024 sozinho, por CBO do Quadro 03; "
-                    + "a exclusão do procedimento consolidado fica com a consulta da capacidade.",
+                    + "MIAC, MIVDT e SIGTAP 0101040083/0101040075, ou 0101040024 sozinho (SIGTAP só de MIP ou MIAI), "
+                    + "por CBO do Quadro 03; a exclusão do procedimento consolidado fica com a consulta da capacidade.",
             "AMB-C6-03: visitas (C) de ACS/TACS com motivo preenchido e a primeira e a última distantes "
                     + "≥ 30 dias corridos; desfecho não filtrado.",
             "AMB-C6-08/09/10: influenza (D) 33 ou 77 com data de aplicação na janela, transcrição incluída, "
@@ -140,6 +148,12 @@ public final class C6Pack implements IndicatorRule {
                     "docs/metodologia/c6-cuidado-pessoa-idosa.md"),
             List.of());
 
+    /** ISO observation instants order as text; ties fall back to the source record id. */
+    private static final Comparator<CanonicalTeam> LATEST_OBSERVATION = Comparator.comparing(CanonicalTeam::observedAt)
+            .thenComparing(t -> t.sourceRef().recordId(), Comparator.nullsFirst(Comparator.naturalOrder()));
+
+    private static final Map<Practice, ComponentSpec> SPECS = specs();
+
     @Override
     public PackDescriptor descriptor() {
         return DESCRIPTOR;
@@ -154,7 +168,7 @@ public final class C6Pack implements IndicatorRule {
     public DataRequirements requirements(YearMonth competencia) {
         DateWindow period = DateWindow.lastCivilMonths(competencia, C6Codes.WINDOW_MONTHS);
         DateWindow births = new DateWindow(
-                competencia.atDay(1).minusYears(130),
+                competencia.atDay(1).minusYears(OLDEST_AGE_READ),
                 competencia.plusMonths(1).atDay(1).minusYears(C6Codes.MINIMUM_AGE_YEARS));
         List<PartRequirement> parts = new ArrayList<>();
         parts.add(PartRequirement.personScoped(Capabilities.CITIZEN, period, births, codes(Capabilities.CITIZEN)));
@@ -197,37 +211,44 @@ public final class C6Pack implements IndicatorRule {
         List<Assessment> assessed = new ArrayList<>();
         for (Subject s : subjects) {
             if (s.eligible()) {
-                assessed.add(new Assessment(s, practices.assess(s.personKey()), eapTeams.contains(s.ine())));
+                assessed.add(Assessment.of(s, practices.assess(s.personKey()), eapTeams.contains(s.ine())));
             }
         }
         IndicatorResult municipal = result(assessed, context);
         return new RuleOutcome(municipal, teams(assessed, context), C6Evidence.of(subjects, assessed, lastDay));
     }
 
-    /** One eligible person with the events behind each practice. */
-    record Assessment(Subject subject, Map<Practice, List<Support>> practices, boolean eap) {
-        boolean met(Practice practice) {
-            return !practices.get(practice).isEmpty();
+    /** One eligible person with the events behind each practice and the points they earn. */
+    record Assessment(Subject subject, Map<Practice, List<Support>> practices, boolean eap, BigInteger points) {
+        Assessment {
+            practices = Collections.unmodifiableMap(new EnumMap<>(practices));
         }
 
-        BigInteger points() {
+        static Assessment of(Subject subject, Map<Practice, List<Support>> practices, boolean eap) {
             List<ComponentSpec> satisfied = new ArrayList<>();
             for (Practice p : Practice.values()) {
-                if (met(p)) {
+                if (!practices.get(p).isEmpty()) {
                     satisfied.add(spec(p));
                 }
             }
-            return Scores.points(satisfied);
+            return new Assessment(subject, practices, eap, Scores.points(satisfied));
+        }
+
+        boolean met(Practice practice) {
+            return !practices.get(practice).isEmpty();
         }
     }
 
     static ComponentSpec spec(Practice practice) {
+        return SPECS.get(practice);
+    }
+
+    private static Map<Practice, ComponentSpec> specs() {
+        Map<Practice, ComponentSpec> specs = new EnumMap<>(Practice.class);
         for (ComponentSpec spec : DESCRIPTOR.components()) {
-            if (spec.code().equals(practice.name())) {
-                return spec;
-            }
+            specs.put(Practice.valueOf(spec.code()), spec);
         }
-        throw new IllegalStateException("no component " + practice);
+        return Collections.unmodifiableMap(specs);
     }
 
     /** The 12 civil months ending with the competência (AMB-C6-02), never past the cutoff. */
@@ -310,7 +331,7 @@ public final class C6Pack implements IndicatorRule {
     private static String cnes(List<Assessment> members) {
         return members.stream()
                 .map(a -> a.subject().cnes())
-                .filter(c -> c != null)
+                .filter(Objects::nonNull)
                 .sorted()
                 .findFirst()
                 .orElse(null);
@@ -322,13 +343,10 @@ public final class C6Pack implements IndicatorRule {
      */
     private static Set<String> eapTeams(List<CanonicalTeam> teams, LocalDate cutoff) {
         Map<String, CanonicalTeam> latest = new HashMap<>();
-        Function<CanonicalTeam, LocalDate> observed =
-                t -> LocalDate.parse(t.observedAt().substring(0, 10));
         for (CanonicalTeam t : teams) {
-            if (t.ine() == null || t.observedAt() == null || observed.apply(t).isAfter(cutoff)) {
-                continue;
+            if (t.ine() != null && t.observedAt() != null && !observedDate(t).isAfter(cutoff)) {
+                latest.merge(t.ine(), t, (a, b) -> LATEST_OBSERVATION.compare(b, a) > 0 ? b : a);
             }
-            latest.merge(t.ine(), t, (a, b) -> observed.apply(b).isAfter(observed.apply(a)) ? b : a);
         }
         Set<String> eap = new HashSet<>();
         latest.forEach((ine, t) -> {
@@ -337,6 +355,16 @@ public final class C6Pack implements IndicatorRule {
             }
         });
         return eap;
+    }
+
+    /** The ISO date (or date-time) a team type was observed; anything else is refused, never guessed. */
+    private static LocalDate observedDate(CanonicalTeam team) {
+        String observed = team.observedAt();
+        try {
+            return LocalDate.parse(observed.length() > 10 ? observed.substring(0, 10) : observed);
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("team observedAt is not an ISO date: " + observed, e);
+        }
     }
 
     /** The code lists each capability binds (C6Codes, transcribed from the ficha). */

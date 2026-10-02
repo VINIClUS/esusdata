@@ -87,7 +87,8 @@ final class C6Cohort {
             if (reason == null) {
                 reason = linkExclusion(link);
             }
-            subjects.add(new Subject(key, link.version(), reason == null ? ELIGIBLE : reason));
+            subjects.add(
+                    new Subject(key, link.conflicting() ? null : link.version(), reason == null ? ELIGIBLE : reason));
         }
         return subjects;
     }
@@ -162,9 +163,11 @@ final class C6Cohort {
     private record Link(CanonicalRegistration version, boolean conflicting) {}
 
     /** What a version says about the link; two same-day versions that differ here conflict. */
-    private record LinkState(String ine, String cnes, String exitReason, Boolean inactive, Boolean refused) {
+    private record LinkState(String ine, String cnes, String exitReason, boolean inactive, boolean refused) {
         static LinkState of(CanonicalRegistration r) {
-            return new LinkState(r.ine(), r.cnes(), r.exitReason(), r.inactive(), r.refused());
+            String exit = r.exitReason() == null || r.exitReason().isBlank() ? null : r.exitReason();
+            return new LinkState(
+                    r.ine(), r.cnes(), exit, Boolean.TRUE.equals(r.inactive()), Boolean.TRUE.equals(r.refused()));
         }
     }
 }
