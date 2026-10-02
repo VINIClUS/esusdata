@@ -74,7 +74,9 @@ por quadrimestre.
 - **Extrato v2**: um arquivo JSONL gzip por job, linhas `{"part":n,"kind":"…","record":{…}}`, todas
   as partes lidas numa só transação `REPEATABLE READ READ ONLY` (§1.9.3). O manifesto lista as
   partes (`ManifestPart`: capacidade, versão, checksum da consulta, tipo, janela, parâmetros e seu
-  checksum, contagem). Extratos v1 continuam legíveis e o C1 continua v1.
+  checksum, contagem). Extratos v1 continuam legíveis e o C1 continua v1. Os checksums dos
+  parâmetros e o checksum composto do manifesto têm uma definição só (`ManifestChecksums`), usada por
+  quem publica e por quem reproduz o extrato.
 - **Capacidades da fundação** (todas `NOT_TESTED` até a validação ao vivo, ADR 0023), escolhidas
   pelo dicionário oficial do DW (`docs/discovery/2026-10-02-dw-dicionario-c2-c7.md`): `citizen`,
   `individual_registration`, `care_encounter`, `dental_encounter`, `home_visit`,
