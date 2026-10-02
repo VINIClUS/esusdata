@@ -1,0 +1,321 @@
+                                           Ministério da Saúde
+                                 Secretaria de Atenção Primária à Saúde
+           Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde
+
+
+                               NOTA TÉCNICA Nº 8/2026-DEAPS/SAPS/MS
+
+
+1.         ASSUNTO
+1.1.        Esta nota tem por objetivo descrever a metodologia utilizada para calcular o desempenho
+quadrimestral dos Componente II - Vínculo e Acompanhamento Territorial e Componente III -
+Qualidade, presentes na Portaria GM/MS nº 3.493, de 10 de abril de 2024, para ﬁns de coﬁnanciamento
+federal da Atenção Primária à Saúde (APS) no âmbito do Sistema Único de Saúde (SUS).
+2.         CONTEXTUALIZAÇÃO
+2.1.       O monitoramento e avaliação do desempenho da Atenção Primária à Saúde são medidas de
+transparência do acesso e da qualidade dos serviços prestados pelas equipes. Estas informações permitem
+que gestores municipais, estaduais e do Distrito Federal adotem ações de aprimoramento para os serviços
+ofertados no âmbito da APS.
+2.2.        O Sistema de Informação para a Atenção Primária à Saúde (Siaps) é o canal oﬁcial do
+Ministério da Saúde para apresentação mensal e quadrimestral dos dados referentes aos componentes
+mencionados, com detalhamento do resultado e classificação (ótimo, bom, suficiente e regular) da equipe.
+2.3.        O s resultados mensais são apresentados para ﬁns de monitoramento e podem ser
+utilizados preliminarmente por gestores e proﬁssionais no planejamento e acompanhamento da execução das
+boas práticas de cuidado em saúde.
+2.4.       Os resultados quadrimestrais são calculados pela média dos meses, para ﬁns de avaliação e
+cofinanciamento federal relativos aos Componentes II e III.
+2.5.       O incentivo financeiro para o componente II e III será repassado nos quatro meses subsequentes.
+2.6.        Para novas homologações, o incentivo ﬁnanceiro para o componente II e III será transferido
+mensalmente aos municípios ou Distrito Federal até o seu segundo recálculo, considerando os valores mensais
+referente a classificação "bom".
+2.7.      Para contabilização nos indicadores, o envio das informações para o Siaps deve ocorrer até o 10º
+dia do mês subsequente, conforme estabelecido no Capítulo II do Título I da Portaria de Consolidação nº 1
+SAPS/MS, de 2 de junho de 2021.
+3.         COMPONENTE II - VÍNCULO E ACOMPANHAMENTO TERRITORIAL
+3.1.     O resultado do quadrimestre será avaliado pela média dos valores mensais Dimensões de Cadastro
+e Acompanhamento.
+3.2.       Os critérios de cadastro e acompanhamento serão monitorados no seguinte intervalo:
+                    Figura 1. Período de Monitoramento do Vínculo e Acompanhamento
+
+
+
+
+3.3.      O valor de bônus a ser adicionado pela Satisfação do Usuário será a maior nota obtida entre os
+meses do quadrimestre avaliado.
+4.         COMPONENTE III: QUALIDADE DO CUIDADO
+4.1.       O resultado do quadrimestre por indicador será obtido pela média dos meses monitorados.
+4.1.1.    Em caso de suspensão de pagamento, a média será aplicada sob os meses válidos para
+pagamento.
+
+
+Atenção: Para os indicadores do cuidado no Desenvolvimento Infantil e na Gestação e Puerpério,
+o resultado quadrimestral levará em consideração apenas os meses que possuam crianças que
+completaram dois anos e gestações que atingiram o 42° dia de puerpério no período em
+avaliação.
+
+
+                     Nota Técnica 8 (0055690090)      SEI 25000.216796/2025-16 / pg. 1
+4.2.         Os resultados de cada indicador serão analisados conforme o período de monitoramento, ilustrado
+a seguir:
+                          Figura 2. Período máximo de monitoramento das Boas Práticas
+
+
+
+
+4.3.         Nota Final do Componente III - Qualidade
+4.3.1.      Para obter-se a Nota Final do Componente III, serão somados pontos por indicador ponderado pelo
+peso atribuído, conforme exemplo abaixo:
+                Quadro 1. Cálculo do Resultado do Quadrimestre por Indicador para uma equipe
+
+                                                                                  Resultado do        Conceito
+              Indicador              Mês 1       Mês 2      Mês 3      Mês 4                           Obtido
+                                                                                  Quadrimestre
+         C1. Mais Acesso à            42,62%        40,87%    41,9%     51,98%          44,34%           Bom
+         APS
+         C2. Cuidado no
+         desenvolvimento                80%            -       85%         -            81,3%*          Ótimo
+         infantil *
+         C3. Cuidado na
+         gestação e                     75%            -         -         -             75%*           Ótimo
+         puerpério *
+         C4. Cuidado da
+         pessoa com                    45,2%        43,9%     49,8%     49,9%           47,2%         Suficiente
+         diabetes
+         C5. Cuidado da
+         pessoa com                     10%          11%       10%        50%           20,25%         Regular
+         hipertensão
+         C6. Cuidado da
+         pessoa idosa
+                                        90%          84%       81%        79%           83,5%           Ótimo
+         C7. Cuidado da
+         mulher na
+         prevenção do
+                                        70%          79%       81%        82%            78%            Ótimo
+         câncer
+Nota: * O sinal " - " neste exemplo significa que a equipe em questão não possui crianças completando 2 (dois) anos de
+idade e que a equipe em questão não possui gestações encerrando o puerpério em todos os meses do período.
+
+
+                    Quadro 2. Classificação da Nota Final do Componente III para uma equipe
+                                         Cálculo                                    Atenção: Exemplo
+                                                                                  Conceito
+                                                                Nota por           obtido
+                   Indicador (A)             Peso (B)                                           Nota
+                                                               Indicador             na
+                                                                                   Média
+                                                                                             0,75 x 1 =
+            C1. Mais Acesso à APS                 1         A x B = Nota C1         Bom
+                                                                                                0,75
+
+
+
+                        Nota Técnica 8 (0055690090)          SEI 25000.216796/2025-16 / pg. 2
+                                     Cálculo                               Atenção: Exemplo
+          C2. Cuidado no
+          desenvolvimento infantil             2     A x B = Nota C2       Ótimo         1x2=2
+          C3. Cuidado da gestação e
+          puerpério
+                                               2     A x B = Nota C3       Ótimo         1x2=2
+          C4. Cuidado da pessoa                                                         0,5 x 1 =
+                                               1     A x B = Nota C4    Suficiente
+          com diabetes                                                                    0,50
+          C5. Cuidado da pessoa                                                        0,25 x 1 =
+                                               1     A x B = Nota C5      Regular
+          com hipertensão                                                                 0,25
+          C6. Cuidado da pessoa
+                                               1     A x B = Nota C6       Ótimo         1x1=1
+          idosa
+          C7. Cuidado da mulher na
+                                               2     A x B = Nota C7       Ótimo         1x2=2
+          prevenção do câncer
+                     Total                  10               Nota Final                    8,5
+
+
+4.3.2.     Assim, para cálculo da pontuação ﬁnal, cada conceito obtido no indicador equivale a pontuação
+abaixo:
+                                          Conceito no Indicador
+                                              Regular: 0,25
+                                             Suficiente: 0,50
+                                                Bom: 0,75
+                                               Ótimo: 1,00
+
+
+4.3.3.    As equipes de Saúde Bucal (eSB) e equipes Multiproﬁssionais na APS (eMulti) seguirão a mesma
+metodologia, conforme quadros abaixo:
+                                     Quadro 3. Equipes de Saúde Bucal
+
+                                     Cálculo                              Atenção: Exemplo
+                                                                       Conceito
+                                                        Nota por
+                 Indicador (A)           Peso (B)                      obtido na         Nota
+                                                       Indicador
+                                                                        Média
+           B1. Primeira consulta                      A x B = Nota                    0,75 x 2 =
+                                               2                          Bom
+           odontológica programada                         B1                            1,5
+                                                      A x B = Nota
+           B2. Tratamento Concluído            2                          Ótimo       1x2=2
+                                                           B2
+                                                      A x B = Nota
+           B3. Taxa de exodontias              2                          Ótimo       1x2=2
+                                                           B3
+           B4. Escovação                              A x B = Nota
+                                               1                       Suficiente    0,5 x 1 = 0,5
+           supervisionada                                  B4
+           B5. Procedimentos
+                                                      A x B = Nota                    0,25 x 2 =
+           odontológicos individuais           2                        Regular
+           preventivos                                     B5                            0,5
+           B6. Tratamento                             A x B = Nota
+                                               1                        Ótimo         1x1=1
+           restaurador atraumático                         B6
+                      Total                    10            Nota Final                   7,5
+
+
+                                 Quadro 4. Equipes Multiprofissionais na APS
+
+                                       Cálculo                            Atenção: Exemplo
+                                                                        Conceito
+                                            Peso        Nota por         obtido
+                    Indicador (A)                                                        Nota
+                                             (B)       Indicador           na
+                                                                         Média
+             M1. Média de
+             atendimentos da eMulti            6     A x B = Nota B1      Ótimo      1x6=6
+             por pessoa
+             M2. Ações
+                                                                                      0,75 x 4
+             interprofissionais da             4     A x B = Nota B2       Bom
+             eMulti
+                                                                                        =3
+                        Total                  10              Total                     9,0
+
+
+5.         DIVULGAÇÃO DOS RESULTADOS
+5.1.      Para deﬁnição do valor do incentivo ﬁnanceiro a ser transferido, as Notas Finais do Componente II
+e do Componente III serão classificadas conforme os intervalos abaixo:
+
+                     Nota Técnica 8 (0055690090)      SEI 25000.216796/2025-16 / pg. 3
+              Quadro 5. Classificação para o Incentivo Financeiro conforme a Nota Final do Componente II
+                                                                                         Classificação para o Incentivo
+                              Nota Final do Componente II
+                                                                                                   Financeiro
+                                                   > 8,5                                              Ótimo
+                                              ≥ 7 e ≤ 8,5                                              Bom
+                                                ≥5e<7                                               Suficiente
+                                                    <5                                               Regular
+
+
+              Quadro 6. Classificação para o Incentivo Financeiro conforme a Nota Final do Componente III
+                                                                                         Classificação para o Incentivo
+                                 Nota Final Componente III
+                                                                                                   Financeiro
+                                                   > 7,5                                              Ótimo
+                                               ≥ 5 e ≤ 7,5                                             Bom
+                                               > 2,5 e < 5                                          Suficiente
+                                                   ≤ 2,5                                             Regular
+
+Atenção: Esta nota revoga a NOTA TÉCNICA Nº 6/2025-DEAPS/SAPS/MS ( 0052386354)
+6.                REFERÊNCIAS
+BRASIL. Ministério da Saúde. Portaria GM/MS nº 3.493, de 10 de abril de 2024. Altera a Portaria de
+Consolidação GM/MS nº 6, de 28 de setembro de 2017, para instituir nova metodologia de cofinanciamento
+federal do Piso de Atenção Primária à Saúde no âmbito do Sistema Único de Saúde (SUS). Brasília: Ministério da
+Saúde, 2024. Disponível em: https://bvsms.saude.gov.br/bvs/saudelegis/gm/2024/prt3493_11_04_2024.html .
+
+BRASIL. Ministério da Saúde. Portaria GM/MS nº 6.907, de 29 de abril de 2025. Altera dispositivos da
+Portaria de Consolidação GM/MS nº 6, de 28 de setembro de 2017, da Portaria GM/MS nº 3.493, de 10 de abril de
+2024, e revoga dispositivos da Portaria Saps/MS nº 161, de 10 de dezembro de 2024, e da Portaria GM/MS nº
+5.668, de 1º de novembro de 2024, que dispõem sobre a metodologia de cofinanciamento federal do Piso de
+Atenção Primária à Saúde - APS no âmbito do Sistema Único de Saúde - SUS. Brasília: Ministério da Saúde,
+2025. Disponível em: https://bvsms.saude.gov.br/bvs/saudelegis/gm/2025/prt6907_08_05_2025.html .
+
+BRASIL. Ministério da Saúde. Portaria GM/MS nº 7.639, de 18 de julho de 2025. Altera a Portaria de
+Consolidação GM/MS nº 1, de 28 de setembro de 2017. Disponível
+em: https://bvsms.saude.gov.br/bvs/saudelegis/gm/2025/prt7639_22_07_2025.html .
+
+BRASIL. Ministério da Saúde. Portaria GM/MS nº 7.799, de 20 de agosto de 2025 . Altera a Portaria de
+Consolidação GM/MS nº 6, de 28 de setembro de 2017 e a Portaria GM/MS nº 3.493, de 10 de abril de 2024, bem
+como revoga a Portaria GM/MS nº 5.668, de 1º de novembro de 2024, para dispor sobre a metodologia de
+cofinanciamento federal do Piso de Atenção Primária à Saúde - APS no âmbito do Sistema Único de Saúde - SUS
+e o incentivo financeiro federal de custeio das equipes de Consultório na Rua - eCR e equipes de Atenção
+Primária Prisional - eAPP, e dispor sobre os eixos temáticos do componente de qualidade para as equipes de
+Saúde da Família Ribeirinha - eSFR. Disponível
+em: https://bvsms.saude.gov.br/bvs/saudelegis/gm/2025/prt7799_21_08_2025.html .
+
+BRASIL. Ministério da Saúde. Secretaria de Atenção Primária à Saúde. Nota Metodológica de Vínculo e
+Acompanhamento Territorial. Brasília: Ministério da Saúde, 2024. Disponível
+em: https://www.gov.br/saude/pt-br/centrais-de-conteudo/publicacoes/notastecnicas/2024/nota-
+metodologica.pdf .
+
+BRASIL. Ministério da Saúde. Secretaria de Atenção Primária à Saúde. Portaria SAPS/MS nº 161, de 10 de
+dezembro de 2024. Estabelece a metodologia de cálculo do Componente Vínculo e Acompanhamento
+Territorial para as equipes de Saúde da Família - eSF, equipes de Atenção Primária - eAP, e as equipes
+vinculadas em conformidade com o Título II da Portaria de Consolidação GM/MS nº 6, de 28 de setembro de
+2017. Brasília: Ministério da Saúde, 2024. Disponível em:
+https://sisaps.saude.gov.br/sistemas/sisab/assets/files/portaria-N161-10dezembro-2024-metodologia-
+componente-II-53193c899c28ff8da0d0446fe61fa8c5.pdf .
+
+BRASIL. Ministério da Saúde. Secretaria de Atenção Primária à Saúde. Portaria de Consolidação nº 1
+SAPS/MS, de 2 de junho de 2021. Consolidação das normas sobre Atenção Primária à Saúde. Brasília:
+Ministério da Saúde, 2021. Disponível em:
+https://bvsms.saude.gov.br/bvs/saudelegis/saps/2021/prc0001_08_06_2021.html .
+
+
+NOTA DE RODAPÉ:
+1. Na seção 2.7 , houve adequação da referência da normativa que estabelece o prazo de envio de dados.
+2. Na Seção 4.3.3 , Quadro 3, foram corrigidas as descrições dos indicadores B4 e B5, que se encontravam invertidas na versão anterior. A inconsistência não alterava a
+metodologia de cálculo, mas comprometia a correspondência entre os indicadores, seus respectivos pesos e os valores apresentados no exemplo, sendo, portanto,
+ajustados os registros da coluna “Nota” e a “Nota Final” do quadro para garantir a coerência das informações.
+3. Na Seção 5.1 , Quadro 5, foram detalhadas as faixas de classificação da coluna “Nota Final do Componente II”, com o objetivo de aprimorar a clareza na interpretação
+
+
+
+                                  Nota Técnica 8 (0055690090)                        SEI 25000.216796/2025-16 / pg. 4
+dos intervalos.
+4. Na Seção 5.1 , Quadro 6, foram detalhadas as faixas de classificação da coluna “Nota Final do Componente III”, bem como corrigida a representação do símbolo
+associado à categoria “Regular”.
+
+                Documento assinado eletronicamente por Audrey Fischer, Diretor(a) do Departamento de Estratégias,
+                Acreditação e Componentes da Atenção Primária à Saúde, em 29/05/2026, às 11:47, conforme horário
+                oficial de Brasília, com fundamento no § 3º, do art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art.
+                8º, da Portaria nº 900 de 31 de Março de 2017.
+                Documento assinado eletronicamente por José Eudes Barroso Vieira, Diretor(a) do Departamento de
+                Saúde da Família, em 29/05/2026, às 14:31, conforme horário oficial de Brasília, com fundamento no § 3º, do
+                art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de
+                2017.
+                Documento assinado eletronicamente por Karina Correa Wengerkievicz, Diretor(a) do Departamento de
+                Gestão do Cuidado Integral, em 29/05/2026, às 17:39, conforme horário oficial de Brasília, com fundamento
+                no § 3º, do art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de
+                Março de 2017.
+                Documento assinado eletronicamente por Angela Fernandes Leal da Silva, Diretor(a) do Departamento
+                de Promoção da Saúde, em 01/06/2026, às 14:04, conforme horário oficial de Brasília, com fundamento no §
+                3º, do art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março
+                de 2017.
+                Documento assinado eletronicamente por Rodrigo Andre Cuevas Gaete, Coordenador(a)-Geral de
+                Inovação e Aceleração Digital da Atenção Primária à Saúde, em 01/06/2026, às 15:24, conforme horário
+                oficial de Brasília, com fundamento no § 3º, do art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art.
+                8º, da Portaria nº 900 de 31 de Março de 2017.
+                Documento assinado eletronicamente por Ana Luiza Ferreira Rodrigues Caldas, Secretário(a) de Atenção
+                Primária à Saúde, em 01/06/2026, às 19:02, conforme horário oficial de Brasília, com fundamento no § 3º, do
+                art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de
+                2017.
+
+
+                A autenticidade deste documento pode ser conferida no site
+                http://sei.saude.gov.br/sei/controlador_externo.php?acao=documento_conferir&id_orgao_acesso_externo=0,
+                informando o código verificador 0055690090 e o código CRC F6E2FD7F.
+
+
+
+Referência: Processo nº 25000.216796/2025-16                                                                                                      SEI nº 0055690090
+                                                        Departamento de Saúde da Família - DESF
+                                                  Departamento de Gestão do Cuidado Integral - DGCI
+                             Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde - DEAPS
+                            Esplanada dos Ministérios, Bloco O - Bairro Zona Cívico-Administrativa, Brasília/DF, CEP 70058-900
+                                                                   Site - saude.gov.br
+
+
+
+
+                                  Nota Técnica 8 (0055690090)                       SEI 25000.216796/2025-16 / pg. 5
+

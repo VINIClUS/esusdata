@@ -1,0 +1,384 @@
+                                                   Ministério da Saúde
+                                         Secretaria de Atenção Primária à Saúde
+                   Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde
+
+
+                          NOTA METODOLÓGICA C5 - CUIDADO DA PESSOA COM HIPERTENSÃO
+
+1.           INDICADOR
+1.1.         Cuidado da pessoa com hipertensão na Atenção Primária à Saúde (APS).
+2.           OBJETIVO
+2.1.          Tem como objetivo avaliar o acesso e monitoramento efetivo do cuidado integral à saúde das pessoas com
+hipertensão, com incentivo à captação precoce e acompanhamento coordenado e contínuo na APS.
+3.           FICHA DE QUALIFICAÇÃO
+               N Título                Descrição
+                   Contextualização do indicador
+               1 Título resumido        Cuidado à pessoa com hipertensão na APS.
+               2 Título completo        Cuidado da pessoa com hipertensão na Atenção Primária à Saúde.
+               3 Palavras-chave         Hipertensão arterial; Condições crônicas; Longitudinalidade; Cuidado integral.
+                                        Monitoramento da atenção integral e do cuidado longitudinal das pessoas com hipertensão na
+                    Contextualização
+               4                        aplicação de boas práticas de cuidado na APS, considerando as evidências e diretrizes clínicas
+                    do indicador
+                                        pertinentes.
+                                        Pessoa com hipertensão: pessoa identificada a partir de atendimento individual com a condição
+                    Conceitos
+               5                        avaliada de hipertensão, realizada por enfermeira(o) e/ou médica(o) da APS, no Modelo de
+                    importantes
+                                        Informação de Atendimento Individual (MIAI), em pelo menos uma ocasião desde 2013.
+                                        Avaliar o acesso, acompanhamento contínuo e monitoramento efetivo das pessoas com
+               6 Objetivo               hipertensão arterial em relação aos episódios de cuidados necessários, com incentivo a
+                                        captação precoce, acompanhamento coordenado e contínuo na APS.
+                                        Permitir que profissionais de saúde e gestores acompanhem a evolução das boas práticas, com
+               7 Uso/aplicabilidade     o intuito de monitorar as ações de promoção da saúde, prevenção de agravos, o manejo, a
+                                        captação, o acesso, o acolhimento e o acompanhamento da pessoa com hipertensão na APS.
+                   Regularidade do Indicador
+                    Periodicidade da
+               8                        Mensal.
+                    atualização
+                    Periodicidade do
+               9                        Mensal.
+                    monitoramento
+                    Periodicidade da
+               10                       Quadrimestral.
+                    avaliação
+                    Dia de extração dos SIAPS: 20º dia útil de cada mês.
+               11
+                    dados               SCNES: A última competência válida.
+                   Escopo da base de dados de acompanhamento
+                                        · Consulta por profissional médica(o) ou enfermeira(o).
+                                        · Registro de aferição de pressão arterial.
+               12 Evento
+                                        · Registro de peso e altura para avaliação antropométrica.
+                                        · Visita domiciliar de ACS/TACS.
+                    Período de
+               13                       Mensal.
+                    acompanhamento
+                                        Pessoa vinculada às equipes de Saúde da Família (eSF) ou Atenção Primária (eAP), conforme
+                                        regras da Nota Técnicaº 30/2025-CGESCO/DESCO/SAPS/MS, com ao menos uma condição
+                    Entrada no
+               14                       avaliada igual à Hipertensão, conforme condição Classificação Internacional de Doenças, 10ª
+                    acompanhamento
+                                        revisão (CID-10) ou Classificação Internacional de Atenção Primária, 2ª edição (CIAP-2), em pelo
+                                        menos uma ocasião desde 2013.
+               15 Interrupção do        · Usuárias(os) que a atualização mais recente do cadastro individual possua a opção “Saída do
+                  acompanhamento        cidadão do cadastro” com a opção “Mudança de território” marcada.
+                                        · Mudança de equipe, considerando critérios de desempate previstos na Portaria SAPS/MS nº
+                                        161/2024.
+N Título               Descrição
+                       . Usuário que tenha todas as condições ou problemas marcados como "resolvidos" no PEC,
+                       relacionados ao CID-10 e/ou CIAP-2 elegíveis para este indicador.
+                       · Óbito no CadSUS.
+                       (A) Ter pelo menos 01 (uma) consulta presencial ou remota realizadas por médica(o) ou
+                       enfermeira(o), nos últimos 06 (seis) meses.
+                       (B) Ter pelo menos 01 (um) registro de aferição de pressão arterial realizado nos últimos 06
+                       (seis) meses.
+16 Boas práticas
+                       (C) Ter pelo menos 01 (um) registro simultâneos de peso e altura realizado nos últimos 12 (doze)
+                       meses.
+                       (D) Ter pelo menos 02 (duas) visitas domiciliares realizadas por ACS/TACS, com intervalo mínimo
+                       de 30 (trinta) dias, nos últimos 12 (doze) meses.
+17 Datas relevantes     Não se aplica.
+ Procedimentos para o desenvolvimento do indicador
+18 Unidade de medida Percentual.
+     Descritivo     da
+19                     %
+     Unidade de Medida
+20 Status do indicador Acumulativo: Não.
+21 Granularidade        Identificador Nacional de Equipe (INE).
+22 Polaridade           Maior-melhor
+                      Numerador:
+                      Somatório das boas práticas pontuadas para a pessoa com hipertensão no período.
+23 Fórmula de Cálculo
+                      Denominador:
+                      Nº total de pessoas com hipertensão vinculadas à equipe no período.
+24 Método de cálculo I. Regras gerais:
+                      a) Identificação da pessoa assistida:
+                      · Nome, data de nascimento, Cadastro de Pessoa Física (CPF) ou Cartão Nacional de Saúde (CNS)
+                      válido por pessoa, em conformidade com o Sistema de Cadastramento de Usuários do Sistema
+                      Único de Saúde (CadSUS).
+                      b) Validação das equipes:
+                      · Serão consideradas equipes de Saúde da Família (eSF), e equipes de Atenção Primária (eAP),
+                      tipo 70 e 76, respectivamente, atendendo as condições previstas na Portaria GM/MS nº
+                      3.493/2024.
+                      · A boa prática (D) não será condicionante de pontuação para eAP, tipo 76, atendendo as
+                      condições previstas na PRC GM/MS nº 02/2017.
+                      c) Grupos de CBO utilizados para todas as consultas de atendimento individual, presencial ou
+                      remoto:
+                      · 2235 - Enfermeiros
+                      · 2231 / 2251 / 2252 / 2253 - Médicos
+                      d) Grupos de CBO utilizados para todos os procedimentos listados, com exceção do
+                      03.01.01.025-0 (teleconsulta na APS):
+                      · 2235 - Enfermeiros
+                      · 2231 / 2251 / 2252 / 2253 - Médicos
+                      · 2232 - Cirurgiões-dentistas
+                      · 2234 - Farmacêuticos
+                      · 2236 - Fisioterapeutas
+                      · 2238 - Fonoaudiólogos
+                      · 2237 - Nutricionistas
+                      · 2241 - Profissionais de Educação Física
+                      · 3222 - Técnico de enfermagem e auxiliar de enfermagem
+                      · 2239 - Terapeutas ocupacionais, ortopedistas e psicomotricistas
+                      · 5151-05 - Agente Comunitário de Saúde
+                      · 3222-55 - Técnico em Agente Comunitário de Saúde
+                      · 3224 - Técnicos em Saúde Bucal
+                      e) Modelos de Informação da Estratégia eSUS APS:
+                      Serão considerados os seguintes modelos de informação:
+                      · Modelo de Informação de Atendimento Individual (MIAI): considera o Atendimento Individual
+                      (presencial, domiciliar e remoto) com identificação do Problema/Condição Avaliada, desde que
+                      registrado por profissionais de saúde dos CBO supracitados, com CNS profissional identificado.
+                      · Modelo de Informação de Procedimentos (MIP): considera os procedimentos realizados
+                      conforme a tabela do Sistema de Gerenciamento da Tabela de Procedimentos, Medicamentos e
+                      OPM do SUS (SIGTAP), desde que registrado por profissionais de saúde dos CBO supracitados,
+                      com CNS profissional identificado.
+                      · Modelo de informação de Visita Domiciliar e Territorial (MIVDT): considera o registro de visitas
+                      domiciliares, com preenchimento do ‘‘motivo da visita’’, desde que registrado por ACS/TACS,
+               N Título                     Descrição
+                                            com CNS profissional identificado.
+                                            f) CID-10 e/ou CIAP-2 ativos considerados para critérios de elegibilidade:
+                                            · CIAP-2: K86; K87; e/ou
+                                            · CID-10: I10; I11; I11.0; I11.9; I12; I12.0; I12.9; I13; I13.0; I13.1; I13.2; I13.9; I15; I15.0; I15.1;
+                                            I15.2; I15.8; I15.9; O10; O10.0; O10.1; O10.2; O10.3; O10.4; O10.9; O11.
+                                            g) Código do procedimento (o procedimento só é válido respeitando-se as habilitações de CBO
+                                            previstos na tabela SIGTAP):
+                                            · 01.01.04.002-4 - Avaliação antropométrica
+                                            · 01.01.04.008-3 - Medição de peso
+                                            · 01.01.04.007-5 - Medição de altura
+                                            · 03.01.10.003-9 - Aferição da pressão arterial
+                                            · 03.01.01.003-0 - Consulta de profissionais de nível superior na atenção primária (exceto
+                                            médico)
+                                            · 03.01.01.006-4 - Consulta médica em atenção primária
+                                            · 03.01.01.025-0 - Teleconsulta na atenção primária
+                    Categorias         de
+               25                           Brasil, regiões, unidade federativa, municípios, CNES e INE.
+                    análise
+                                            Siaps
+               26 Fonte de dados
+                                            SCNES
+                Análise do indicador
+                                            A transição do perfil demográfico e epidemiológico com o aumento da expectativa de vida no
+                                            país, gera mudanças nos padrões de morbimortalidade. Essas mudanças estão relacionadas ao
+                                            aumento da prevalência das condições crônicas não transmissíveis, como a hipertensão. Os
+                    Interpretação em
+               27                           dados apresentados pelo indicador serão essenciais para a compreensão de como se dá o
+                    saúde
+                                            cuidado integral da pessoa com hipertensão na APS, e para subsidiar a tomada de decisões
+                                            visando induzir o avanço da implementação de boas práticas fundamentais para garantia da
+                                            melhoria contínua da qualidade de vida nos territórios.
+               28 Ano de referência         2024.
+                    Indicadores
+               29                           Não se aplica.
+                    relacionados
+                                            Ótimo: > 75 e ≤ 100
+                                            Bom: > 50 e ≤ 75
+               30 Parâmetro
+                                            Suficiente: > 25 e ≤ 50
+                                            Regular: ≤ 25
+                    Classificação
+               31                           Indicador de resultado.
+                    gerencial
+                    Classificação de
+               32                           Indicador de efetividade.
+                    desempenho
+                Limitações
+                                            Considerando que há necessidade de registro qualificado da informação em campo específico, é
+                                            possível que os resultados sejam limitados por dificuldades de registro pelos profissionais de
+               33 Limitações
+                                            saúde no prontuário eletrônico, assim como o envio tardio da informação pela gestão local.
+                                            Há possibilidade de lapso temporal na identificação da ocorrência de óbitos no CadSUS.
+                Responsabilidades
+                                            Coordenação-Geral de Inovação e Aceleração Digital na APS (CGIAD)
+                                            e-mail: https://webatendimento.saude.gov.br/faq/saps
+               34 Gerencial
+                                            Setor: Deaps/Saps/MS
+                                            Telefone: (61) 3315- 9018
+                                            Coordenação-Geral de Prevenção às Condições Crônicas na APS (CGCOC)
+                                            e-mail: cgcoc@saude.gov.br
+                                            Setor: DEPROS/Saps/MS
+                                            Telefone: (61) 3315-6101
+               37 Técnica
+                                            Departamento de Promoção da Saúde (DEPROS)
+                                            e-mail: deppros@saude.gov.br
+                                            Setor: Saps/MS
+                                            Telefone: (61) 3315-6101
+
+
+
+4.           CADERNO DE CÁCULO
+4.1.           Definição de pessoa com hipertensão: são consideradas no denominador as pessoas com hipertensão
+identificadas como ativas na competência avaliada. Para a identificação das pessoas com hipertensão serão utilizadas as
+condições ou problemas “ativos” informados. As pessoas com condições ou problemas “resolvidos” ou “concluídos” não
+serão contabilizadas para o período de referência.
+4.2.           Para garantir que todos os municípios possam fazer o monitoramento da sua situação em relação a esses
+indicadores, acompanhar o progresso e fazer um cálculo preliminar dos seus resultados, serão considerados os modelos de
+informação publicados previamente pela Secretaria de Atenção Primária à Saúde, do Ministério da Saúde, no âmbito do e-
+SUS APS, através do sítio eletrônico: https://sisaps.saude.gov.br/sistemas/sisab/docs/modelos/intro/.
+4.3.         O numerador é constituído pela soma das boas práticas pontuadas durante o acompanhamento da pessoa
+com hipertensão. A pontuação pode alcançar um valor máximo de 100 pontos, para cada pessoa no período, conforme
+Quadro 01.
+4.4.           Atenção: é importante destacar que para as boas práticas, serão considerados os registros de qualquer
+profissional habilitado em estabelecimento de saúde da APS, no país.
+
+             Quadro 01. Boas práticas de cuidado da pessoa com hipertensão
+                                                                  Boas Práticas                                                   Pontos
+                   Ter pelo menos 01 (uma) consulta presencial ou remota realizadas por médica(o) ou enfermeira(o), nos
+               (A)                                                                                                                    25
+                   últimos 06 (seis) meses.
+               (B) Ter pelo menos 01 (um) registro de aferição de pressão arterial realizado nos últimos 06 (seis) meses.             25
+               (C) Ter pelo menos 01 (um) registro simultâneos de peso e altura realizado nos últimos 12 (doze) meses.                25
+                     Ter pelo menos 02 (duas) visitas domiciliares realizadas por ACS/TACS, com intervalo mínimo de 30 (trinta)
+               (D)                                                                                                                    25
+                     dias, nos últimos 12 (doze) meses.
+                                                               Somatório em pontos                                                    100
+
+              Quadro 02. Detalhamento para composição da boa prática (A) pelo menos 01 (uma) consulta presencial ou
+remota realizadas por médica(o) ou enfermeira(o), nos últimos 06 (seis) meses.
+                Condicionante         Código/Campo                                       Descrição                          Observação
+                                  2251, 2252, 2253, 2231 Médicos                                                                  -
+                       CBO
+                                           2235           Enfermeiros                                                             -
+                                                         Modelo de Informação de Atendimento Individual, desde que
+                                         Registro de
+                  Modelo de                              registrado por profissionais de saúde dos CBO supracitados, com
+                                      atendimento da                                                                              -
+                  informação                             CNS profissional identificado, alocado conforme os códigos das
+                                    Estratégia e-SUS APS
+                                                         equipes descritos.
+
+              Quadro 03. Detalhamento para composição da boa prática (B) pelo menos 01 (um) registro de aferição de
+pressão arterial realizado nos últimos 06 (seis) meses.
+                 Condicionante            Código/Campo                                      Descrição                       Observação
+                                      2251, 2252, 2253, 2231      Médicos                                                         -
+                                               2235               Enfermeiros                                                     -
+                                                                  Técnico de Enfermagem; ou Auxiliar de Enfermagem; ou
+                                               3222                                                                               -
+                                                                  Técnico em Agente Comunitário de Saúde
+                                               2232               Cirurgiões-dentistas                                            -
+                                               2234               Farmacêuticos                                                   -
+                        CBO                    2236               Fisioterapeutas                                                 -
+                                               2238               Fonoaudiólogos                                                  -
+                                               2237               Nutricionistas                                                  -
+                                               2241               Profissionais de Educação Física                                -
+                                               2239               Terapeutas ocupacionais, ortoptistas e psicomotricistas         -
+                                               3224               Técnicos em Saúde Bucal                                         -
+                     Modelo de       Modelo de Informação de      Serão considerados os registros no campo “pressão               -
+                     informação       Atendimento Individual      arterial” (mmHg) específico do PEC ou código SIGTAP.
+                                                                  Serão considerados os registros com os códigos SIGTAP
+                                     Modelo de Informação de
+                                                                  especificados, com exceção do registro de procedimento
+                                         Procedimento
+                                                                  consolidado.
+                  Condicionante            Código/Campo                                    Descrição                          Observação
+                                      Modelo de Informação de     Serão considerados os registros no campo “pressão
+                                        Atividade Coletiva        arterial” (mmHg) específico do PEC ou código SIGTAP.
+                                      Modelo de Informação de Serão considerados os registros de pressão arterial no
+                                     Visita Domiciliar e Territorial campo específico.
+
+                      SIGTAP               03.01.10.003-9         Aferição da pressão arterial.                                      -
+
+               Quadro 04. Detalhamento para composição da boa prática (C) pelo menos 01 (um) registro simultâneos de
+peso e altura realizado nos últimos 12 (doze) meses.
+                  Condicionante           Código/Campo                                  Descrição                         Observação
+                                      2251, 2252, 2253, 2231    Médicos                                                          -
+                                              2235              Enfermeiros                                                      -
+                                                                Técnico de Enfermagem; ou Auxiliar de Enfermagem; ou
+                                              3222                                                                               -
+                                                                Técnico em Agente Comunitário de Saúde
+
+                                             5151-05            Agente Comunitário de Saúde                                      -
+
+                                              2232              Cirurgiões-dentistas                                             -
+                       CBO
+                                              2234              Farmacêuticos                                                    -
+                                              2236              Fisioterapeutas                                                  -
+                                              2238              Fonoaudiólogos                                                   -
+                                              2237              Nutricionistas                                                   -
+                                              2241              Profissionais de Educação Física                                 -
+                                              2239              Terapeutas ocupacionais, ortoptistas e psicomotricistas          -
+
+                                     Modelo de Informação de Serão considerados os registros de Peso e Altura do
+                                      Atendimento Individual campo específico do PEC.
+                                                             Serão considerados os registros com os códigos SIGTAP
+                                     Modelo de Informação de
+                                                             especificados, com exceção do registro de procedimento
+                                         Procedimento                                                                       Registros
+                    Modelo de                                consolidado.
+                                                                                                                          realizados no
+                    informação                               Serão considerados os registros no campo
+                                     Modelo de Informação de                                                               mesmo dia.
+                                                             “Antropometria” ou o registro de Peso e Altura do
+                                       Atividade Coletiva
+                                                             campo específico do PEC.
+                                     Modelo de Informação de Serão considerados os registros de peso e altura no
+                                    Visita Domiciliar e Territorial campo específico.
+
+                                          01.01.04.002-4        Avaliação antropométrica                                         -
+                      SIGTAP              01.01.04.008-3        Medição de peso                                                  -
+                                          01.01.04.007-5        Medição de altura                                                -
+
+              Quadro 05. Detalhamento para composição da boa prática (D) pelo menos 02 (duas) visitas domiciliares
+realizadas por ACS/TACS, com intervalo mínimo de 30 (trinta) dias, nos últimos 12 (doze) meses.
+                    Condicionante                    Código/Campo                                   Descrição                 Observação
+                                                                                    Técnico em Agente Comunitário de
+                                                        3222-55                                                                      -
+                         CBO                                                        Saúde
+
+                                                        5151-05                     Agente Comunitário de Saúde                      -
+
+                     Modelo de        Modelo de Informação de Visita Domiciliar e Serão considerados os registros de visita
+                                                                                                                                     -
+                     informação                       Territorial                 domiciliar.
+
+Esta nota revoga a NOTA METODOLÓGICA C5 - CUIDADO DA PESSOA COM HIPERTENSÃO (0050086608)
+5.             REFERÊNCIAS
+BARROSO, W. K. S. et al. Diretrizes Brasileiras de Hipertensão Arterial – 2020. Arquivos Brasileiros de Cardiologia, v. 116, n. 3,
+p: 516-658, 2021.
+BRASIL. Ministério da saúde Secretaria de Atenção Primária à Saúde. Departamento de Atenção Básica. Estratégia para o
+cuidado da pessoa com doença crônica: Hipertensão arterial sistêmica. Brasília: Ministério da Saúde, 2014.
+ BRASIL. Ministério da Saúde. Secretaria de Vigilância em Saúde e Ambiente. Departamento de Análise Epidemiológica e
+ Vigilância de Doenças Não Transmissíveis. Vigitel Brasil 2023: vigilância de fatores de risco e proteção para doenças crônicas
+ por inquérito telefônico: estimativas sobre frequência e distribuição sociodemográfica de fatores de risco e proteção para
+ doenças crônicas nas capitais dos 26 estados brasileiros e no Distrito Federal em 2023. Brasília: Ministério da Saúde, 2023.
+ CAMPBELL et al. World Health Organization guideline on pharmacological treatment of hypertension: Policy implications for
+ the region of the Americas. The Lancet Regional Health – Americas, v. 9, p. 100219, 2022.
+ INSTITUTO BRASILEIRO DE GEOGRAFIA E ESTATÍSTICA. Pesquisa Nacional de Saúde 2019: Ciclos de vida: Brasil. Rio de
+ Janeiro: IBGE, 2021.
+ MANCIA et al. ESH Guidelines for the management of arterial hypertension The Task Force for the management of arterial
+ hypertension of the European Society of Hypertension: Endorsed by the International Society of Hypertension (ISH) and the
+ European Renal Association (ERA). Journal of Hypertension, n. 41, v.12, p. 1874-2071, 2023.
+ PRÉCOMA, D. B. et al. Atualização da Diretriz de Prevenção Cardiovascular da Sociedade Brasileira de Cardiologia – 2019.
+ Arquivos Brasileiros de Cardiologia, v. 113, n.4, p. 787-891, 2019.
+
+
+NOTA DE RODAPÉ:
+1. Na Seção 3, item 6, foi atualizada a redação do objetivo para contemplar acompanhamento contínuo e monitoramento efetivo das pessoas com hipertensão arterial.
+2. Na Seção 3, item 14, foi atualizada a referência normativa para a Nota Técnica nº 30/2025-CGESCO/DESCO/SAPS/MS.
+3. Na Seção 3, item 24-d, foi incluído o CBO 3224 - Técnicos em Saúde Bucal.
+4. Na Seção 4, quadro 3, foram incluídos CBO previstos no atributo do SIGTAP 03.01.10.003-9 - Aferição de Pressão Arterial (2232 - Cirurgiões-dentistas, 2234 - Farmacêuticos, 2236 -
+Fisioterapeutas, 2238 - Fonoaudiólogos, 2237 - Nutricionistas, 2241- Profissionais de Educação Física, 2239 - Terapeutas ocupacionais, ortoptistas e psicomotricistas e 3224 - Técnicos em Saúde
+Bucal) e retirado o CBO 5151-05 - Agente Comunitário de Saúde.
+5. Na Seção 4, quadro 4, foram incluídos novos CBO (2232 - Cirurgiões-dentistas, 2234 - Farmacêuticos, 2236 - Fisioterapeutas, 2238 - Fonoaudiólogos, 2237 - Nutricionistas, 2241- Profissionais
+de Educação Física e 2239 - Terapeutas ocupacionais, ortoptistas e psicomotricistas).
+
+                      Documento assinado eletronicamente por Audrey Fischer, Diretor(a) do Departamento de Estratégias, Acreditação e
+                      Componentes da Atenção Primária à Saúde, em 19/06/2026, às 16:35, conforme horário oficial de Brasília, com
+                      fundamento no § 3º, do art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de
+                      Março de 2017.
+
+                      Documento assinado eletronicamente por Angela Fernandes Leal da Silva, Diretor(a) do Departamento de Promoção da
+                      Saúde, em 21/06/2026, às 06:41, conforme horário oficial de Brasília, com fundamento no § 3º, do art. 4º, do Decreto nº
+                      10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de 2017.
+
+
+                     A autenticidade deste documento pode ser conferida no site http://sei.saude.gov.br/sei/controlador_externo.php?
+                     acao=documento_conferir&id_orgao_acesso_externo=0, informando o código verificador 0056042518 e o código CRC
+                     4029BF7F.
+
+
+
+Referência: Processo nº 25000.137969/2025-22                                                                                                                              SEI nº 0056042518
+
+                                         Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde - Deaps
+                                        Esplanada dos Ministérios, Bloco G - Bairro Zona Cívico-Administrativa, Brasília/DF, CEP 70058-900
+                                                                               Site - saude.gov.br
+

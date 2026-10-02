@@ -1,0 +1,460 @@
+                                                    Ministério da Saúde
+                                          Secretaria de Atenção Primária à Saúde
+                    Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde
+
+
+                        NOTA METODOLÓGICA C2 - CUIDADO NO DESENVOLVIMENTO INFANTIL
+
+1.           INDICADOR
+1.1.         Cuidado no desenvolvimento infantil na Atenção Primária à Saúde.
+2.           OBJETIVO
+2.1.          Tem como objetivo avaliar o acesso e monitoramento efetivo das crianças até dois anos de idade em relação
+aos episódios de cuidados necessários, com incentivo a captação precoce e acompanhamento coordenado e contínuo na
+APS.
+3.           FICHA DE QUALIFICAÇÃO
+
+                Nº           Título                                                 Descrição
+                Contextualização do indicador
+                1      Título resumido       Cuidado no desenvolvimento infantil.
+                2      Título completo       Cuidado no desenvolvimento infantil na Atenção Primária à Saúde.
+                                             Saúde da criança; Lactente; Desenvolvimento infantil; cuidado da criança; Crescimento
+                3      Palavras-chave
+                                             infantil.
+                                             Monitoramento da atenção integral e do cuidado longitudinal no desenvolvimento
+                       Contextualização
+                4                            infantil. Conjunto de boas práticas relacionadas à promoção da saúde e do
+                       do indicador
+                                             desenvolvimento infantil nos 02 (dois) primeiros anos de vida.
+                       Conceitos             Puericultura: conjunto de ações voltadas à vigilância do crescimento e desenvolvimento
+                5
+                       importantes           para promoção da atenção integral à saúde da criança.
+                                             Avaliar o acesso e acompanhamento efetivo das crianças com até 2 (dois) anos de idade
+                6      Objetivo              em relação aos episódios de cuidados necessários, com incentivo a captação precoce,
+                                             acompanhamento coordenado e contínuo na APS.
+                                             Permitir que profissionais de saúde e gestores acompanhem a evolução das boas práticas,
+                                             com o intuito de monitorar as ações de promoção da saúde, prevenção de agravos, o
+                7      Uso/aplicabilidade
+                                             manejo, a captação, o acesso, o acolhimento e o acompanhamento das crianças nos dois
+                                             primeiros anos de vida na APS.
+                Regularidade do Indicador
+                     Periodicidade da
+                8                         Mensal.
+                     atualização
+                     Periodicidade do
+                9                         Mensal.
+                     monitoramento
+                     Periodicidade da
+                10                        Quadrimestral.
+                     avaliação
+                       Dia de extração dos   SIAPS: 20º dia útil de cada mês.
+                11
+                       dados                 SCNES: A última competência válida.
+                Escopo da base de dados de acompanhamento
+                                         · Consulta por profissional médica(o) ou enfermeira(o).
+                                         · Registro de peso e altura para avaliação antropométrica.
+                                         · Visita domiciliar de ACS/TACS.
+                12 Evento
+                                         · Vacinação contra difteria, tétano, coqueluche, hepatite B, infecções causadas por
+                                         Haemophilus influenzae tipo b, poliomielite, sarampo, caxumba, rubéola e pneumocócica,
+                                         com todas as doses recomendadas.
+                     Período de
+                13                       Mensal.
+                     acompanhamento
+                                         Criança vinculada às equipes de Saúde da Família (eSF) ou Atenção Primária (eAP),
+                     Entrada no
+                14                       conforme regras da Nota Técnica n° 30/2025-CGESCO/DESCO/SAPS/MS, com até 02 (dois)
+                     acompanhamento
+                                         anos de vida no período.
+Nº          Título                                                  Descrição
+                         · Usuárias(os) que a atualização mais recente do cadastro individual possua a opção “Saída
+                         do cidadão do cadastro” com a opção “Mudança de território” marcada.
+     Interrupção do
+15                       · Mudança de equipe, considerando os critérios de desempate previstos na Portaria
+     acompanhamento
+                         SAPS/MS nº 161/2024.
+                         · Óbito no CADSUS.
+                         (A) Ter a 1ª consulta presencial realizada por médica(o) ou enfermeira(o), até o 30º dia de
+                         vida.
+                         (B) Ter pelo menos 09 (nove) consultas presenciais ou remotas realizadas por médica(o) ou
+                         enfermeira(o) até dois anos de vida.
+                         (C) Ter pelo menos 09 (nove) registros simultâneos de peso e altura até os dois anos de
+16 Boas práticas         vida.
+                         (D) Ter pelo menos 02 (duas) visitas domiciliares realizadas por ACS/TACS, sendo a primeira
+                         até os primeiros 30 (trinta) dias de vida e a segunda até os 06 (seis) meses de vida.
+                         (E) Ter vacinas contra difteria, tétano, coqueluche, hepatite B, infecções causadas por
+                         Haemophilus influenzae tipo b, poliomielite, sarampo, caxumba e rubéola, pneumocócica,
+                         registradas com todas as doses recomendadas.
+17 Datas relevantes       · 30° dia de vida.
+Procedimentos para o desenvolvimento do indicador
+18   Unidade de medida Percentual.
+     Descritivo da
+19                     %
+     Unidade de Medida
+20   Status do indicador Acumulativo: Não.
+21   Granularidade        Identificador Nacional de Equipe (INE).
+22   Polaridade           Maior-melhor.
+                        Numerador:
+                        Somatório das boas práticas pontuadas para cada criança com até 02 (dois) anos de vida
+23   Fórmula de Cálculo durante o acompanhamento do desenvolvimento infantil.
+                        Denominador:
+                        Nº total de crianças com até 02 (dois) anos de vida vinculadas à equipe no período.
+24   Método de cálculo    I. Regras gerais:
+                          a) Identificação da pessoa assistida:
+                           · Nome, data de nascimento, Cadastro de Pessoa Física (CPF) ou Cartão Nacional de Saúde
+                           (CNS) válido por pessoa, em conformidade com o Sistema de Cadastramento de Usuários
+                           do Sistema Único de Saúde (CadSUS).
+                           b) Validação das equipes:
+                           · Serão consideradas equipes de Saúde da Família (eSF), e equipes de Atenção Primária
+                           (eAP), tipo 70 e 76, respectivamente, atendendo as condições previstas na Portaria GM/MS
+                           nº 3.493/2024.
+                           . A boa prática (D) considera a pontuação integral para eAP, tipo 76.
+                          c) Grupos de CBO utilizados para todas as consultas de atendimento individual, presencial
+                          ou remoto:
+                           · 2235 - Enfermeiros
+                           · 2231 / 2251 / 2252 / 2253 - Médicos
+                          d) Grupos de CBO utilizados para todos os procedimentos listados, com exceção de
+                          03.01.01.026-9 (avaliação do crescimento na puericultura), 03.01.01.027-7 (avaliação do
+                          desenvolvimento da criança na puericultura) e 03.01.01.025-0 (teleconsulta na atenção
+                          primária):
+                            · 2235 - Enfermeiros
+                            · 2231 / 2251 / 2252 / 2253 - Médicos
+                            · 2232 - Cirurgiões-dentistas
+                            · 2234 - Farmacêuticos
+                            · 2236 - Fisioterapeutas
+                            · 2238 - Fonoaudiólogos
+                            · 2237 - Nutricionistas
+                            · 2241 - Profissionais de Educação Física
+                            · 3222 - Técnico de enfermagem e auxiliar de enfermagem
+                            · 2239 - Terapeutas ocupacionais, ortopedistas e psicomotricistas
+                            · 5151-05 - Agente Comunitário de Saúde
+                            · 3222-55 - Técnico em Agente Comunitário de Saúde
+
+                          e) Modelos de Informação da Estratégia e-SUS APS e Rede Nacional de Dados em Saúde:
+                          Serão considerados os seguintes modelos de informação:
+Nº   Título                                           Descrição
+                · Modelo de Informação de Atendimento Individual (MIAI): considera o Atendimento
+              Individual (presencial, domiciliar e remoto) com identificação do Problema/Condição
+              Avaliada, desde que registrado por profissionais de saúde dos CBO supracitados, com CNS
+              profissional identificado.
+               · Modelo de Informação de Procedimentos (MIP): considera os procedimentos realizados
+              conforme a tabela do Sistema de Gerenciamento da Tabela de Procedimentos,
+              Medicamentos e OPM do SUS (SIGTAP), desde que registrado por profissionais de saúde
+              dos CBO supracitados, com CNS profissional identificado.
+               · Modelo de informação de Visita Domiciliar e Territorial (MIVDT): considera o registro de
+              visitas domiciliares realizadas por ACS/TACS, devidamente identificados pelo CNS do
+              profissional, com preenchimento do campo ‘‘motivo da visita’’ selecionando as opções
+              ‘‘recém-nascido’’ ou “criança”. A avaliação será feita considerando o período estabelecido
+              na boa prática: primeira visita até 30 (trinta) dias de vida e segunda até 6 (seis) meses de
+              vida.
+                · Modelo de informação de Vacinação (MIV): considera o registro da aplicação dos
+              imunizantes, com identificação do imunobiológico e dados da estratégia, dose, lote e
+              fabricante, desde que registrado por profissionais de saúde dos CBO supracitados, com CNS
+              profissional identificado.
+                · Registro de Imunobiológico Administrado (RIA): considera as informações sobre a
+              aplicação de imunobiológicos, como vacinas, e faz parte da Rede Nacional de Dados em
+              Saúde (RNDS) que tem como objetivo padronizar o registro e compartilhamento dessas
+              informações, tanto em campanhas de vacinação quanto na rotina de imunização.
+
+              f) Código do procedimento (o procedimento só é válido respeitando-se as habilitações de
+              CBO previstos na tabela SIGTAP):
+                · 01.01.04.002-4 - Avaliação antropométrica
+                · 01.01.04.008-3 - Medição de peso
+                · 01.01.04.007-5 - Medição de altura
+                · 03.01.01.026-9 - Avaliação do crescimento na puericultura
+                · 03.01.01.027-7 - Avaliação do desenvolvimento da criança na puericultura
+                · 03.01.01.025-0 - Teleconsulta na atenção primária
+
+              g) Esquema de doses:
+              Esquema Primário:
+                   1) Vacina pentavalente: 3 doses de vacina(s) com os componentes difteria, tétano,
+                   pertussis (coqueluche), hepatite B e haemophilus influenzae tipo b (com intervalo
+                   mínimo de 30 dias entre as doses).
+                   Códigos de vacinas que devem ser considerados:
+                   09 – Vacina hepatite B (HepB)
+                   17 – Vacina Haemophilus influenzae (Hib)
+                   29 – Vacina penta acelular (DTPa/VIP/Hib)
+                   39 – Vacina tetra (DTP/Hib)
+                   42 – Vacina penta (DTP/ HepB/Hib)
+                   43 – Vacina hexa (DTPa/ HepB/VIP/Hib)
+                   46 – Vacina DTP (DTP)
+                   47 – Vacina DTPa infantil (DTPa)
+                   58 – Vacina tetra acelular (DTPa/VIP)
+
+                  2) Vacina pólio injetável (VIP): 3 doses de vacina(s) com os componentes da
+                  poliomielite na forma inativada (com intervalo mínimo de 30 dias entre as doses):
+                  Códigos de vacinas que devem ser considerados:
+                  22 – Vacina polio injetável (VIP)
+                  29 – Vacina penta acelular (DTPa/VIP/Hib)
+                  43 – Vacina hexa (DTPa/ HepB/VIP/Hib)
+                  58 – Vacina tetra acelular (DTPa/VIP)
+
+                  3) Vacina sarampo, caxumba, rubéola (SCR) e Vacina sarampo, caxumba, rubéola e
+                  varicela (SCRV): Duas doses de vacinas com os componentes sarampo, caxumba e
+                  rubéola (não devem ser consideradas doses registradas antes dos 12 meses de vida da
+                  criança).
+                  Códigos de vacinas que devem ser considerados:
+                  24 - Vacina sarampo, caxumba, rubéola (SCR)
+                  56 - Vacina sarampo, caxumba, rubéola e varicela (SCRV)
+                Nº          Título                                                  Descrição
+                                               4) Vacina pneumocócica 10-valente (VPC10): 2 doses de vacina(s) com o componente
+                                               da pneumocócica 10 valente conjugada (com intervalo mínimo de 30 dias entre as
+                                               doses).
+                                               Códigos de vacinas que devem ser considerados:
+                                               26 – Vacina pneumo 10 (VPC10)
+                                               59 – Vacina pneumo 13 (VPC13)
+                                               106 – Vacina adsorvida pneumocócica 15-valente (conjugada, polissacarídica) (VPC15)
+                                               107 – Vacina pneumo 20 (VPC20)
+                      Categorias de
+                25                        Brasil, regiões, unidade federativa, municípios, CNES e INE.
+                      análise
+                                          · Siaps
+                26    Fonte de dados      · SCNES
+                                          · RNDS
+                Análise do indicador
+                                          Os dois primeiros anos de vida são uma janela de oportunidade para promover a saúde e o
+                                          desenvolvimento integral das crianças, contribuindo para que tenham uma vida saudável e
+                      Interpretação em    atinjam seu pleno potencial, tendo diversas repercussões nos outros ciclos da vida. Os dados
+                27
+                      saúde               apresentados pelo indicador serão essenciais para a compreensão de como se dá o cuidado
+                                          integral à criança na APS, e para subsidiar a tomada de decisões visando induzir o avanço da
+                                          implementação de boas práticas fundamentais para garantir o melhor começo de vida.
+                28    Ano de referência   2024.
+                      Indicadores
+                29                        Não se aplica.
+                      relacionados
+                                          Ótimo: > 75 e ≤ 100
+                                          Bom: > 50 e ≤ 75
+                30    Parâmetro
+                                          Suficiente: > 25 e ≤ 50
+                                          Regular: ≤ 25
+                      Classificação
+                31                        Indicador de resultado.
+                      gerencial
+                      Classificação de
+                32                        Indicador de efetividade.
+                      desempenho
+                Limitações
+                                          · Considerando que há necessidade de registro qualificado da informação em campo
+                                          específico, é possível que os resultados sejam limitados por dificuldades de registro pelos
+                33    Limitações          profissionais de saúde no prontuário eletrônico, assim como o envio tardio da informação
+                                          pela gestão local.
+                                          · Há possibilidade de lapso temporal na identificação da ocorrência de óbitos no CadSUS.
+                Responsabilidades
+                                          Coordenação-Geral de Inovação e Aceleração Digital na APS (CGIAD)
+                                          e-mail: https://webatendimento.saude.gov.br/faq/saps
+                34    Gerencial
+                                          Setor: Deaps/Saps/MS
+                                          Telefone: (61) 3315- 9018
+                                          Coordenação-Geral de Atenção à Saúde das Crianças, Adolescentes e Jovens (CGCRIAJ)
+                                          e-mail: dgci@saude.gov.br
+                                          Setor: DGCI/Saps/MS
+                                          Telefone: (61) 3315-9135
+                                          Telefone: (61) 3315-8847
+                35    Técnica
+                                          Departamento de Gestão do Cuidado Integral (DGCI)
+                                          e-mail: dgci@saude.gov.br
+                                          Setor: Saps/MS
+                                          Telefone: (61) 3315-9135
+                                          Telefone: (61) 3315-8847
+
+4.           CADERNO DE CÁCULO
+4.1.          Definição de criança: são consideradas no denominador todas as crianças vinculadas à equipe com até dois
+anos de vida no período.
+4.2.           Para garantir que todos os municípios possam fazer o monitoramento da sua situação em relação a esses
+indicadores, acompanhar o progresso e fazer um cálculo preliminar dos seus resultados, serão considerados os modelos de
+informação publicados previamente pela Secretaria de Atenção Primária à Saúde, do Ministério da Saúde, no âmbito do e-
+SUS APS, através do sítio eletrônico: https://sisaps.saude.gov.br/sistemas/sisab/docs/modelos/intro/ .
+4.3.         O numerador é constituído pela soma das boas práticas pontuadas durante o acompanhamento de criança
+com até dois anos de idade. A pontuação pode alcançar um valor máximo de 100 pontos, para cada criança no período,
+conforme Quadro 01.
+4.4.           Atenção: é importante destacar que para as boas práticas, serão considerados os registros de qualquer
+profissional habilitado em estabelecimento de saúde da APS, no país.
+
+             Quadro 01. Boas práticas de cuidado no Desenvolvimento Infantil
+                                                                  Boas Práticas                                                    Pontos
+               (A) Ter a 1ª consulta presencial realizada por médica(o) ou enfermeira(o), até o 30º dia de vida.                    20
+                     Ter pelo menos 09 (nove) consultas presenciais ou remotas realizadas por médica(o) ou enfermeira(o) até
+               (B)                                                                                                                  20
+                     dois anos de vida.
+               (C) Ter pelo menos 09 (nove) registros simultâneos de peso e altura até os dois anos de vida.                        20
+                     Ter pelo menos 02 (duas) visitas domiciliares realizadas por ACS/TACS, sendo a primeira até os primeiros 30
+               (D)                                                                                                                  20
+                     (trinta) dias de vida e a segunda até os 06 (seis) meses de vida.
+                   Ter vacinas contra difteria, tétano, coqueluche, hepatite B, infecções causadas por Haemophilus influenzae
+               (E) tipo b, poliomielite, sarampo, caxumba e rubéola, pneumocócica, registradas com todas as doses                   20
+                   recomendadas.
+                                                              Somatório em pontos                                                   100
+
+             Quadro 02. Detalhamento para composição das boas práticas (A) 1ª consulta presencial realizada por
+médica(o) ou enfermeira(o), até o 30º dia de vida e (B) pelo menos 09 (nove) consultas presenciais ou remotas realizadas
+por médica(o) ou enfermeira(o) até dois anos de vida
+                Condicionante        Código/Campo                            Descrição                             Observação
+                                   2251, 2252, 2253,
+                                                       Médicos                                                          -
+                       CBO               2231
+                                          2235         Enfermeiros                                                      -
+                                                       Modelo de Informação de Atendimento Individual,
+                                       Registro de     desde que registrado por profissionais de saúde dos Com indicação de
+                 Modelo de
+                                    atendimento da CBO supracitados, com CNS profissional problema/condição
+                 informação
+                                  Estratégia e-SUS APS identificado, alocado conforme os códigos das avaliado “Puericultura”
+                                                       equipes descritos.
+
+               Quadro 03. Detalhamento para composição da boa prática (C) pelo menos 09 (nove) registros simultâneos de
+peso e altura até os dois anos de vida.
+                Condicionante            Código/Campo                                  Descrição                       Observação
+                                     2251, 2252, 2253, 2231    Médicos                                                       -
+                                              2235             Enfermeiros                                                   -
+                                                               Técnico de Enfermagem; ou Auxiliar de Enfermagem;
+                                              3222                                                                           -
+                        CBO                                    ou Técnico em Agente Comunitário de Saúde
+
+                                             5151-05           Agente Comunitário de Saúde                                   -
+                                              2232              Cirurgiões-dentistas                                         -
+                                              2234              Farmacêuticos                                                -
+                                              2236              Fisioterapeutas                                              -
+                                              2238              Fonoaudiólogos                                               -
+                                              2237              Nutricionistas                                               -
+                                              2241              Profissionais de Educação Física                             -
+                                                                Terapeutas ocupacionais, ortoptistas e
+                                              2239                                                                           -
+                                                                psicomotricistas
+                     Modelo de      Modelo de Informação de Serão considerados os registros de Peso e Altura do     Registros realizados
+                     informação      Atendimento Individual campo específico do PEC.                                  no mesmo dia.
+
+                                                            Serão considerados os registros com os códigos
+                                    Modelo de Informação de
+                                                            SIGTAP especificados, com exceção do registro de
+                                        Procedimento
+                                                            procedimento consolidado.
+                 Condicionante          Código/Campo                                Descrição                             Observação
+                                                           Serão considerados os registros no campo
+                                   Modelo de Informação de
+                                                           “Antropometria” ou o registro de Peso e Altura do
+                                     Atividade Coletiva
+                                                           campo específico do PEC.
+                                   Modelo de Informação de Serão considerados os registros de peso e altura no
+                                  Visita Domiciliar e Territorial campo específico.
+
+                                        01.01.04.002-4        Avaliação antropométrica                                         -
+
+                      SIGTAP            03.01.01.026-9        Avaliação do crescimento na puericultura                         -
+                                        01.01.04.008-3        Medição de peso                                                  -
+                                        01.01.04.007-5        Medição de altura                                                -
+
+              Quadro 04. Detalhamento para composição da boa prática (D) pelo menos 02 (duas) visitas domiciliares
+realizadas por ACS/TACS, sendo a primeira até os primeiros 30 (trinta) dias de vida e a segunda até os 06 (seis) meses de
+vida.
+                  Condicionante                    Código/Campo                                   Descrição                   Observação
+                                                                                  Técnico em Agente Comunitário de
+                                                       3222-55                                                                     -
+                        CBO                                                       Saúde
+
+                                                       5151-05                    Agente Comunitário de Saúde                      -
+
+                    Modelo de        Modelo de Informação de Visita Domiciliar e Serão considerados os registros de visita
+                                                                                                                                   -
+                    informação                       Territorial                 domiciliar.
+
+
+             Quadro 05. Detalhamento para composição da boa prática (E) ter vacinas contra difteria, tétano, coqueluche,
+hepatite B, infecções causadas por Haemophilus influenzae tipo b, poliomielite, sarampo, caxumba e rubéola,
+pneumocócica, registradas com todas as doses recomendadas.
+                 Condicionante            Código/Campo                                 Descrição                           Observação
+                                     Todos que submeterem o registro ao SIAPS ou à RNDS. Será considerado qualquer
+                CBO                                                                                                       -
+                                     registro de profissional habilitado em estabelecimento de saúde da APS, no país.
+                                                                    Registro do código da vacina no campo específico do
+                                     Modelo de Informação de
+                                                                    PEC e correta identificação da criança, com data de   -
+                Modelo de            Vacinação
+                                                                    nascimento e CPF ou CNS.
+                informação
+                                     Registro de Imunobiológico Registro da vacina ou transcrição, com todas as
+                                                                                                                          -
+                                     Administrado (RIA)             doses recomendadas.
+                                     09                             Vacina hepatite B                                     -
+                                     17                             Vacina Hib                                            -
+                                     22                             Vacina polio injetável                                -
+                                     29                             Vacina penta acelular (DTPa/VIP/Hib)                  -
+                                     26                             Vacina pneumo 10 (VPC10)                              -
+                                     43                             Vacina hexa (DTPa/ HepB/VIP/Hib)                      -
+                                     58                             Vacina tetra acelular (DTPa/VIP)                      -
+                                     24                             Vacina sarampo, caxumba, rubéola                      -
+                                     56                             Vacina sarampo, caxumba, rubéola e varicela (SCRV)    -
+                Códigos Vacinas      39                             Vacina tetra (DTP/Hib)                                -
+                                     42                             Vacina penta (DTP/ HepB/Hib)                          -
+                                     43                             Vacina hexa (DTPa/ HepB/VIP/Hib)                      -
+                                     46                             Vacina DTP                                            -
+                                     47                             Vacina DTPa infantil                                  -
+                                     58                             Vacina tetra acelular (DTPa/VIP)                      -
+                                     59                             Vacina pneumo 13 (VPC13)                              -
+                                                                    Vacina adsorvida pneumocócica 15-valente
+                                     106                                                                                  -
+                                                                    (conjugada, polissacarídica) (VPC15)
+                                     107                            Vacina pneumo 20 (VPC20)                              -
+
+Esta nota revoga a NOTA METODOLÓGICA C2 - CUIDADO NO DESENVOLVIMENTO INFANTIL (0049702562)
+5.            REFERÊNCIAS
+BRASIL. Ministério da Saúde. Manual de Normas e Procedimentos para Vacinação. Brasília: Ministério da Saúde, 2022.
+ BRASIL. Ministério da Saúde. Secretaria de Atenção à Saúde. Departamento de Atenção Básica. Saúde da criança:
+ crescimento e desenvolvimento. Brasília: Ministério da Saúde, 2012.
+ BRASIL. Ministério da Saúde. Saúde Bucal. Caderno de Atenção Básica, n° 17. Brasília: Ministério da Saúde, 2008.
+ BRASIL. Ministério da Saúde. Portaria nº 1.130, de 05 de agosto de 2015. Institui a a Política Nacional de Atenção Integral à
+ Saúde da Criança (PNAISC) no âmbito do Sistema Único de Saúde (SUS). 2015.
+ BRASIL. Ministério da Saúde. Secretaria de Atenção à Saúde. Departamento de Gestão do Cuidado Integral Coordenação-
+ Geral de Articulação do Cuidado Integral Coordenação de Atenção à Saúde da Criança e do Adolescente. Caderneta da
+ Criança. Passaporte da Cidadania. 7ª edição. Brasília: Ministério da Saúde, 2024a.
+ BRASIL. Ministério da Saúde. Secretaria de Vigilância em Saúde e Ambiente. Departamento do Programa Nacional De
+ Imunizações. Instrução Normativa do Calendário Nacional de Vacinação: 2024. 2024b.
+ BRASIL. Ministério da Saúde. Nota técnica conjunta nº 52/2023 - CACRIAD/CGACI/DGCI/SAPS/MS                                                                                      e
+ CGSB/DESCO/SAPS/MS. Definição de anquiloglossia. Brasília: Ministério da Saúde, 2023.
+ BRASIL. Ministério da Saúde. Gabinete do Ministro. Portaria de Consolidação N° 2, de 28 de setembro de 2017.
+ Consolidação das normas sobre as políticas nacionais de saúde do Sistema Único de Saúde. Brasília: Ministério da Saúde,
+ 2017.
+ BRASIL. Ministério da Saúde. Secretaria de Atenção Primaria à Saúde. Departamento de Promoção da Saúde. Guia alimentar
+ para crianças brasileiras menores de 2 anos. Brasília: Ministério da Saúde, 2019.
+ BRASIL. Ministério da Saúde. Guia para a organização da Vigilância Alimentar e Nutricional na Atenção Primária à Saúde
+ [recurso eletrônico] / Ministério da Saúde. Universidade Federal de Sergipe. – Brasília: Ministério da Saúde, 2022.
+ BRASIL. Ministério da Saúde. Secretaria de Atenção à Saúde. Departamento de Atenção Básica. A saúde bucal no Sistema
+ Único de Saúde [recurso eletrônico]. Brasília: Ministério da Saúde, 2018a.
+ BRASIL. Ministério da Saúde. Secretaria de Atenção à Saúde. Departamento de Ações Programáticas Estratégicas. Política
+ Nacional de Atenção Integral à Saúde da Criança: orientações para implementação/Ministério da Saúde. Secretaria de
+ Atenção à Saúde. Departamento de Ações Programáticas Estratégicas. – Brasília: Ministério da Saúde, 2018b.
+ DINIZ, Lílian Martins Oliveira; FIGUEIREDO, Bruna de Campos Guimarães. O sistema imunológico do recém-nascido. 2014.
+ Rev Med Minas Gerais 2014; v. 24, n. 2, pag. 227-233.
+
+
+NOTA DE RODAPÉ:
+1. Na Seção 3, item 14, foi atualizada a referência normativa para a Nota Técnica nº 30/2025-CGESCO/DESCO/SAPS/MS.
+2. Na Seção 4, quadro 2, foi incluída a especificação do Problema/Condição Avaliada "Puericultura" para composição da boa prática.
+3. Na Seção 4, quadro 3, inclusão de códigos CBO (2232, 2234, 2236, 2238, 2237, 2241 e 2239).
+4. Na Seção 4, quadro 5, foi atualizada a descrição do modelo de informação para contemplar registro da vacina, ou transcrição, com todas as doses recomendadas.
+
+                    Documento assinado eletronicamente por Audrey Fischer, Diretor(a) do Departamento de Estratégias, Acreditação e
+                    Componentes da Atenção Primária à Saúde, em 19/06/2026, às 16:35, conforme horário oficial de Brasília, com
+                    fundamento no § 3º, do art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de
+                    Março de 2017.
+
+                    Documento assinado eletronicamente por Olivia Lucena de Medeiros, Diretor(a) do Departamento de Gestão do Cuidado
+                    Integral, em 19/06/2026, às 18:04, conforme horário oficial de Brasília, com fundamento no § 3º, do art. 4º, do Decreto nº
+                    10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de 2017.
+
+                    Documento assinado eletronicamente por Sonia Isoyama Venancio, Coordenador(a)-Geral de Atenção à Saúde das
+                    Crianças, Adolescentes e Jovens, em 22/06/2026, às 14:54, conforme horário oficial de Brasília, com fundamento no § 3º,
+                    do art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de 2017.
+
+
+                    A autenticidade deste documento pode ser conferida no site http://sei.saude.gov.br/sei/controlador_externo.php?
+                    acao=documento_conferir&id_orgao_acesso_externo=0, informando o código verificador 0054824593 e o código CRC
+                    367B0942.
+
+
+
+Referência: Processo nº 25000.137969/2025-22                                                                                                                       SEI nº 0054824593
+
+                                       Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde - Deaps
+                                      Esplanada dos Ministérios, Bloco G - Bairro Zona Cívico-Administrativa, Brasília/DF, CEP 70058-900
+                                                                             Site - saude.gov.br
+

@@ -1,0 +1,224 @@
+                                                   Ministério da Saúde
+                                         Secretaria de Atenção Primária à Saúde
+                   Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde
+
+
+                                         NOTA METODOLÓGICA C1 - MAIS ACESSO
+
+1.           INDICADOR
+1.1.         Mais Acesso à Atenção Primária à Saúde (APS).
+2.           OBJETIVO
+2.1.          O indicador tem como objetivo verificar o percentual de acesso de demanda programada em relação ao total
+de demandas (espontânea e programada) na APS, bem como permitir a visualização de variações geográficas e temporais na
+oferta de atendimentos à demanda programada.
+3.           FICHA DE QUALIFICAÇÃO
+               N           Título                                                   Descrição
+                   Contextualização do indicador
+               1 Título resumido        Mais Acesso à APS.
+               2 Título completo        Mais Acesso à Atenção Primária à Saúde (APS).
+               3 Palavras-chave         Acesso Efetivo aos Serviços de Saúde; Acesso à Atenção Primária; Controle de Acesso.
+                    Contextualização    Verifica o percentual de acesso de demanda programada em relação ao total de demandas
+               4
+                    do indicador        (espontânea e programada) na APS.
+                                         · Demanda programada: consiste no atendimento à pessoa com necessidade de ações
+                                        programáticas individuais, direcionadas para os ciclos de vida, doenças e agravos prioritários e
+                                        que necessitam de acompanhamento contínuo (consulta agendada programada; cuidado
+                    Conceitos           continuado; e consulta agendada).
+               5
+                    importantes          · Demanda espontânea: consiste no atendimento à pessoa com necessidade de saúde que
+                                        exige atenção imediata, no mesmo dia, sem consulta previamente agendada (escuta inicial/
+                                        orientação; consulta no dia; e atendimento de urgência). Essa necessidade se refere a um
+                                        quadro de sofrimento agudo, com evolução de risco ou potencialidade de prevenção.
+                                        Verificar a relação de atendimentos de demanda programada realizados por profissionais da
+               6 Objetivo
+                                        APS e o total de atendimentos realizados.
+                                        Analisar variações geográficas e temporais na oferta de atendimentos à demanda programada
+               7 Uso/aplicabilidade     na Atenção Primária à Saúde, identificando situações de desigualdade e tendências que
+                                        demandem ações e estudos específicos.
+                   Regularidade do Indicador
+                    Periodicidade da
+               8                        Mensal.
+                    atualização
+                    Periodicidade do
+               9                        Mensal.
+                    monitoramento
+                    Periodicidade da
+               10                       Quadrimestral.
+                    avaliação
+                    Dia de extração dos SIAPS: 20º dia útil de cada mês.
+               11
+                    dados               SCNES: A última competência válida.
+                   Escopo da base de dados de acompanhamento
+               12 Evento                Atendimentos por consulta programada/continuada e espontânea.
+                  Período de
+               13                       Mensal.
+                  acompanhamento
+                    Entrada no
+               14                       Pessoa com registro de atendimentos programados/continuados e/ou espontâneos.
+                    acompanhamento
+                    Interrupção do
+               15                       Não se aplica.
+                    acompanhamento
+               16 Boas práticas         Não se aplica.
+               17 Datas relevantes      Não se aplica.
+                   Procedimentos para o desenvolvimento do indicador
+N           Título                                                  Descrição
+18 Unidade de medida Percentual.
+     Descritivo da
+19                     %
+     Unidade de Medida
+20 Status do indicador Acumulativo: Não.
+21 Granularidade        Identificador Nacional de Equipe (INE).
+22 Polaridade           Não se aplica.
+                      Numerador:
+                      Nº total de atendimentos por demanda programada (consulta agendada programada; cuidado
+23 Fórmula de Cálculo continuado; e consulta agendada).
+                      Denominador:
+                      Nº total de atendimentos por todos os tipos de demandas (espontâneas e programadas).
+                      I. Regras Gerais:
+                      a) Identificação da pessoa assistida:
+                      · Nome, data de nascimento, Cadastro de Pessoa Física (CPF) ou Cartão Nacional de Saúde (CNS)
+                      válido por pessoa, em conformidade com o Sistema de Cadastramento de Usuários do Sistema
+                      Único de Saúde (CadSUS).
+                      b) Validação das equipes:
+                      · Serão consideradas equipes de Saúde da Família (eSF), e equipes de Atenção Primária (eAP),
+                      tipo 70 e 76, respectivamente, atendendo as condições previstas na Portaria GM/MS n°
+                      3.493/2024.
+                      c) CBO utilizados para o cálculo do indicador:
+                      · 2251-42 - Médico da Estratégia de Saúde da Família
+                      · 2251-70 - Médico Generalista
+24 Método de cálculo
+                      · 2251-30 - Médico de Família e Comunidade
+                      · 2251-25 - Médico Clínico
+                      · 2252-50 - Médico Ginecologista e Obstetra
+                      · 2235-65 - Enfermeiro da Estratégia de Saúde da Família
+                      · 2235-05 - Enfermeiro
+                      d) Modelos de Informação da Estratégia e-SUS APS:
+                      · Modelo de informação de Atendimento Individual (MIAI): considera o Atendimento Individual
+                      (presencial, domiciliar e remoto) com identificação do tipo de demanda programada (consulta
+                      agendada programada; cuidado continuado; e consulta agendada), ou demanda espontânea
+                      (escuta inicial/ orientação; consulta no dia; e atendimento de urgência), desde que registrado
+                      por profissionais de saúde dos CBO supracitados, com CNS profissional identificado, alocado
+                      conforme códigos das equipes e CNES descritos.
+     Categorias de
+25                      Brasil, regiões, unidade federativa, municípios, CNES e INE.
+     análise
+                        · Siaps
+26 Fonte de dados
+                        · SCNES
+ Análise do indicador
+                        Uma equipe que apresenta baixa oferta de atendimentos programáticos/continuados pode
+   Interpretação em     estar desenvolvendo um modelo excessivamente centrado na demanda espontânea. Por outro
+27
+   saúde                lado, uma equipe que apresenta quase exclusivamente atendimentos
+                        programáticos/continuados pode não estar aberta à demanda espontânea.
+28 Ano de referência    2024.
+   Indicadores
+29                      Não se aplica.
+   relacionados
+                        Ótimo: > 50 e ≤ 70
+                        Bom: > 30 e ≤ 50
+30 Parâmetro
+                        Suficiente: > 10 e ≤ 30
+                        Regular: ≤ 10 ou > 70
+     Classificação
+31                      Indicador de processo.
+     gerencial
+     Classificação de
+32                      Indicador de efetividade.
+     desempenho
+ Limitações
+                        Considerando que há necessidade de registro qualificado da informação em campo específico, é
+33 Limitações           possível que os resultados sejam limitados por dificuldades de registro pelos profissionais de
+                        saúde no prontuário eletrônico, assim como o envio tardio da informação pela gestão local.
+ Responsabilidades
+34 Gerencial            Coordenação-Geral de Inovação e Aceleração Digital na APS (CGIAD)
+                        e-mail: https://webatendimento.saude.gov.br/faq/saps
+                          N            Título                                                                        Descrição
+                                                          Setor: Deaps/Saps/MS
+                                                          Telefone: (61) 3315- 9018
+                                                          Coordenação-Geral de Saúde da Família e Comunidade (CGESCO)
+                                                          e-mail: cgesco.desco@saude.gov.br
+                                                          Setor: Desf/Saps/MS
+                                                          Telefone: (61) 3315- 9053
+                         35 Técnica
+                                                          Departamento de Saúde da Família (Desf)
+                                                          e-mail: desf@saude.gov.br
+                                                          Setor: Saps/MS
+                                                          Telefone: (61) 3315-9041
+
+4.                    CADERNO DE CÁCULO
+4.1.           Definição de atendimentos demandas programadas e espontâneas: são considerados todos os atendimentos
+com campo de marcação no modelo de informação de Atendimento Individual, sendo o numerador a identificação do tipo de
+demanda programada (consulta agendada programada; cuidado continuado; e consulta agendada); e o denominador a
+identificação do tipo de demanda programada (consulta agendada programada; cuidado continuado; e consulta agendada)
+somadas ao tipo de demanda espontânea (escuta inicial/ orientação; consulta no dia; e atendimento de urgência), desde que
+registrados por profissionais de saúde dos CBO supracitados, com CNS profissional identificado, conforme códigos INE e CNES
+descritos.
+4.2.           Para garantir que todos os municípios possam fazer o monitoramento da sua situação em relação a esses
+indicadores, acompanhar o progresso e fazer um cálculo preliminar dos seus resultados, serão considerados os modelos de
+informação publicados previamente pela Secretaria de Atenção Primária à Saúde, do Ministério da Saúde, no âmbito do e-
+SUS APS, através do sítio eletrônico: https://sisaps.saude.gov.br/sistemas/sisab/docs/modelos/intro/ .
+
+
+                      Quadro 01. Detalhamento para composição do indicador
+                           Condicionante               Código/Campo                                                        Descrição                  Observação
+                                                             Tipo 70                Equipe de Saúde da Família (eSF)                                     40h
+                          Tipo de equipe
+                                                             Tipo 76                Equipe de Atenção Primária (eAP)                                  20h e 30h
+                                                            2251-42                 Médico da Estratégia de Saúde da Família                              -
+                                                            2251-70                 Médico Generalista                                                    -
+                                                            2251-30                 Médico de Família e Comunidade                                        -
+                                  CBO                      2251-25                  Médico Clínico                                                        -
+                                                           2252-50                  Médico Ginecologista e Obstetra                                       -
+                                                            2235-65                 Enfermeiro da Estratégia de Saúde da Família                          -
+                                                            2235-05                 Enfermeiro                                                            -
+                                                        Registro de                 Modelo de Informação de Atendimento Individual, desde que
+                              Modelo de                                             registrado por profissionais de saúde dos CBO supracitados, com
+                                                     atendimento da                                                                                       -
+                              informação                                            CNS profissional identificado, alocado conforme os códigos das
+                                                   Estratégia e-SUS APS
+                                                                                    equipes descritos.
+
+
+Esta nota revoga a NOTA METODOLÓGICA C1 - MAIS ACESSO (0050084955)
+5.                    REFERÊNCIAS
+CHÁVEZ, Giannina Marcela et al. Teorização da demanda por profissionais e usuários da estratégia saúde da família:
+espontânea, programada, reprimida. Texto & Contexto-Enfermagem, v. 29, p. e20180331, 2021.
+ESTEVÃO, Túlio; DE SOUSA, Milena Nunes Alves. Capacitação interprofissional sobre gestão da demanda, acolhimento e
+classificação de risco na Atenção Primária à Saúde. Revista Eletrônica Acervo Saúde, v. 23, n. 2, p. e12031-e12031, 2023.
+MOURA, Ricardo Amorim de et al. Atendimento à demanda espontânea na Estratégia Saúde da Família: práticas e reflexões
+de um processo em construção. Physis: Revista de Saúde Coletiva, v. 32, n. 1, p. e320103, 2022.
+SCHERER, Magda Duarte dos Anjos et al. Análise dos problemas vinculados aos padrões de qualidade da atenção primária no
+Distrito Federal. Saúde em Debate, v. 48, p. e8607, 2024.
+
+
+NOTA DE RODAPÉ:
+1. Na Seção 3, item 24 - c, foram incluídos os CBO 2251-25 - Médico Clínico e 2252-50 - Médico Ginecologista e Obstetra.
+2. Na Seção 4, quadro 01, foram incluídos os CBO 2251-25 - Médico Clínico e 2252-50 - Médico Ginecologista e Obstetra.
+                 Documento assinado eletronicamente por Audrey Fischer, Diretor(a) do Departamento de Estratégias, Acreditação e
+                 Componentes da Atenção Primária à Saúde, em 23/06/2026, às 14:00, conforme horário oficial de Brasília, com
+                 fundamento no § 3º, do art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de
+                 Março de 2017.
+
+                 Documento assinado eletronicamente por Ana Cláudia Cardozo Chaves, Coordenador(a)-Geral de Saúde da Família e
+                 Comunidade, em 23/06/2026, às 19:12, conforme horário oficial de Brasília, com fundamento no § 3º, do art. 4º, do
+                 Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de 2017.
+
+                 Documento assinado eletronicamente por José Eudes Barroso Vieira, Diretor(a) do Departamento de Saúde da Família,
+                 em 24/06/2026, às 12:06, conforme horário oficial de Brasília, com fundamento no § 3º, do art. 4º, do Decreto nº 10.543,
+                 de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de 2017.
+
+
+                 A autenticidade deste documento pode ser conferida no site http://sei.saude.gov.br/sei/controlador_externo.php?
+                 acao=documento_conferir&id_orgao_acesso_externo=0, informando o código verificador 0054814890 e o código CRC
+                 C114323A.
+
+
+
+Referência: Processo nº 25000.137969/2025-22                                                                                         SEI nº 0054814890
+
+                                 Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde - Deaps
+                                Esplanada dos Ministérios, Bloco G - Bairro Zona Cívico-Administrativa, Brasília/DF, CEP 70058-900
+                                                                       Site - saude.gov.br
+
