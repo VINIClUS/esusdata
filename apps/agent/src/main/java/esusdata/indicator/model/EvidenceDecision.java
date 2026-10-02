@@ -17,6 +17,12 @@ public enum EvidenceDecision {
     PRACTICE_NOT_MET,
     /** The ficha scores the practice without evidence (e.g. visits for eAP tipo 76). */
     PRACTICE_EXEMPT,
+    /**
+     * The practice could not be decided for this subject because the ficha is ambiguous for the
+     * case at hand (an {@code AMB-…} reading): no points (never 0) and a reason code that names the
+     * ambiguity. Never folded into {@link #PRACTICE_NOT_MET}.
+     */
+    PRACTICE_AMBIGUOUS,
     /** A source event that supports a practice decision of the same subject. */
     SUPPORTING_EVENT
 }
