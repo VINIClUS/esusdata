@@ -23,9 +23,9 @@ import java.util.function.Predicate;
  *   <li>Grupo 4 (pneumocócica): 2 doses, 30 days apart.
  * </ul>
  *
- * <p>A transcription (registro anterior) counts by its application date: the record carries no
- * registration date (AMB-C2-09 v is a standing limitation). The dose field is not read: doses are
- * applications (AMB-C2-09 iv).
+ * <p>Intervals count application dates; whether the 12-month and two-year limits use the application
+ * or the registration date of a transcription is a reading (AMB-C2-09 v). The dose field is not
+ * read: doses are applications (AMB-C2-09 iv).
  */
 final class VaccinePractice {
 
@@ -44,13 +44,19 @@ final class VaccinePractice {
             Reading.BIRTH_HEPATITIS_B,
             Reading.SHORT_INTERVAL_INVALIDATES,
             Reading.DOSES_AFTER_TWO_YEARS,
+            Reading.DOSE_BY_REGISTRATION_DATE,
             Reading.VACCINE_CBO_RESTRICTED,
             Reading.ANNIVERSARY_DAY_INSIDE,
             Reading.ANNIVERSARY_NEXT_DAY);
 
     private VaccinePractice() {}
 
-    private record Dose(LocalDate date, String code, String cbo, Support support) {}
+    /** {@code date} is the application; {@code registered} the day it was recorded (a transcription's is later). */
+    private record Dose(LocalDate date, LocalDate registered, String code, String cbo, Support support) {
+        LocalDate limitDate(Set<Reading> readings) {
+            return readings.contains(Reading.DOSE_BY_REGISTRATION_DATE) ? registered : date;
+        }
+    }
 
     static PracticeOutcome evaluate(ChildRecords child) {
         List<Dose> doses = doses(child);
@@ -71,7 +77,7 @@ final class VaccinePractice {
             }
         }
         NavigableSet<LocalDate> mmr =
-                dates(doses, C2Codes.MMR, d -> clock.fromMonths(d.date(), TWELVE_MONTHS, readings));
+                dates(doses, C2Codes.MMR, d -> clock.fromMonths(d.limitDate(readings), TWELVE_MONTHS, readings));
         return groupOne(clock, doses, readings)
                 && enough(dates(doses, C2Codes.POLIO, d -> true), PRIMARY_DOSES, readings)
                 && mmr.size() >= TWO_DOSES
@@ -107,7 +113,7 @@ final class VaccinePractice {
                 && dose.cbo() != null
                 && !C2Codes.PROCEDURE.matches(dose.cbo());
         boolean inWindow = readings.contains(Reading.DOSES_AFTER_TWO_YEARS)
-                || clock.upToMonths(dose.date(), TWO_YEARS_IN_MONTHS, readings);
+                || clock.upToMonths(dose.limitDate(readings), TWO_YEARS_IN_MONTHS, readings);
         return !restrictedCbo && inWindow;
     }
 
@@ -154,11 +160,14 @@ final class VaccinePractice {
         List<Dose> doses = new ArrayList<>();
         for (CanonicalImmunization i : child.doses()) {
             LocalDate date = LocalDate.parse(i.applicationDate());
+            LocalDate registered = i.registrationDate() == null ? date : LocalDate.parse(i.registrationDate());
             String code = code(i.immunobiologicalCode());
-            if (C2Codes.IMMUNOBIOLOGICAL_CODES.contains(code) && child.inScope(date)) {
+            boolean known = child.inScope(date) && !registered.isAfter(child.cutoff());
+            if (C2Codes.IMMUNOBIOLOGICAL_CODES.contains(code) && known) {
                 String model = Boolean.TRUE.equals(i.transcription()) ? "MIV_TRANSCRICAO" : "MIV";
                 doses.add(new Dose(
                         date,
+                        registered,
                         code,
                         i.cbo(),
                         new PracticeOutcome.Support(i.sourceRef(), date, i.cbo(), i.cnes(), i.ine(), model)));

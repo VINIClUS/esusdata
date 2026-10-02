@@ -82,9 +82,9 @@ public final class C2Pack implements IndicatorRule {
             "Datas (AMB-C2-01, AMB-C2-02): o dia do nascimento é o dia 0 (N+29 cumpre o 30º dia, N+30 é"
                     + " ambíguo); a coorte usa o aniversário da Lei 810/1949 (29/02 completa anos em 01/03); datas"
                     + " exatas de aniversário e aniversários inexistentes no mês tornam a prática ambígua.",
-            "Prática E (AMB-C2-09 iv/v, AMB-C2-10 ii/iii): doses são aplicações em datas distintas, não o campo"
-                    + " dose; transcrição conta pela data de aplicação (a data do registro não está no extrato);"
-                    + " SCR sem intervalo mínimo; só o Esquema Primário do 24 g.",
+            "Prática E (AMB-C2-09 iv, AMB-C2-10 ii/iii): doses são aplicações em datas distintas, não o campo"
+                    + " dose; SCR sem intervalo mínimo; só o Esquema Primário do 24 g. Transcrição registrada depois"
+                    + " do corte ainda não é conhecida no corte.",
             "Cadastros não unificados (AMB-C2-14) contam como pessoas distintas; o corte local não reproduz o"
                     + " 20º dia útil do Siaps (AMB-C2-16).",
             "Leituras declaradas: CBO de quatro dígitos é família (AMB-C2-13); visitas com motivo diferente de"
@@ -331,7 +331,8 @@ public final class C2Pack implements IndicatorRule {
         return switch (outcome.status()) {
             case MET -> EvidenceDecision.PRACTICE_MET;
             case EXEMPT -> EvidenceDecision.PRACTICE_EXEMPT;
-            case NOT_MET, AMBIGUOUS -> EvidenceDecision.PRACTICE_NOT_MET;
+            case NOT_MET -> EvidenceDecision.PRACTICE_NOT_MET;
+            case AMBIGUOUS -> EvidenceDecision.PRACTICE_AMBIGUOUS;
         };
     }
 

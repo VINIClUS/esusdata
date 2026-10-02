@@ -71,8 +71,11 @@ class C2PackCasesTest {
     private static final String ACS = "515105";
 
     private static final BigInteger VINTE = BigInteger.valueOf(20);
-    private static final Set<EvidenceDecision> DECISOES_DE_PRATICA =
-            Set.of(EvidenceDecision.PRACTICE_MET, EvidenceDecision.PRACTICE_NOT_MET, EvidenceDecision.PRACTICE_EXEMPT);
+    private static final Set<EvidenceDecision> DECISOES_DE_PRATICA = Set.of(
+            EvidenceDecision.PRACTICE_MET,
+            EvidenceDecision.PRACTICE_NOT_MET,
+            EvidenceDecision.PRACTICE_EXEMPT,
+            EvidenceDecision.PRACTICE_AMBIGUOUS);
 
     private final List<Record> registros = new ArrayList<>();
 
@@ -956,26 +959,30 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_61_transcricaoContaPelaDataDeAplicacao() {
-        // A ficha marca CT-61 (aplicada aos 13 meses, transcrita aos 26) como ambígua (AMB-C2-09 v);
-        // o extrato não traz data de registro e o contrato conta a transcrição pela data de aplicação.
+    void ct_c2_61_transcricaoRegistradaDepoisDosDoisAnosEAmbigua() {
+        // CT-61: SCR aplicada aos 13 e aos 15 meses e transcrita depois do 2º aniversário (antes do
+        // corte): conta pela data de aplicação, não pela de registro (AMB-C2-09 v, AMB-C2-10 i).
         crianca(CRIANCA, N);
         penta(CRIANCA, N);
         vip(CRIANCA, N);
         pneumo(CRIANCA, N);
+        LocalDate registro = N.plusYears(2).plusDays(10);
         for (LocalDate data : List.of(N.plusMonths(13), N.plusMonths(15))) {
-            add(new CanonicalImmunization(
-                    CanonicalFixtures.ref("tb_fat_vacinacao_vacina"),
-                    IBGE,
-                    CRIANCA,
-                    data.toString(),
-                    "24",
-                    null,
-                    null,
-                    true,
-                    null,
-                    null,
-                    null));
+            add(CanonicalFixtures.transcribedDose(CRIANCA, data, registro, "24", null));
+        }
+
+        assertAmbigua(calcular(), CRIANCA, "E", "AMB-C2-10");
+    }
+
+    @Test
+    void ct_c2_61_transcricaoDentroDosDoisAnosContaPelaAplicacao() {
+        crianca(CRIANCA, N);
+        penta(CRIANCA, N);
+        vip(CRIANCA, N);
+        pneumo(CRIANCA, N);
+        LocalDate registro = N.plusMonths(16);
+        for (LocalDate data : List.of(N.plusMonths(13), N.plusMonths(15))) {
+            add(CanonicalFixtures.transcribedDose(CRIANCA, data, registro, "24", null));
         }
 
         assertCumpre(calcular(), CRIANCA, "E");
@@ -1611,7 +1618,7 @@ class C2PackCasesTest {
 
     private static void assertAmbigua(RuleOutcome outcome, String chave, String pratica, String amb) {
         EvidenceItem linha = pratica(outcome, chave, pratica);
-        assertThat(linha.decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+        assertThat(linha.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
         assertThat(linha.points()).isNull();
         assertThat(linha.reasonCode()).startsWith("AMBIGUIDADE:").contains(amb);
         ResultComponent componente = componente(outcome.result(), pratica);

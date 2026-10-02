@@ -61,3 +61,14 @@ declarada como limitação permanente em `C2Pack` e mantém o pacote `BLOCKED`.
 - **O quê:** nada a implementar agora; registro para o Portão C. A capacidade `citizen` promete chave
   unificada (`tb_dim_cidadao_pec_grupo`); o óbito do CadSUS (item 15) não existe no PEC local.
 - **Impacto:** limitações permanentes (AMB-C2-14; óbito só pelo cadastro local).
+
+## Respostas da integração (emenda da fundação `9526ac6`)
+
+- S-C2-01 e S-C2-02: sem fonte no DW (L7, L1); as limitações ficam. A98/Z001 não são usados.
+- S-C2-03: adotado — `reasonCodes` `ACOMP_RECEM_NASCIDO`/`ACOMP_CRIANCA`, `outcomeCode` `1` realizada.
+- S-C2-04: adotado — MIAI no domicílio é `form = INDIVIDUAL` com `careLocationCode` `4`; `remote` vem
+  do tipo de participação (`null` quando a fonte não diz).
+- S-C2-05: atendido — `CanonicalImmunization.registrationDate`. O pacote passou a tratar AMB-C2-09 v
+  como leitura (limites de 12 meses e 2 anos pela data de aplicação × pela de registro) e ignora
+  transcrição registrada depois do corte.
+- Prática ambígua passa a sair como `EvidenceDecision.PRACTICE_AMBIGUOUS` (sem pontos).
