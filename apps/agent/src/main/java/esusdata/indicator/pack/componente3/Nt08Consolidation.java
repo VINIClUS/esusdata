@@ -10,7 +10,6 @@ import esusdata.indicator.model.Quadrimestre;
 import esusdata.indicator.pack.componente3.ComponentIIIInput.Monthly;
 import esusdata.indicator.pack.componente3.ComponentIIIResult.IndicatorQuadrimestral;
 import esusdata.indicator.pack.componente3.ComponentIIIResult.UnitResult;
-import java.math.BigInteger;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -97,7 +96,7 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
         for (IndicatorQuadrimestral indicator : indicators) {
             score = score.plus(indicator.factor().times(indicator.weight()));
         }
-        score = reduced(score);
+        score = score.reduced();
         Classification methodological = Nt08Tables.classifyFinalScore(score);
         return new UnitResult(
                 unit.ine(),
@@ -164,8 +163,9 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
                     IndicatorStatus.NO_DENOMINATOR,
                     "AMB-CIII-06: nenhum mês com evento de coorte no quadrimestre; a Nota Final fica indisponível");
         }
-        ExactRatio mean = reduced(
-                ExactRatio.meanOfExactRatios(used.stream().map(Monthly::value).toArray(ExactRatio[]::new)));
+        ExactRatio mean = ExactRatio.meanOfExactRatios(
+                        used.stream().map(Monthly::value).toArray(ExactRatio[]::new))
+                .reduced();
         List<YearMonth> months = used.stream().map(Monthly::month).toList();
         List<String> resultIds = used.stream().map(Monthly::resultId).toList();
         Optional<Classification> band = rule.classify(mean);
@@ -185,15 +185,6 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
                 classification,
                 Nt08Tables.factor(classification));
         return new Assessment(computed, null);
-    }
-
-    /** Lowest terms, so the exact value the API shows is the plain fraction. */
-    private static ExactRatio reduced(ExactRatio value) {
-        BigInteger gcd = value.numerator().gcd(value.denominator());
-        return BigInteger.ONE.equals(gcd)
-                ? value
-                : ExactRatio.of(
-                        value.numerator().divide(gcd), value.denominator().divide(gcd));
     }
 
     /** An indicator and, when it is not {@code COMPUTED}, why. */

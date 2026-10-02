@@ -63,3 +63,13 @@ atendido.
   uma nota de quadrimestre incompleto.
 - **Pedido.** A tela/API podem distinguir "quadrimestre em curso" de "bloqueado" (ex.: campo de
   competências faltantes); hoje isso só aparece no texto da limitação.
+
+## Respostas da integração (emenda 9526ac6 da fundação)
+
+- **S-01:** atendido pelo `QualityComponentService` da fundação (em construção): lê o resultado
+  mensal publicado mais novo de cada (pacote, competência), monta a unidade municipal e uma por INE,
+  passa `IndicatorRuleRegistry.all()` e devolve o fingerprint dos ids.
+- **S-02:** aceito — sem segundo portão; os portões do Componente III vão em `limitations`.
+- **S-03:** atendido — `ExactRatio.reduced()`; o helper privado foi removido.
+- **S-04:** recusado — `Bands` não muda; fica a comparação cruzada local em `Nt08Tables`.
+- **S-05:** aceito — exigir as quatro competências; as faltantes só no texto da limitação.
