@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.c5;
 
 import static esusdata.indicator.pack.c5.C5TestData.CBO_ACS;
+import static esusdata.indicator.pack.c5.C5TestData.CBO_DENTIST;
 import static esusdata.indicator.pack.c5.C5TestData.CBO_DOCTOR;
 import static esusdata.indicator.pack.c5.C5TestData.CBO_NURSE;
 import static esusdata.indicator.pack.c5.C5TestData.CBO_NURSING_TECH;
@@ -10,6 +11,7 @@ import static esusdata.indicator.pack.c5.C5TestData.CBO_TACS;
 import static esusdata.indicator.pack.c5.C5TestData.IBGE;
 import static esusdata.indicator.pack.c5.C5TestData.MARCH_2026;
 import static esusdata.indicator.pack.c5.C5TestData.ORIGIN_MIAC;
+import static esusdata.indicator.pack.c5.C5TestData.ORIGIN_MIAO;
 import static esusdata.indicator.pack.c5.C5TestData.ORIGIN_MIP;
 import static esusdata.indicator.pack.c5.C5TestData.P1;
 import static esusdata.indicator.pack.c5.C5TestData.P2;
@@ -34,6 +36,7 @@ import static esusdata.indicator.pack.c5.C5TestData.encounterWithProcedures;
 import static esusdata.indicator.pack.c5.C5TestData.endOf;
 import static esusdata.indicator.pack.c5.C5TestData.practiceOf;
 import static esusdata.indicator.pack.c5.C5TestData.procedure;
+import static esusdata.indicator.pack.c5.C5TestData.procedureFrom;
 import static esusdata.indicator.pack.c5.C5TestData.remoteConsultation;
 import static esusdata.indicator.pack.c5.C5TestData.scenario;
 import static esusdata.indicator.pack.c5.C5TestData.supportingOf;
@@ -166,8 +169,9 @@ class C5PracticesTest {
     // ---- practice B: Quadro 03 ----
 
     @Test
-    void tC5_07_bloodPressureByAcsDoesNotMeetBAndByTacsDoes() {
-        // The canonical visit record has no blood pressure: the ACS/TACS reading comes as MIP.
+    void tC5_07_bloodPressureAsMipByAcsDoesNotMeetBAndByTacsDoes() {
+        // The ficha's case is blood pressure in the visit form (MIVDT), but the canonical visit
+        // record has no blood-pressure field (lacuna L6): the ACS/TACS reading is tested as MIP.
         LocalDate day = LocalDate.of(2026, 2, 2);
         CanonicalProcedureEvent byTacs = procedure(P2, day, SIGTAP_BLOOD_PRESSURE, CBO_TACS);
         RuleOutcome outcome = scenario()
@@ -302,6 +306,23 @@ class C5PracticesTest {
         assertThat(practiceD.decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
         assertThat(practiceD.reasonCode()).isEqualTo("INTERVALO_MENOR_QUE_30_DIAS");
         assertThat(practiceD.points()).isEqualTo(BigInteger.ZERO);
+        assertThat(supportingOf(outcome, P1, "D")).hasSize(2);
+    }
+
+    @Test
+    void practiceD_fewerThanTwoDistinctDatesIsNoRecord() {
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .withVisits(P1, LocalDate.of(2026, 1, 1))
+                .eligible(P2)
+                .withVisits(P2, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1))
+                .ungated();
+
+        for (String key : List.of(P1, P2)) {
+            assertPractices(outcome, key);
+            assertThat(practiceOf(outcome, key, "D").reasonCode()).isEqualTo("SEM_REGISTRO_NA_JANELA");
+            assertThat(supportingOf(outcome, key, "D")).isEmpty();
+        }
     }
 
     @Test
@@ -389,6 +410,64 @@ class C5PracticesTest {
         assertPractices(outcome, P4); // only one visit inside W12
     }
 
+    @Test
+    void cutoff_earlyCutoffAppliesToBloodPressureAnthropometryAndVisits() {
+        LocalDate afterCutoff = LocalDate.of(2026, 3, 25);
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .withBloodPressure(P1, afterCutoff)
+                .eligible(P2)
+                .withAnthropometry(P2, afterCutoff)
+                .eligible(P3)
+                .withVisits(P3, LocalDate.of(2026, 2, 1), afterCutoff)
+                .eligible(P4)
+                .withBloodPressure(P4, LocalDate.of(2026, 3, 20))
+                .ungated(new EvaluationContext(IBGE, MARCH_2026, LocalDate.of(2026, 3, 20)));
+
+        assertPractices(outcome, P1);
+        assertPractices(outcome, P2);
+        assertPractices(outcome, P3);
+        assertPractices(outcome, P4, "B"); // on the cutoff itself
+    }
+
+    // ---- information models of Quadros 03/04 ----
+
+    @Test
+    void models_dentalRecordIsNotAcceptedForBloodPressureOrAnthropometry() {
+        LocalDate day = LocalDate.of(2026, 2, 2);
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .add(procedureFrom(P1, day, SIGTAP_BLOOD_PRESSURE, CBO_DENTIST, ORIGIN_MIAO))
+                .add(procedureFrom(P1, day, SIGTAP_ANTHROPOMETRY, CBO_DENTIST, ORIGIN_MIAO))
+                .add(bloodPressureMeasurement(P1, day, CBO_NURSE, ORIGIN_MIAO))
+                .eligible(P2)
+                .add(procedureFrom(P2, day, SIGTAP_BLOOD_PRESSURE, CBO_DENTIST, ORIGIN_MIP))
+                .ungated();
+
+        assertPractices(outcome, P1);
+        assertPractices(outcome, P2, "B"); // 2232 is in Quadro 03
+    }
+
+    @Test
+    void models_originIsNormalizedAndAMissingOneIsShownAsNotInformed() {
+        LocalDate day = LocalDate.of(2026, 2, 2);
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .add(bloodPressureMeasurement(P1, day, CBO_NURSE, null))
+                .eligible(P2)
+                .add(bloodPressureMeasurement(P2, day, CBO_NURSE, "miac"))
+                .ungated();
+
+        assertPractices(outcome, P1, "B");
+        assertPractices(outcome, P2, "B");
+        assertThat(supportingOf(outcome, P1, "B"))
+                .extracting(EvidenceItem::modality)
+                .containsExactly("NAO_INFORMADO");
+        assertThat(supportingOf(outcome, P2, "B"))
+                .extracting(EvidenceItem::modality)
+                .containsExactly("MIAC");
+    }
+
     // ---- T-C5-23 / MET-32: duplicated evidence never adds points ----
 
     @Test
@@ -410,8 +489,7 @@ class C5PracticesTest {
                 .containsExactly(february.sourceRef());
         assertThat(supportingOf(outcome, P1, "B"))
                 .extracting(EvidenceItem::sourceRef)
-                .singleElement()
-                .isIn(bloodPressure.sourceRef(), sameBloodPressureAsMip.sourceRef());
+                .containsExactly(bloodPressure.sourceRef()); // same date: the encounter is read first
         assertThat(outcome.evidence())
                 .filteredOn(row -> row.decision() == EvidenceDecision.SUPPORTING_EVENT)
                 .hasSize(2);

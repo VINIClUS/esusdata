@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The code tables of the C5 ficha («NOTA METODOLÓGICA C5 - CUIDADO DA PESSOA COM HIPERTENSÃO»,
@@ -70,8 +71,20 @@ public final class C5Codes {
     private static final Pattern NOT_ALPHANUMERIC = Pattern.compile("[^A-Z0-9]");
     private static final Pattern WHITESPACE = Pattern.compile("\\s");
     private static final Pattern DOT = Pattern.compile("\\.");
-    private static final Set<String> CID_UNDOTTED =
-            CID_HIPERTENSAO.stream().map(C5Codes::undotted).collect(Collectors.toUnmodifiableSet());
+    private static final String SEPARATOR = ":";
+    private static final int CID_CATEGORY_LENGTH = 3;
+
+    /** Every listed code as {@link #conditionKey} writes it. */
+    private static final Set<String> ELIGIBLE_KEYS = Stream.concat(
+                    CIAP_HIPERTENSAO.stream().map(code -> CIAP2 + SEPARATOR + code),
+                    CID_HIPERTENSAO.stream().map(code -> CID10 + SEPARATOR + undotted(code)))
+            .collect(Collectors.toUnmodifiableSet());
+
+    /** The listed CID-10 categories ({@code I10} … {@code O11}) and CIAP-2 codes, as key prefixes. */
+    private static final Set<String> NEIGHBOR_PREFIXES = Stream.concat(
+                    CIAP_HIPERTENSAO.stream().map(code -> CIAP2 + SEPARATOR + code),
+                    CID_HIPERTENSAO.stream().map(code -> CID10 + SEPARATOR + code.substring(0, CID_CATEGORY_LENGTH)))
+            .collect(Collectors.toUnmodifiableSet());
 
     private C5Codes() {}
 
@@ -83,16 +96,37 @@ public final class C5Codes {
      * @param codeSystem {@code CIAP2} or {@code CID10} (hyphens, spaces and case ignored)
      */
     public static boolean isEligibleCondition(String codeSystem, String code) {
+        String key = conditionKey(codeSystem, code);
+        return key != null && ELIGIBLE_KEYS.contains(key);
+    }
+
+    /**
+     * One code as the rule compares it: the system without case, hyphens or spaces ({@code CID-10}
+     * is {@code CID10}), a colon, and the code in upper case without spaces — and, for CID-10,
+     * without the dot. {@code null} when either part is missing.
+     */
+    public static String conditionKey(String codeSystem, String code) {
         if (codeSystem == null || code == null) {
-            return false;
+            return null;
         }
         String system =
                 NOT_ALPHANUMERIC.matcher(codeSystem.toUpperCase(Locale.ROOT)).replaceAll("");
         String normalized = WHITESPACE.matcher(code).replaceAll("").toUpperCase(Locale.ROOT);
-        if (CIAP2.equals(system)) {
-            return CIAP_HIPERTENSAO.contains(normalized);
+        return system + SEPARATOR + (CID10.equals(system) ? undotted(normalized) : normalized);
+    }
+
+    /**
+     * An unlisted code next to the list — a CID-10 of category {@code I10}, {@code I11}, {@code
+     * I12}, {@code I13}, {@code I15}, {@code O10} or {@code O11}, or {@code K86}/{@code K87} with a
+     * suffix — that the literal reading leaves out and the AMB-C5-04 diagnostic counts. Other
+     * conditions ({@code E11}) are not diagnosed.
+     */
+    static boolean isUnlistedNeighbor(String codeSystem, String code) {
+        String key = conditionKey(codeSystem, code);
+        if (key == null || ELIGIBLE_KEYS.contains(key)) {
+            return false;
         }
-        return CID10.equals(system) && CID_UNDOTTED.contains(undotted(normalized));
+        return NEIGHBOR_PREFIXES.stream().anyMatch(key::startsWith);
     }
 
     /**

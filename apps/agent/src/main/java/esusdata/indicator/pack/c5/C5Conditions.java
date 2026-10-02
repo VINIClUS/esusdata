@@ -69,9 +69,14 @@ final class C5Conditions {
         return c.basis() == null || PROFESSIONAL.equals(normalized(c.basis()));
     }
 
-    /** Rows whose code is outside the ficha's literal list: shown as a diagnostic (AMB-C5-04). */
+    /**
+     * Rows with an unlisted code next to the list ({@link C5Codes#isUnlistedNeighbor}): shown as a
+     * diagnostic for the reconciliation (AMB-C5-04), never included.
+     */
     static long outOfListCount(List<CanonicalCondition> conditions) {
-        return conditions.stream().filter(c -> !isEligible(c)).count();
+        return conditions.stream()
+                .filter(c -> C5Codes.isUnlistedNeighbor(c.codeSystem(), c.code()))
+                .count();
     }
 
     /** Upper case, no accents, trimmed; {@code null} stays {@code null}. */
@@ -98,7 +103,7 @@ final class C5Conditions {
     }
 
     private static String codeKey(CanonicalCondition c) {
-        return normalized(c.codeSystem()) + ':' + normalized(c.code()).replace(".", "");
+        return C5Codes.conditionKey(c.codeSystem(), c.code());
     }
 
     private static State stateOf(Map<String, CodeState> codes) {

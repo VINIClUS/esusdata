@@ -80,6 +80,8 @@ final class C5TestData {
     static final String CBO_ACS = "515105";
     /** Técnico em saúde bucal (grupo 3224). */
     static final String CBO_ORAL_HEALTH_TECH = "322415";
+    /** Cirurgião-dentista clínico geral (grupo 2232, Quadro 03). */
+    static final String CBO_DENTIST = "223208";
     /** Psicólogo clínico: in none of the C5 groups. */
     static final String CBO_PSYCHOLOGIST = "251510";
 
@@ -92,6 +94,8 @@ final class C5TestData {
 
     static final String ORIGIN_MIP = "MIP";
     static final String ORIGIN_MIAC = "MIAC";
+    /** Dental encounter: not a model of Quadros 03/04. */
+    static final String ORIGIN_MIAO = "MIAO";
 
     static final List<String> PRACTICES = List.of("A", "B", "C", "D");
     static final BigInteger PRACTICE_POINTS = BigInteger.valueOf(25);
@@ -144,6 +148,20 @@ final class C5TestData {
                 status,
                 resolvedOn == null ? null : resolvedOn.toString(),
                 PROFESSIONAL);
+    }
+
+    /** An active condition whose source does not say whether it was evaluated or reported. */
+    static CanonicalCondition conditionWithoutBasis(String key, String system, String code, LocalDate recorded) {
+        return new CanonicalCondition(
+                CanonicalFixtures.ref(CONDITION_TABLE),
+                IBGE,
+                key,
+                system,
+                code,
+                recorded.toString(),
+                ACTIVE,
+                null,
+                null);
     }
 
     /** A condition the person reported (basis {@code SELF_REPORTED}), active. */
@@ -313,6 +331,21 @@ final class C5TestData {
 
     static CanonicalProcedureEvent procedure(String key, LocalDate date, String code, String stage, String cbo) {
         return CanonicalFixtures.procedure(key, date, code, stage, cbo);
+    }
+
+    /** A performed SIGTAP procedure from the information model {@code origin}. */
+    static CanonicalProcedureEvent procedureFrom(String key, LocalDate date, String code, String cbo, String origin) {
+        return new CanonicalProcedureEvent(
+                CanonicalFixtures.ref("tb_fat_proced_atend_proced"),
+                IBGE,
+                key,
+                date.toString(),
+                code,
+                "PERFORMED",
+                cbo,
+                null,
+                null,
+                origin);
     }
 
     /** Blood pressure measured outside an encounter ({@code origin} MIP or MIAC) by {@code cbo}. */

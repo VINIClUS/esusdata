@@ -11,9 +11,11 @@ import esusdata.indicator.model.EvaluationContext;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -41,6 +43,12 @@ final class C5Practices {
     private static final String INDIVIDUAL = "INDIVIDUAL";
     private static final String PERFORMED = "PERFORMED";
     private static final Pattern NOT_DIGIT = Pattern.compile("\\D");
+
+    /**
+     * Orders records by date; {@link BinaryOperator#maxBy} and {@link BinaryOperator#minBy} keep
+     * the first one read on the same date.
+     */
+    private static final Comparator<C5Event> BY_DATE = Comparator.comparing(C5Event::date);
 
     private final DateWindow sixMonths;
     private final DateWindow twelveMonths;
@@ -99,8 +107,7 @@ final class C5Practices {
         Stream<C5Event> procedureEvents = performed(person, C5Codes.CBO_AFERICAO_PA)
                 .filter(p -> C5Codes.SIGTAP_AFERICAO_PA.equals(digits(p.sigtapCode())))
                 .map(C5Event::of);
-        Stream<C5Event> measured = of(measurements, person).stream()
-                .filter(m -> C5Codes.CBO_AFERICAO_PA.matches(m.cbo()))
+        Stream<C5Event> measured = measured(person, C5Codes.CBO_AFERICAO_PA)
                 .filter(m -> hasPressure(m.systolicMmhg(), m.diastolicMmhg()))
                 .map(C5Event::of);
         List<C5Event> found = Stream.of(encounters, procedureEvents, measured)
@@ -122,9 +129,7 @@ final class C5Practices {
                         C5Event.of(e),
                         notBlank(e.weightKg()) || C5Anthropometry.givesWeight(digitsOf(e.proceduresPerformed())),
                         notBlank(e.heightCm()) || C5Anthropometry.givesHeight(digitsOf(e.proceduresPerformed()))));
-        of(measurements, person).stream()
-                .filter(m -> cbo.matches(m.cbo()))
-                .forEach(m -> days.add(C5Event.of(m), notBlank(m.weightKg()), notBlank(m.heightCm())));
+        measured(person, cbo).forEach(m -> days.add(C5Event.of(m), notBlank(m.weightKg()), notBlank(m.heightCm())));
         of(visits, person).stream()
                 .filter(v -> cbo.matches(v.cbo()))
                 .forEach(v -> days.add(C5Event.of(v), notBlank(v.weightKg()), notBlank(v.heightCm())));
@@ -138,8 +143,9 @@ final class C5Practices {
 
     /**
      * D — Quadro 05 (p. 5): two home visits by ACS/TACS at least 30 days apart within 12 months,
-     * whatever the outcome (AMB-C5-09) or the reason (mandatory in the LEDI). The earliest and the
-     * latest visit support the decision; they are 30 days apart exactly when some pair is.
+     * whatever the outcome (AMB-C5-09) or the reason (mandatory in the LEDI). Fewer than two
+     * distinct dates is no record of the practice; otherwise the latest and the earliest visit
+     * support the decision, and they are 30 days apart exactly when some pair is.
      */
     private Outcome homeVisits(String person) {
         List<C5Event> found = of(visits, person).stream()
@@ -147,15 +153,12 @@ final class C5Practices {
                 .map(C5Event::of)
                 .filter(e -> within(e, twelveMonths))
                 .toList();
-        if (found.isEmpty()) {
+        if (found.stream().map(C5Event::date).distinct().count() < 2) {
             return notMet(D, NOT_RECORDED, List.of());
         }
-        C5Event latest = latest(found);
-        C5Event earliest = earliest(found);
-        List<C5Event> support = new ArrayList<>(List.of(latest));
-        if (!earliest.identity().equals(latest.identity())) {
-            support.add(earliest);
-        }
+        C5Event latest = found.stream().reduce(BinaryOperator.maxBy(BY_DATE)).orElseThrow();
+        C5Event earliest = found.stream().reduce(BinaryOperator.minBy(BY_DATE)).orElseThrow();
+        List<C5Event> support = List.of(latest, earliest);
         boolean met = ChronoUnit.DAYS.between(earliest.date(), latest.date()) >= MIN_VISIT_INTERVAL_DAYS;
         return met ? new Outcome(D, true, MET, support) : notMet(D, SHORT_INTERVAL, support);
     }
@@ -166,11 +169,22 @@ final class C5Practices {
                 .filter(e -> cbo.matches(e.cbo()));
     }
 
-    /** Procedures done (stage {@code PERFORMED}, or unknown); a request proves nothing (§1.7). */
+    /**
+     * Procedures done (stage {@code PERFORMED}, or unknown) in a model of Quadros 03/04; a request
+     * proves nothing (§1.7) and a dental record ({@code MIAO}) is not accepted.
+     */
     private Stream<CanonicalProcedureEvent> performed(String person, CboGroups cbo) {
         return of(procedures, person).stream()
                 .filter(p -> p.stage() == null || PERFORMED.equalsIgnoreCase(p.stage()))
+                .filter(p -> C5Event.acceptedOrigin(p.origin()))
                 .filter(p -> cbo.matches(p.cbo()));
+    }
+
+    /** Measurements (MIP or MIAC, AMB-C5-06) of a model of Quadros 03/04 by the practice's CBO. */
+    private Stream<CanonicalMeasurement> measured(String person, CboGroups cbo) {
+        return of(measurements, person).stream()
+                .filter(m -> C5Event.acceptedOrigin(m.origin()))
+                .filter(m -> cbo.matches(m.cbo()));
     }
 
     private boolean within(C5Event e, DateWindow window) {
@@ -182,31 +196,12 @@ final class C5Practices {
         if (found.isEmpty()) {
             return notMet(code, NOT_RECORDED, List.of());
         }
-        return new Outcome(code, true, MET, List.of(latest(found)));
+        C5Event latest = found.stream().reduce(BinaryOperator.maxBy(BY_DATE)).orElseThrow();
+        return new Outcome(code, true, MET, List.of(latest));
     }
 
     private static Outcome notMet(String code, String reason, List<C5Event> support) {
         return new Outcome(code, false, reason, support);
-    }
-
-    private static C5Event latest(List<C5Event> events) {
-        C5Event best = events.get(0);
-        for (C5Event e : events) {
-            if (e.date().isAfter(best.date())) {
-                best = e;
-            }
-        }
-        return best;
-    }
-
-    private static C5Event earliest(List<C5Event> events) {
-        C5Event best = events.get(0);
-        for (C5Event e : events) {
-            if (e.date().isBefore(best.date())) {
-                best = e;
-            }
-        }
-        return best;
     }
 
     private static boolean hasPressure(String systolic, String diastolic) {

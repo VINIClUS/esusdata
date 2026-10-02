@@ -59,3 +59,22 @@ alternativa local declarada como limitação permanente do descritor.
   o resultado da equipe (e o municipal que a contém) sai `RULE_AMBIGUITY` (AMB-C5-01, P07, MET-23).
   Sem tipo, a prática D é exigida de todos e a limitação explica.
 - **Impacto:** até 25 pontos por pessoa em equipes eAP 76. Comum a C4 (D) e C6 (C).
+
+## SOL-C5-06 — Versão do cadastro individual vigente no início da janela
+
+- **O quê:** que a capacidade `individual_registration` devolva, além das versões do período, a
+  última versão de cada pessoa anterior ao início da janela (a vigente no começo do período).
+- **Por quê:** o vínculo é resolvido pela versão do cadastro vigente no corte (§1.7.3; item 14,
+  p. 1, remete à «Nota Técnicaº 30/2025-CGESCO/DESCO/SAPS/MS», não transcrita). Com
+  `scope_date_column = registration_date`, quem não atualizou o cadastro nos 24 meses lidos não
+  traz versão nenhuma.
+- **Hoje:** janela de 24 meses (a do esqueleto da fundação); pessoa sem versão nesse período sai
+  `EXCLUIDO_SEM_VINCULO`. Limitação declarada no descritor.
+- **Impacto:** denominador subestimado para cadastros antigos sem atualização. Comum a C2–C7.
+
+## SOL-C5-07 — Capacidade de equipes (`team`) com tipo e validação
+
+- **O quê:** além do tipo (SOL-C5-05), a validação de equipes do item 24 b («atendendo as condições
+  previstas na Portaria GM/MS nº 3.493/2024») e a «última competência válida» do SCNES (item 11).
+- **Hoje:** se `teams()` vier com tipo conhecido fora de {70, 76}, a pessoa sai
+  `EXCLUIDO_EQUIPE_NAO_ELEGIVEL`; sem tipo, ninguém é excluído por equipe (limitação).

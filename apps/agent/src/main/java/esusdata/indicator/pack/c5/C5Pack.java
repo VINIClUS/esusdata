@@ -36,11 +36,9 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Function;
@@ -73,28 +71,33 @@ public final class C5Pack implements IndicatorRule {
      */
     public static final AgeAt.AnniversaryRule ANNIVERSARY_RULE = AgeAt.AnniversaryRule.CLAMP_TO_MONTH_END;
 
-    /** The team type the ficha exempts from practice D (item 24 b, p. 2; AMB-C5-01). */
-    static final String EAP_76 = "76";
-
     private static final List<String> STANDING_LIMITATIONS = List.of(
             "Item 4.4: registros de outros municípios e estabelecimentos do país não estão no PEC local.",
             "Histórico da condição «desde 2013» limitado ao que a instalação local do PEC registrou.",
             "Óbito no CadSUS fora do alcance: usa o óbito e a saída do cadastro registrados no PEC.",
             "Lacuna L8: vínculo da NT 30/2025 e desempate da Portaria SAPS/MS 161/2024 reconstruídos pela"
                     + " versão do cadastro individual vigente no corte.",
-            "Lacuna L1: tipo de equipe ausente no DW. Sem tipo comprovado, a exceção eAP 76 da prática D"
-                    + " (AMB-C5-01) não é aplicada e D é exigida.",
+            "Lacuna L1: tipo de equipe ausente no DW. Sem tipo comprovado, nem a validação eSF 70/eAP 76"
+                    + " (item 24 b) nem a exceção eAP 76 da prática D (AMB-C5-01) são aplicadas; D é exigida.",
+            "Cadastro individual lido nos últimos 24 meses: pessoa cuja última versão é anterior fica sem"
+                    + " vínculo (convenção do pacote; a NT 30/2025 não foi transcrita).",
+            "Validação de equipes e SCNES (Portaria GM/MS 3.493/2024; PRC GM/MS 02/2017) fora do alcance do"
+                    + " PEC local.",
+            "Conformidade da identificação com o CadSUS (item 24 a) não conferida.",
+            "Corte de envio no 20º dia útil e envio tardio da gestão local (itens 11 e 33) fora do alcance.",
+            "Lacuna L12: situação vigente do problema lida pela última linha de cada código.",
             "Condição sem CBO do profissional no registro canônico: não se confere «médica(o) e/ou"
                     + " enfermeira(o)» do item 5.",
             "Lacuna L6: PA da visita domiciliar (MIVDT) sem campo no registro canônico; não entra na prática B.",
-            "Lacuna L5: PA de atividade coletiva sem fonte no DW.",
+            "Lacuna L5: o DW não tem PA de participante de atividade coletiva; o MIAC (AMB-C5-06) só"
+                    + " comprova B se a medição vier com PA.",
+            "MIAO (atendimento odontológico) não aceito para PA, peso e altura: os Quadros 03 e 04 não o" + " citam.",
             "Habilitação SIGTAP por CBO (item 24 g) não conferida: vale o CBO do quadro da prática.",
             "AMB-C5-02 (provisória): janelas de 6 e 12 meses civis completos até o fim da competência.",
             "AMB-C5-03 (provisória): visitas com intervalo de 30 dias corridos ou mais.",
             "AMB-C5-04 (provisória): só a lista literal de CIAP-2 e CID-10 da ficha; situação «resolvido» ou"
                     + " «concluído» conta como resolvida.",
             "AMB-C5-05 (provisória): consulta da prática A só pelo MIAI; procedimento de consulta não conta.",
-            "AMB-C5-06 (provisória): MIAC aceito para PA e peso e altura, como nos Quadros 03 e 04.",
             "AMB-C5-07 (provisória): peso e altura na mesma data civil, de qualquer registro aceito.",
             "AMB-C5-08 (provisória): CBO de quatro dígitos casa pelo prefixo; com hífen, exato.",
             "AMB-C5-09 (provisória): desfecho da visita domiciliar não filtrado.",
@@ -185,7 +188,9 @@ public final class C5Pack implements IndicatorRule {
         C5Practices practices = new C5Practices(data, context);
         List<EvidenceItem> evidence = new ArrayList<>();
         List<C5Results.Scored> eligible = new ArrayList<>();
-        for (C5Cohort.Decision decision : C5Cohort.decide(data, cutoff).values()) {
+        C5Teams teamTypes = C5Teams.of(data.teams());
+        for (C5Cohort.Decision decision :
+                C5Cohort.decide(data, cutoff, teamTypes).values()) {
             if (decision.eligible()) {
                 C5Results.Scored person =
                         C5Results.Scored.of(decision, practices.evaluate(decision.personKey()), specs);
@@ -196,12 +201,12 @@ public final class C5Pack implements IndicatorRule {
             }
         }
         List<String> limitations = limitations(data);
-        Set<String> eap76 = eap76Teams(data);
+        C5Results.Scope scope = new C5Results.Scope(DESCRIPTOR, context);
         boolean anyEap76 =
-                eligible.stream().anyMatch(p -> eap76.contains(p.decision().ine()));
+                eligible.stream().anyMatch(p -> teamTypes.isEap76(p.decision().ine()));
         return new RuleOutcome(
-                C5Results.of(DESCRIPTOR, context, eligible, limitations, anyEap76),
-                teams(context, eligible, limitations, eap76),
+                C5Results.of(scope, eligible, limitations, anyEap76),
+                teams(scope, eligible, limitations, teamTypes),
                 evidence);
     }
 
@@ -212,7 +217,7 @@ public final class C5Pack implements IndicatorRule {
 
     /** One team (INE of the link) per group of eligible people, by INE, without a team last. */
     private static List<TeamResult> teams(
-            EvaluationContext context, List<C5Results.Scored> eligible, List<String> limitations, Set<String> eap76) {
+            C5Results.Scope scope, List<C5Results.Scored> eligible, List<String> limitations, C5Teams teamTypes) {
         SortedMap<String, List<C5Results.Scored>> byTeam =
                 new TreeMap<>(Comparator.nullsLast(Comparator.naturalOrder()));
         for (C5Results.Scored person : eligible) {
@@ -222,26 +227,13 @@ public final class C5Pack implements IndicatorRule {
         List<TeamResult> teams = new ArrayList<>(byTeam.size());
         for (Map.Entry<String, List<C5Results.Scored>> team : byTeam.entrySet()) {
             List<C5Results.Scored> members = team.getValue();
-            boolean ambiguous = eap76.contains(team.getKey());
+            boolean ambiguous = teamTypes.isEap76(team.getKey());
             teams.add(new TeamResult(
                     team.getKey(),
                     members.get(0).decision().cnes(),
-                    C5Results.of(DESCRIPTOR, context, members, limitations, ambiguous)));
+                    C5Results.of(scope, members, limitations, ambiguous)));
         }
         return teams;
-    }
-
-    /** INEs the source shows as eAP tipo 76; without a team type (lacuna L1) none is. */
-    private static Set<String> eap76Teams(CanonicalDataset data) {
-        Set<String> ines = new HashSet<>();
-        for (CanonicalTeam team : data.teams()) {
-            if (team.ine() != null
-                    && team.teamTypeCode() != null
-                    && EAP_76.equals(team.teamTypeCode().strip())) {
-                ines.add(team.ine());
-            }
-        }
-        return ines;
     }
 
     /** The standing limitations, plus the AMB-C5-04 diagnostic of this run when it applies. */

@@ -6,10 +6,14 @@ import static esusdata.indicator.pack.c5.C5TestData.CBO_NURSE;
 import static esusdata.indicator.pack.c5.C5TestData.CIAP2;
 import static esusdata.indicator.pack.c5.C5TestData.CID10;
 import static esusdata.indicator.pack.c5.C5TestData.CNES;
+import static esusdata.indicator.pack.c5.C5TestData.CNES_2;
 import static esusdata.indicator.pack.c5.C5TestData.CUTOFF_TEXT;
 import static esusdata.indicator.pack.c5.C5TestData.HYPERTENSION_DATE;
+import static esusdata.indicator.pack.c5.C5TestData.IBGE;
 import static esusdata.indicator.pack.c5.C5TestData.INE;
+import static esusdata.indicator.pack.c5.C5TestData.INE_2;
 import static esusdata.indicator.pack.c5.C5TestData.LINK_DATE;
+import static esusdata.indicator.pack.c5.C5TestData.MARCH_2026;
 import static esusdata.indicator.pack.c5.C5TestData.ORIGIN_MIAC;
 import static esusdata.indicator.pack.c5.C5TestData.OTHER_IBGE;
 import static esusdata.indicator.pack.c5.C5TestData.P1;
@@ -28,6 +32,7 @@ import static esusdata.indicator.pack.c5.C5TestData.assertNoRepeatedSupport;
 import static esusdata.indicator.pack.c5.C5TestData.assertPractices;
 import static esusdata.indicator.pack.c5.C5TestData.bloodPressureMeasurement;
 import static esusdata.indicator.pack.c5.C5TestData.condition;
+import static esusdata.indicator.pack.c5.C5TestData.conditionWithoutBasis;
 import static esusdata.indicator.pack.c5.C5TestData.consultation;
 import static esusdata.indicator.pack.c5.C5TestData.deceased;
 import static esusdata.indicator.pack.c5.C5TestData.decisionOf;
@@ -46,6 +51,7 @@ import static esusdata.indicator.pack.c5.C5TestData.selfReportedCondition;
 import static esusdata.indicator.pack.c5.C5TestData.selfReportedRegistration;
 import static esusdata.indicator.pack.c5.C5TestData.simplifiedRegistration;
 import static esusdata.indicator.pack.c5.C5TestData.supportingOf;
+import static esusdata.indicator.pack.c5.C5TestData.team;
 import static esusdata.indicator.pack.c5.C5TestData.visit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -54,6 +60,7 @@ import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalHomeVisit;
 import esusdata.indicator.model.CanonicalMeasurement;
+import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.EvidenceSubjectKind;
@@ -78,6 +85,8 @@ class C5CohortTest {
     private static final String LEFT_TERRITORY = "EXCLUIDO_SAIDA_TERRITORIO";
     private static final String NO_LINK = "EXCLUIDO_SEM_VINCULO";
     private static final String ALL_RESOLVED = "EXCLUIDO_CONDICOES_RESOLVIDAS";
+    private static final String NO_CONDITION_IN_PERIOD = "EXCLUIDO_SEM_CONDICAO_AVALIADA";
+    private static final String TEAM_NOT_ELIGIBLE = "EXCLUIDO_EQUIPE_NAO_ELEGIVEL";
 
     // ---- codes (item 24 f) ----
 
@@ -113,7 +122,8 @@ class C5CohortTest {
         assertThat(rowsOf(outcome, P2)).isEmpty();
         assertThat(outcome.result().denominator()).isEqualTo(BigInteger.ONE);
         assertThat(outcome.result().limitations())
-                .contains("AMB-C5-04: 2 registro(s) de condição com código fora da lista literal da ficha"
+                .filteredOn(limitation -> limitation.startsWith("AMB-C5-04:"))
+                .containsExactly("AMB-C5-04: 2 registro(s) de condição com código fora da lista literal da ficha"
                         + " (diagnóstico, não entram).");
     }
 
@@ -189,8 +199,74 @@ class C5CohortTest {
                 .add(condition(P1, CID10, "I10", LocalDate.of(2012, 12, 31), "ATIVO"))
                 .ungated();
 
-        assertThat(decisionOf(outcome, P1).decision()).isEqualTo(EvidenceDecision.EXCLUDED);
+        assertExcluded(outcome, P1, NO_CONDITION_IN_PERIOD);
         assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
+    }
+
+    @Test
+    void conditions_professionalRecordOutOfPeriodIsNotSelfReportedEvenWithTheFlag() {
+        // EXCLUIDO_SO_AUTORREFERIDO only when no professional listed record exists at all.
+        RuleOutcome outcome = scenario()
+                .add(selfReportedRegistration(P1, LINK_DATE))
+                .add(condition(P1, CID10, "I10", LocalDate.of(2012, 6, 1), "ATIVO"))
+                .add(selfReportedRegistration(P2, LINK_DATE))
+                .add(condition(P2, CID10, "I10", LocalDate.of(2026, 4, 2), "ATIVO"))
+                .ungated();
+
+        assertExcluded(outcome, P1, NO_CONDITION_IN_PERIOD);
+        assertExcluded(outcome, P2, NO_CONDITION_IN_PERIOD); // recorded after the cutoff
+    }
+
+    @Test
+    void conditions_sameCodeWithHyphenatedSystemIsTheSameCode() {
+        // I-1: «CID-10» and «CID10» name the same code; the latest row (resolved) decides.
+        RuleOutcome outcome = scenario()
+                .linked(P1)
+                .add(condition(P1, "CID10", "I10", HYPERTENSION_DATE, "ATIVO"))
+                .add(condition(P1, "CID-10", "I10", LocalDate.of(2024, 3, 1), RESOLVED))
+                .ungated();
+
+        assertExcluded(outcome, P1, ALL_RESOLVED);
+    }
+
+    @Test
+    void conditions_onTheSameDateAnActiveRowWinsOverAResolvedOne() {
+        LocalDate day = LocalDate.of(2024, 3, 1);
+        RuleOutcome outcome = scenario()
+                .linked(P1)
+                .add(condition(P1, CID10, "I10", day, RESOLVED))
+                .add(condition(P1, CID10, "I10", day, "ATIVO"))
+                .linked(P2)
+                .add(condition(P2, CID10, "I10", day, "ATIVO"))
+                .add(condition(P2, CID10, "I10", day, RESOLVED))
+                .ungated();
+
+        assertPractices(outcome, P1);
+        assertPractices(outcome, P2);
+    }
+
+    @Test
+    void conditions_withoutBasisIdentify() {
+        RuleOutcome outcome = scenario()
+                .linked(P1)
+                .add(conditionWithoutBasis(P1, CIAP2, "K86", HYPERTENSION_DATE))
+                .ungated();
+
+        assertPractices(outcome, P1);
+    }
+
+    @Test
+    void cutoff_earlyCutoffAppliesToTheCohort() {
+        EvaluationContext early = new EvaluationContext(IBGE, MARCH_2026, LocalDate.of(2026, 3, 20));
+        RuleOutcome outcome = scenario()
+                .linked(P1)
+                .add(condition(P1, CID10, "I10", LocalDate.of(2026, 3, 25), "ATIVO"))
+                .eligible(P2)
+                .ungated(early);
+
+        assertExcluded(outcome, P1, NO_CONDITION_IN_PERIOD);
+        assertPractices(outcome, P2);
+        assertThat(decisionOf(outcome, P2).eventDate()).isEqualTo("2026-03-20");
     }
 
     // ---- self-reported hypertension (T-C5-19) ----
@@ -241,6 +317,42 @@ class C5CohortTest {
         assertPractices(outcome, P8); // death, simplified version and exit all after the cutoff or ignored
     }
 
+    @Test
+    void interruptions_exitReasonsSpelledOutWithAccents() {
+        LocalDate later = LocalDate.of(2025, 8, 1);
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .add(exitRegistration(P1, later, "Mudança de território"))
+                .eligible(P2)
+                .add(exitRegistration(P2, later, "Óbito"))
+                .ungated();
+
+        assertExcluded(outcome, P1, LEFT_TERRITORY);
+        assertExcluded(outcome, P2, DEATH);
+    }
+
+    @Test
+    void teams_knownTypeOtherThanEsf70OrEap76Excludes() {
+        // Items 14 and 24 b: only eSF (70) and eAP (76); without a known type nothing is validated.
+        RuleOutcome outcome = scenario()
+                .add(team(INE, CNES, "71"), team(INE_2, CNES_2, "70"))
+                .eligible(P1)
+                .linked(P2)
+                .add(resolvedCondition(P2, CID10, "I10", RESOLVED, LocalDate.of(2025, 6, 1)))
+                .eligible(P3)
+                .add(inactiveRegistration(P3, LocalDate.of(2025, 8, 1)))
+                .eligible(P4, CNES_2, INE_2)
+                .eligible(P5, CNES, "0000003333")
+                .ungated();
+
+        assertExcluded(outcome, P1, TEAM_NOT_ELIGIBLE);
+        assertExcluded(outcome, P2, TEAM_NOT_ELIGIBLE); // before EXCLUIDO_CONDICOES_RESOLVIDAS
+        assertExcluded(outcome, P3, NO_LINK); // after EXCLUIDO_SEM_VINCULO
+        assertPractices(outcome, P4);
+        assertPractices(outcome, P5); // no type known for this INE
+        assertThat(outcome.result().denominator()).isEqualTo(BigInteger.TWO);
+    }
+
     // ---- T-C5-24: C5 is computed on its own ----
 
     @Test
@@ -253,6 +365,8 @@ class C5CohortTest {
 
         assertPractices(outcome, P1, "A");
         assertThat(outcome.result().denominator()).isEqualTo(BigInteger.ONE);
+        // E11 is not a neighbour of the list: no AMB-C5-04 diagnostic.
+        assertThat(outcome.result().limitations()).noneMatch(limitation -> limitation.startsWith("AMB-C5-04:"));
     }
 
     // ---- ENG-36: the evidence rebuilds the population ----

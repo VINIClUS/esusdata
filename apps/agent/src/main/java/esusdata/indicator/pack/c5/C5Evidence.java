@@ -28,9 +28,9 @@ final class C5Evidence {
         C5Cohort.Decision decision = person.decision();
         List<EvidenceItem> rows = new ArrayList<>();
         rows.add(personRow(decision, cutoff, null, EvidenceDecision.ELIGIBLE, decision.reasonCode(), person.points()));
-        for (int i = 0; i < specs.size(); i++) {
-            C5Practices.Outcome practice = person.practices().get(i);
-            BigInteger points = practice.met() ? specs.get(i).weight() : BigInteger.ZERO;
+        for (ComponentSpec spec : specs) {
+            C5Practices.Outcome practice = person.practice(spec.code());
+            BigInteger points = practice.met() ? spec.weight() : BigInteger.ZERO;
             EvidenceDecision verdict =
                     practice.met() ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
             rows.add(personRow(decision, cutoff, practice.code(), verdict, practice.reasonCode(), points));

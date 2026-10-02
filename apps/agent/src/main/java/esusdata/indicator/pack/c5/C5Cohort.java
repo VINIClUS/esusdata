@@ -23,12 +23,18 @@ final class C5Cohort {
 
     static final String ELIGIBLE = "ELEGIVEL";
     static final String ONLY_SELF_REPORTED = "EXCLUIDO_SO_AUTORREFERIDO";
-    /** A listed professional condition exists, but none recorded between 2013 and the cutoff. */
+    /**
+     * A listed professional condition exists, but none recorded between 2013 and the cutoff — even
+     * if the person also reported hypertension.
+     */
     static final String NO_CONDITION_IN_PERIOD = "EXCLUIDO_SEM_CONDICAO_AVALIADA";
 
     static final String DEATH = "EXCLUIDO_OBITO";
     static final String LEFT_TERRITORY = "EXCLUIDO_SAIDA_TERRITORIO";
     static final String NO_LINK = "EXCLUIDO_SEM_VINCULO";
+    /** The team of the link has a known type other than eSF 70 or eAP 76 (items 14 and 24 b, p. 1–2). */
+    static final String TEAM_NOT_ELIGIBLE = "EXCLUIDO_EQUIPE_NAO_ELEGIVEL";
+
     static final String CONDITIONS_RESOLVED = "EXCLUIDO_CONDICOES_RESOLVIDAS";
 
     /** «Saída do cidadão do cadastro» with «Mudança de território» (item 15, p. 1). */
@@ -38,7 +44,8 @@ final class C5Cohort {
     private static final Set<String> DEATH_EXITS = Set.of("135", "OBITO");
 
     private final Map<String, C5Conditions.State> conditions;
-    private final Set<String> selfReported = new HashSet<>();
+    private final Set<String> professional = new HashSet<>();
+    private final C5Teams teams;
     private final Map<String, CanonicalRegistration> links = new HashMap<>();
     private final Set<String> deaths = new HashSet<>();
 
@@ -49,17 +56,15 @@ final class C5Cohort {
         }
     }
 
-    private C5Cohort(CanonicalDataset data, LocalDate cutoff) {
+    private C5Cohort(CanonicalDataset data, LocalDate cutoff, C5Teams teams) {
+        this.teams = teams;
         conditions = C5Conditions.professionalStates(data.conditions(), cutoff);
         for (CanonicalCondition c : data.conditions()) {
-            if (C5Conditions.isEligible(c) && C5Conditions.isSelfReported(c)) {
-                selfReported.add(c.personKey());
+            if (C5Conditions.isEligible(c) && C5Conditions.isProfessional(c)) {
+                professional.add(c.personKey());
             }
         }
         for (CanonicalRegistration r : data.registrations()) {
-            if (Boolean.TRUE.equals(r.selfReportedHypertension())) {
-                selfReported.add(r.personKey());
-            }
             keepIfInForce(r, cutoff);
         }
         for (CanonicalPerson p : data.persons()) {
@@ -71,8 +76,8 @@ final class C5Cohort {
     }
 
     /** One decision per person of the reconstructed population, ordered by person key. */
-    static SortedMap<String, Decision> decide(CanonicalDataset data, LocalDate cutoff) {
-        C5Cohort cohort = new C5Cohort(data, cutoff);
+    static SortedMap<String, Decision> decide(CanonicalDataset data, LocalDate cutoff, C5Teams teams) {
+        C5Cohort cohort = new C5Cohort(data, cutoff, teams);
         SortedMap<String, Decision> decisions = new TreeMap<>();
         for (String person : population(data)) {
             decisions.put(person, cohort.decision(person));
@@ -123,7 +128,7 @@ final class C5Cohort {
     private String reason(String person, CanonicalRegistration link) {
         C5Conditions.State state = conditions.get(person);
         if (state == null) {
-            return selfReported.contains(person) ? ONLY_SELF_REPORTED : NO_CONDITION_IN_PERIOD;
+            return professional.contains(person) ? NO_CONDITION_IN_PERIOD : ONLY_SELF_REPORTED;
         }
         if (deaths.contains(person) || exitIn(link, DEATH_EXITS)) {
             return DEATH;
@@ -133,6 +138,9 @@ final class C5Cohort {
         }
         if (link == null || Boolean.TRUE.equals(link.inactive()) || Boolean.TRUE.equals(link.refused())) {
             return NO_LINK;
+        }
+        if (teams.isIneligible(link.ine())) {
+            return TEAM_NOT_ELIGIBLE;
         }
         return state == C5Conditions.State.ALL_RESOLVED ? CONDITIONS_RESOLVED : ELIGIBLE;
     }

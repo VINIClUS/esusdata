@@ -6,6 +6,7 @@ import static esusdata.indicator.pack.c5.C5TestData.MARCH_2026;
 import static esusdata.indicator.pack.c5.C5TestData.PRACTICES;
 import static esusdata.indicator.pack.c5.C5TestData.PRACTICE_POINTS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.ComponentKind;
@@ -15,6 +16,7 @@ import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.ValueKind;
+import java.math.BigInteger;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -169,5 +171,67 @@ class C5DescriptorTest {
         assertThat(C5Codes.isEligibleCondition(CID10, "I110")).isTrue();
         assertThat(C5Codes.isEligibleCondition(CID10, "O109")).isTrue();
         assertThat(C5Codes.isEligibleCondition(CID10, "I118")).isFalse();
+    }
+
+    @Test
+    void ambC5_04_conditionKeyNormalizesSystemCaseSpacesAndTheCidDot() {
+        assertThat(C5Codes.conditionKey("CID-10", " i11.0 ")).isEqualTo(C5Codes.conditionKey(CID10, "I110"));
+        assertThat(C5Codes.conditionKey("ciap 2", "k86")).isEqualTo(C5Codes.conditionKey(CIAP2, "K86"));
+        assertThat(C5Codes.conditionKey(null, "I10")).isNull();
+    }
+
+    @Test
+    void ambC5_04_diagnosticCountsOnlyUnlistedNeighboursOfTheList() {
+        for (String code : List.of("I11.8", "I10.0", "I15.3", "O11.1", "I118")) {
+            assertThat(C5Codes.isUnlistedNeighbor(CID10, code)).as(code).isTrue();
+        }
+        for (String code : List.of("I10", "I11.0", "E11", "O12", "I14")) {
+            assertThat(C5Codes.isUnlistedNeighbor(CID10, code)).as(code).isFalse();
+        }
+        assertThat(C5Codes.isUnlistedNeighbor(CIAP2, "K861")).isTrue();
+        assertThat(C5Codes.isUnlistedNeighbor(CIAP2, "K86")).isFalse();
+        assertThat(C5Codes.isUnlistedNeighbor(CIAP2, "K85")).isFalse();
+    }
+
+    // ---- standing limitations ----
+
+    @Test
+    void limitations_declareWhatThePecCannotShowAndTheConventionsOfThePack() {
+        List<String> limitations = new C5Pack().descriptor().standingLimitations();
+
+        assertThat(limitations)
+                .anySatisfy(text -> assertThat(text)
+                        .startsWith("Lacuna L1:")
+                        .contains("validação eSF 70/eAP 76")
+                        .contains("AMB-C5-01"))
+                .anySatisfy(
+                        text -> assertThat(text).contains("últimos 24 meses").contains("NT 30/2025"))
+                .anySatisfy(text -> assertThat(text).contains("3.493/2024").contains("SCNES"))
+                .anySatisfy(text -> assertThat(text).contains("CadSUS").contains("item 24 a"))
+                .anySatisfy(text -> assertThat(text).contains("20º dia útil"))
+                .anySatisfy(text -> assertThat(text).startsWith("Lacuna L12:"))
+                .anySatisfy(text -> assertThat(text).startsWith("Lacuna L5:").contains("AMB-C5-06"))
+                .anySatisfy(text -> assertThat(text).startsWith("MIAO"));
+        assertThat(limitations).noneMatch(text -> text.startsWith("AMB-C5-06"));
+    }
+
+    // ---- practices are matched to the descriptor by code ----
+
+    @Test
+    void scoring_practicesAreMatchedToTheirSpecByCodeNotByPosition() {
+        List<ComponentSpec> specs = new C5Pack().descriptor().components();
+        C5Cohort.Decision decision = new C5Cohort.Decision("pessoa-1", "ELEGIVEL", null, null);
+        List<C5Practices.Outcome> reversed = List.of(
+                new C5Practices.Outcome("D", true, "CUMPRIDA", List.of()),
+                new C5Practices.Outcome("C", false, "SEM_REGISTRO_NA_JANELA", List.of()),
+                new C5Practices.Outcome("B", false, "SEM_REGISTRO_NA_JANELA", List.of()),
+                new C5Practices.Outcome("A", true, "CUMPRIDA", List.of()));
+
+        C5Results.Scored scored = C5Results.Scored.of(decision, reversed, specs);
+
+        assertThat(scored.points()).isEqualTo(PRACTICE_POINTS.multiply(BigInteger.TWO));
+        assertThat(scored.practice("D").met()).isTrue();
+        assertThatThrownBy(() -> C5Results.Scored.of(decision, reversed.subList(0, 3), specs))
+                .isInstanceOf(IllegalStateException.class);
     }
 }

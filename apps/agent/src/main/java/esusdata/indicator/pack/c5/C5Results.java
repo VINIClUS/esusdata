@@ -30,22 +30,38 @@ final class C5Results {
 
     private static final int DISPLAY_SCALE = 4;
 
-    /** One eligible person with practices A–D in the descriptor's order and the points earned. */
+    /** One eligible person with practices A–D and the points earned. */
     record Scored(C5Cohort.Decision decision, List<C5Practices.Outcome> practices, BigInteger points) {
         Scored {
             practices = List.copyOf(practices);
         }
 
+        /** Scores each practice by the descriptor's spec of the same code, never by position. */
         static Scored of(C5Cohort.Decision decision, List<C5Practices.Outcome> practices, List<ComponentSpec> specs) {
             List<ComponentSpec> met = new ArrayList<>();
-            for (int i = 0; i < specs.size(); i++) {
-                if (practices.get(i).met()) {
-                    met.add(specs.get(i));
+            for (ComponentSpec spec : specs) {
+                if (practice(practices, spec.code()).met()) {
+                    met.add(spec);
                 }
             }
             return new Scored(decision, practices, Scores.points(met));
         }
+
+        /** The decision of practice {@code code}; every practice of the descriptor is decided. */
+        C5Practices.Outcome practice(String code) {
+            return practice(practices, code);
+        }
+
+        private static C5Practices.Outcome practice(List<C5Practices.Outcome> practices, String code) {
+            return practices.stream()
+                    .filter(p -> p.code().equals(code))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("C5: prática " + code + " não avaliada"));
+        }
     }
+
+    /** What every result of one run shares: the pack's description and the evaluation's scope. */
+    record Scope(PackDescriptor descriptor, EvaluationContext context) {}
 
     private C5Results() {}
 
@@ -53,68 +69,46 @@ final class C5Results {
      * The result of {@code people}. With {@code ambiguous} (someone of an eAP tipo 76 team) the
      * value, band and numerator stay unavailable as {@code RULE_AMBIGUITY}; counts and practices stay.
      */
-    static IndicatorResult of(
-            PackDescriptor descriptor,
-            EvaluationContext context,
-            List<Scored> people,
-            List<String> limitations,
-            boolean ambiguous) {
+    static IndicatorResult of(Scope scope, List<Scored> people, List<String> limitations, boolean ambiguous) {
         BigInteger total = BigInteger.ZERO;
         for (Scored person : people) {
             total = total.add(person.points());
         }
         BigInteger eligible = BigInteger.valueOf(people.size());
-        List<ResultComponent> components = components(descriptor.components(), people);
+        List<ResultComponent> components = components(scope.descriptor().components(), people);
         Optional<ExactRatio> mean = Scores.meanPoints(total, eligible);
         if (mean.isEmpty()) {
-            return build(
-                    descriptor,
-                    context,
-                    IndicatorStatus.NO_DENOMINATOR,
-                    null,
-                    total,
-                    eligible,
-                    limitations,
-                    components);
+            return build(scope, IndicatorStatus.NO_DENOMINATOR, null, total, eligible, limitations, components);
         }
         if (ambiguous) {
             List<String> withAmbiguity = new ArrayList<>(limitations);
             withAmbiguity.add(EAP76_AMBIGUITY);
-            return build(
-                    descriptor,
-                    context,
-                    IndicatorStatus.RULE_AMBIGUITY,
-                    null,
-                    null,
-                    eligible,
-                    withAmbiguity,
-                    components);
+            return build(scope, IndicatorStatus.RULE_AMBIGUITY, null, null, eligible, withAmbiguity, components);
         }
-        return build(
-                descriptor, context, IndicatorStatus.COMPUTED, mean.get(), total, eligible, limitations, components);
+        return build(scope, IndicatorStatus.COMPUTED, mean.get(), total, eligible, limitations, components);
     }
 
     private static List<ResultComponent> components(List<ComponentSpec> specs, List<Scored> people) {
         List<ResultComponent> components = new ArrayList<>(specs.size());
         BigInteger eligible = BigInteger.valueOf(people.size());
-        for (int i = 0; i < specs.size(); i++) {
-            int index = i;
+        for (ComponentSpec spec : specs) {
             long met =
-                    people.stream().filter(p -> p.practices().get(index).met()).count();
-            components.add(ResultComponent.of(specs.get(i), BigInteger.valueOf(met), eligible));
+                    people.stream().filter(p -> p.practice(spec.code()).met()).count();
+            components.add(ResultComponent.of(spec, BigInteger.valueOf(met), eligible));
         }
         return components;
     }
 
     private static IndicatorResult build(
-            PackDescriptor descriptor,
-            EvaluationContext context,
+            Scope scope,
             IndicatorStatus status,
             ExactRatio value,
             BigInteger numerator,
             BigInteger denominator,
             List<String> limitations,
             List<ResultComponent> components) {
+        PackDescriptor descriptor = scope.descriptor();
+        EvaluationContext context = scope.context();
         Classification classification =
                 value == null ? null : Bands.QUALIDADE_C2_C7.classify(value).orElse(null);
         String valueText =

@@ -1,5 +1,6 @@
 package esusdata.indicator.pack.c5;
 
+import esusdata.indicator.model.SourceRef;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,7 +55,7 @@ final class C5Anthropometry {
     private static final class DateRecords {
         private boolean weight;
         private boolean height;
-        private final Map<Object, C5Event> events = new LinkedHashMap<>();
+        private final Map<SourceRef, C5Event> events = new LinkedHashMap<>();
 
         void add(C5Event event, boolean gaveWeight, boolean gaveHeight) {
             weight |= gaveWeight;
