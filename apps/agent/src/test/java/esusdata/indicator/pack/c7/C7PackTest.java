@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.ComponentKind;
+import esusdata.indicator.model.ComponentSpec;
 import esusdata.indicator.model.DataRequirements;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
@@ -36,7 +37,7 @@ class C7PackTest {
         assertThat(d.components())
                 .extracting(c -> c.code() + ":" + c.weight() + ":" + c.kind())
                 .containsExactly("A:20:SUBGROUP", "B:30:SUBGROUP", "C:30:SUBGROUP", "D:20:SUBGROUP");
-        assertThat(d.components().stream().map(c -> c.weight()).reduce(BigInteger.ZERO, BigInteger::add))
+        assertThat(d.components().stream().map(ComponentSpec::weight).reduce(BigInteger.ZERO, BigInteger::add))
                 .isEqualTo(BigInteger.valueOf(100));
         assertThat(d.components()).allMatch(c -> c.kind() == ComponentKind.SUBGROUP);
         assertThat(d.executionEnabled()).isFalse();

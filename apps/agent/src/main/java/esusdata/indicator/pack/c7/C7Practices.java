@@ -41,6 +41,16 @@ final class C7Practices {
     static final int MONTHS_C = 12;
     static final int MONTHS_D = 24;
 
+    private final Map<String, List<Fact>> procedures;
+    private final Map<String, List<Fact>> encounters;
+    private final Map<String, List<Fact>> doses;
+    private final LocalDate reference;
+    private final DateWindow window60;
+    private final DateWindow windowA;
+    private final DateWindow windowC;
+    private final DateWindow windowD;
+    private final boolean hpvMolecularCounts;
+
     enum Outcome {
         MET,
         NOT_MET,
@@ -62,16 +72,6 @@ final class C7Practices {
 
     /** A person's decision for one subgroup, with the distinct records that support it. */
     record Decision(Outcome outcome, String reason, List<Fact> support) {}
-
-    private final Map<String, List<Fact>> procedures;
-    private final Map<String, List<Fact>> encounters;
-    private final Map<String, List<Fact>> doses;
-    private final LocalDate reference;
-    private final DateWindow window60;
-    private final DateWindow windowA;
-    private final DateWindow windowC;
-    private final DateWindow windowD;
-    private final boolean hpvMolecularCounts;
 
     C7Practices(CanonicalDataset data, YearMonth competencia) {
         this.reference = competencia.atEndOfMonth();

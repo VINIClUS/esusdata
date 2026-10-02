@@ -14,7 +14,6 @@ import java.util.Set;
  * digits only; CBO as the ficha writes it; CID-10 without the dot, as the ficha lists it. Version
  * {@link #VERSION} changes whenever a list does.
  */
-@SuppressWarnings("PMD.DataClass") // a table of frozen codes, like Capabilities
 public final class C7Codes {
 
     public static final String VERSION = "c7-codes@2026-06";
