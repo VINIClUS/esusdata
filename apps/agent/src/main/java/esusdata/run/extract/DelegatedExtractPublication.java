@@ -1,6 +1,7 @@
 package esusdata.run.extract;
 
 import esusdata.run.acquisition.AcquisitionCommand;
+import esusdata.run.acquisition.AcquisitionPart;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -10,8 +11,11 @@ import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Objects;
+import java.util.SortedMap;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -35,8 +39,20 @@ import tools.jackson.databind.ObjectMapper;
  * child's own scope check (see {@code apps/execplane/src/extract.rs}); what stays Java's is the
  * out-of-scope-<em>read</em> guarantee — {@link ExtractReader}/{@link ExtractValidation} reject
  * any out-of-scope record unconditionally, before calculation, regardless of who wrote the file.
+ *
+ * <p>A canonical v2 acquisition (ADR 0030) is published with {@link #publishV2}: the same checks
+ * plus the child's row count per part, and a manifest listing every part. Everything in that
+ * manifest but the counts comes from the bound {@link AcquisitionCommand} — the parts' capability,
+ * version, query checksum, record kind, window and binds — and the binds and checksums only from
+ * {@link ManifestChecksums}, the one definition the replay of the extract checks them with.
  */
 public final class DelegatedExtractPublication implements AutoCloseable {
+
+    /**
+     * The manifest-level {@code adapterVersion} of a canonical v2 extract: every part names its own
+     * capability version, so the manifest names the plan instead of one adapter.
+     */
+    public static final String CANONICAL_V2_ADAPTER_VERSION = "canonical-v2";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -44,6 +60,9 @@ public final class DelegatedExtractPublication implements AutoCloseable {
     private final String extractionId;
     private final long maxTempFileBytes;
     private final ExtractionScope acquisitionScope;
+    /** A canonical v2 acquisition's parts as the manifest will list them, row counts still 0; empty for v1. */
+    private final List<ManifestPart> plannedParts;
+
     private final ExtractRecovery.WriterLock writerLock;
     private final Path tempFile;
 
@@ -56,11 +75,22 @@ public final class DelegatedExtractPublication implements AutoCloseable {
                 Objects.requireNonNull(acquisitionCommand, "acquisitionCommand is required")
                         .budget()
                         .maxTempFileBytes(),
-                scopeFor(acquisitionCommand));
+                scopeFor(acquisitionCommand),
+                plannedParts(acquisitionCommand));
     }
 
     DelegatedExtractPublication(
             Path baseDir, String extractionId, long maxTempFileBytes, ExtractionScope acquisitionScope)
+            throws IOException {
+        this(baseDir, extractionId, maxTempFileBytes, acquisitionScope, List.of());
+    }
+
+    private DelegatedExtractPublication(
+            Path baseDir,
+            String extractionId,
+            long maxTempFileBytes,
+            ExtractionScope acquisitionScope,
+            List<ManifestPart> plannedParts)
             throws IOException {
         this.baseDir = baseDir;
         this.extractionId = extractionId;
@@ -69,6 +99,7 @@ public final class DelegatedExtractPublication implements AutoCloseable {
         }
         this.maxTempFileBytes = maxTempFileBytes;
         this.acquisitionScope = Objects.requireNonNull(acquisitionScope, "acquisitionScope is required");
+        this.plannedParts = List.copyOf(plannedParts);
         ExtractValidation.validateExtractionId(baseDir, extractionId);
         Files.createDirectories(baseDir);
         // owned by this publication from here on; released by close() or on a failed constructor
@@ -102,9 +133,52 @@ public final class DelegatedExtractPublication implements AutoCloseable {
                 acquisitionCommand.periodEndExclusive().toString());
     }
 
+    /**
+     * Each part of a canonical v2 command as its manifest entry, before any process is spawned: a
+     * window outside the acquisition's period, or a bind declared both as a code list and as a date,
+     * fails the acquisition here, before the source is ever read.
+     */
+    private static List<ManifestPart> plannedParts(AcquisitionCommand acquisitionCommand) {
+        List<ManifestPart> parts = new ArrayList<>();
+        for (AcquisitionPart part : acquisitionCommand.parts()) {
+            int index = parts.size();
+            if (part.periodStart().isBefore(acquisitionCommand.periodStart())
+                    || part.periodEndExclusive().isAfter(acquisitionCommand.periodEndExclusive())
+                    || !part.periodStart().isBefore(part.periodEndExclusive())) {
+                throw new IllegalArgumentException("part " + index + " (" + part.capability() + ") window ["
+                        + part.periodStart() + ", " + part.periodEndExclusive()
+                        + ") is not a non-empty window inside the acquisition period ["
+                        + acquisitionCommand.periodStart() + ", " + acquisitionCommand.periodEndExclusive() + ")");
+            }
+            SortedMap<String, List<String>> params = ManifestChecksums.params(part.arrayParams(), part.dateParams());
+            parts.add(new ManifestPart(
+                    index,
+                    part.capability(),
+                    part.adapterVersion(),
+                    part.queryChecksum(),
+                    part.recordKind(),
+                    part.periodStart().toString(),
+                    part.periodEndExclusive().toString(),
+                    params,
+                    ManifestChecksums.paramsChecksum(params),
+                    0));
+        }
+        return parts;
+    }
+
     /** The path the child must create its data file at — an absolute, single, reserved location. */
     public Path tempFile() {
         return tempFile;
+    }
+
+    /**
+     * The manifest-level {@code queryChecksum} this canonical v2 acquisition will publish — {@link
+     * ManifestChecksums#compositeQueryChecksum} of its parts, which no row count enters — so the
+     * envelope names exactly the plan the manifest will record.
+     */
+    public String canonicalV2QueryChecksum() {
+        requireCanonicalV2();
+        return ManifestChecksums.compositeQueryChecksum(plannedParts);
     }
 
     /**
@@ -124,6 +198,9 @@ public final class DelegatedExtractPublication implements AutoCloseable {
             String completenessStatus,
             String consistencyLevel)
             throws IOException {
+        if (!plannedParts.isEmpty()) {
+            throw new IllegalStateException("a canonical v2 acquisition is published with publishV2");
+        }
         validateChildReport(rowCount, exclusionCount, checksum, compressedBytes);
         verifyTempFile(compressedBytes, checksum);
         ExtractPublication.validateManifestArguments(
@@ -137,11 +214,7 @@ public final class DelegatedExtractPublication implements AutoCloseable {
                 adapterVersion,
                 completenessStatus,
                 consistencyLevel);
-
-        Path finalFile = baseDir.resolve(extractionId + ".jsonl.gz");
-        Path manifestFile = baseDir.resolve(extractionId + ".manifest.json");
-        ExtractPublication.requirePublicationTargetAbsent(finalFile, "extract data file");
-        ExtractPublication.requirePublicationTargetAbsent(manifestFile, "manifest file");
+        requirePublicationTargetsAbsent();
 
         Instant finishedAt = Instant.now();
         ExtractionManifest manifest = new ExtractionManifest(
@@ -162,19 +235,147 @@ public final class DelegatedExtractPublication implements AutoCloseable {
                 queryChecksum,
                 adapterVersion);
         ExtractValidation.validateManifest(manifest);
+        return publishFiles(manifest);
+    }
 
+    /**
+     * Publishes a canonical v2 extract (ADR 0030): {@link #publish}'s checks of the child's report
+     * and of the file on disk, plus its row count per part, then a manifest with {@code
+     * canonicalSchemaVersion} "2", {@code SNAPSHOT}/{@code COMPLETE}, one {@link ManifestPart} per
+     * bound part — capability, version, query checksum, record kind, window, binds (dates as ISO
+     * text) and their checksum from the command, only the row count from the child — {@code
+     * rowCount} their sum, the composite {@code queryChecksum} and {@code adapterVersion} {@value
+     * #CANONICAL_V2_ADAPTER_VERSION}. A v2 extract has no exclusions: the child reports zero.
+     *
+     * @param partRowCounts the child's row count of each part, in part order
+     */
+    public ExtractionManifest publishV2(
+            long rowCount,
+            long exclusionCount,
+            String checksum,
+            long compressedBytes,
+            Instant startedAt,
+            String sourceZoneId,
+            List<Long> partRowCounts)
+            throws IOException {
+        requireCanonicalV2();
+        validateChildReport(rowCount, exclusionCount, checksum, compressedBytes);
+        List<ManifestPart> parts = countedParts(rowCount, exclusionCount, partRowCounts);
+        verifyTempFile(compressedBytes, checksum);
+        String queryChecksum = ManifestChecksums.compositeQueryChecksum(parts);
+        ExtractPublication.validateManifestArguments(
+                acquisitionScope.sourceId(),
+                acquisitionScope.municipalityIbge(),
+                acquisitionScope.periodStart(),
+                acquisitionScope.periodEndExclusive(),
+                startedAt,
+                sourceZoneId,
+                queryChecksum,
+                CANONICAL_V2_ADAPTER_VERSION,
+                "COMPLETE",
+                "SNAPSHOT");
+        requirePublicationTargetsAbsent();
+
+        Instant finishedAt = Instant.now();
+        if (finishedAt.isBefore(startedAt)) {
+            throw new IllegalStateException("Manifest timestamps are not ordered");
+        }
+        return publishFiles(new ExtractionManifest(
+                extractionId,
+                acquisitionScope.sourceId(),
+                acquisitionScope.municipalityIbge(),
+                acquisitionScope.periodStart(),
+                acquisitionScope.periodEndExclusive(),
+                startedAt.toString(),
+                finishedAt.toString(),
+                ExtractionManifest.CANONICAL_SCHEMA_VERSION_V2,
+                "COMPLETE",
+                "SNAPSHOT",
+                sourceZoneId,
+                rowCount,
+                0,
+                checksum,
+                queryChecksum,
+                CANONICAL_V2_ADAPTER_VERSION,
+                parts));
+    }
+
+    private void requireCanonicalV2() {
+        if (plannedParts.isEmpty()) {
+            throw new IllegalStateException("this publication is bound to a canonical v1 acquisition");
+        }
+    }
+
+    /**
+     * The bound parts with the child's row counts — one per part, none negative, adding up to the
+     * reported {@code row_count} — or {@link IllegalStateException}: a report that does not account
+     * for every row of every part is never published.
+     */
+    private List<ManifestPart> countedParts(long rowCount, long exclusionCount, List<Long> partRowCounts) {
+        if (exclusionCount != 0) {
+            throw new IllegalStateException(
+                    "execution plane reported exclusion_count=" + exclusionCount + " for a canonical v2 extract");
+        }
+        if (partRowCounts == null || partRowCounts.size() != plannedParts.size()) {
+            throw new IllegalStateException("execution plane reported "
+                    + (partRowCounts == null ? 0 : partRowCounts.size()) + " part row counts for "
+                    + plannedParts.size() + " parts");
+        }
+        List<ManifestPart> parts = new ArrayList<>(plannedParts.size());
+        long sum = 0;
+        for (ManifestPart planned : plannedParts) {
+            Long count = partRowCounts.get(planned.index());
+            if (count == null || count < 0) {
+                throw new IllegalStateException(
+                        "execution plane reported an invalid row count for part " + planned.index() + ": " + count);
+            }
+            sum = Math.addExact(sum, count);
+            parts.add(new ManifestPart(
+                    planned.index(),
+                    planned.capability(),
+                    planned.adapterVersion(),
+                    planned.queryChecksum(),
+                    planned.recordKind(),
+                    planned.periodStart(),
+                    planned.periodEndExclusive(),
+                    planned.params(),
+                    planned.paramsChecksum(),
+                    count));
+        }
+        if (sum != rowCount) {
+            throw new IllegalStateException(
+                    "execution plane reported row_count=" + rowCount + " but its part row counts add up to " + sum);
+        }
+        return parts;
+    }
+
+    private void requirePublicationTargetsAbsent() throws IOException {
+        ExtractPublication.requirePublicationTargetAbsent(finalFile(), "extract data file");
+        ExtractPublication.requirePublicationTargetAbsent(manifestFile(), "manifest file");
+    }
+
+    /** Writes the manifest, then publishes the data file and the manifest, each by hard link. */
+    private ExtractionManifest publishFiles(ExtractionManifest manifest) throws IOException {
         Path manifestTemp = baseDir.resolve(extractionId + ".manifest.json.tmp");
         ExtractValidation.rejectSymbolicLink(manifestTemp, "manifest temporary file");
         ExtractPublication.writeAndForce(manifestTemp, MAPPER.writeValueAsBytes(manifest));
 
-        ExtractPublication.publishNewFile(tempFile, finalFile);
+        ExtractPublication.publishNewFile(tempFile, finalFile());
         ExtractPublication.forceDirectory(baseDir);
 
-        ExtractPublication.publishNewFile(manifestTemp, manifestFile);
+        ExtractPublication.publishNewFile(manifestTemp, manifestFile());
         ExtractPublication.forceDirectory(baseDir);
         writerLock.close();
 
         return manifest;
+    }
+
+    private Path finalFile() {
+        return baseDir.resolve(extractionId + ".jsonl.gz");
+    }
+
+    private Path manifestFile() {
+        return baseDir.resolve(extractionId + ".manifest.json");
     }
 
     /**
