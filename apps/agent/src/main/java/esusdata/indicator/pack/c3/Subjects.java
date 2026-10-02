@@ -72,13 +72,18 @@ final class Subjects {
         return earliest;
     }
 
+    /**
+     * A code is a pregnancy code when it matches the pregnancy list exactly, or matches it at all
+     * while not matching the puerperium list exactly ({@code O15.2}, {@code O26.6} are puerperal).
+     */
     private static boolean unexplained(CanonicalCareEvent event, LocalDate date, List<Episode> episodes) {
-        if (CodeMatch.of(event, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID).found()) {
+        CodeMatch pregnancy = CodeMatch.of(event, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID);
+        CodeMatch puerperium = CodeMatch.of(event, C3Codes.PUERPERIUM_CIAP, C3Codes.PUERPERIUM_CID);
+        boolean pregnancyCode = pregnancy == CodeMatch.EXACT || (pregnancy.found() && puerperium != CodeMatch.EXACT);
+        if (pregnancyCode) {
             return !covered(date, episodes);
         }
-        return CodeMatch.of(event, C3Codes.PUERPERIUM_CIAP, C3Codes.PUERPERIUM_CID)
-                        .found()
-                && !afterSomeDum(date, episodes);
+        return puerperium.found() && !afterSomeDum(date, episodes);
     }
 
     private static boolean afterSomeDum(LocalDate date, List<Episode> episodes) {

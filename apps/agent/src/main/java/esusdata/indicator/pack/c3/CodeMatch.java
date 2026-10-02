@@ -50,12 +50,11 @@ enum CodeMatch {
 
     /** A condition of the LPC by its code system ({@code CIAP2} exact, {@code CID10} as CID-10). */
     static CodeMatch of(CanonicalCondition condition, List<String> ciapList, List<String> cidList) {
-        String system =
-                condition.codeSystem() == null ? "" : condition.codeSystem().strip();
-        if (CIAP2.equalsIgnoreCase(system)) {
+        String system = C3Codes.token(condition.codeSystem());
+        if (CIAP2.equals(system)) {
             return ciapList.contains(C3Codes.normalized(condition.code())) ? EXACT : NONE;
         }
-        if (CID10.equalsIgnoreCase(system)) {
+        if (CID10.equals(system)) {
             return cid(condition.code(), cidList);
         }
         return any(condition.code(), ciapList, cidList);

@@ -2,7 +2,6 @@ package esusdata.indicator.pack.c3;
 
 import esusdata.indicator.model.CanonicalMeasurement;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * How a collective activity (MIAC) meets the ficha's two code conditions — "Atividade código 05
@@ -13,8 +12,6 @@ enum MiacMatch {
     BOTH,
     ONE,
     NEITHER;
-
-    private static final String MIAC = "MIAC";
 
     /** {@code NEITHER} also for a record that is not a MIAC. */
     static MiacMatch of(CanonicalMeasurement measurement, List<String> practices) {
@@ -30,8 +27,7 @@ enum MiacMatch {
     }
 
     static boolean isMiac(CanonicalMeasurement measurement) {
-        return measurement.origin() != null
-                && MIAC.equals(measurement.origin().strip().toUpperCase(Locale.ROOT));
+        return C3Codes.ORIGIN_MIAC.equals(C3Codes.token(measurement.origin()));
     }
 
     /** Whether the record counts at all. */

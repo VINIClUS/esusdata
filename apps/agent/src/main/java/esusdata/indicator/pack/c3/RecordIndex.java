@@ -12,12 +12,10 @@ import esusdata.indicator.model.CanonicalPregnancyOutcome;
 import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CanonicalRegistration;
 import esusdata.indicator.model.CanonicalTeam;
-import esusdata.indicator.model.SourceRef;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
@@ -38,24 +36,20 @@ final class RecordIndex {
 
     static SortedMap<String, PersonRecords> of(CanonicalDataset data, String municipalityIbge) {
         requireMunicipality(data, municipalityIbge);
-        Map<String, List<CanonicalCareEvent>> care =
-                group(data.careEvents(), CanonicalCareEvent::personKey, CanonicalCareEvent::sourceRef);
+        Map<String, List<CanonicalCareEvent>> care = group(data.careEvents(), CanonicalCareEvent::personKey);
         Map<String, List<CanonicalProcedureEvent>> procedures =
-                group(data.procedureEvents(), CanonicalProcedureEvent::personKey, CanonicalProcedureEvent::sourceRef);
-        Map<String, List<CanonicalHomeVisit>> visits =
-                group(data.homeVisits(), CanonicalHomeVisit::personKey, CanonicalHomeVisit::sourceRef);
+                group(data.procedureEvents(), CanonicalProcedureEvent::personKey);
+        Map<String, List<CanonicalHomeVisit>> visits = group(data.homeVisits(), CanonicalHomeVisit::personKey);
         Map<String, List<CanonicalMeasurement>> measurements =
-                group(data.measurements(), CanonicalMeasurement::personKey, CanonicalMeasurement::sourceRef);
+                group(data.measurements(), CanonicalMeasurement::personKey);
         Map<String, List<CanonicalImmunization>> immunizations =
-                group(data.immunizations(), CanonicalImmunization::personKey, CanonicalImmunization::sourceRef);
-        Map<String, List<CanonicalPregnancyOutcome>> outcomes = group(
-                data.pregnancyOutcomes(), CanonicalPregnancyOutcome::personKey, CanonicalPregnancyOutcome::sourceRef);
+                group(data.immunizations(), CanonicalImmunization::personKey);
+        Map<String, List<CanonicalPregnancyOutcome>> outcomes =
+                group(data.pregnancyOutcomes(), CanonicalPregnancyOutcome::personKey);
         Map<String, List<CanonicalRegistration>> registrations =
-                group(data.registrations(), CanonicalRegistration::personKey, CanonicalRegistration::sourceRef);
-        Map<String, List<CanonicalPerson>> persons =
-                group(data.persons(), CanonicalPerson::personKey, CanonicalPerson::sourceRef);
-        Map<String, List<CanonicalCondition>> conditions =
-                group(data.conditions(), CanonicalCondition::personKey, CanonicalCondition::sourceRef);
+                group(data.registrations(), CanonicalRegistration::personKey);
+        Map<String, List<CanonicalPerson>> persons = group(data.persons(), CanonicalPerson::personKey);
+        Map<String, List<CanonicalCondition>> conditions = group(data.conditions(), CanonicalCondition::personKey);
 
         SortedMap<String, PersonRecords> index = new TreeMap<>();
         for (Map.Entry<String, List<CanonicalCareEvent>> entry : care.entrySet()) {
@@ -106,15 +100,16 @@ final class RecordIndex {
         }
     }
 
-    private static <T> Map<String, List<T>> group(
-            List<T> records, Function<T, String> person, Function<T, SourceRef> ref) {
+    /**
+     * The records by person, each identical record once (MET-32). Records are compared whole: two
+     * distinct facts that happen to share a source reference are both kept.
+     */
+    private static <T> Map<String, List<T>> group(List<T> records, Function<T, String> person) {
         Map<String, List<T>> byPerson = new HashMap<>();
-        Set<SourceRef> seen = new HashSet<>();
+        Set<T> seen = new HashSet<>();
         for (T canonicalRecord : records) {
-            SourceRef sourceRef = ref.apply(canonicalRecord);
             String key = person.apply(canonicalRecord);
-            boolean repeated = sourceRef != null && !seen.add(sourceRef);
-            if (key != null && !repeated) {
+            if (key != null && seen.add(canonicalRecord)) {
                 byPerson.computeIfAbsent(key, k -> new ArrayList<>()).add(canonicalRecord);
             }
         }
@@ -122,8 +117,6 @@ final class RecordIndex {
     }
 
     private static List<CanonicalCareEvent> ofForm(List<CanonicalCareEvent> events, String form) {
-        return events.stream()
-                .filter(e -> e.form() != null && form.equals(e.form().strip().toUpperCase(Locale.ROOT)))
-                .toList();
+        return events.stream().filter(e -> form.equals(C3Codes.token(e.form()))).toList();
     }
 }

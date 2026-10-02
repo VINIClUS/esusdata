@@ -2,6 +2,7 @@ package esusdata.indicator.pack.c3;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -67,17 +68,27 @@ final class PracticeEvaluator {
         return outcomes;
     }
 
+    /**
+     * The decision every reading agrees on; when they diverge, AMB-C3-03, with the supports every
+     * reading shares keeping their label and the others relabelled AMB-C3-03.
+     */
     private static PracticeOutcome agree(List<Map<Practice, PracticeOutcome>> perReading, Practice practice) {
         PracticeOutcome first = perReading.get(0).get(practice);
-        List<Support> supports = new ArrayList<>();
-        boolean diverge = false;
+        boolean diverge = perReading.stream().anyMatch(r -> r.get(practice).decision() != first.decision());
+        if (!diverge) {
+            return first;
+        }
+        Map<String, Support> byRef = new LinkedHashMap<>();
         for (Map<Practice, PracticeOutcome> reading : perReading) {
-            PracticeOutcome outcome = reading.get(practice);
-            diverge |= outcome.decision() != first.decision();
-            for (Support support : outcome.supports()) {
-                supports.add(new Support(support.event(), Ambiguity.AMB_C3_03));
+            for (Support support : reading.get(practice).supports()) {
+                boolean shared = perReading.stream()
+                        .allMatch(r -> r.get(practice).supports().contains(support));
+                byRef.putIfAbsent(
+                        support.event().refKey(), shared ? support : new Support(support.event(), Ambiguity.AMB_C3_03));
             }
         }
-        return diverge ? PracticeOutcome.ambiguous(Ambiguity.AMB_C3_03, Tally.merge(supports)) : first;
+        List<Support> supports = new ArrayList<>(byRef.values());
+        supports.sort((x, y) -> EventRef.ORDER.compare(x.event(), y.event()));
+        return PracticeOutcome.ambiguous(Ambiguity.AMB_C3_03, supports);
     }
 }

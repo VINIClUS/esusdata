@@ -1,5 +1,6 @@
 package esusdata.indicator.pack.c3;
 
+import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CboGroups;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,9 +18,6 @@ import java.util.Set;
  */
 @SuppressWarnings("PMD.AvoidDuplicateLiterals") // each list copies its quadro literally; CBO repeat by design
 final class C3Codes {
-
-    /** Version of these tables; bump it when a list changes. */
-    static final String VERSION = "c3-codes@2026-06";
 
     // ---- 24 f (p.3): "CID-10 e CIAP-2 para considerar uma gestação" ----
 
@@ -177,6 +175,15 @@ final class C3Codes {
     /** Condition status "2" (resolvido): its resolution date is the pregnancy outcome candidate (L2). */
     static final String CONDITION_RESOLVED = "2";
 
+    /** Condition statuses "0" (ativo) and "1" (latente): the "ativos" of 24 f/g. */
+    static final List<String> CONDITION_ACTIVE = List.of("0", "1");
+
+    // ---- Modelos de informação (origem dos registros) ----
+
+    static final String ORIGIN_MIAI = "MIAI";
+    static final String ORIGIN_MIP = "MIP";
+    static final String ORIGIN_MIAC = "MIAC";
+
     // ---- Equipes (24 b, p.2) ----
 
     /** CNES team type 76, eAP: E and J "consideram a pontuação integral" (24 b). */
@@ -191,6 +198,21 @@ final class C3Codes {
     static final String EXIT_CHANGE_OF_TERRITORY = "136";
 
     private C3Codes() {}
+
+    /** A source token as compared here: stripped, upper case, {@code ""} for {@code null}. */
+    static String token(String text) {
+        return text == null ? "" : text.strip().toUpperCase(Locale.ROOT);
+    }
+
+    /** True when the LPC condition is marked resolved ("2"). */
+    static boolean resolved(CanonicalCondition condition) {
+        return CONDITION_RESOLVED.equals(token(condition.status()));
+    }
+
+    /** True when the LPC condition is active or latent ("0", "1"); an unknown status is not. */
+    static boolean active(CanonicalCondition condition) {
+        return CONDITION_ACTIVE.contains(token(condition.status()));
+    }
 
     /** True when a LEDI code is in the list, "5" and "05" being the same code. */
     static boolean ledi(String code, List<String> list) {

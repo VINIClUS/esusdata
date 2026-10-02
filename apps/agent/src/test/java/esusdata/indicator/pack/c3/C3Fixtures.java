@@ -21,6 +21,7 @@ import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.EvidenceSubjectKind;
 import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.model.SourceRef;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -334,7 +335,55 @@ final class C3Fixtures {
     }
 
     static CanonicalTeam team(String ine, String teamTypeCode) {
-        return new CanonicalTeam(CanonicalFixtures.ref("tb_dim_equipe"), IBGE, ine, CNES, teamTypeCode, "2025-01-01");
+        return team(ine, teamTypeCode, "2025-01-01");
+    }
+
+    /** A team observation on {@code observedAt} (may be {@code null}). */
+    static CanonicalTeam team(String ine, String teamTypeCode, String observedAt) {
+        return new CanonicalTeam(CanonicalFixtures.ref("tb_dim_equipe"), IBGE, ine, CNES, teamTypeCode, observedAt);
+    }
+
+    /** A registration version with its own source reference and flags. */
+    static CanonicalRegistration registrationVersion(
+            String personKey,
+            LocalDate date,
+            String ine,
+            SourceRef ref,
+            boolean simplified,
+            boolean inactive,
+            boolean refused) {
+        return new CanonicalRegistration(
+                ref,
+                IBGE,
+                personKey,
+                date.toString(),
+                CNES,
+                ine,
+                simplified,
+                inactive,
+                refused,
+                null,
+                null,
+                null,
+                true);
+    }
+
+    /** Blood pressure of a collective activity (MIAC) participant, by a nurse. */
+    static CanonicalMeasurement collectivePressure(
+            String personKey, LocalDate date, String activityType, String... practices) {
+        return new CanonicalMeasurement(
+                CanonicalFixtures.ref("tb_fat_atvdd_coletiva_part"),
+                IBGE,
+                personKey,
+                date.toString(),
+                null,
+                null,
+                "120",
+                "80",
+                NURSE,
+                "MIAC",
+                activityType,
+                List.of(practices));
     }
 
     static CanonicalPregnancyOutcome outcome(String personKey, LocalDate date, String... codes) {

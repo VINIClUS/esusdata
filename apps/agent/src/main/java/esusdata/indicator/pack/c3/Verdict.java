@@ -24,17 +24,25 @@ record Verdict(boolean eligible, String reasonCode, LocalDate eventDate, Ambigui
 
     /**
      * The verdict every reading of the dates agrees on ({@code null} = no objection), or AMB-C3-03
-     * when the readings disagree.
+     * when the readings disagree. Readings agree on the decision (eligible, reason, ambiguity), not
+     * on its date: the date is the primary reading's.
      */
     static Verdict agreed(List<Verdict> perReading, LocalDate eventDate) {
         Verdict first = perReading.get(0);
         for (Verdict verdict : perReading) {
-            boolean same = first == null ? verdict == null : first.equals(verdict);
+            boolean same = first == null ? verdict == null : first.sameDecision(verdict);
             if (!same) {
                 return ambiguous(Ambiguity.AMB_C3_03, eventDate);
             }
         }
         return first;
+    }
+
+    private boolean sameDecision(Verdict other) {
+        return other != null
+                && eligible == other.eligible
+                && reasonCode.equals(other.reasonCode)
+                && ambiguity == other.ambiguity;
     }
 
     boolean ambiguousSubject() {

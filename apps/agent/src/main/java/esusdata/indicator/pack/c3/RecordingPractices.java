@@ -7,7 +7,6 @@ import esusdata.indicator.model.CanonicalProcedureEvent;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.NavigableSet;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -22,7 +21,6 @@ import java.util.TreeSet;
 final class RecordingPractices {
 
     private static final int SEVEN = 7;
-    private static final String MIP = "MIP";
 
     private RecordingPractices() {}
 
@@ -58,7 +56,7 @@ final class RecordingPractices {
             List<DayTally.DayItem> items, GestationWindow window, CanonicalMeasurement measurement) {
         Ambiguity byCbo = CboRule.BLOOD_PRESSURE.ambiguityOf(measurement.cbo());
         MiacMatch miac = MiacMatch.of(measurement, C3Codes.MIAC_PRACTICES);
-        if (MIP.equals(origin(measurement))) {
+        if (C3Codes.ORIGIN_MIP.equals(C3Codes.token(measurement.origin()))) {
             add(items, window, EventRef.of(measurement), byCbo);
         } else if (miac.counts()) {
             add(items, window, EventRef.of(measurement), miac.ambiguity(byCbo));
@@ -76,7 +74,7 @@ final class RecordingPractices {
         }
         for (CanonicalMeasurement measurement : person.measurements()) {
             MiacMatch miac = MiacMatch.of(measurement, C3Codes.MIAC_PRACTICES_ANTHROPOMETRY);
-            if (MIP.equals(origin(measurement)) || miac == MiacMatch.BOTH) {
+            if (C3Codes.ORIGIN_MIP.equals(C3Codes.token(measurement.origin())) || miac == MiacMatch.BOTH) {
                 measures.values(EventRef.of(measurement), measurement.weightKg(), measurement.heightCm());
             } else if (miac.counts() && both(measurement.weightKg(), measurement.heightCm())) {
                 measures.undecided(EventRef.of(measurement), Ambiguity.AMB_C3_19);
@@ -102,10 +100,6 @@ final class RecordingPractices {
 
     static boolean present(String value) {
         return value != null && !value.isBlank();
-    }
-
-    private static String origin(CanonicalMeasurement measurement) {
-        return measurement.origin() == null ? "" : measurement.origin().strip().toUpperCase(Locale.ROOT);
     }
 
     /** The weights, heights and undecided pairs of the pregnancy, by day (Quadro 04). */

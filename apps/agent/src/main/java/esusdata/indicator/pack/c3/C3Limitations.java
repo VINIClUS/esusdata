@@ -36,6 +36,13 @@ final class C3Limitations {
             "Semana ordinal (12ª e 20ª) e fronteiras de 294 e 42 dias ficam RULE_AMBIGUITY nas faixas em"
                     + " que as leituras divergem (AMB-C3-01; AMB-C3-04).",
             "O corte local de extração não reproduz o 20º dia útil do SIAPS (item 11, p.1; AMB-C3-21).",
+            "Códigos do 24 f sem DUM nem IG na janela de 13 meses podem ser de uma gestação cuja DUM foi"
+                    + " registrada antes da janela; ficam RULE_AMBIGUITY, possivelmente sem ambiguidade real"
+                    + " (24 f, p.3; AMB-C3-03).",
+            "A IG é registrada em semanas inteiras: uma DUM derivada da IG até 6 dias depois de uma DUM"
+                    + " registrada é tratada como a mesma DUM (4.1, p.5; AMB-C3-03).",
+            "A alocação do profissional em equipe tipo 70 ou 76 não é verificada (Quadros 02 e 08;"
+                    + " lacuna L1; AMB-C3-13).",
             "São lidas pessoas nascidas nos últimos 130 anos: a ficha não tem faixa etária.");
 
     private C3Limitations() {}

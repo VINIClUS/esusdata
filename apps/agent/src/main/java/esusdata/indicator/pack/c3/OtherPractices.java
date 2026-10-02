@@ -6,6 +6,8 @@ import esusdata.indicator.model.CanonicalMeasurement;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 /**
  * Practices F and K: one dTpa from the 20ª week (24 i, Quadro 06) and one oral-health activity
@@ -23,23 +25,40 @@ final class OtherPractices {
 
     /**
      * F: a dose of "57" is certain in {@code [DUM + 140, D)} by a listed CBO; "talvez" in {@code
-     * DUM + 133..139} (AMB-C3-01), in {@code [D, D + 42]} (AMB-C3-17 (i)), without a date
-     * (AMB-C3-17 (ii)) or by a CBO outside the lists (AMB-C3-13).
+     * DUM + 133..139} (AMB-C3-01), in {@code [D, D + 42]} from DUM + 133 on (AMB-C3-17 (i)),
+     * without a date (AMB-C3-17 (ii)) or by a CBO outside the lists (AMB-C3-13). Before DUM + 133
+     * it never counts, even after an early D.
      */
     static PracticeOutcome dtpa(PersonRecords person, GestationWindow window) {
         List<TallyMark> marks = new ArrayList<>();
+        SortedMap<LocalDate, TallyMark> byDate = new TreeMap<>();
         for (CanonicalImmunization dose : person.immunizations()) {
-            String code = dose.immunobiologicalCode() == null
-                    ? ""
-                    : dose.immunobiologicalCode().strip();
-            if (C3Codes.DTPA_ADULT.equals(code)) {
-                TallyMark mark = dtpaMark(EventRef.of(dose), window);
-                if (mark != null) {
-                    marks.add(mark);
-                }
+            TallyMark mark = C3Codes.DTPA_ADULT.equals(C3Codes.token(dose.immunobiologicalCode()))
+                    ? dtpaMark(EventRef.of(dose), window)
+                    : null;
+            if (mark == null) {
+                continue;
+            }
+            LocalDate date = mark.events().get(0).date();
+            if (date == null) {
+                marks.add(mark);
+            } else {
+                byDate.merge(date, mark, OtherPractices::sameDose);
             }
         }
+        marks.addAll(byDate.values());
         return Tally.decide(1, marks);
+    }
+
+    /**
+     * The same dose (person, "57", application date) from the MIV and from a transcription is one
+     * dose (MET-32): the certain record, else the first in evidence order.
+     */
+    private static TallyMark sameDose(TallyMark a, TallyMark b) {
+        if (a.certain() != b.certain()) {
+            return a.certain() ? a : b;
+        }
+        return EventRef.ORDER.compare(a.events().get(0), b.events().get(0)) <= 0 ? a : b;
     }
 
     /**
@@ -76,13 +95,16 @@ final class OtherPractices {
         if (date == null) {
             return TallyMark.of(dose, Ambiguity.AMB_C3_17);
         }
+        long day = window.day(date);
+        if (day < DTPA_ORDINAL_FROM) {
+            return null;
+        }
         if (!date.isBefore(window.end())) {
             return date.isAfter(window.boundaryDay()) ? null : TallyMark.of(dose, Ambiguity.AMB_C3_17);
         }
-        long day = window.day(date);
         if (day >= DTPA_CERTAIN_FROM) {
             return TallyMark.of(dose, C3Codes.LISTED_CBO.matches(dose.cbo()) ? null : Ambiguity.AMB_C3_13);
         }
-        return day >= DTPA_ORDINAL_FROM ? TallyMark.of(dose, Ambiguity.AMB_C3_01) : null;
+        return TallyMark.of(dose, Ambiguity.AMB_C3_01);
     }
 }

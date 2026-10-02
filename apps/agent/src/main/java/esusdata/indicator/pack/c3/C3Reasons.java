@@ -25,42 +25,10 @@ final class C3Reasons {
     static final String EAP_TIPO_76_PONTUACAO_INTEGRAL = "EAP_TIPO_76_PONTUACAO_INTEGRAL";
     static final String EVIDENCIA = "EVIDENCIA";
 
-    // ---- ambiguities (prefix + Ambiguity name) ----
+    // ---- ambiguities: built from Ambiguity by ambiguity(...) and ambiguousEvidence(...) ----
 
     static final String AMBIGUITY_PREFIX = "AMBIGUIDADE_";
     static final String AMBIGUOUS_EVIDENCE_PREFIX = "EVIDENCIA_AMBIGUA_";
-
-    static final String AMBIGUIDADE_AMB_C3_01 = "AMBIGUIDADE_AMB_C3_01";
-    static final String AMBIGUIDADE_AMB_C3_02 = "AMBIGUIDADE_AMB_C3_02";
-    static final String AMBIGUIDADE_AMB_C3_03 = "AMBIGUIDADE_AMB_C3_03";
-    static final String AMBIGUIDADE_AMB_C3_04 = "AMBIGUIDADE_AMB_C3_04";
-    static final String AMBIGUIDADE_AMB_C3_05 = "AMBIGUIDADE_AMB_C3_05";
-    static final String AMBIGUIDADE_AMB_C3_07 = "AMBIGUIDADE_AMB_C3_07";
-    static final String AMBIGUIDADE_AMB_C3_08 = "AMBIGUIDADE_AMB_C3_08";
-    static final String AMBIGUIDADE_AMB_C3_11 = "AMBIGUIDADE_AMB_C3_11";
-    static final String AMBIGUIDADE_AMB_C3_12 = "AMBIGUIDADE_AMB_C3_12";
-    static final String AMBIGUIDADE_AMB_C3_13 = "AMBIGUIDADE_AMB_C3_13";
-    static final String AMBIGUIDADE_AMB_C3_14 = "AMBIGUIDADE_AMB_C3_14";
-    static final String AMBIGUIDADE_AMB_C3_15 = "AMBIGUIDADE_AMB_C3_15";
-    static final String AMBIGUIDADE_AMB_C3_16 = "AMBIGUIDADE_AMB_C3_16";
-    static final String AMBIGUIDADE_AMB_C3_17 = "AMBIGUIDADE_AMB_C3_17";
-    static final String AMBIGUIDADE_AMB_C3_18 = "AMBIGUIDADE_AMB_C3_18";
-    static final String AMBIGUIDADE_AMB_C3_19 = "AMBIGUIDADE_AMB_C3_19";
-
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_01 = "EVIDENCIA_AMBIGUA_AMB_C3_01";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_02 = "EVIDENCIA_AMBIGUA_AMB_C3_02";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_03 = "EVIDENCIA_AMBIGUA_AMB_C3_03";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_04 = "EVIDENCIA_AMBIGUA_AMB_C3_04";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_08 = "EVIDENCIA_AMBIGUA_AMB_C3_08";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_11 = "EVIDENCIA_AMBIGUA_AMB_C3_11";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_12 = "EVIDENCIA_AMBIGUA_AMB_C3_12";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_13 = "EVIDENCIA_AMBIGUA_AMB_C3_13";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_14 = "EVIDENCIA_AMBIGUA_AMB_C3_14";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_15 = "EVIDENCIA_AMBIGUA_AMB_C3_15";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_16 = "EVIDENCIA_AMBIGUA_AMB_C3_16";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_17 = "EVIDENCIA_AMBIGUA_AMB_C3_17";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_18 = "EVIDENCIA_AMBIGUA_AMB_C3_18";
-    static final String EVIDENCIA_AMBIGUA_AMB_C3_19 = "EVIDENCIA_AMBIGUA_AMB_C3_19";
 
     private C3Reasons() {}
 

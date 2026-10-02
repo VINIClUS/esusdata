@@ -94,7 +94,7 @@ class C3CohortCasesTest {
         // a seventh consultation with a non-pregnancy code: undecided (AMB-C3-11)
         EvidenceItem b = practice(outcome, EP1, "B");
         assertThat(b.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
-        assertThat(b.reasonCode()).startsWith("AMBIGUIDADE_AMB_C3_");
+        assertThat(b.reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_11");
         assertThat(b.points()).isNull();
     }
 
@@ -339,6 +339,8 @@ class C3CohortCasesTest {
                 .filteredOn(e -> EP1.equals(e.subjectKey()))
                 .anySatisfy(e -> assertThat(e.reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_03"));
         assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        // the DUM reads DUM+94 (A not met), the IG reads IG 10s (A met): A depends on the reading
+        assertAmbiguous(practice(outcome, EP1, "A"), "03");
     }
 
     @Test

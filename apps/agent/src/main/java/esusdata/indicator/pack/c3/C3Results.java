@@ -64,8 +64,9 @@ final class C3Results {
         List<Subject> eligible = subjects.stream().filter(Subject::eligible).toList();
         List<Subject> ambiguous = subjects.stream().filter(Subject::ambiguous).toList();
         BigInteger denominator = BigInteger.valueOf(eligible.size());
-        List<ResultComponent> components = components(eligible);
-        boolean consolidation = consolidationEligible(eligible);
+        boolean cohortAmbiguous = subjects.stream().anyMatch(s -> s.verdict().ambiguousSubject());
+        List<ResultComponent> components = components(eligible, cohortAmbiguous);
+        boolean consolidation = consolidationEligible(subjects);
         List<String> limitations = new ArrayList<>(descriptor.standingLimitations());
         if (!ambiguous.isEmpty()) {
             limitations.add(ambiguityNote(ambiguous));
@@ -90,15 +91,19 @@ final class C3Results {
         return build(IndicatorStatus.COMPUTED, value, total, denominator, limitations, components, consolidation);
     }
 
-    /** Per practice: met or exempt over eligible; an ambiguous episode leaves the value undefined. */
-    private List<ResultComponent> components(List<Subject> eligible) {
+    /**
+     * Per practice: met or exempt over eligible. An eligible episode ambiguous in the practice, or
+     * any ambiguous subject of the cohort (the denominator itself is undecided), leaves the value
+     * undefined; the counts stay exact.
+     */
+    private List<ResultComponent> components(List<Subject> eligible, boolean cohortAmbiguous) {
         List<ResultComponent> components = new ArrayList<>();
         BigInteger denominator = BigInteger.valueOf(eligible.size());
         for (Practice practice : Practice.values()) {
             long met =
                     eligible.stream().filter(s -> s.practice(practice).scores()).count();
-            boolean ambiguous =
-                    eligible.stream().anyMatch(s -> s.practice(practice).decision() == PracticeDecision.AMBIGUOUS);
+            boolean ambiguous = cohortAmbiguous
+                    || eligible.stream().anyMatch(s -> s.practice(practice).decision() == PracticeDecision.AMBIGUOUS);
             ResultComponent component =
                     ResultComponent.of(weights.spec(practice), BigInteger.valueOf(met), denominator);
             components.add(
@@ -117,9 +122,10 @@ final class C3Results {
     }
 
     /** NT 8/2026: the month counts when an eligible episode reaches D + 42 in it. */
-    private boolean consolidationEligible(List<Subject> eligible) {
+    private boolean consolidationEligible(List<Subject> subjects) {
         YearMonth month = context.competencia();
-        return eligible.stream()
+        return subjects.stream()
+                .filter(s -> s.episode() != null && (s.eligible() || s.verdict().ambiguousSubject()))
                 .anyMatch(
                         s -> YearMonth.from(s.episode().primary().boundaryDay()).equals(month));
     }
@@ -127,7 +133,7 @@ final class C3Results {
     private static String ambiguityNote(List<Subject> ambiguous) {
         SortedSet<String> ids = new TreeSet<>();
         ambiguous.forEach(s -> ids.addAll(s.ambiguities()));
-        return "RULE_AMBIGUITY: " + ambiguous.size() + " episódio(s) dependem de ambiguidade da ficha ("
+        return "RULE_AMBIGUITY: " + ambiguous.size() + " sujeito(s) dependem de ambiguidade da ficha ("
                 + String.join(", ", ids) + "); valor indisponível até esclarecimento documentado (§4.2).";
     }
 

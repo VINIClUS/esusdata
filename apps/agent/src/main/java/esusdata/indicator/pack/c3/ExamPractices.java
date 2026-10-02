@@ -26,18 +26,17 @@ final class ExamPractices {
         this.convention = convention;
     }
 
-    /** G: the four agents in the 1º trimestre {@code [DUM, DUM + first]}. */
+    /**
+     * G: the four agents in the 1º trimestre {@code [DUM, min(DUM + first, D)]}; the day D is
+     * AMB-C3-04.
+     */
     PracticeOutcome firstTrimester(List<ExamEvidence> evidence, GestationWindow window) {
         if (convention == null) {
             return decide(evidence, FIRST_TRIMESTER, wholePregnancy(window));
         }
         LocalDate last = window.dum().plusDays(convention.firstTrimesterLastDay());
-        return decide(
-                evidence,
-                FIRST_TRIMESTER,
-                e -> C3Dates.within(e.event().date(), window.dum(), last)
-                        ? new TallyMark(e.quality(), List.of(e.event()))
-                        : null);
+        LocalDate through = last.isBefore(window.end()) ? last : window.end();
+        return decide(evidence, FIRST_TRIMESTER, trimester(window, window.dum(), through));
     }
 
     /** H: sífilis and HIV in the 3º trimestre {@code [DUM + third, D)}; the day D is AMB-C3-04. */
@@ -46,13 +45,19 @@ final class ExamPractices {
             return decide(evidence, THIRD_TRIMESTER, wholePregnancy(window));
         }
         LocalDate first = window.dum().plusDays(convention.thirdTrimesterFirstDay());
-        return decide(evidence, THIRD_TRIMESTER, e -> {
+        return decide(evidence, THIRD_TRIMESTER, trimester(window, first, window.end()));
+    }
+
+    /** Records in {@code [from, through]} count by their own quality, the day D as AMB-C3-04. */
+    private static Function<ExamEvidence, TallyMark> trimester(
+            GestationWindow window, LocalDate from, LocalDate through) {
+        return e -> {
             LocalDate date = e.event().date();
-            if (!C3Dates.within(date, first, window.end())) {
+            if (!C3Dates.within(date, from, through)) {
                 return null;
             }
             return new TallyMark(window.phaseOf(date).inPregnancy(e.quality()), List.of(e.event()));
-        });
+        };
     }
 
     /** Without a convention: any record in {@code [DUM, D]} is "talvez" (AMB-C3-02 unless its own). */

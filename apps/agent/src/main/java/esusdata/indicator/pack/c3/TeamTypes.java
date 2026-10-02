@@ -11,11 +11,8 @@ import java.util.List;
  */
 final class TeamTypes {
 
-    private static final Comparator<CanonicalTeam> RECENCY = Comparator.comparing(
-                    (CanonicalTeam t) -> C3Dates.parse(t.observedAt()),
-                    Comparator.nullsFirst(Comparator.<LocalDate>naturalOrder()))
-            .thenComparing(t ->
-                    t.sourceRef() == null ? "" : String.valueOf(t.sourceRef().recordId()));
+    private static final Comparator<CanonicalTeam> RECENCY =
+            Recency.of(CanonicalTeam::observedAt, CanonicalTeam::sourceRef);
 
     private final List<CanonicalTeam> teams;
     private final LocalDate cutoff;
@@ -35,8 +32,7 @@ final class TeamTypes {
                             return observed == null || !observed.isAfter(cutoff);
                         })
                         .max(RECENCY)
-                        .map(t -> t.teamTypeCode() != null
-                                && C3Codes.EAP_TEAM_TYPE.equals(t.teamTypeCode().strip()))
+                        .map(t -> C3Codes.EAP_TEAM_TYPE.equals(C3Codes.token(t.teamTypeCode())))
                         .orElse(false);
     }
 }

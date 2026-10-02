@@ -1,7 +1,6 @@
 package esusdata.indicator.pack.c3;
 
 import esusdata.indicator.model.CanonicalProcedureEvent;
-import java.util.Locale;
 
 /**
  * What the Quadros accept of a procedure event: performed or evaluated, never only requested
@@ -16,18 +15,18 @@ final class Procedures {
 
     /** Performed or evaluated, and not consolidated. */
     static boolean counts(CanonicalProcedureEvent event) {
-        String stage = upper(event.stage());
+        String stage = C3Codes.token(event.stage());
         return (PERFORMED.equals(stage) || EVALUATED.equals(stage)) && !consolidated(event);
     }
 
     /** Counts, and came from the MIP. */
     static boolean fromMip(CanonicalProcedureEvent event) {
-        return counts(event) && "MIP".equals(upper(event.origin()));
+        return counts(event) && C3Codes.ORIGIN_MIP.equals(C3Codes.token(event.origin()));
     }
 
     /** Came from a MIAI (AMB-C3-18 (iv) for CBO 2234/3222). */
     static boolean fromMiai(CanonicalProcedureEvent event) {
-        return "MIAI".equals(upper(event.origin()));
+        return C3Codes.ORIGIN_MIAI.equals(C3Codes.token(event.origin()));
     }
 
     /** The SIGTAP code with digits only. */
@@ -40,10 +39,6 @@ final class Procedures {
     }
 
     private static boolean consolidated(CanonicalProcedureEvent event) {
-        return upper(event.origin()).contains("CONSOLIDADO");
-    }
-
-    private static String upper(String text) {
-        return text == null ? "" : text.strip().toUpperCase(Locale.ROOT);
+        return C3Codes.token(event.origin()).contains("CONSOLIDADO");
     }
 }

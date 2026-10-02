@@ -20,7 +20,10 @@ final class Cohort {
     /** Whether an episode is "ativa na competência" (4.1). */
     enum Activity {
         ACTIVE,
-        /** Only the boundary day D + 42 falls in the competência (AMB-C3-04). */
+        /**
+         * Not active under every reading of the dates: only the boundary day D + 42 falls in the
+         * competência (AMB-C3-04), or the readings disagree (AMB-C3-03).
+         */
         BOUNDARY,
         INACTIVE
     }
@@ -60,8 +63,8 @@ final class Cohort {
             boolean anyActive = episode.readings().stream().anyMatch(r -> activity(r) == Activity.ACTIVE);
             return Verdict.ambiguous(anyActive ? Ambiguity.AMB_C3_03 : Ambiguity.AMB_C3_04, end);
         }
-        if (episode.lateOutcome()) {
-            return Verdict.ambiguous(Ambiguity.AMB_C3_05, end);
+        if (episode.datesAmbiguity() != null) {
+            return Verdict.ambiguous(episode.datesAmbiguity(), end);
         }
         Verdict code = Verdict.agreed(perReading(episode, r -> pregnancyCode(person, r, end)), end);
         if (code != null) {
@@ -77,13 +80,16 @@ final class Cohort {
 
     /** Link and death, which do not depend on the episode's dates; {@code null} when they hold. */
     Verdict personal(PersonRecords person, RegistrationLink link, LocalDate eventDate) {
+        if (C3Reasons.EXCLUIDO_OBITO.equals(link.exclusion())) {
+            return Verdict.excluded(C3Reasons.EXCLUIDO_OBITO, link.since());
+        }
         if (link.exclusion() != null) {
             return Verdict.excluded(link.exclusion(), eventDate);
         }
         for (CanonicalPerson record : person.persons()) {
             LocalDate death = C3Dates.parse(record.deathDate());
             if (death != null && !death.isAfter(cutoff)) {
-                return Verdict.excluded(C3Reasons.EXCLUIDO_OBITO, eventDate);
+                return Verdict.excluded(C3Reasons.EXCLUIDO_OBITO, death);
             }
         }
         return null;
@@ -117,8 +123,8 @@ final class Cohort {
 
     /**
      * 24 g: an exact exclusion code in {@code [DUM, D]} excludes (from the earliest such date); a
-     * code that matches only by prefix is AMB-C3-08; a code in {@code (D, D + 42]}, or a resolved
-     * one in the LPC ("ativos", AMB-C3-07 (ii)), is AMB-C3-07.
+     * code that matches only by prefix is AMB-C3-08; a code in {@code (D, D + 42]}, or an LPC
+     * condition that is not active or latent ("ativos", AMB-C3-07 (ii)), is AMB-C3-07.
      */
     private static Verdict abortion(PersonRecords person, GestationWindow reading) {
         LocalDate exact = null;
@@ -151,11 +157,14 @@ final class Cohort {
         OUTSIDE
     }
 
-    /** A 24 g code found on a date; {@code resolved} for a condition resolved in the LPC. */
-    private record CodeAt(LocalDate date, CodeMatch match, boolean resolved) {
+    /**
+     * A 24 g code found on a date; {@code active} is false for an LPC condition that is not active
+     * or latent ("ativos", AMB-C3-07 (ii)).
+     */
+    private record CodeAt(LocalDate date, CodeMatch match, boolean active) {
         Bucket bucket(GestationWindow reading) {
             if (reading.inPregnancy(date)) {
-                if (resolved) {
+                if (!active) {
                     return Bucket.UNDECIDED;
                 }
                 return match == CodeMatch.EXACT ? Bucket.EXCLUDES : Bucket.PREFIX_ONLY;
@@ -168,7 +177,7 @@ final class Cohort {
     private static List<CodeAt> exclusionCodes(PersonRecords person) {
         List<CodeAt> codes = new ArrayList<>();
         for (CanonicalCareEvent event : person.individualCare()) {
-            add(codes, event.careDate(), CodeMatch.of(event, C3Codes.EXCLUSION_CIAP, C3Codes.EXCLUSION_CID), false);
+            add(codes, event.careDate(), CodeMatch.of(event, C3Codes.EXCLUSION_CIAP, C3Codes.EXCLUSION_CID), true);
         }
         for (CanonicalPregnancyOutcome outcome : person.outcomes()) {
             for (String code : outcome.codes()) {
@@ -176,7 +185,7 @@ final class Cohort {
                         codes,
                         outcome.outcomeDate(),
                         CodeMatch.any(code, C3Codes.EXCLUSION_CIAP, C3Codes.EXCLUSION_CID),
-                        false);
+                        true);
             }
         }
         for (CanonicalCondition condition : person.conditions()) {
@@ -184,21 +193,16 @@ final class Cohort {
                     codes,
                     condition.recordedDate(),
                     CodeMatch.of(condition, C3Codes.EXCLUSION_CIAP, C3Codes.EXCLUSION_CID),
-                    resolved(condition));
+                    C3Codes.active(condition));
         }
         return codes;
     }
 
-    private static void add(List<CodeAt> codes, String date, CodeMatch match, boolean resolved) {
+    private static void add(List<CodeAt> codes, String date, CodeMatch match, boolean active) {
         LocalDate parsed = C3Dates.parse(date);
         if (match.found() && parsed != null) {
-            codes.add(new CodeAt(parsed, match, resolved));
+            codes.add(new CodeAt(parsed, match, active));
         }
-    }
-
-    private static boolean resolved(CanonicalCondition condition) {
-        return condition.status() != null
-                && C3Codes.CONDITION_RESOLVED.equals(condition.status().strip());
     }
 
     /**

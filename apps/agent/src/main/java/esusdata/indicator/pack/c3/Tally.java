@@ -50,19 +50,6 @@ final class Tally {
         return sorted(byRef.values());
     }
 
-    /** Merges supports, each source record once, a certain one winning, in {@link EventRef#ORDER}. */
-    static List<Support> merge(List<Support> supports) {
-        Map<String, Support> byRef = new LinkedHashMap<>();
-        for (Support support : supports) {
-            String key = support.event().refKey();
-            Support held = byRef.get(key);
-            if (held == null || support.ambiguity() == null) {
-                byRef.put(key, support);
-            }
-        }
-        return sorted(byRef.values());
-    }
-
     private static List<Support> sorted(Iterable<Support> supports) {
         List<Support> list = new ArrayList<>();
         supports.forEach(list::add);

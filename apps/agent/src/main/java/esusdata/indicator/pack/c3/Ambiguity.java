@@ -16,7 +16,10 @@ enum Ambiguity {
     AMB_C3_04,
     /** Outcome recorded after DUM+294. */
     AMB_C3_05,
-    /** Abortion code in the puerperium. */
+    /**
+     * Abortion (24 g) whose effect the ficha leaves open: a code in the puerperium, or an LPC
+     * condition that is not active or latent ("ativos").
+     */
     AMB_C3_07,
     /** CID-10 that matches a list only by category prefix. */
     AMB_C3_08,
