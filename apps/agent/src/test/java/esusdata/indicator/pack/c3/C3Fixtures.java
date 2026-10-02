@@ -143,8 +143,8 @@ final class C3Fixtures {
     // ---- records ----
 
     /** An individual (MIAI) encounter by a nurse on {@code date}; chain the fields a test needs. */
-    static Care care(String personKey, LocalDate date) {
-        return new Care(personKey, date);
+    static Encounter care(String personKey, LocalDate date) {
+        return new Encounter(personKey, date);
     }
 
     /** The prenatal consultation that anchors the episode: nurse, W78 and the DUM. */
@@ -370,41 +370,37 @@ final class C3Fixtures {
     static List<Record> episode(String personKey, String ine, String practices) {
         List<Record> records = new ArrayList<>(linked(personKey, ine));
         records.add(anchor(personKey, dum(practices.indexOf('A') >= 0 ? 56 : 100), DUM));
-        if (practices.indexOf('B') >= 0) {
-            for (int day : MORE_PRENATAL_DAYS) {
-                records.add(prenatal(personKey, dum(day)));
+        for (int i = 0; i < practices.length(); i++) {
+            records.addAll(practiceRecords(personKey, practices.charAt(i)));
+        }
+        return records;
+    }
+
+    /** The records that meet one practice of {@link #episode} (A is met by the anchor itself). */
+    private static List<Record> practiceRecords(String personKey, char practice) {
+        List<Record> records = new ArrayList<>();
+        switch (practice) {
+            case 'B' -> MORE_PRENATAL_DAYS.forEach(day -> records.add(prenatal(personKey, dum(day))));
+            case 'C' -> {
+                for (int i = 0; i < 7; i++) {
+                    records.add(bloodPressure(personKey, dum(101 + i), NURSE));
+                }
             }
-        }
-        for (int i = 0; i < 7; i++) {
-            if (practices.indexOf('C') >= 0) {
-                records.add(bloodPressure(personKey, dum(101 + i), NURSE));
+            case 'D' -> {
+                for (int i = 0; i < 7; i++) {
+                    records.add(anthropometry(personKey, dum(111 + i)));
+                }
             }
-            if (practices.indexOf('D') >= 0) {
-                records.add(anthropometry(personKey, dum(111 + i)));
+            case 'E' -> List.of(150, 160, 170).forEach(day -> records.add(visit(personKey, dum(day), ACS)));
+            case 'F' -> records.add(dtpa(personKey, dum(196)));
+            case 'G' -> records.addAll(tests(personKey, dum(60), SYPHILIS, HIV, HEPATITIS_B, HEPATITIS_C));
+            case 'H' -> records.addAll(tests(personKey, dum(240), SYPHILIS, HIV));
+            case 'I' -> records.add(puerperal(personKey, SUBSTITUTE_END.plusDays(10)));
+            case 'J' -> records.add(visit(personKey, SUBSTITUTE_END.plusDays(10), ACS));
+            case 'K' -> records.add(dental(personKey, dum(140)));
+            default -> {
+                // A: the anchor on DUM+56
             }
-        }
-        if (practices.indexOf('E') >= 0) {
-            records.add(visit(personKey, dum(150), ACS));
-            records.add(visit(personKey, dum(160), ACS));
-            records.add(visit(personKey, dum(170), ACS));
-        }
-        if (practices.indexOf('F') >= 0) {
-            records.add(dtpa(personKey, dum(196)));
-        }
-        if (practices.indexOf('G') >= 0) {
-            records.addAll(tests(personKey, dum(60), SYPHILIS, HIV, HEPATITIS_B, HEPATITIS_C));
-        }
-        if (practices.indexOf('H') >= 0) {
-            records.addAll(tests(personKey, dum(240), SYPHILIS, HIV));
-        }
-        if (practices.indexOf('I') >= 0) {
-            records.add(puerperal(personKey, SUBSTITUTE_END.plusDays(10)));
-        }
-        if (practices.indexOf('J') >= 0) {
-            records.add(visit(personKey, SUBSTITUTE_END.plusDays(10), ACS));
-        }
-        if (practices.indexOf('K') >= 0) {
-            records.add(dental(personKey, dum(140)));
         }
         return records;
     }
@@ -475,8 +471,7 @@ final class C3Fixtures {
     }
 
     /** An MIAI (or MIAOI) encounter under construction; every unset field stays {@code null}. */
-    @SuppressWarnings("PMD.TooManyFields") // one field per encounter column a C3 case sets
-    static final class Care {
+    static final class Encounter {
         private final String personKey;
         private final LocalDate date;
         private String municipality = IBGE;
@@ -495,78 +490,78 @@ final class C3Fixtures {
         private LocalDate lmp;
         private Integer gestationalWeeks;
 
-        private Care(String personKey, LocalDate date) {
+        private Encounter(String personKey, LocalDate date) {
             this.personKey = personKey;
             this.date = date;
         }
 
-        Care municipality(String ibge) {
+        Encounter municipality(String ibge) {
             this.municipality = ibge;
             return this;
         }
 
-        Care form(String value) {
+        Encounter form(String value) {
             this.form = value;
             return this;
         }
 
-        Care cbo(String value) {
+        Encounter cbo(String value) {
             this.cbo = value;
             return this;
         }
 
-        Care remote() {
+        Encounter remote() {
             this.remote = true;
             return this;
         }
 
-        Care ciap(String... codes) {
+        Encounter ciap(String... codes) {
             ciap.addAll(List.of(codes));
             return this;
         }
 
-        Care cid(String... codes) {
+        Encounter cid(String... codes) {
             cid.addAll(List.of(codes));
             return this;
         }
 
-        Care evaluated(String... sigtap) {
+        Encounter evaluated(String... sigtap) {
             evaluated.addAll(List.of(sigtap));
             return this;
         }
 
-        Care performed(String... sigtap) {
+        Encounter performed(String... sigtap) {
             performed.addAll(List.of(sigtap));
             return this;
         }
 
-        Care requested(String... sigtap) {
+        Encounter requested(String... sigtap) {
             requested.addAll(List.of(sigtap));
             return this;
         }
 
-        Care weight(String kg) {
+        Encounter weight(String kg) {
             this.weightKg = kg;
             return this;
         }
 
-        Care height(String cm) {
+        Encounter height(String cm) {
             this.heightCm = cm;
             return this;
         }
 
-        Care pressure() {
+        Encounter pressure() {
             this.systolic = "118";
             this.diastolic = "76";
             return this;
         }
 
-        Care lmp(LocalDate value) {
+        Encounter lmp(LocalDate value) {
             this.lmp = value;
             return this;
         }
 
-        Care gestationalWeeks(int weeks) {
+        Encounter gestationalWeeks(int weeks) {
             this.gestationalWeeks = weeks;
             return this;
         }

@@ -699,7 +699,7 @@ class C3PracticeCasesTest {
         List<Integer> days = new ArrayList<>(List.of(56));
         days.addAll(MORE_PRENATAL_DAYS);
         for (int i = 0; i < count; i++) {
-            C3Fixtures.Care consult = care(P1, dum(days.get(i))).ciap(PREGNANCY_CIAP);
+            C3Fixtures.Encounter consult = care(P1, dum(days.get(i))).ciap(PREGNANCY_CIAP);
             if (i == 0) {
                 consult.lmp(DUM);
             }
