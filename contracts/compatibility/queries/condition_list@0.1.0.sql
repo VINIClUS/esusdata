@@ -9,7 +9,8 @@ SELECT CAST(NULL AS text) AS source_entity_type,
        CAST(NULL AS date) AS recorded_date,
        CAST(NULL AS text) AS status,
        CAST(NULL AS date) AS resolved_date,
-       CAST(NULL AS text) AS basis
+       CAST(NULL AS text) AS basis,
+       CAST(NULL AS text) AS cbo
  WHERE FALSE
    AND CAST(? AS text) IS NULL
    AND CAST(? AS date) IS NULL
