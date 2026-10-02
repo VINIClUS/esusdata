@@ -9,6 +9,7 @@ import esusdata.indicator.model.ComponentSpec;
 import esusdata.indicator.model.DataRequirements;
 import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
+import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
@@ -18,9 +19,11 @@ import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.ValueKind;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -28,9 +31,12 @@ import java.util.TreeMap;
 /**
  * C3 — Cuidado na gestação e puerpério (Tech Spec §2.4; ficha transcrita em {@code docs/metodologia/c3-gestacao-puerperio.md}).
  *
- * <p>Esqueleto da fundação (ADR 0030): o descritor, as práticas com os pesos da ficha, as faixas e
- * as capacidades lidas já estão aqui; a regra ({@link #evaluate}) e as listas de códigos ficam com
- * a sessão do pacote. Enquanto isso o pacote devolve {@code BLOCKED} sem contagens, nunca zero.
+ * <p>Episódios (gestações) identificados pela DUM ou pela idade gestacional do MIAI; coorte da
+ * competência (gestantes e puérperas ativas, vínculo no corte, óbito, aborto); onze práticas em
+ * decisão tri-estado (cumpre / não cumpre / ambígua); escore {@code Σ pontos ÷ episódios
+ * elegíveis} na escala 0–100. Ambiguidade da ficha nunca vira escolha silenciosa: o resultado fica
+ * {@code RULE_AMBIGUITY}. Enquanto houver portão incompleto, {@link #evaluate} devolve {@code
+ * BLOCKED} com as contagens ({@link RuleOutcomes#gate}).
  */
 public final class C3Pack implements IndicatorRule {
 
@@ -118,7 +124,7 @@ public final class C3Pack implements IndicatorRule {
                             9,
                             PREGNANCY)),
             ReleaseGates.noneComplete(),
-            List.of("Regra em implementação (ADR 0030): o pacote ainda não calcula."),
+            C3Limitations.STANDING,
             MonthlyEligibility.MONTHS_WITH_COHORT_EVENT,
             BudgetHint.engineeringDefault(),
             List.of(
@@ -126,40 +132,77 @@ public final class C3Pack implements IndicatorRule {
                     "docs/metodologia/c3-gestacao-puerperio.md"),
             List.of());
 
+    private static final int MONTHS_READ = 13;
+    private static final int REGISTRATION_MONTHS_READ = 24;
+    private static final int BIRTH_YEARS_READ = 130;
+
+    private final TrimesterConvention convention;
+
+    /** The production rule: no trimester convention is documented (AMB-C3-02). */
+    public C3Pack() {
+        this(null);
+    }
+
+    private C3Pack(TrimesterConvention convention) {
+        this.convention = convention;
+    }
+
+    /** The rule once a trimester convention is documented at Portão B (AMB-C3-02). */
+    static C3Pack withTrimesterConvention(TrimesterConvention convention) {
+        return new C3Pack(Objects.requireNonNull(convention, "convention"));
+    }
+
     @Override
     public PackDescriptor descriptor() {
         return DESCRIPTOR;
     }
 
+    /**
+     * 13 civil months (a DUM up to 336 days before the competência), 24 months of registration
+     * versions, and people born in the last 130 years — the ficha has no age range.
+     */
     @Override
     public DataRequirements requirements(YearMonth competencia) {
-        DateWindow period = DateWindow.lastCivilMonths(competencia, 13);
+        DateWindow period = DateWindow.lastCivilMonths(competencia, MONTHS_READ);
+        DateWindow registrations = DateWindow.lastCivilMonths(competencia, REGISTRATION_MONTHS_READ);
         DateWindow births = new DateWindow(
-                competencia.atDay(1).minusYears(70), competencia.plusMonths(1).atDay(1));
+                competencia.atDay(1).minusYears(BIRTH_YEARS_READ),
+                competencia.plusMonths(1).atDay(1));
         List<PartRequirement> parts = new ArrayList<>();
-        parts.add(PartRequirement.personScoped(Capabilities.CITIZEN, period, births, codes(Capabilities.CITIZEN)));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.INDIVIDUAL_REGISTRATION, period, births, codes(Capabilities.INDIVIDUAL_REGISTRATION)));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.CARE_ENCOUNTER, period, births, codes(Capabilities.CARE_ENCOUNTER)));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.DENTAL_ENCOUNTER, period, births, codes(Capabilities.DENTAL_ENCOUNTER)));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.PROCEDURE_PERFORMED, period, births, codes(Capabilities.PROCEDURE_PERFORMED)));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.EXAM_REQUEST_EVALUATION, period, births, codes(Capabilities.EXAM_REQUEST_EVALUATION)));
-        parts.add(
-                PartRequirement.personScoped(Capabilities.HOME_VISIT, period, births, codes(Capabilities.HOME_VISIT)));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.MEASUREMENT_RECORD, period, births, codes(Capabilities.MEASUREMENT_RECORD)));
-        parts.add(PartRequirement.personScoped(
-                Capabilities.IMMUNIZATION_HISTORY, period, births, codes(Capabilities.IMMUNIZATION_HISTORY)));
+        for (String capability : DESCRIPTOR.requiredCapabilities()) {
+            DateWindow window = Capabilities.INDIVIDUAL_REGISTRATION.equals(capability) ? registrations : period;
+            parts.add(PartRequirement.personScoped(capability, window, births, codes(capability)));
+        }
         return new DataRequirements(DataRequirements.V2, parts);
     }
 
     @Override
     public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
-        return RuleOutcomes.pending(DESCRIPTOR, context, "Regra em implementação (ADR 0030).");
+        return RuleOutcomes.gate(DESCRIPTOR, compute(data, context));
+    }
+
+    /** The exact outcome before the release gates (§4.4): what {@link #evaluate} gates. */
+    RuleOutcome compute(CanonicalDataset data, EvaluationContext context) {
+        LocalDate cutoff = context.dataCutoff();
+        SortedMap<String, PersonRecords> people = RecordIndex.of(data, context.municipalityIbge());
+        Subjects builder = new Subjects(
+                new Cohort(context.competencia(), cutoff),
+                new PracticeEvaluator(convention),
+                new TeamTypes(data.teams(), cutoff),
+                cutoff);
+        SortedMap<String, Subject> byKey = new TreeMap<>();
+        for (PersonRecords person : people.values()) {
+            for (Subject subject : builder.of(person)) {
+                byKey.put(subject.key(), subject);
+            }
+        }
+        List<Subject> subjects = List.copyOf(byKey.values());
+        PracticeWeights weights = new PracticeWeights(DESCRIPTOR.components());
+        C3Results results = new C3Results(DESCRIPTOR, context, weights);
+        EvidenceRows rows = new EvidenceRows(weights);
+        List<EvidenceItem> evidence = new ArrayList<>();
+        subjects.forEach(s -> evidence.addAll(rows.of(s)));
+        return new RuleOutcome(results.result(subjects), results.teams(subjects), evidence);
     }
 
     @Override
@@ -167,20 +210,17 @@ public final class C3Pack implements IndicatorRule {
         return Bands.QUALIDADE_C2_C7.classify(value);
     }
 
-    /** The code lists each capability binds; empty until the pack transcribes them from the ficha. */
+    /** The code lists each capability binds (24 h, Quadro 07, 24 i); the rest bind none. */
     private static SortedMap<String, List<String>> codes(String capability) {
-        return switch (capability) {
-            case Capabilities.PROCEDURE_PERFORMED -> codeLists(Capabilities.PROCEDURE_CODES);
-            case Capabilities.EXAM_REQUEST_EVALUATION -> codeLists(Capabilities.PROCEDURE_CODES);
-            case Capabilities.IMMUNIZATION_HISTORY -> codeLists(Capabilities.IMMUNOBIOLOGICAL_CODES);
-            default -> new TreeMap<>();
-        };
-    }
-
-    private static SortedMap<String, List<String>> codeLists(String... names) {
         SortedMap<String, List<String>> lists = new TreeMap<>();
-        for (String name : names) {
-            lists.put(name, List.of());
+        switch (capability) {
+            case Capabilities.PROCEDURE_PERFORMED -> lists.put(Capabilities.PROCEDURE_CODES, C3Codes.PROCEDURE_SIGTAP);
+            case Capabilities.EXAM_REQUEST_EVALUATION -> lists.put(Capabilities.PROCEDURE_CODES, C3Codes.TEST_SIGTAP);
+            case Capabilities.IMMUNIZATION_HISTORY ->
+                lists.put(Capabilities.IMMUNOBIOLOGICAL_CODES, List.of(C3Codes.DTPA_ADULT));
+            default -> {
+                // no code bind
+            }
         }
         return lists;
     }

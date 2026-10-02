@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.c3;
 
 import esusdata.indicator.model.CboGroups;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -12,7 +13,7 @@ import java.util.Locale;
  * {@link CboGroups} (four characters = family, six = occupation, AMB-C3-20). Lists the ficha does
  * not enumerate (the "códigos rápidos ABP") are not completed here (AMB-C3-10).
  */
-@SuppressWarnings("PMD.DataClass") // a versioned table of the ficha's literal codes
+@SuppressWarnings("PMD.AvoidDuplicateLiterals") // each list copies its quadro literally; CBO repeat by design
 final class C3Codes {
 
     /** Version of these tables; bump it when a list changes. */
@@ -25,8 +26,8 @@ final class C3Codes {
     static final List<String> PREGNANCY_CID = cid(
             "O10", "O11", "O12", "O13", "O14", "O15", "O16", "O20", "O21", "O22", "O23", "O24", "O25", "O26", "O28",
             "O29", "O30", "O31", "O32", "O33", "O34", "O35", "O36", "O40", "O41", "O43", "O44", "O46", "O47", "O48",
-            "O75.2", "O75.3", "O98", "O99.0", "O99.1", "O99.2", "O99.3", "O99.4", "O99.5", "O99.6", "O99.7",
-            "Z32.1", "Z33", "Z34", "Z35", "Z36", "Z64.0");
+            "O75.2", "O75.3", "O98", "O99.0", "O99.1", "O99.2", "O99.3", "O99.4", "O99.5", "O99.6", "O99.7", "Z32.1",
+            "Z33", "Z34", "Z35", "Z36", "Z64.0");
 
     // ---- 24 f (p.3): "CID-10 e/ou CIAP-2 para puerpério" ----
 
@@ -41,9 +42,9 @@ final class C3Codes {
     static final List<String> PUERPERIUM_CIAP_UNMAPPED = List.of("48", "49");
 
     static final List<String> PUERPERIUM_CID = cid(
-            "F53", "F53.0", "F53.1", "F53.8", "F53.9", "M83.0", "O10", "O15.2", "O26.6", "O72.2", "O72.3", "O85",
-            "O86", "O87", "O90", "O91", "O92", "O94", "O98", "O99", "Z37.0", "Z37.1", "Z37.2", "Z37.3", "Z37.4",
-            "Z37.5", "Z37.6", "Z37.7", "Z37.9", "Z38", "Z39");
+            "F53", "F53.0", "F53.1", "F53.8", "F53.9", "M83.0", "O10", "O15.2", "O26.6", "O72.2", "O72.3", "O85", "O86",
+            "O87", "O90", "O91", "O92", "O94", "O98", "O99", "Z37.0", "Z37.1", "Z37.2", "Z37.3", "Z37.4", "Z37.5",
+            "Z37.6", "Z37.7", "Z37.9", "Z38", "Z39");
 
     // ---- 24 g (p.3): "CID-10 e/ou CIAP-2 ativos considerados para critérios de exclusão" ----
 
@@ -135,8 +136,8 @@ final class C3Codes {
     static final String HTLV_SIGTAP = "0202030318";
 
     /** The 22 SIGTAP of the Quadro 07 (p.8). */
-    static final List<String> TEST_SIGTAP = concat(
-            SYPHILIS_SIGTAP, HIV_SIGTAP, HEPATITIS_B_SIGTAP, HEPATITIS_C_SIGTAP, List.of(HTLV_SIGTAP));
+    static final List<String> TEST_SIGTAP =
+            concat(SYPHILIS_SIGTAP, HIV_SIGTAP, HEPATITIS_B_SIGTAP, HEPATITIS_C_SIGTAP, List.of(HTLV_SIGTAP));
 
     /** The 32 SIGTAP of the 24 h (p.3–4): what {@code procedure_performed} is asked for. */
     static final List<String> PROCEDURE_SIGTAP = concat(
@@ -148,6 +149,11 @@ final class C3Codes {
 
     /** "57 - Vacina dTpa adulto": "1 dose a cada gestação, a partir da vigésima semana". */
     static final String DTPA_ADULT = "57";
+
+    // ---- Equipes (24 b, p.2) ----
+
+    /** CNES team type 76, eAP: E and J "consideram a pontuação integral" (24 b). */
+    static final String EAP_TEAM_TYPE = "76";
 
     // ---- Saída do cadastro (item 15, p.1–2; LEDI MotivoSaida, dicionário do DW) ----
 
@@ -170,6 +176,10 @@ final class C3Codes {
 
     @SafeVarargs
     private static List<String> concat(List<String>... lists) {
-        return Arrays.stream(lists).flatMap(List::stream).toList();
+        List<String> all = new ArrayList<>();
+        for (List<String> list : lists) {
+            all.addAll(list);
+        }
+        return List.copyOf(all);
     }
 }
