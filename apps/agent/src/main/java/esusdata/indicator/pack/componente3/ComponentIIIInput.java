@@ -36,5 +36,11 @@ public record ComponentIIIInput(String municipalityIbge, Quadrimestre quadrimest
             String resultId,
             IndicatorStatus status,
             ExactRatio value,
-            boolean consolidationEligible) {}
+            boolean consolidationEligible) {
+        public Monthly {
+            Objects.requireNonNull(indicatorPack, "indicatorPack");
+            Objects.requireNonNull(month, "month");
+            Objects.requireNonNull(status, "status");
+        }
+    }
 }

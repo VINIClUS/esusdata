@@ -4,7 +4,6 @@ import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ExactRatio;
 import java.util.EnumMap;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * The tables of NT nº 8/2026-DEAPS/SAPS/MS the Nota Final uses, verbatim (transcription in {@code
@@ -12,15 +11,6 @@ import java.util.Set;
  * in {@link ComponentIII#DESCRIPTOR}, one per component indicator.
  */
 public final class Nt08Tables {
-
-    /**
-     * NT 8/2026, "Atenção" after item 4.1.1 (p. 1): "Para os indicadores do cuidado no
-     * Desenvolvimento Infantil e na Gestação e Puerpério, o resultado quadrimestral levará em
-     * consideração apenas os meses que possuam crianças que completaram dois anos e gestações que
-     * atingiram o 42° dia de puerpério no período em avaliação." Only these two packs skip months.
-     */
-    public static final Set<String> MONTHS_WITH_COHORT_EVENT_ONLY =
-            Set.of("c2-desenvolvimento-infantil", "c3-gestacao-puerperio");
 
     /**
      * NT 8/2026, item 4.3.2 (p. 3): "cada conceito obtido no indicador equivale a pontuação abaixo:

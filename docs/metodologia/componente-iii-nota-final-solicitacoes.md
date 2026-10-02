@@ -19,8 +19,10 @@ atendido.
   quadrimestre, por equipe e para o município."
 - **Impacto.** Sem isso, toda unidade sai `BLOCKED` com a limitação "regra do indicador não
   registrada" (mapa vazio) — nunca uma nota.
-- **Alternativa local.** A consolidação é pura e completa (`Nt08Consolidation`); a fase B testa o
-  caminho de ponta a ponta em `QualityComponentConsolidationTest`.
+- **Alternativa local.** A consolidação é pura e completa (`Nt08Consolidation`); o caminho de ponta a
+  ponta será testado na fase B (`QualityComponentConsolidationTest`, a ser escrito). O javadoc do
+  controlador ("Until the consolidation … land, every unit is `BLOCKED`") fica desatualizado e deve
+  ser revisto junto.
 
 ## S-02 — Confirmar: a consolidação não aplica um segundo portão
 

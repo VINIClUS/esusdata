@@ -5,6 +5,7 @@ import esusdata.indicator.model.ComponentSpec;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.Quadrimestre;
 import esusdata.indicator.pack.componente3.ComponentIIIInput.Monthly;
 import esusdata.indicator.pack.componente3.ComponentIIIResult.IndicatorQuadrimestral;
@@ -30,7 +31,9 @@ import java.util.Optional;
  * </ol>
  *
  * <p>An indicator that is absent, blocked, ambiguous or without an eligible month leaves the unit
- * without a Nota Final: never a zero, never a redistributed weight (MET-17, AMB-CIII-06/07). The
+ * without a Nota Final: never a zero, never a redistributed weight (MET-17, AMB-CIII-06/07). A
+ * blocked, unsupported or ambiguous month blocks the indicator even when, in C2/C3, it would not
+ * enter the mean: its eligibility cannot be trusted (conservative). The
  * release gates rest on the monthly results of C1–C7: a gated month arrives {@code BLOCKED} and
  * blocks the unit.
  */
@@ -134,7 +137,9 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
             }
             published.add(ofMonth.get(0));
         }
-        boolean cohortOnly = Nt08Tables.MONTHS_WITH_COHORT_EVENT_ONLY.contains(spec.code());
+        // NT 8/2026, "Atenção" (p. 1): C2 and C3 count "apenas os meses que possuam crianças que
+        // completaram dois anos e gestações que atingiram o 42° dia de puerpério" — each pack declares it.
+        boolean cohortOnly = rule.descriptor().monthlyEligibility() == MonthlyEligibility.MONTHS_WITH_COHORT_EVENT;
         List<Monthly> used = published.stream()
                 .filter(m -> !cohortOnly || m.consolidationEligible())
                 .toList();
@@ -147,7 +152,8 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
             return Assessment.unavailable(
                     spec,
                     IndicatorStatus.RULE_AMBIGUITY,
-                    "AMB-CIII-07: mês monitorado sem denominador; a NT 8/2026 não diz se sai da média — nunca zero");
+                    "mês que entra na média sem denominador (AMB-CIII-07 em C1 e C4–C7; contradição do pacote em"
+                            + " C2/C3); a NT 8/2026 não diz se sai da média — nunca zero");
         }
         if (used.stream().anyMatch(m -> m.value() == null)) {
             return Assessment.unavailable(spec, IndicatorStatus.BLOCKED, "resultado mensal calculado sem valor");

@@ -24,8 +24,9 @@ public record ComponentIIIResult(Quadrimestre quadrimestre, List<UnitResult> uni
     /**
      * The consolidation of one unit (a team, or the municipality when {@code ine} is null).
      *
-     * @param status {@code COMPUTED}, {@code BLOCKED} (a component is blocked or the consolidation
-     *     is not released) or {@code NO_DENOMINATOR} (a component has no eligible month)
+     * @param status {@code COMPUTED} when the seven indicators are, otherwise the worst indicator
+     *     status ({@code BLOCKED} > {@code UNSUPPORTED_SOURCE} > {@code RULE_AMBIGUITY} > {@code
+     *     NO_DENOMINATOR}); the release gates rest on the monthly results of C1–C7
      * @param financialTransferClassification the classification the transfer uses in the
      *     transition of Portaria 10.994/2026, kept apart from the methodological one
      */

@@ -49,8 +49,11 @@ public final class ComponentIII {
                             + " sem valor deixa a unidade sem nota, nunca zero nem peso redistribuído (MET-17).",
                     "AMB-CIII-01: os meses dos quadrimestres (jan–abr, mai–ago, set–dez) seguem a convenção da"
                             + " Tech Spec (MET-05); a NT 8/2026 não os define.",
-                    "AMB-CIII-03/04: a média quadrimestral é classificada sobre o valor exato, sem arredondar, pelas"
-                            + " faixas da ficha de cada indicador, que prevalecem sobre os exemplos do Quadro 1.",
+                    "AMB-CIII-02/03/04: a média quadrimestral é a média aritmética simples dos meses, classificada sobre"
+                            + " o valor exato, sem arredondar, pelas faixas da ficha de cada indicador, que prevalecem"
+                            + " sobre os exemplos do Quadro 1.",
+                    "AMB-CIII-05: \"A\" do Quadro 2 é lido como o fator do conceito, pelo exemplo do item 4.3.2,"
+                            + " não pelo rótulo da coluna.",
                     "AMB-CIII-06/07: indicador sem mês elegível (C2/C3) ou com mês monitorado sem denominador (C1,"
                             + " C4–C7) fica indisponível e a unidade fica sem Nota Final.",
                     "AMB-CIII-08: a suspensão de pagamento (item 4.1.1) não é aplicada; os meses válidos para"
@@ -61,7 +64,8 @@ public final class ComponentIII {
                             + " 20º dia útil e pode divergir do Siaps.",
                     "AMB-CIII-13: equipes novas (item 2.6 e § 7º da Portaria) não são tratadas: a contagem do"
                             + " \"segundo recálculo\" não está definida.",
-                    "Pesos do Quadro 2 (eSF/eAP) aplicados a toda equipe: o tipo de equipe não está na fonte (L1);"
+                    "Pesos do Quadro 2 (eSF/eAP) aplicados a toda equipe: o tipo de equipe não está na fonte (lacuna L1 de"
+                            + " docs/discovery/2026-10-02-dw-dicionario-c2-c7.md);"
                             + " eSB e eMulti têm quadros próprios, fora do escopo."),
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.engineeringDefault(),
