@@ -215,8 +215,8 @@ public final class C7Rule {
     private static EvidenceDecision decisionOf(Outcome outcome) {
         return switch (outcome) {
             case MET -> EvidenceDecision.PRACTICE_MET;
-            case NOT_MET, AMBIGUOUS_PRACTICE -> EvidenceDecision.PRACTICE_NOT_MET;
-            case AMBIGUOUS_DENOMINATOR -> EvidenceDecision.EXCLUDED;
+            case NOT_MET -> EvidenceDecision.PRACTICE_NOT_MET;
+            case AMBIGUOUS_PRACTICE, AMBIGUOUS_DENOMINATOR -> EvidenceDecision.PRACTICE_AMBIGUOUS;
         };
     }
 

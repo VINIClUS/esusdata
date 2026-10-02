@@ -87,15 +87,18 @@ class C7PackTest {
                             "0203010019",
                             "0201020076",
                             "0201020084",
+                            "ABEX001",
+                            "ABP022",
                             "0204030030",
-                            "0204030188");
+                            "0204030188",
+                            "ABP023");
 
             PartRequirement after = parts(YearMonth.of(2026, 1)).get(capability);
             assertThat(after.periodStart()).isEqualTo(LocalDate.of(2021, 2, 1));
             assertThat(after.periodEndExclusive()).isEqualTo(LocalDate.of(2026, 2, 1));
             assertThat(after.arrayParams().get(Capabilities.PROCEDURE_CODES))
                     .contains("0202100251")
-                    .allMatch(code -> code.matches("\\d{10}"));
+                    .allMatch(code -> code.matches("\\d{10}|AB[A-Z]*\\d{3}"));
             assertBirths(after, LocalDate.of(1956, 1, 31), LocalDate.of(2001, 1, 31));
         }
     }

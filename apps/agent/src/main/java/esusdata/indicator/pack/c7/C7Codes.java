@@ -110,13 +110,19 @@ public final class C7Codes {
         return code == null ? "" : SEPARATORS.matcher(code).replaceAll("").toUpperCase(Locale.ROOT);
     }
 
-    /** SIGTAP codes bound as {@code procedure_codes}: digits only, A (36 and 60 months) and D. */
+    /**
+     * Codes bound as {@code procedure_codes}: SIGTAP digits only and the AB codes literal, as
+     * {@code tb_dim_procedimento.co_proced} stores both (como-adicionar.md, convenções) — A (36 and
+     * 60 months) and D.
+     */
     static List<String> procedureCodes(YearMonth competencia) {
         List<String> codes = new ArrayList<>(A_SIGTAP_36_MESES);
         if (!competencia.isBefore(HPV_MOLECULAR_DESDE)) {
             codes.add(A_SIGTAP_HPV_MOLECULAR);
         }
+        codes.addAll(A_CODIGOS_AB);
         codes.addAll(D_SIGTAP);
+        codes.addAll(D_CODIGOS_AB);
         return List.copyOf(codes);
     }
 

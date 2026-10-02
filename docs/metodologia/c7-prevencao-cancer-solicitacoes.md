@@ -18,6 +18,9 @@ limitação permanente em `C7Pack.STANDING_LIMITATIONS`.
 - **Impacto.** Sem o bind, um rastreamento registrado só pelo código AB não é lido e A/D podem sair
   subestimados. A regra já compara `ABEX001`, `ABP022` e `ABP023` se chegarem no código do evento.
 
+  os SIGTAP (`co_proced` guarda os dois). **Atendido no pacote**: `C7Codes.procedureCodes` envia
+  `ABEX001`, `ABP022` e `ABP023`.
+
 ## S-C7-02 — Problemas avaliados com códigos ABP em `care_encounter`
 
 - **O quê.** Confirmar (inventário) se `ciap_codes` do `care_encounter` traz os códigos ABP do bloco
@@ -25,6 +28,8 @@ limitação permanente em `C7Pack.STANDING_LIMITATIONS`.
 - **Por quê.** Item 24, alínea g (p. 4): "Código ABP: ABP003; ABP022; ABP023." vale para C. A regra
   procura esses códigos em `ciapCodes` e `cidCodes` (AMB-C7-16).
 - **Impacto.** Se os ABP não chegarem, C só conta CIAP-2/CID-10.
+- **Resposta da fundação.** `ciap_codes` traz `nu_ciap` como está (pode trazer `ABP…`); confirmação no
+  inventário ao vivo.
 
 ## S-C7-03 — Binds de CIAP-2/CID-10 em `care_encounter` (opcional, volume)
 
@@ -34,6 +39,7 @@ limitação permanente em `C7Pack.STANDING_LIMITATIONS`.
   (pp. 3–4). Sem bind, a parte lê todos os atendimentos de 12 meses de quem tem 14 a 69 anos e o
   filtro é feito em Java.
 - **Impacto.** Só volume (§1.9.2); o resultado não muda.
+- **Resposta da fundação.** Adiado (só volume).
 
 ## S-C7-04 — Domínio de sexo e identidade de gênero no registro canônico
 
@@ -44,12 +50,14 @@ limitação permanente em `C7Pack.STANDING_LIMITATIONS`.
   regra compara os códigos LEDI 149/150 (AMB-C7-12). Se a consulta devolver outro formato, a
   elegibilidade dos homens transgênero e a exclusão do item 4.2 deixam de funcionar.
 - **Impacto.** Denominadores de A–D.
+- **Resposta da fundação.** Adotado: `genderIdentity` em código LEDI (149/150), `sex` em palavras.
 
 ## S-C7-05 — Tipo de equipe (eSF 70 / eAP 76) e óbito do CadSUS
 
 - **O quê.** Fonte de tipo de equipe (lacuna L1) e de óbito nacional, quando houver (ADR 0030).
 - **Por quê.** Item 24, b (p. 3): "tipo 70 e 76"; item 15 (p. 2): "Óbito no CADSUS".
 - **Impacto.** Hoje: equipe não validada e só óbito local (limitações permanentes).
+- **Resposta da fundação.** Limitações mantidas.
 
 ## S-C7-06 — Status por componente com ambiguidade
 
@@ -59,6 +67,8 @@ limitação permanente em `C7Pack.STANDING_LIMITATIONS`.
 - **Por quê.** AMB-C7-05, AMB-C7-06 e AMB-C7-08 afetam o valor de um subgrupo só quando o caso
   ocorre; o componente fica sem valor e o resultado `RULE_AMBIGUITY` (Tech Spec §4.2).
 - **Impacto.** Exibição dos componentes de C7.
+- **Resposta da fundação.** Aceito; e `EvidenceDecision.PRACTICE_AMBIGUOUS` passa a ser a decisão da
+  evidência para AMB-C7-05/06/08 (adotado no pacote).
 
 ## S-C7-07 — Janelas lidas no `CanonicalDataset` da execução
 

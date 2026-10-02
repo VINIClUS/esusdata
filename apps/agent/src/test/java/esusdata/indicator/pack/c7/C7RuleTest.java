@@ -215,7 +215,7 @@ class C7RuleTest {
         assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
         assertThat(practiceRow(outcome, "homemTrans", "B"))
                 .extracting(EvidenceItem::decision, EvidenceItem::reasonCode)
-                .containsExactly(EvidenceDecision.EXCLUDED, AMB_05);
+                .containsExactly(EvidenceDecision.PRACTICE_AMBIGUOUS, AMB_05);
     }
 
     // ---- CT03: age boundaries, completed years on 2026-06-30, inclusive limits ----
@@ -731,6 +731,7 @@ class C7RuleTest {
 
         assertComponent(outcome.result(), "A", 0, 1, IndicatorStatus.RULE_AMBIGUITY);
         assertThat(practiceRow(outcome, "p", "A").reasonCode()).isEqualTo(AMB_08);
+        assertThat(practiceRow(outcome, "p", "A").decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
         assertThat(rows(outcome, e -> e.decision() == EvidenceDecision.SUPPORTING_EVENT))
                 .singleElement()
                 .satisfies(e -> {
@@ -1094,7 +1095,10 @@ class C7RuleTest {
     }
 
     private static boolean isPractice(EvidenceItem e) {
-        return e.decision() == EvidenceDecision.PRACTICE_MET || e.decision() == EvidenceDecision.PRACTICE_NOT_MET;
+        // an AMB-C7-05 row is ambiguous about the denominator itself, so it is not counted there
+        return e.decision() == EvidenceDecision.PRACTICE_MET
+                || e.decision() == EvidenceDecision.PRACTICE_NOT_MET
+                || (e.decision() == EvidenceDecision.PRACTICE_AMBIGUOUS && !AMB_05.equals(e.reasonCode()));
     }
 
     /** Linked people (every person gets a registration version on 2020-01-01) plus their records. */

@@ -76,9 +76,8 @@ public final class C7Pack implements IndicatorRule {
             "Tipo de equipe eSF 70 / eAP 76 e SCNES (item 24, b) sem fonte no DW (lacuna L1): a equipe não é validada.",
             "AMB-C7-09: só médicos (2251, 2252, 2253, 2231) e enfermeiros (2235) dos Quadros 02, 04 e 05 contam em A, C "
                     + "e D; a lista maior do item 24, d e a habilitação de CBO na tabela SIGTAP não são aplicadas.",
-            "AMB-C7-16: em A e D, os códigos AB (ABEX001, ABP022, ABP023) e o registro rápido contam só quando a "
-                    + "fonte os entrega no código do procedimento ou exame; não vão como parâmetro da consulta e o ABP "
-                    + "do bloco Avaliação do atendimento só é lido para C (pedidos S-C7-01/02).",
+            "AMB-C7-16: em A e D, os códigos AB (ABEX001, ABP022, ABP023) vão na consulta com os SIGTAP e o ABP do "
+                    + "bloco Avaliação do atendimento só é lido para C; o registro rápido não é definido pela ficha.",
             "Calendário do Siaps (item 11; NT nº 8/2026, item 2.7): o PEC local contém registros não enviados ou "
                     + "enviados fora do prazo, que o Siaps não contaria.",
             "AMB-C7-03/04: idade em anos completos no último dia da competência, limites inclusivos, aniversário de "
