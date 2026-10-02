@@ -1,7 +1,7 @@
 {
   "capability": "condition_list",
   "adapter_version": "0.1.0",
-  "description": "Condições avaliadas ou autorreferidas com os códigos CIAP-2/CID-10 pedidos, com situação (ativa/resolvida) (§1.7 Condição).",
+  "description": "Condições avaliadas ou autorreferidas com os códigos CIAP-2/CID-10 pedidos, com situação (ativa/resolvida) (§1.7 Condição). CBO de quem avaliou (cabeçalho do atendimento), nulo no autorreferido.",
   "record_kind": "condition",
   "entity_type_column": "source_entity_type",
   "record_id_column": "source_record_id",
@@ -88,6 +88,11 @@
       "name": "basis",
       "type": "text",
       "required": true
+    },
+    {
+      "name": "cbo",
+      "type": "text",
+      "required": false
     }
   ]
 }

@@ -12,7 +12,8 @@ import java.util.TreeMap;
  * lies in {@code [periodStart, periodEndExclusive)}.
  *
  * @param params the binds the query ran with (code lists and dates as canonical strings), so a
- *     replay can prove it read the same thing; {@code paramsChecksum} is their SHA-256
+ *     replay can prove it read the same thing; {@code paramsChecksum} is their SHA-256, both as
+ *     {@link ManifestChecksums} defines them
  */
 public record ManifestPart(
         int index,
