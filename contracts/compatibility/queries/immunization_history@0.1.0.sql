@@ -11,7 +11,8 @@ SELECT CAST(NULL AS text) AS source_entity_type,
        CAST(NULL AS boolean) AS transcription,
        CAST(NULL AS text) AS cbo,
        CAST(NULL AS text) AS cnes,
-       CAST(NULL AS text) AS ine
+       CAST(NULL AS text) AS ine,
+       CAST(NULL AS date) AS registration_date
  WHERE FALSE
    AND CAST(? AS text) IS NULL
    AND CAST(? AS date) IS NULL

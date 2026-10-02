@@ -55,6 +55,41 @@ código) e em `docs/metodologia/guia-preenchimento-equipe-aps.md`; o que o DW do
 7. **`consolidationEligible`** (só C2 e C3): diga se a competência teve o evento de coorte da
    NT 8/2026 (criança completando dois anos; gestação chegando ao 42º dia de puerpério).
 
+## O que as capacidades entregam (convenções)
+
+As consultas congeladas (`contracts/compatibility/queries/<id>@0.1.0.sql`) devolvem códigos naturais,
+nunca chaves substitutas do DW (`co_seq_dim_*`). O mapeamento coluna a coluna está em
+`docs/discovery/capacidades-dw-v2.md`.
+
+**Listas de códigos** (parâmetros `text[]` da regra):
+
+| Parâmetro | Como casa | O registro traz |
+|---|---|---|
+| `procedure_codes` | igualdade com `tb_dim_procedimento.co_proced`, que guarda SIGTAP só com dígitos (`0202010503`) **ou** código AB literal (`ABEX001`, `ABP022`); liste os dois quando a ficha listar os dois (a equivalência AB↔SIGTAP do DW é inferida e não é usada) | `sigtap_code` como o DW grava |
+| `cid_codes` | pela categoria: um código da lista casa com todo código do DW que começa com ele, sem ponto (`E11` casa `E11`, `E119`, `E11.9`); um código completo casa só ele | o código como o DW grava |
+| `ciap_codes` | igualdade com `tb_dim_ciap.nu_ciap` (que pode trazer códigos AB, ex.: `ABP022`) | idem |
+| `immunobiological_codes` | igualdade com o código LEDI do imunobiológico (`42` penta) | idem |
+
+Lista vazia ⇒ nenhuma linha daquela parte (nunca "tudo").
+
+**Vocabulários** (códigos LEDI quando o registro diz "código da fonte"):
+
+| Campo | Valores |
+|---|---|
+| `CanonicalPerson.sex` | `FEMININO`, `MASCULINO`, `INDETERMINADO` ou `null` |
+| `CanonicalPerson.genderIdentity` | código LEDI (`149` homem transgênero, `150` mulher transgênero, …) |
+| `CanonicalRegistration.exitReason` | `135` óbito, `136` mudança de território |
+| `CanonicalCondition.status` / `basis` / `cbo` | `0` ativo, `1` latente, `2` resolvido / `PROFESSIONAL`, `SELF_REPORTED` / CBO de quem avaliou (nulo no autorreferido) |
+| `CanonicalCareEvent.form` / `careLocationCode` / `remote` | `INDIVIDUAL` (MIAI, inclusive no domicílio) ou `DENTAL` (MIAO) / código LEDI do local (`4` domicílio) / `true` remoto (LEDI 3–7), `false` presencial (LEDI 2), `null` quando a fonte não diz |
+| `CanonicalProcedureEvent.stage` / `origin` | `REQUESTED`, `EVALUATED`, `PERFORMED` / `MIAI`, `MIAO`, `MIP`; procedimento consolidado (sem pessoa) não entra |
+| `CanonicalHomeVisit.outcomeCode` / `reasonCodes` | `1` realizada, `2` recusada, `3` ausente / um token por motivo marcado: o nome da coluna `st_*` sem o prefixo, em maiúsculas (`ACOMP_GESTANTE`, `ACOMP_PUERPERA`, `ACOMP_RECEM_NASCIDO`, `ACOMP_CRIANCA`, …) |
+| `CanonicalImmunization.applicationDate` / `registrationDate` / `doseCode`, `strategyCode` | dia da aplicação, também na transcrição / dia do registro no PEC / códigos LEDI |
+| `CanonicalMeasurement.origin` / `activityTypeCode` / `healthPracticeCodes` | `MIP`, `MIAC` / MIAC: tipo de atividade LEDI (04–07 …) / MIAC: práticas em saúde LEDI |
+
+**Evidência e componentes ambíguos**: prática que a ficha não decide para o sujeito sai
+`PRACTICE_AMBIGUOUS` (sem pontos, nunca 0; `reasonCode` com a `AMB-…`), nunca `PRACTICE_NOT_MET`; um
+componente pode sair `RULE_AMBIGUITY` (valor nulo, contagens exatas).
+
 ## Regras que não se negociam
 
 - Aritmética exata: `ExactRatio`/`BigInteger`, nunca `double`; escore C2–C7 nunca ×100
