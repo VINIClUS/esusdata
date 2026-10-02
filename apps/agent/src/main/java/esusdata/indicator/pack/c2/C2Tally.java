@@ -57,9 +57,7 @@ final class C2Tally {
                 met[i]++;
             } else if (outcome.status() == PracticeOutcome.Status.AMBIGUOUS) {
                 ambiguous[i]++;
-                ambiguities.addAll(List.of(outcome.reasonCode()
-                        .substring(PracticeOutcome.AMBIGUITY_PREFIX.length())
-                        .split(",")));
+                ambiguities.addAll(outcome.ambiguities());
             }
         }
     }

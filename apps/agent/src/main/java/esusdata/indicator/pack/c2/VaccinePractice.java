@@ -30,7 +30,11 @@ import java.util.function.Predicate;
 final class VaccinePractice {
 
     private static final int MINIMUM_INTERVAL_DAYS = 30;
-    private static final long TWO_YEARS_IN_MONTHS = 24;
+    private static final long TWO_YEARS_IN_MONTHS = ChildClock.TWO_YEARS_IN_MONTHS;
+
+    /** "Dose ao nascer" of hepatitis B (AMB-C2-09 ii): a {@code 09} dose in the first 30 days (d ≤ 29). */
+    private static final int BIRTH_DOSE_LAST_DAY = 29;
+
     private static final long TWELVE_MONTHS = 12;
     private static final int PRIMARY_DOSES = 3;
     private static final int TWO_DOSES = 2;
@@ -95,7 +99,7 @@ final class VaccinePractice {
     private static boolean birthDoseSkipped(ChildClock clock, Dose dose, Set<Reading> readings) {
         return !readings.contains(Reading.BIRTH_HEPATITIS_B)
                 && C2Codes.HEPATITIS_B_ONLY.equals(dose.code())
-                && clock.day(dose.date()) <= ChildClock.LAST_DAY_BOTH_READINGS;
+                && clock.day(dose.date()) <= BIRTH_DOSE_LAST_DAY;
     }
 
     private static boolean admitted(ChildClock clock, Dose dose, Set<Reading> readings) {
@@ -137,11 +141,20 @@ final class VaccinePractice {
         return dates;
     }
 
+    /** The code as the ficha writes it: {@code 9} from a source without the leading zero is {@code 09}. */
+    private static String code(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        return trimmed.length() == 1 ? "0" + trimmed : trimmed;
+    }
+
     private static List<Dose> doses(ChildRecords child) {
         List<Dose> doses = new ArrayList<>();
         for (CanonicalImmunization i : child.doses()) {
             LocalDate date = LocalDate.parse(i.applicationDate());
-            String code = i.immunobiologicalCode();
+            String code = code(i.immunobiologicalCode());
             if (C2Codes.IMMUNOBIOLOGICAL_CODES.contains(code) && child.inScope(date)) {
                 String model = Boolean.TRUE.equals(i.transcription()) ? "MIV_TRANSCRICAO" : "MIV";
                 doses.add(new Dose(

@@ -5,6 +5,7 @@ import esusdata.indicator.model.CanonicalHomeVisit;
 import esusdata.indicator.model.CanonicalMeasurement;
 import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.pack.c2.PracticeOutcome.Support;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -22,11 +23,11 @@ import java.util.TreeMap;
 final class AnthropometryPractice {
 
     private static final int REQUIRED_DAYS = 9;
-    private static final long TWO_YEARS_IN_MONTHS = 24;
-    private static final String MIAI = "MIAI";
-    private static final String MIP = "MIP";
-    private static final String MIAC = "MIAC";
-    private static final String MIVDT = "MIVDT";
+    private static final long TWO_YEARS_IN_MONTHS = ChildClock.TWO_YEARS_IN_MONTHS;
+    private static final String MIAI = C2Codes.MIAI;
+    private static final String MIP = C2Codes.MIP;
+    private static final String MIAC = C2Codes.MIAC;
+    private static final String MIVDT = C2Codes.MIVDT;
 
     private static final List<Reading> READINGS = List.of(
             Reading.ANNIVERSARY_DAY_INSIDE,
@@ -37,8 +38,8 @@ final class AnthropometryPractice {
     private AnthropometryPractice() {}
 
     /**
-     * What one record says about a day: a weight, a height, both ({@code pairKey} identifies a
-     * self-contained pair, so the same record twice is one pair — MET-32), or only an anthropometry
+     * What one record says about a day: a weight, a height, both ({@code pairKey} is the pair's
+     * values, so the same measure recorded twice or in two models is one pair — MET-32), or only an anthropometry
      * code without values ({@code loneCode}, AMB-C2-07 i).
      */
     private record Measure(
@@ -108,7 +109,7 @@ final class AnthropometryPractice {
     /** MIAI: "registros de Peso e Altura do campo específico do PEC". */
     private static void addEncounters(ChildRecords child, List<Measure> measures) {
         for (CanonicalCareEvent e : child.encounters()) {
-            if (!"DENTAL".equals(e.form()) && C2Codes.ANTHROPOMETRY.matches(e.cbo())) {
+            if ("INDIVIDUAL".equals(e.form()) && C2Codes.ANTHROPOMETRY.matches(e.cbo())) {
                 Support support =
                         new Support(e.sourceRef(), LocalDate.parse(e.careDate()), e.cbo(), e.cnes(), e.ine(), MIAI);
                 addValues(child, measures, support, e.weightKg(), e.heightCm());
@@ -145,8 +146,20 @@ final class AnthropometryPractice {
         boolean weight = ChildRecords.present(weightKg);
         boolean height = ChildRecords.present(heightCm);
         if ((weight || height) && child.inScope(support.date())) {
-            String pairKey = weight && height ? support.model() + "|" + weightKg + "|" + heightCm : null;
+            String pairKey = weight && height ? decimal(weightKg) + "|" + decimal(heightCm) : null;
             measures.add(new Measure(support.date(), weight, height, pairKey, false, support));
+        }
+    }
+
+    /**
+     * The value as a number, so the same measure copied into another model (the DW writes the PEC
+     * encounter's weight and height also as a procedure, dictionary finding 7) is one pair, not two.
+     */
+    private static String decimal(String value) {
+        try {
+            return new BigDecimal(value.trim()).stripTrailingZeros().toPlainString();
+        } catch (NumberFormatException e) {
+            return value.trim();
         }
     }
 

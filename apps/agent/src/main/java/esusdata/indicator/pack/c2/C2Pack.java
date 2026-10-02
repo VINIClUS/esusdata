@@ -21,6 +21,8 @@ import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.EvidenceSubjectKind;
 import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
@@ -31,6 +33,7 @@ import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
 import java.math.BigInteger;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -83,7 +86,13 @@ public final class C2Pack implements IndicatorRule {
                     + " dose; transcrição conta pela data de aplicação (a data do registro não está no extrato);"
                     + " SCR sem intervalo mínimo; só o Esquema Primário do 24 g.",
             "Cadastros não unificados (AMB-C2-14) contam como pessoas distintas; o corte local não reproduz o"
-                    + " 20º dia útil do Siaps (AMB-C2-16).");
+                    + " 20º dia útil do Siaps (AMB-C2-16).",
+            "Leituras declaradas: CBO de quatro dígitos é família (AMB-C2-13); visitas com motivo diferente de"
+                    + " recém-nascido ou criança não contam (AMB-C2-08 iii); a coorte vai até o 2º aniversário, não até"
+                    + " 'anos completos ≤ 2' (AMB-C2-02); sem o filtro de Puericultura, A e B divergem do tratamento"
+                    + " proposto na transcrição (AMB-C2-05); equipe de tipo conhecido fora de 70/76 sai da coorte"
+                    + " (24 b); atendimento domiciliar só no MIAI com local 4 é ambíguo (AMB-C2-04), registro de outro"
+                    + " modelo não conta.");
 
     public static final String ID = "c2-desenvolvimento-infantil";
     public static final String RULE_VERSION = ID + "@0.1.0";
@@ -132,7 +141,7 @@ public final class C2Pack implements IndicatorRule {
                             "E",
                             "Ter vacinas contra difteria, tétano, coqueluche, hepatite B, infecções causadas por Haemophilus influenzae tipo b, poliomielite, sarampo, caxumba e rubéola, pneumocócica, registradas com todas as doses recomendadas.",
                             20,
-                            UP_TO_TWO_YEARS)),
+                            "a ficha não fixa janela (AMB-C2-10)")),
             ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.MONTHS_WITH_COHORT_EVENT,
@@ -176,6 +185,11 @@ public final class C2Pack implements IndicatorRule {
      */
     public static RuleOutcome compute(CanonicalDataset data, EvaluationContext context) {
         String ibge = context.municipalityIbge();
+        rejectForeignRecords(data, ibge);
+        Optional<String> missing = missingCapability(data);
+        if (missing.isPresent()) {
+            return unsupported(context, missing.get());
+        }
         Map<String, List<CanonicalRegistration>> registrations = byPerson(
                 data.registrations(), ibge, CanonicalRegistration::municipalityIbge, CanonicalRegistration::personKey);
         Map<String, List<CanonicalCareEvent>> encounters =
@@ -191,7 +205,7 @@ public final class C2Pack implements IndicatorRule {
                 data.measurements(), ibge, CanonicalMeasurement::municipalityIbge, CanonicalMeasurement::personKey);
         Map<String, List<CanonicalImmunization>> doses = byPerson(
                 data.immunizations(), ibge, CanonicalImmunization::municipalityIbge, CanonicalImmunization::personKey);
-        Map<String, String> teamTypes = teamTypes(data.teams(), ibge);
+        Map<String, String> teamTypes = teamTypes(data.teams(), ibge, context.dataCutoff());
 
         C2Tally municipal = new C2Tally(DESCRIPTOR);
         SortedMap<String, C2Tally> teams = new TreeMap<>();
@@ -199,6 +213,7 @@ public final class C2Pack implements IndicatorRule {
         for (CanonicalPerson person : persons(data.persons(), ibge)) {
             String key = person.personKey();
             C2Cohort.Member member = C2Cohort.classify(person, registrations.getOrDefault(key, List.of()), context);
+            member = C2Cohort.onConsideredTeam(member, teamTypes.get(member.ine()));
             if (!member.eligible()) {
                 evidence.add(personRow(member, context, EvidenceDecision.EXCLUDED, null));
                 continue;
@@ -260,6 +275,9 @@ public final class C2Pack implements IndicatorRule {
         for (int i = 0; i < child.outcomes().size(); i++) {
             PracticeOutcome outcome = child.outcomes().get(i);
             ComponentSpec spec = DESCRIPTOR.components().get(i);
+            if (!spec.code().equals(outcome.component())) {
+                throw new IllegalStateException("practice " + outcome.component() + " out of order at " + spec.code());
+            }
             rows.add(new EvidenceItem(
                     EvidenceSubjectKind.PERSON,
                     member.person().personKey(),
@@ -325,28 +343,91 @@ public final class C2Pack implements IndicatorRule {
         };
     }
 
-    /** People of the citizen extract, one per opaque key, in key order (a reproducible evidence order). */
+    /**
+     * People of the citizen extract, one per opaque key, in key order (a reproducible evidence
+     * order). Two rows of one key keep a death either of them records.
+     */
     private static List<CanonicalPerson> persons(List<CanonicalPerson> persons, String ibge) {
         Map<String, CanonicalPerson> unique = new TreeMap<>();
         for (CanonicalPerson p : persons) {
             requireMunicipality(ibge, p.municipalityIbge());
-            unique.putIfAbsent(p.personKey(), p);
+            unique.merge(p.personKey(), p, (kept, other) -> kept.deathDate() == null ? other : kept);
         }
         return List.copyOf(unique.values());
     }
 
-    /** The CNES team type per INE, when the source has it (it does not today: DW gap L1). */
-    private static Map<String, String> teamTypes(List<CanonicalTeam> teams, String ibge) {
-        List<CanonicalTeam> sorted = new ArrayList<>(teams);
-        sorted.sort(Comparator.comparing(t -> t.observedAt() == null ? "" : t.observedAt()));
-        Map<String, String> types = new HashMap<>();
-        for (CanonicalTeam t : sorted) {
-            requireMunicipality(ibge, t.municipalityIbge());
-            if (t.ine() != null && t.teamTypeCode() != null) {
-                types.put(t.ine(), t.teamTypeCode());
+    /** Records of kinds C2 does not read still prove the extract is the authorized municipality's. */
+    private static void rejectForeignRecords(CanonicalDataset data, String ibge) {
+        data.encounters().forEach(r -> requireMunicipality(ibge, r.municipalityIbge()));
+        data.conditions().forEach(r -> requireMunicipality(ibge, r.municipalityIbge()));
+        data.pregnancyOutcomes().forEach(r -> requireMunicipality(ibge, r.municipalityIbge()));
+    }
+
+    /**
+     * A v2 extract names the window of every capability it read; one of ours missing means its
+     * records are unknown, never zero (ADR 0030). A dataset without windows (built in memory) is
+     * taken as complete.
+     */
+    private static Optional<String> missingCapability(CanonicalDataset data) {
+        if (data.windows().isEmpty()) {
+            return Optional.empty();
+        }
+        for (String capability : DESCRIPTOR.requiredCapabilities()) {
+            if (data.windowOf(capability).isEmpty()) {
+                return Optional.of(capability);
             }
         }
+        return Optional.empty();
+    }
+
+    private static RuleOutcome unsupported(EvaluationContext context, String capability) {
+        List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
+        limitations.add("Capacidade " + capability + " ausente do extrato: o C2 não é calculado sem ela.");
+        IndicatorResult result = new IndicatorResult(
+                IndicatorStatus.UNSUPPORTED_SOURCE,
+                null,
+                null,
+                null,
+                DESCRIPTOR.denominatorKind(),
+                null,
+                context.referencePeriod(),
+                DESCRIPTOR.ruleVersion(),
+                context.dataCutoff().toString(),
+                context.municipalityIbge(),
+                limitations,
+                DESCRIPTOR.calculationPolicyVersion(),
+                DESCRIPTOR.valueKind(),
+                null,
+                List.of(),
+                false);
+        return new RuleOutcome(result, List.of(), List.of());
+    }
+
+    /**
+     * The CNES team type per INE as last observed up to the cutoff, when the source has it (it does
+     * not today: DW gap L1).
+     */
+    private static Map<String, String> teamTypes(List<CanonicalTeam> teams, String ibge, LocalDate cutoff) {
+        List<CanonicalTeam> observed = new ArrayList<>();
+        for (CanonicalTeam t : teams) {
+            requireMunicipality(ibge, t.municipalityIbge());
+            boolean known = t.ine() != null && t.teamTypeCode() != null;
+            if (known && !observedOn(t).isAfter(cutoff)) {
+                observed.add(t);
+            }
+        }
+        observed.sort(Comparator.comparing(C2Pack::observedOn));
+        Map<String, String> types = new HashMap<>();
+        for (CanonicalTeam t : observed) {
+            types.put(t.ine(), t.teamTypeCode());
+        }
         return types;
+    }
+
+    /** The day a team was observed (a date or a timestamp); unknown counts as before any cutoff. */
+    private static LocalDate observedOn(CanonicalTeam team) {
+        String at = team.observedAt();
+        return at == null || at.length() < 10 ? LocalDate.MIN : LocalDate.parse(at.substring(0, 10));
     }
 
     private static <T> Map<String, List<T>> byPerson(

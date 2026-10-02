@@ -2,10 +2,14 @@ package esusdata.indicator.pack.c2;
 
 import esusdata.indicator.model.SourceRef;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 /** How one practice ended for one child, with the source events behind it. */
-record PracticeOutcome(String component, Status status, String reasonCode, List<Support> support) {
+record PracticeOutcome(
+        String component, Status status, String reasonCode, SortedSet<String> ambiguities, List<Support> support) {
 
     static final String MET = "CUMPRIDA";
     static final String NOT_MET = "NAO_CUMPRIDA";
@@ -22,21 +26,26 @@ record PracticeOutcome(String component, Status status, String reasonCode, List<
     }
 
     PracticeOutcome {
+        ambiguities = Collections.unmodifiableSortedSet(new TreeSet<>(ambiguities));
         support = List.copyOf(support);
     }
 
     static PracticeOutcome of(String component, Readings.Verdict verdict, List<Support> support) {
         if (verdict.ambiguous()) {
             return new PracticeOutcome(
-                    component, Status.AMBIGUOUS, AMBIGUITY_PREFIX + String.join(",", verdict.ambiguities()), support);
+                    component,
+                    Status.AMBIGUOUS,
+                    AMBIGUITY_PREFIX + String.join(",", verdict.ambiguities()),
+                    verdict.ambiguities(),
+                    support);
         }
         return verdict.met()
-                ? new PracticeOutcome(component, Status.MET, MET, support)
-                : new PracticeOutcome(component, Status.NOT_MET, NOT_MET, List.of());
+                ? new PracticeOutcome(component, Status.MET, MET, new TreeSet<>(), support)
+                : new PracticeOutcome(component, Status.NOT_MET, NOT_MET, new TreeSet<>(), List.of());
     }
 
     static PracticeOutcome exempt(String component) {
-        return new PracticeOutcome(component, Status.EXEMPT, EXEMPT_EAP, List.of());
+        return new PracticeOutcome(component, Status.EXEMPT, EXEMPT_EAP, new TreeSet<>(), List.of());
     }
 
     boolean scores() {

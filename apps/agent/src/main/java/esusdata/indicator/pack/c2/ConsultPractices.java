@@ -17,9 +17,15 @@ import java.util.Set;
 final class ConsultPractices {
 
     private static final int REQUIRED_CONSULTS = 9;
-    private static final long TWO_YEARS_IN_MONTHS = 24;
-    private static final String MIAI = "MIAI";
-    private static final String MIP = "MIP";
+    private static final long TWO_YEARS_IN_MONTHS = ChildClock.TWO_YEARS_IN_MONTHS;
+    private static final String MIAI = C2Codes.MIAI;
+    private static final String MIP = C2Codes.MIP;
+
+    /**
+     * Only the individual-encounter model (Quadro 02: MIAI); a home-care record of another model
+     * ({@code form} HOME) is not it. A MIAI encounter at home (local de atendimento 4) is AMB-C2-04.
+     */
+    private static final String INDIVIDUAL = "INDIVIDUAL";
 
     private static final List<Reading> FIRST_CONSULT_READINGS = List.of(
             Reading.DAY_30_INSIDE,
@@ -39,8 +45,11 @@ final class ConsultPractices {
     /** One MIAI consultation; {@code key} collapses the same consultation recorded twice (MET-32). */
     private record Consult(LocalDate date, String key, boolean home, Boolean remote, Support support) {}
 
-    /** A teleconsultation or child-development code recorded only in the MIP (AMB-C2-06). */
-    private record ProcedureConsult(LocalDate date, String code, Support support) {}
+    /**
+     * A teleconsultation or child-development code in the MIP (AMB-C2-06); {@code sameDayConsult}
+     * when a MIAI consultation exists that day, so B does not count the same visit twice.
+     */
+    private record ProcedureConsult(LocalDate date, String code, boolean sameDayConsult, Support support) {}
 
     /** A — "Ter a 1ª consulta presencial … até o 30º dia de vida." */
     static PracticeOutcome firstPresentialConsult(ChildRecords child) {
@@ -119,7 +128,7 @@ final class ConsultPractices {
         }
         if (readings.contains(Reading.PROCEDURE_ONLY_CONSULT)) {
             for (ProcedureConsult p : procedureOnly) {
-                if (clock.upToMonths(p.date(), TWO_YEARS_IN_MONTHS, readings)) {
+                if (!p.sameDayConsult() && clock.upToMonths(p.date(), TWO_YEARS_IN_MONTHS, readings)) {
                     keys.add(MIP + "|" + p.date());
                     days.add(p.date());
                 }
@@ -142,9 +151,9 @@ final class ConsultPractices {
         List<Consult> consults = new ArrayList<>();
         for (CanonicalCareEvent e : child.encounters()) {
             LocalDate date = LocalDate.parse(e.careDate());
-            if (!"DENTAL".equals(e.form()) && C2Codes.CONSULT.matches(e.cbo()) && child.inScope(date)) {
-                boolean home = "HOME".equals(e.form()) || C2Codes.HOME_CARE_LOCATION.equals(e.careLocationCode());
-                String key = date + "|" + e.cbo() + "|" + e.cnes() + "|" + e.ine();
+            if (INDIVIDUAL.equals(e.form()) && C2Codes.CONSULT.matches(e.cbo()) && child.inScope(date)) {
+                boolean home = C2Codes.HOME_CARE_LOCATION.equals(e.careLocationCode());
+                String key = date + "|" + normalizedCbo(e.cbo()) + "|" + e.cnes() + "|" + e.ine();
                 String model = home ? MIAI + "_DOMICILIAR" : MIAI;
                 consults.add(new Consult(
                         date,
@@ -157,6 +166,11 @@ final class ConsultPractices {
         return consults;
     }
 
+    /** CBO as text without punctuation, so "2251-42" and "225142" are one professional (MET-32). */
+    private static String normalizedCbo(String cbo) {
+        return cbo == null ? null : cbo.replaceAll("[-.\\s]", "");
+    }
+
     private static List<ProcedureConsult> procedureOnly(ChildRecords child, List<Consult> consults) {
         Set<LocalDate> consultDays = new HashSet<>();
         for (Consult c : consults) {
@@ -167,9 +181,12 @@ final class ConsultPractices {
             LocalDate date = LocalDate.parse(p.eventDate());
             boolean code = C2Codes.TELECONSULT_SIGTAP.equals(p.sigtapCode())
                     || C2Codes.CHILD_DEVELOPMENT_SIGTAP.equals(p.sigtapCode());
-            if (code && MIP.equals(p.origin()) && child.inScope(date) && !consultDays.contains(date)) {
+            if (code && MIP.equals(p.origin()) && child.inScope(date)) {
                 list.add(new ProcedureConsult(
-                        date, p.sigtapCode(), new Support(p.sourceRef(), date, p.cbo(), p.cnes(), p.ine(), MIP)));
+                        date,
+                        p.sigtapCode(),
+                        consultDays.contains(date),
+                        new Support(p.sourceRef(), date, p.cbo(), p.cnes(), p.ine(), MIP)));
             }
         }
         return list;

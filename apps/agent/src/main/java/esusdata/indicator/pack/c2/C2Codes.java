@@ -109,6 +109,16 @@ public final class C2Codes {
     /** Tipo de equipe eAP (24 b, p.2): "A boa prática (D) considera a pontuação integral para eAP, tipo 76." */
     public static final String TEAM_TYPE_EAP = "76";
 
+    /** Information models as the canonical records name them. */
+    static final String MIAI = "MIAI";
+
+    static final String MIP = "MIP";
+    static final String MIAC = "MIAC";
+    static final String MIVDT = "MIVDT";
+
+    /** Team types the 24 b considers (eSF 70, eAP 76). */
+    static final List<String> CONSIDERED_TEAM_TYPES = List.of("70", TEAM_TYPE_EAP);
+
     static final CboGroups CONSULT = new CboGroups(CONSULT_CBO);
     static final CboGroups ANTHROPOMETRY = new CboGroups(ANTHROPOMETRY_CBO);
     static final CboGroups VISIT = new CboGroups(VISIT_CBO);

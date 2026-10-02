@@ -16,7 +16,7 @@ import java.util.Set;
 final class VisitPractice {
 
     private static final long SIX_MONTHS = 6;
-    private static final String MIVDT = "MIVDT";
+    private static final String MIVDT = C2Codes.MIVDT;
 
     private static final List<Reading> READINGS = List.of(
             Reading.DAY_30_INSIDE,

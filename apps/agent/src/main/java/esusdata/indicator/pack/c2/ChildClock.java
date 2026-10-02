@@ -14,6 +14,9 @@ record ChildClock(LocalDate birth) {
     /** The last day inside "até o 30º dia de vida" when the birth day is the 1º dia (AMB-C2-01). */
     static final int LAST_DAY_BOTH_READINGS = 29;
 
+    /** "Até (os) dois anos de vida" in civil months. */
+    static final long TWO_YEARS_IN_MONTHS = 24;
+
     /** Day 0 is the day of birth ({@link AgeAt#daysSinceBirth}). */
     long day(LocalDate date) {
         return AgeAt.daysSinceBirth(birth, date);

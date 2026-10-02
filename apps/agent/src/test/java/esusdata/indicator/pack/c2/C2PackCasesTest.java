@@ -1444,7 +1444,7 @@ class C2PackCasesTest {
     }
 
     private static CanonicalCareEvent domiciliar(String chave, LocalDate data) {
-        return atendimento(chave, data, ENFERMEIRA, false, "HOME", "4");
+        return atendimento(chave, data, ENFERMEIRA, false, "INDIVIDUAL", "4");
     }
 
     private static CanonicalCareEvent atendimento(

@@ -36,6 +36,7 @@ final class C2Cohort {
     static final String REFUSED = "EXCLUIDO_RECUSA_CADASTRO";
     static final String TERRITORY_CHANGE = "INTERROMPIDO_MUDANCA_TERRITORIO";
     static final String DEATH = "INTERROMPIDO_OBITO";
+    static final String TEAM_TYPE_NOT_CONSIDERED = "EXCLUIDO_TIPO_EQUIPE_NAO_CONSIDERADO";
 
     private static final Comparator<CanonicalRegistration> LATEST = Comparator.comparing(
                     (CanonicalRegistration r) -> LocalDate.parse(r.registrationDate()))
@@ -70,6 +71,18 @@ final class C2Cohort {
         boolean completesTwo = YearMonth.from(secondBirthday).equals(month);
         return new Member(
                 person, clock, true, completesTwo ? ELIGIBLE_COMPLETES_TWO : ELIGIBLE, ine, cnes, completesTwo);
+    }
+
+    /**
+     * 24 b (p.2): only eSF (70) and eAP (76) teams are considered. A child linked to a team whose
+     * type is known and is neither leaves the cohort; an unknown type keeps it (gap L1, declared).
+     */
+    static Member onConsideredTeam(Member member, String teamType) {
+        if (!member.eligible() || teamType == null || C2Codes.CONSIDERED_TEAM_TYPES.contains(teamType)) {
+            return member;
+        }
+        return new Member(
+                member.person(), member.clock(), false, TEAM_TYPE_NOT_CONSIDERED, member.ine(), member.cnes(), false);
     }
 
     private static String exclusion(
