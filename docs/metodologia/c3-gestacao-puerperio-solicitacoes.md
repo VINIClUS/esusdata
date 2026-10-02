@@ -66,3 +66,14 @@ alternativa local declarada como limitação no descritor.
   sem lista SIGTAP; a capacidade só devolve os códigos pedidos.
 - **Alternativa local:** K é comprovada só pelo atendimento odontológico (MIAOI); limitação declarada.
 - **Impacto:** K pode ficar abaixo do Siaps quando a única atividade foi um procedimento avulso.
+
+## Respostas da integração (emenda da fundação 9526ac6)
+
+| Pedido | Resposta | Como o pacote ficou |
+|---|---|---|
+| S-C3-01 | Atendido: `EvidenceDecision.PRACTICE_AMBIGUOUS` | Prática ambígua sai `PRACTICE_AMBIGUOUS`, sem pontos, `reasonCode` com a AMB |
+| S-C3-02 | Sem capacidade de desfecho; usar a resolução da condição de gravidez na LPC como candidata declarada | Prioridade: desfecho registrado (`pregnancy_outcome`, se vier) > resolução na LPC (`ELEGIVEL_DESFECHO_RESOLUCAO_LPC`) > DUM+294; limitação L2 mantida |
+| S-C3-03 | Sem fonte (L1) | Limitação mantida; exceção eAP só com `team` tipo 76 no extrato |
+| S-C3-04 | Aprovado | `condition_list` entra no descritor e nas `requirements` com as listas do 24 f/g |
+| S-C3-05 | (a) PA da visita: não (L6); (b) MIAC com tipo de atividade e práticas em saúde | PA de visita segue limitação; MIAC avaliado em C, D e K (AMB-C3-19 quando só uma condição casa) |
+| S-C3-06 | Sem modo "por CBO" | Limitação mantida (K só pelo MIAOI e MIAC) |
