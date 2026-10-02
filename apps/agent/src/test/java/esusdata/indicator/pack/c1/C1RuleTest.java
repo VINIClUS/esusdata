@@ -8,6 +8,7 @@ import esusdata.indicator.model.CanonicalModality;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.SourceRef;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -127,8 +128,8 @@ class C1RuleTest {
 
     @Test
     void allCompleteFlagsCannotOverrideKnownStandingLimitations() {
-        IndicatorResult result = C1Rule.compute(
-                encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31", C1Rule.ReleaseGates.allComplete());
+        IndicatorResult result =
+                C1Rule.compute(encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31", ReleaseGates.allComplete());
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.BLOCKED);
         assertThat(result.valueText()).isNull();

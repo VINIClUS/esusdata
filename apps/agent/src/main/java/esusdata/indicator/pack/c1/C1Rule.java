@@ -5,6 +5,7 @@ import esusdata.indicator.model.CanonicalModality;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.ReleaseGates;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -42,52 +43,12 @@ public final class C1Rule {
     private C1Rule() {}
 
     /**
-     * Release gates are deliberately supplied by the release workflow rather than inferred from
-     * the presence of this class or its compatibility entry. A result must not look published
-     * while any one of the five gates is incomplete.
+     * Limitations every C1 result carries until Q01 is applied and reconciled. Release gates
+     * are supplied by the release workflow ({@link ReleaseGates}); a result also stays blocked
+     * while any of these stands, even with every gate complete.
      */
-    public record ReleaseGates(
-            boolean sourceAndValidity,
-            boolean calculationModel,
-            boolean adapter,
-            boolean reconciliation,
-            boolean pilotAndOperations) {
-        public static ReleaseGates allComplete() {
-            return new ReleaseGates(true, true, true, true, true);
-        }
-
-        public static ReleaseGates knownIncomplete() {
-            return new ReleaseGates(false, false, true, false, false);
-        }
-
-        public boolean isComplete() {
-            return sourceAndValidity
-                    && calculationModel
-                    && adapter
-                    && reconciliation
-                    && pilotAndOperations
-                    && STANDING_LIMITATIONS.isEmpty();
-        }
-
-        public List<String> incompleteReasons() {
-            List<String> reasons = new ArrayList<>();
-            if (!sourceAndValidity) {
-                reasons.add("Portão A (fonte e vigência) incompleto");
-            }
-            if (!calculationModel) {
-                reasons.add("Portão B (modelo de cálculo) incompleto");
-            }
-            if (!adapter) {
-                reasons.add("Portão C (adaptador) incompleto");
-            }
-            if (!reconciliation) {
-                reasons.add("Portão D (reconciliação) incompleto");
-            }
-            if (!pilotAndOperations) {
-                reasons.add("Portão E (piloto e operação) incompleto");
-            }
-            return List.copyOf(reasons);
-        }
+    public static List<String> standingLimitations() {
+        return STANDING_LIMITATIONS;
     }
 
     /**
@@ -98,7 +59,7 @@ public final class C1Rule {
      */
     public static IndicatorResult compute(
             List<CanonicalEncounter> encounters, String municipalityIbge, String referencePeriod, String dataCutoff) {
-        return compute(encounters, municipalityIbge, referencePeriod, dataCutoff, ReleaseGates.knownIncomplete());
+        return compute(encounters, municipalityIbge, referencePeriod, dataCutoff, ReleaseGates.adapterOnly());
     }
 
     /**
@@ -114,7 +75,7 @@ public final class C1Rule {
             ReleaseGates releaseGates) {
         validateRequestedScope(encounters, municipalityIbge, referencePeriod);
         Computation computation = count(encounters);
-        if (!releaseGates.isComplete()) {
+        if (!releaseGates.isComplete() || !STANDING_LIMITATIONS.isEmpty()) {
             List<String> limitations = new ArrayList<>(computation.limitations());
             limitations.addAll(releaseGates.incompleteReasons());
             return new IndicatorResult(

@@ -1,0 +1,67 @@
+{
+  "capability": "citizen",
+  "adapter_version": "0.1.0",
+  "description": "Pessoas do município nascidas na faixa pedida, com a chave opaca unificada (cadastros do mesmo cidadão contam como um), nascimento, sexo, identidade de gênero e óbito quando houver (§1.7 Pessoa).",
+  "record_kind": "person",
+  "entity_type_column": "source_entity_type",
+  "record_id_column": "source_record_id",
+  "municipality_column": "municipality_ibge",
+  "scope_date_column": null,
+  "query": "queries/citizen@0.1.0.sql",
+  "binds": [
+    {
+      "name": "municipality_ibge",
+      "type": "MUNICIPALITY_IBGE"
+    },
+    {
+      "name": "birth_date_from",
+      "type": "DATE"
+    },
+    {
+      "name": "birth_date_to",
+      "type": "DATE"
+    }
+  ],
+  "columns": [
+    {
+      "name": "source_entity_type",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "source_record_id",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "municipality_ibge",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "person_key",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "birth_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "sex",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "gender_identity",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "death_date",
+      "type": "date",
+      "required": false
+    }
+  ]
+}

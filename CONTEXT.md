@@ -84,6 +84,60 @@ _Avoid_: nota, score
 **Resultado de indicador** (`IndicatorResult`):
 Numerador, denominador, razão exata e classificação de uma regra para um escopo e competência.
 
+### Indicadores por práticas (ADR 0030)
+
+**Regra de indicador** (`IndicatorRule`, `IndicatorRuleRegistry`):
+A implementação compilada de um pacote: diz o que ler (`requirements`), calcula (`evaluate`) e
+classifica (`classify`). Pura, sem I/O. O registro lista as regras da release; pacote fora dele é
+pedido inválido.
+
+**Descritor do pacote** (`PackDescriptor`):
+Identidade, versão da regra, pacote metodológico (`qualidade-esf-eap-2026-06`), família
+(`QUALIDADE_ESF_EAP`), código (C1…C7), título, natureza do valor, práticas, capacidades lidas,
+portões e limitações permanentes. Estar descrito não habilita execução.
+
+**Natureza do valor** (`ValueKind`):
+`PERCENTAGE` (C1, 100 × n/d), `SCORE` (C2–C6, média de pontos 0–100), `COMPOSITE_SCORE` (C7, soma
+ponderada de subproporções) e `FINAL_SCORE` (Nota Final do Componente III, 0–10). Um escore nunca é
+multiplicado por 100 de novo.
+_Avoid_: percentual para C2–C7
+
+**Prática** (`ComponentSpec` kind `PRACTICE`, `ResultComponent`):
+Uma boa prática da ficha (A, B, …) com peso em pontos. A pessoa ou o episódio soma os pesos das
+práticas comprovadas; o resultado mostra, por prática, quantos elegíveis a cumpriram.
+
+**Subgrupo** (`ComponentSpec` kind `SUBGROUP`):
+Uma subpopulação do C7 com denominador próprio. Subgrupo sem denominador deixa o escore indefinido
+(P10), nunca zero.
+
+**Portões de liberação** (`ReleaseGates`):
+Os Portões A–E da Tech Spec §4.4. Enquanto algum falta, o resultado sai `BLOCKED` com as contagens.
+
+**Capacidade** (`CapabilityContract`, descritor `capabilities/<id>@<versão>.json`):
+Uma consulta congelada que produz um tipo de registro canônico. A SQL é o esquema: os aliases das
+colunas são os campos do registro. Códigos clínicos entram como parâmetros do pacote.
+_Avoid_: query livre, SQL configurável
+
+**Extrato v2** (`ManifestPart`, `RecordKind`):
+O extrato de várias partes, uma por capacidade, lidas numa só transação. Cada linha diz sua parte
+e seu tipo. O C1 continua no extrato v1.
+
+**Resultado por equipe** (`TeamResult`):
+O mesmo resultado calculado para cada INE, a granularidade das fichas. Registros sem equipe ficam
+num grupo próprio, nunca atribuídos a outra equipe.
+
+**Quadrimestre** (`Quadrimestre`):
+Q1 jan–abr, Q2 mai–ago, Q3 set–dez (`2026-Q2`). Nunca o trimestre civil.
+
+**Elegibilidade mensal** (`MonthlyEligibility`, `consolidationEligible`):
+Se a competência entra na média quadrimestral (NT 8/2026). C2 e C3 só contam meses com o evento de
+coorte da nota; mês fora não vira zero.
+
+**Nota Final do Componente III** (`ComponentIII`, `ComponentIIIConsolidation`):
+A soma ponderada (1/2/2/1/1/1/2) dos fatores das classificações quadrimestrais de C1–C7, calculada na
+leitura a partir de resultados publicados. "Nota" aqui é o nome oficial do escore composto, não da
+classificação. A classificação financeira da transição fica separada da metodológica.
+
 ### Execução
 
 **Execução** (`Run` na API, `Job` na fila):

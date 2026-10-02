@@ -1,0 +1,15 @@
+{
+  "schema_version": "1",
+  "descriptors": [
+    "care_encounter@0.1.0.json",
+    "citizen@0.1.0.json",
+    "condition_list@0.1.0.json",
+    "dental_encounter@0.1.0.json",
+    "exam_request_evaluation@0.1.0.json",
+    "home_visit@0.1.0.json",
+    "immunization_history@0.1.0.json",
+    "individual_registration@0.1.0.json",
+    "measurement_record@0.1.0.json",
+    "procedure_performed@0.1.0.json"
+  ]
+}
