@@ -11,6 +11,8 @@ import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
@@ -177,9 +179,61 @@ public final class C4Pack implements IndicatorRule {
         return RuleOutcomes.gate(DESCRIPTOR, evaluateUngated(data, context));
     }
 
+    /**
+     * The capabilities a dataset with declared windows did not read, or read over a shorter window
+     * than {@link #requirements} asks (the v2 reader declares every part it read, empty ones too). A
+     * dataset that declares no window at all is not checked.
+     */
+    static List<String> unreadParts(CanonicalDataset data, YearMonth competencia) {
+        List<String> missing = new ArrayList<>();
+        if (data.windows().isEmpty()) {
+            return missing;
+        }
+        for (PartRequirement part : new C4Pack().requirements(competencia).parts()) {
+            Optional<DateWindow> read = data.windowOf(part.capability());
+            boolean covered = read.isPresent()
+                    && !read.get().start().isAfter(part.periodStart())
+                    && !read.get().endExclusive().isBefore(part.periodEndExclusive());
+            if (!covered) {
+                missing.add(part.capability());
+            }
+        }
+        return missing;
+    }
+
+    /** {@code UNSUPPORTED_SOURCE}: no value and no counts — a part not read is never a zero. */
+    private static RuleOutcome unsupported(EvaluationContext context, List<String> missing) {
+        List<String> limitations = new ArrayList<>();
+        limitations.add("Fonte sem as partes exigidas pela regra (lidas com janela ausente ou menor): "
+                + String.join(", ", missing) + ".");
+        limitations.addAll(DESCRIPTOR.standingLimitations());
+        IndicatorResult result = new IndicatorResult(
+                IndicatorStatus.UNSUPPORTED_SOURCE,
+                null,
+                null,
+                null,
+                DESCRIPTOR.denominatorKind(),
+                null,
+                context.referencePeriod(),
+                DESCRIPTOR.ruleVersion(),
+                context.dataCutoff().toString(),
+                context.municipalityIbge(),
+                limitations,
+                DESCRIPTOR.calculationPolicyVersion(),
+                DESCRIPTOR.valueKind(),
+                null,
+                List.of(),
+                false);
+        return new RuleOutcome(result, List.of(), List.of());
+    }
+
     /** The computation before the release gates: what the gates hide, exactly as computed. */
     static RuleOutcome evaluateUngated(CanonicalDataset data, EvaluationContext context) {
         C4Scope.requireMunicipality(data, context.municipalityIbge());
+        List<String> missing = unreadParts(data, context.competencia());
+        if (!missing.isEmpty()) {
+            return unsupported(context, missing);
+        }
         LocalDate cutoff = context.dataCutoff();
         C4Practices practices = new C4Practices(data, context.competencia(), cutoff);
         List<ComponentSpec> specs = DESCRIPTOR.components();

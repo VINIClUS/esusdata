@@ -37,6 +37,7 @@ import esusdata.indicator.model.CanonicalRegistration;
 import esusdata.indicator.model.CanonicalTeam;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.DataRequirements;
+import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
@@ -407,5 +408,38 @@ class C4IntegrationReviewTest {
 
         assertThat(supporting(o, "p1", "A")).extracting(EvidenceItem::modality).containsOnly("MIAI");
         assertThat(supporting(o, "p1", "D")).extracting(EvidenceItem::modality).containsOnly("MIVDT");
+    }
+
+    // ---- 6: a part not read (or read over a shorter window) is UNSUPPORTED_SOURCE ---------------
+
+    @Test
+    void finding6_aRequiredPartNotReadOrReadShorterIsUnsupportedSource() {
+        DataRequirements r = new C4Pack().requirements(YearMonth.of(2026, 3));
+        CanonicalDataset.Builder complete = CanonicalDataset.builder();
+        CanonicalDataset.Builder shorter = CanonicalDataset.builder();
+        for (PartRequirement part : r.parts()) {
+            DateWindow window = new DateWindow(part.periodStart(), part.periodEndExclusive());
+            complete.window(part.capability(), window);
+            boolean isConditions = Capabilities.CONDITION_LIST.equals(part.capability());
+            shorter.window(
+                    part.capability(), isConditions ? DateWindow.lastCivilMonths(YearMonth.of(2026, 3), 120) : window);
+        }
+        CanonicalDataset missing = CanonicalDataset.builder()
+                .window(Capabilities.CARE_ENCOUNTER, DateWindow.lastCivilMonths(YearMonth.of(2026, 3), 12))
+                .add(registration("p1", LINKED_ON, INE_ESF))
+                .add(activeCondition("p1", "CID10", "E11", DIAGNOSED_ON))
+                .build();
+
+        for (CanonicalDataset dataset : List.of(shorter.build(), missing)) {
+            RuleOutcome o = new C4Pack().evaluate(dataset, CONTEXT);
+            assertThat(o.result().status()).isEqualTo(IndicatorStatus.UNSUPPORTED_SOURCE);
+            assertThat(o.result().valueText()).isNull();
+            assertThat(o.result().numerator()).isNull();
+            assertThat(o.result().denominator()).isNull();
+            assertThat(o.result().components()).isEmpty();
+            assertThat(o.evidence()).isEmpty();
+        }
+        assertThat(new C4Pack().evaluate(complete.build(), CONTEXT).result().status())
+                .isEqualTo(IndicatorStatus.NO_DENOMINATOR);
     }
 }
