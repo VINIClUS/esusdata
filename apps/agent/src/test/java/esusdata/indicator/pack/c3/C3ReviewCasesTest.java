@@ -506,13 +506,13 @@ class C3ReviewCasesTest {
     // ---- practice branches ----
 
     @Test
-    void collectiveBloodPressureWithBothCodesCounts() {
+    void collectiveBloodPressureWithTheFichaCodesIsAmbiguous() {
         List<Record> records = pregnancy(P1, DUM);
         for (int i = 0; i < 6; i++) {
             records.add(bloodPressure(P1, dum(101 + i), NURSE));
         }
         records.add(collectivePressure(P1, dum(120), "05", "01"));
-        assertMet(practice(compute(records), EP1, "C"), 9);
+        assertAmbiguous(practice(compute(records), EP1, "C"), "19");
     }
 
     @Test

@@ -302,17 +302,19 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void amb19_aCollectiveActivityWithActivityAndPracticeCodesCountsForD() {
+    void amb19_aCollectiveActivityWithTheFichaPracticeCodeIsAmbiguousForD() {
+        // the ficha's "Práticas em Saúde 01" has no documented LEDI code (capacidades-dw-v2 §3.7)
         List<Record> records = measuredConsults(6, false, true);
         records.add(collectiveActivity(P1, dum(250), NURSE, "05", "01"));
-        assertMet(practice(computeNovember(new C3Pack(), records), "D"), 9);
+        assertAmbiguous(practice(computeNovember(new C3Pack(), records), "D"), "19");
     }
 
     @Test
     void amb19_activityCodesWithoutLeadingZeroAreTheSameCodes() {
+        // activity "6" is the ficha's "06": the record counts, as AMB-C3-19 (practice not mapped)
         List<Record> records = measuredConsults(6, false, true);
         records.add(collectiveActivity(P1, dum(250), NURSE, "6", "1"));
-        assertMet(practice(computeNovember(new C3Pack(), records), "D"), 9);
+        assertAmbiguous(practice(computeNovember(new C3Pack(), records), "D"), "19");
     }
 
     @Test
@@ -652,12 +654,14 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct59_anOralHealthCollectiveActivityMeetsK() {
+    void ct59_anOralHealthCollectiveActivityIsAmbiguousUntilThePracticeCodesAreMapped() {
+        // CT-C3-59 meets K once the ficha's "Práticas em Saúde 02/04" have a documented LEDI code;
+        // until then the activity code alone leaves K undecided (AMB-C3-19)
         List<Record> records = withAnchorOn(dum(56));
         records.add(collectiveActivity(P1, dum(140), ORAL_HEALTH_TECHNICIAN, "05", "02"));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertMet(practice(outcome, "K"), 9);
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertAmbiguous(practice(outcome, "K"), "19");
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
     }
 
     @Test

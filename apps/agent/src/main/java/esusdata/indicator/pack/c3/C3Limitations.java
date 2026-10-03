@@ -23,8 +23,9 @@ final class C3Limitations {
             "A data de desfecho da gestação não está no DW: usa-se a data de resolução da condição de"
                     + " gravidez na LPC (manual do PEC) e, sem ela, DUM+294 (item 17, p.2; lacuna L2; MET-21).",
             "A pressão arterial da visita domiciliar não é lida (Quadro 03, p.6; lacuna L6).",
-            "O MIAC conta com atividade 05/06 e a prática em saúde do quadro; só uma das duas condições"
-                    + " fica RULE_AMBIGUITY (24 e, p.3; Quadros 04 e 08; AMB-C3-19).",
+            "Os códigos de \"Práticas em Saúde\" da ficha (01, 02, 04) não correspondem aos códigos LEDI que"
+                    + " o DW grava e não há mapeamento documentado: o MIAC com atividade 05/06 fica"
+                    + " RULE_AMBIGUITY em C, D e K (24 e, p.3; Quadros 04 e 08; AMB-C3-19).",
             "Em K, procedimentos do MIP não são avaliados: a ficha não lista SIGTAP para eles (Quadro 08," + " p.8).",
             "Os códigos rápidos ABP de pré-natal e de puerpério não são enumerados pela ficha e não são"
                     + " usados (24 f, p.3; AMB-C3-10).",

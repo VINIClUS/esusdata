@@ -184,6 +184,10 @@ public final class C3Pack implements IndicatorRule {
 
     /** The exact outcome before the release gates (§4.4): what {@link #evaluate} gates. */
     RuleOutcome compute(CanonicalDataset data, EvaluationContext context) {
+        List<String> gaps = SourceCoverage.gaps(requirements(context.competencia()), data);
+        if (!gaps.isEmpty()) {
+            return SourceCoverage.unsupported(DESCRIPTOR, context, gaps);
+        }
         LocalDate cutoff = context.dataCutoff();
         SortedMap<String, PersonRecords> people = RecordIndex.of(data, context.municipalityIbge());
         Subjects builder = new Subjects(

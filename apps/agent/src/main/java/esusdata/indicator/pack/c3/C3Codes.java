@@ -155,14 +155,22 @@ final class C3Codes {
     /** "Atividade código 05 e 06" (24 e; Quadros 04 e 08). */
     static final List<String> MIAC_ACTIVITY_TYPES = List.of("05", "06");
 
-    /** "Práticas em Saúde códigos 01, 02, 04" (24 e): the MIAC in general, used for C. */
-    static final List<String> MIAC_PRACTICES = List.of("01", "02", "04");
+    /*
+     * "Práticas em Saúde" — 24 e: "códigos 01, 02, 04"; Quadro 04 (p.7, D): "código 01"; Quadro 08
+     * (p.8, K): "códigos 02 e 04". The ficha's numbering is not the LEDI PraticasEmSaude the DW
+     * returns (LEDI has no 1 nor 4; 2 is "aplicação tópica de flúor"; docs/discovery/capacidades-dw-v2.md
+     * §3.7), and no document maps one onto the other. Until a mapping is documented the lists below,
+     * in LEDI codes, stay empty: a MIAC with activity 05/06 is then only "talvez" (AMB-C3-19).
+     */
 
-    /** "Práticas em Saúde código 01" (Quadro 04, p.7): D. */
-    static final List<String> MIAC_PRACTICES_ANTHROPOMETRY = List.of("01");
+    /** LEDI codes of the 24 e practices (01, 02, 04), used for C: none documented. */
+    static final List<String> MIAC_PRACTICES = List.of();
 
-    /** "Práticas em Saúde códigos 02 e 04" (Quadro 08, p.8): K. */
-    static final List<String> MIAC_PRACTICES_ORAL_HEALTH = List.of("02", "04");
+    /** LEDI codes of the Quadro 04 practice (01), used for D: none documented. */
+    static final List<String> MIAC_PRACTICES_ANTHROPOMETRY = List.of();
+
+    /** LEDI codes of the Quadro 08 practices (02, 04), used for K: none documented. */
+    static final List<String> MIAC_PRACTICES_ORAL_HEALTH = List.of();
 
     // ---- Lista de problemas e condições (LPC) ----
 

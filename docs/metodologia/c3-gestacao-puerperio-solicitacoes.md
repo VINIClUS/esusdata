@@ -77,3 +77,15 @@ alternativa local declarada como limitação no descritor.
 | S-C3-04 | Aprovado | `condition_list` entra no descritor e nas `requirements` com as listas do 24 f/g |
 | S-C3-05 | (a) PA da visita: não (L6); (b) MIAC com tipo de atividade e práticas em saúde | PA de visita segue limitação; MIAC avaliado em C, D e K (AMB-C3-19 quando só uma condição casa) |
 | S-C3-06 | Sem modo "por CBO" | Limitação mantida (K só pelo MIAOI e MIAC) |
+
+## S-C3-07 — Códigos de "Práticas em Saúde" da ficha × LEDI
+
+- **O quê:** a correspondência documentada entre os códigos que a ficha usa para "Práticas em Saúde"
+  e os códigos LEDI `PraticasEmSaude` que `measurement_record` devolve em `health_practice_codes`.
+- **Por quê:** 24 e (p.3): "Práticas em Saúde códigos 01, 02, 04"; Quadro 04 (p.7): "código 01";
+  Quadro 08 (p.8): "códigos 02 e 04". O LEDI (`docs/discovery/capacidades-dw-v2.md` §3.7) não tem os
+  códigos 1 nem 4, e o 2 é "aplicação tópica de flúor": a numeração da ficha não é a do LEDI.
+- **Alternativa local:** as listas LEDI das práticas ficam vazias em `C3Codes`; MIAC com atividade
+  05/06 conta só como "talvez" em C, D e K (AMB-C3-19), e o CT-C3-59 fica `RULE_AMBIGUITY` até o
+  mapeamento.
+- **Impacto:** atividades coletivas nunca cumprem sozinhas C, D ou K.
