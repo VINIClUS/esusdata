@@ -6,6 +6,7 @@ import { usePacotesIndicadores } from '@/api/hooks'
 import { normalizeQualityComponent, qualityComponentPath } from '@/api/normalizers'
 import type { Componente3Resumo, QualityComponent } from '@/api/types'
 import { useScope } from '@/app/scope-context'
+import { contarLidos } from './lidos'
 
 /**
  * `GET /quality-component` (ADR 0030) for the scope's municipality and one quadrimestre: the Nota
@@ -14,6 +15,8 @@ import { useScope } from '@/app/scope-context'
  */
 export function useComponente3(quadrimestre: string): {
   resumo: Componente3Resumo | undefined
+  /** How many published results each indicator of each unit read (`lidosChave`). */
+  lidos: ReadonlyMap<string, number>
   isPending: boolean
   error: Error | null
 } {
@@ -34,5 +37,6 @@ export function useComponente3(quadrimestre: string): {
     () => (query.data ? normalizeQualityComponent(query.data, pacotes.data ?? []) : undefined),
     [query.data, pacotes.data],
   )
-  return { resumo, isPending: query.isPending, error: query.error }
+  const lidos = useMemo(() => contarLidos(query.data), [query.data])
+  return { resumo, lidos, isPending: query.isPending, error: query.error }
 }

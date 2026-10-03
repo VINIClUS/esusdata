@@ -14,6 +14,7 @@ import { FilterSelect } from '@/components/ui/FilterSelect'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { colors } from '@/theme/tokens'
+import { lidosChave } from './lidos'
 import { useComponente3 } from './useComponente3'
 
 const TITLE = 'Componente III – Nota Final'
@@ -50,29 +51,37 @@ const unidadeColumns: Column<Componente3Unidade>[] = [
   {
     key: 'financeira',
     header: 'Transição financeira (Portaria 10.994/2026)',
-    render: (u) => traco(u.classificacaoFinanceira),
+    // The NT 8/2026 grades "uma equipe" and the Portaria pays teams: the municipality has none.
+    render: (u) =>
+      traco(u.ine === null ? 'Não se aplica (repasse por equipe)' : u.classificacaoFinanceira),
   },
   { key: 'situacao', header: 'Situação', render: situacao },
 ]
 
-const indicadorColumns: Column<Componente3Indicador>[] = [
-  {
-    key: 'indicador',
-    header: 'Indicador',
-    sx: { minWidth: 220 },
-    render: (i) => <Typography sx={{ fontSize: 13.5, color: colors.navy }}>{i.nome}</Typography>,
-  },
-  { key: 'peso', header: 'Peso', align: 'center', render: (i) => traco(i.peso) },
-  {
-    key: 'meses',
-    header: 'Meses usados',
-    render: (i) => traco(i.mesesUsados.length > 0 ? i.mesesUsados.join(', ') : null),
-  },
-  { key: 'media', header: 'Média', align: 'right', render: (i) => traco(i.media) },
-  { key: 'classificacao', header: 'Classificação', render: (i) => traco(i.classificacao) },
-  { key: 'fator', header: 'Fator', align: 'right', render: (i) => traco(i.fator) },
-  { key: 'situacao', header: 'Situação', render: situacao },
-]
+function indicadorColumns(lidos: (codigo: string) => number): Column<Componente3Indicador>[] {
+  return [
+    {
+      key: 'indicador',
+      header: 'Indicador',
+      sx: { minWidth: 220 },
+      render: (i) => <Typography sx={{ fontSize: 13.5, color: colors.navy }}>{i.nome}</Typography>,
+    },
+    { key: 'peso', header: 'Peso', align: 'center', render: (i) => traco(i.peso) },
+    {
+      key: 'meses',
+      header: 'Meses usados',
+      // Every result read is counted, the months that did not enter the mean included (ADR 0030).
+      render: (i) =>
+        traco(
+          `${i.mesesUsados.length > 0 ? i.mesesUsados.join(', ') : '—'} · ${lidos(i.codigo)} lidos`,
+        ),
+    },
+    { key: 'media', header: 'Média', align: 'right', render: (i) => traco(i.media) },
+    { key: 'classificacao', header: 'Classificação', render: (i) => traco(i.classificacao) },
+    { key: 'fator', header: 'Fator', align: 'right', render: (i) => traco(i.fator) },
+    { key: 'situacao', header: 'Situação', render: situacao },
+  ]
+}
 
 function Lista({ itens }: { itens: string[] }) {
   return (
@@ -90,7 +99,16 @@ function Lista({ itens }: { itens: string[] }) {
   )
 }
 
-function Unidade({ unidade, geral }: { unidade: Componente3Unidade; geral: string[] }) {
+function Unidade({
+  unidade,
+  geral,
+  lidos,
+}: {
+  unidade: Componente3Unidade
+  geral: string[]
+  lidos: ReadonlyMap<string, number>
+}) {
+  const colunas = indicadorColumns((codigo) => lidos.get(lidosChave(unidade.ine, codigo)) ?? 0)
   const proprias = unidade.limitacoes.filter((l) => !geral.includes(l))
   return (
     <SectionCard
@@ -103,12 +121,7 @@ function Unidade({ unidade, geral }: { unidade: Componente3Unidade; geral: strin
       action={situacao(unidade)}
     >
       {unidade.indicadores.length > 0 ? (
-        <DataTable
-          columns={indicadorColumns}
-          rows={unidade.indicadores}
-          getRowKey={(i) => i.codigo}
-          dense
-        />
+        <DataTable columns={colunas} rows={unidade.indicadores} getRowKey={(i) => i.codigo} dense />
       ) : (
         <Typography sx={{ py: 2, color: colors.textSecondary }}>
           Nenhum indicador consolidado nesta unidade.
@@ -123,7 +136,13 @@ function Unidade({ unidade, geral }: { unidade: Componente3Unidade; geral: strin
   )
 }
 
-function Consolidacao({ resumo }: { resumo: Componente3Resumo }) {
+function Consolidacao({
+  resumo,
+  lidos,
+}: {
+  resumo: Componente3Resumo
+  lidos: ReadonlyMap<string, number>
+}) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
       {!resumo.completo && (
@@ -147,7 +166,7 @@ function Consolidacao({ resumo }: { resumo: Componente3Resumo }) {
         />
       </SectionCard>
       {resumo.unidades.map((unidade) => (
-        <Unidade key={unidade.chave} unidade={unidade} geral={resumo.limitacoes} />
+        <Unidade key={unidade.chave} unidade={unidade} geral={resumo.limitacoes} lidos={lidos} />
       ))}
       <Typography sx={{ fontSize: 12.5, color: colors.textSecondary, overflowWrap: 'anywhere' }}>
         Regra {resumo.versaoRegra} ·{' '}
@@ -180,7 +199,7 @@ export function Componente3Page() {
   const padrao =
     (competencia ? quadrimestreDe(competencia) : null) ?? opcoes[0] ?? quadrimestreAtual()
   const quadrimestre = escolhido && opcoes.includes(escolhido) ? escolhido : padrao
-  const { resumo, isPending, error } = useComponente3(quadrimestre)
+  const { resumo, lidos, isPending, error } = useComponente3(quadrimestre)
 
   return (
     <>
@@ -254,7 +273,7 @@ export function Componente3Page() {
           {error?.message ?? 'A API não fornece esta consolidação neste momento.'}
         </Callout>
       ) : (
-        <Consolidacao resumo={resumo} />
+        <Consolidacao resumo={resumo} lidos={lidos} />
       )}
     </>
   )
