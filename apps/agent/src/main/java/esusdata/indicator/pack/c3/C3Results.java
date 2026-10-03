@@ -12,7 +12,6 @@ import esusdata.indicator.model.TeamResult;
 import java.math.BigInteger;
 import java.time.YearMonth;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
@@ -33,31 +32,39 @@ final class C3Results {
     private final PackDescriptor descriptor;
     private final EvaluationContext context;
     private final PracticeWeights weights;
+    private final TeamTypes teamTypes;
 
-    C3Results(PackDescriptor descriptor, EvaluationContext context, PracticeWeights weights) {
+    C3Results(PackDescriptor descriptor, EvaluationContext context, PracticeWeights weights, TeamTypes teamTypes) {
+        this.teamTypes = teamTypes;
         this.descriptor = descriptor;
         this.context = context;
         this.weights = weights;
     }
 
-    /** One result per INE of the link (ordered, without a team last), over its scored subjects. */
+    /**
+     * One result per INE of the link, ordered, over its scored subjects; the CNES of the team
+     * current at the cutoff, else the CNES all members' links agree on.
+     */
     List<TeamResult> teams(List<Subject> subjects) {
-        SortedMap<String, List<Subject>> byTeam = new TreeMap<>(Comparator.nullsLast(Comparator.naturalOrder()));
+        SortedMap<String, List<Subject>> byTeam = new TreeMap<>();
         for (Subject subject : subjects) {
-            if (subject.eligible() || subject.ambiguous()) {
+            if (subject.ine() != null && (subject.eligible() || subject.ambiguous())) {
                 byTeam.computeIfAbsent(subject.ine(), k -> new ArrayList<>()).add(subject);
             }
         }
         List<TeamResult> teams = new ArrayList<>();
         for (Map.Entry<String, List<Subject>> team : byTeam.entrySet()) {
-            String cnes = team.getValue().stream()
-                    .map(s -> s.link().cnes())
-                    .filter(c -> c != null)
-                    .findFirst()
-                    .orElse(null);
+            String cnes = teamTypes.cnes(team.getKey()).orElseGet(() -> agreedCnes(team.getValue()));
             teams.add(new TeamResult(team.getKey(), cnes, result(team.getValue())));
         }
         return teams;
+    }
+
+    /** The CNES of the members' links when they all agree, else {@code null}. */
+    private static String agreedCnes(List<Subject> members) {
+        List<String> cnes =
+                members.stream().map(s -> s.link().cnes()).distinct().toList();
+        return cnes.size() == 1 ? cnes.get(0) : null;
     }
 
     IndicatorResult result(List<Subject> subjects) {

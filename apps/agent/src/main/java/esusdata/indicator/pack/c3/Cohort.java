@@ -30,8 +30,10 @@ final class Cohort {
 
     private final LocalDate firstDay;
     private final LocalDate cutoff;
+    private final TeamTypes teamTypes;
 
-    Cohort(YearMonth competencia, LocalDate cutoff) {
+    Cohort(YearMonth competencia, LocalDate cutoff, TeamTypes teamTypes) {
+        this.teamTypes = teamTypes;
         this.firstDay = competencia.atDay(1);
         this.cutoff = cutoff;
     }
@@ -78,13 +80,19 @@ final class Cohort {
         return Verdict.eligible(reason, end);
     }
 
-    /** Link and death, which do not depend on the episode's dates; {@code null} when they hold. */
+    /**
+     * Link, team type (24 b: only types 70 and 76 when the type is known) and death, which do not
+     * depend on the episode's dates; {@code null} when they hold.
+     */
     Verdict personal(PersonRecords person, RegistrationLink link, LocalDate eventDate) {
         if (C3Reasons.EXCLUIDO_OBITO.equals(link.exclusion())) {
             return Verdict.excluded(C3Reasons.EXCLUIDO_OBITO, link.since());
         }
         if (link.exclusion() != null) {
             return Verdict.excluded(link.exclusion(), eventDate);
+        }
+        if (teamTypes.outOfScope(link.ine())) {
+            return Verdict.excluded(C3Reasons.EXCLUIDO_EQUIPE_FORA_DO_ESCOPO, eventDate);
         }
         for (CanonicalPerson record : person.persons()) {
             LocalDate death = C3Dates.parse(record.deathDate());

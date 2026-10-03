@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.c3;
 
 import static esusdata.indicator.pack.c3.C3Fixtures.ACS;
+import static esusdata.indicator.pack.c3.C3Fixtures.DENTIST;
 import static esusdata.indicator.pack.c3.C3Fixtures.DOCTOR;
 import static esusdata.indicator.pack.c3.C3Fixtures.DTPA;
 import static esusdata.indicator.pack.c3.C3Fixtures.DUM;
@@ -72,7 +73,6 @@ import org.junit.jupiter.api.Test;
 class C3PracticeCasesTest {
 
     private static final String P1 = "gestante-1";
-    private static final String CONSOLIDATED = "MIP_CONSOLIDADO";
     private static final String PRENATAL_CONSULT_SIGTAP = "0301010110";
 
     // ---- A: 1st consultation up to the 12th week (AMB-C3-01) ----
@@ -115,8 +115,7 @@ class C3PracticeCasesTest {
     @Test
     void ct13_dentistConsultDoesNotCountForAButADentalEncounterMeetsK() {
         List<Record> records = withAnchorOn(dum(100));
-        records.add(
-                care(P1, dum(56)).cbo(C3Fixtures.DENTIST).ciap(PREGNANCY_CIAP).build());
+        records.add(care(P1, dum(56)).cbo(DENTIST).ciap(PREGNANCY_CIAP).build());
         records.add(dental(P1, dum(56)));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
         assertNotMet(practice(outcome, "A"));
@@ -237,9 +236,12 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct25_aConsolidatedProcedureDoesNotCount() {
-        List<Record> records = measuredConsults(6, true, false);
-        records.add(procedure(P1, dum(250), C3Codes.BLOOD_PRESSURE_SIGTAP, PERFORMED, CONSOLIDATED, NURSE));
+    void ct25_aBloodPressureProcedureOutsideTheMipDoesNotCount() {
+        // integration review B6: only the MIP procedure counts; the MIAO never
+        List<Record> records = withAnchorOn(dum(56));
+        for (int i = 0; i < 7; i++) {
+            records.add(procedure(P1, dum(100 + i), C3Codes.BLOOD_PRESSURE_SIGTAP, PERFORMED, "MIAO", DENTIST));
+        }
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
         assertNotMet(practice(outcome, "C"));
         assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
@@ -302,8 +304,8 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void amb19_aCollectiveActivityWithTheFichaPracticeCodeIsAmbiguousForD() {
-        // the ficha's "Práticas em Saúde 01" has no documented LEDI code (capacidades-dw-v2 §3.7)
+    void amb19_theFichaNumberingIsNotALediPracticeCode() {
+        // the ficha's "01" is LEDI 20 (capacidades-dw-v2 §3.7): "01" itself matches only the activity
         List<Record> records = measuredConsults(6, false, true);
         records.add(collectiveActivity(P1, dum(250), NURSE, "05", "01"));
         assertAmbiguous(practice(computeNovember(new C3Pack(), records), "D"), "19");
@@ -311,10 +313,10 @@ class C3PracticeCasesTest {
 
     @Test
     void amb19_activityCodesWithoutLeadingZeroAreTheSameCodes() {
-        // activity "6" is the ficha's "06": the record counts, as AMB-C3-19 (practice not mapped)
+        // activity "6" is the ficha's "06"; LEDI 20 is the ficha's antropometria (01): the pair counts
         List<Record> records = measuredConsults(6, false, true);
-        records.add(collectiveActivity(P1, dum(250), NURSE, "6", "1"));
-        assertAmbiguous(practice(computeNovember(new C3Pack(), records), "D"), "19");
+        records.add(collectiveActivity(P1, dum(250), NURSE, "6", "20"));
+        assertMet(practice(computeNovember(new C3Pack(), records), "D"), 9);
     }
 
     @Test
@@ -447,10 +449,12 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void amb17_aTranscriptionWithoutDateIsAmbiguous() {
+    void amb17_aDoseWithoutApplicationDateIsNotRead() {
+        // integration review M5: the application date is the capability's scope column; a record
+        // without it cannot occur and is not counted
         RuleOutcome outcome =
                 computeNovember(new C3Pack(), withDose(dose(P1, null, DTPA, NURSE, true, LocalDate.of(2025, 11, 5))));
-        assertAmbiguous(practice(outcome, "F"), "17");
+        assertNotMet(practice(outcome, "F"));
     }
 
     @Test
@@ -654,14 +658,12 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct59_anOralHealthCollectiveActivityIsAmbiguousUntilThePracticeCodesAreMapped() {
-        // CT-C3-59 meets K once the ficha's "Práticas em Saúde 02/04" have a documented LEDI code;
-        // until then the activity code alone leaves K undecided (AMB-C3-19)
+    void ct59_anOralHealthCollectiveActivityMeetsK() {
+        // "Práticas em Saúde 02" (flúor) is LEDI 2 (capacidades-dw-v2 §3.7)
         List<Record> records = withAnchorOn(dum(56));
         records.add(collectiveActivity(P1, dum(140), ORAL_HEALTH_TECHNICIAN, "05", "02"));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "K"), "19");
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        assertMet(practice(outcome, "K"), 9);
     }
 
     @Test

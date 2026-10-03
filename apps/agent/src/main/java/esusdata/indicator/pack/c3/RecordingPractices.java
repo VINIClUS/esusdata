@@ -6,8 +6,10 @@ import esusdata.indicator.model.CanonicalMeasurement;
 import esusdata.indicator.model.CanonicalProcedureEvent;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -28,21 +30,26 @@ final class RecordingPractices {
     static PracticeOutcome bloodPressure(PersonRecords person, GestationWindow window) {
         CboRule rule = CboRule.BLOOD_PRESSURE;
         List<DayTally.DayItem> items = new ArrayList<>();
+        Set<LocalDate> fieldDays = new HashSet<>();
         for (CanonicalCareEvent event : person.individualCare()) {
             if (both(event.systolicMmhg(), event.diastolicMmhg()) && rule.accepts(event.cbo())) {
                 add(items, window, EventRef.of(event), rule.ambiguityOf(event.cbo()));
+                fieldDays.add(C3Dates.parse(event.careDate()));
             }
         }
         for (CanonicalMeasurement measurement : person.measurements()) {
             if (both(measurement.systolicMmhg(), measurement.diastolicMmhg()) && rule.accepts(measurement.cbo())) {
                 measuredPressure(items, window, measurement);
+                fieldDays.add(C3Dates.parse(measurement.measuredDate()));
             }
         }
         for (CanonicalProcedureEvent procedure : person.procedures()) {
-            if (Procedures.counts(procedure)
+            EventRef event = EventRef.of(procedure);
+            if (Procedures.fromMip(procedure)
                     && C3Codes.BLOOD_PRESSURE_SIGTAP.equals(Procedures.sigtap(procedure))
-                    && rule.accepts(procedure.cbo())) {
-                add(items, window, EventRef.of(procedure), rule.ambiguityOf(procedure.cbo()));
+                    && rule.accepts(procedure.cbo())
+                    && !fieldDays.contains(event.date())) {
+                add(items, window, event, rule.ambiguityOf(procedure.cbo()));
             }
         }
         return Tally.decide(SEVEN, DayTally.marks(items, Ambiguity.AMB_C3_14));
@@ -81,7 +88,7 @@ final class RecordingPractices {
             }
         }
         for (CanonicalProcedureEvent procedure : person.procedures()) {
-            if (Procedures.counts(procedure)) {
+            if (Procedures.fromMip(procedure)) {
                 measures.procedure(EventRef.of(procedure), Procedures.sigtap(procedure));
             }
         }
@@ -98,8 +105,9 @@ final class RecordingPractices {
         return present(first) && present(second);
     }
 
+    /** A measured value counts only as a decimal greater than zero. */
     static boolean present(String value) {
-        return value != null && !value.isBlank();
+        return C3Codes.positive(value);
     }
 
     /** The weights, heights and undecided pairs of the pregnancy, by day (Quadro 04). */
@@ -108,6 +116,8 @@ final class RecordingPractices {
         private final SortedMap<LocalDate, List<EventRef>> weights = new TreeMap<>();
         private final SortedMap<LocalDate, List<EventRef>> heights = new TreeMap<>();
         private final SortedMap<LocalDate, List<Support>> undecided = new TreeMap<>();
+        private final Set<LocalDate> fieldWeights = new HashSet<>();
+        private final Set<LocalDate> fieldHeights = new HashSet<>();
 
         Measures(GestationWindow window) {
             this.window = window;
@@ -119,20 +129,32 @@ final class RecordingPractices {
             }
             if (present(weight)) {
                 put(weights, event);
+                fieldWeights.add(event.date());
             }
             if (present(height)) {
                 put(heights, event);
+                fieldHeights.add(event.date());
             }
         }
 
+        /**
+         * A MIP measurement procedure; on a day whose field already has the same measure it is the
+         * same act and adds nothing (call after every field value).
+         */
         void procedure(EventRef event, String sigtap) {
-            if (!C3Codes.ANTHROPOMETRY_CBO.matches(event.cbo())) {
+            boolean weighed = fieldWeights.contains(event.date());
+            boolean measured = fieldHeights.contains(event.date());
+            if (!C3Codes.ANTHROPOMETRY_CBO.matches(event.cbo()) || (weighed && measured)) {
                 return;
             }
             switch (sigtap) {
-                case C3Codes.WEIGHT_SIGTAP -> put(weights, event);
-                case C3Codes.HEIGHT_SIGTAP -> put(heights, event);
-                case C3Codes.ANTHROPOMETRIC_EVALUATION_SIGTAP -> undecided(event, Ambiguity.AMB_C3_15);
+                case C3Codes.WEIGHT_SIGTAP -> putUnless(weighed, weights, event);
+                case C3Codes.HEIGHT_SIGTAP -> putUnless(measured, heights, event);
+                case C3Codes.ANTHROPOMETRIC_EVALUATION_SIGTAP -> {
+                    if (!weighed && !measured) {
+                        undecided(event, Ambiguity.AMB_C3_15);
+                    }
+                }
                 default -> {
                     // not an anthropometry code
                 }
@@ -164,6 +186,12 @@ final class RecordingPractices {
                 }
             }
             return items;
+        }
+
+        private void putUnless(boolean already, SortedMap<LocalDate, List<EventRef>> byDay, EventRef event) {
+            if (!already) {
+                put(byDay, event);
+            }
         }
 
         private void put(SortedMap<LocalDate, List<EventRef>> byDay, EventRef event) {

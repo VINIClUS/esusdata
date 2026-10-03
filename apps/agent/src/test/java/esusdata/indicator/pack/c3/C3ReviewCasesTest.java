@@ -233,7 +233,8 @@ class C3ReviewCasesTest {
     // ---- M6: deduplication by whole record ----
 
     private static CanonicalHomeVisit visitWithRef(SourceRef ref, LocalDate date) {
-        return new CanonicalHomeVisit(ref, IBGE, P1, date.toString(), ACS, CNES, INE, "1", List.of(), null, null);
+        return new CanonicalHomeVisit(
+                ref, IBGE, P1, date.toString(), ACS, CNES, INE, "1", List.of("ACOMP_GESTANTE"), null, null);
     }
 
     @Test
@@ -330,10 +331,13 @@ class C3ReviewCasesTest {
     }
 
     @Test
-    void minor4_resolvedLpcPregnancyMatchingOnlyByPrefixIsAmbiguous() {
+    void b3_aResolvedPregnancyCodeOtherThanW78DoesNotEndThePregnancy() {
+        // integration review B3 (replaces the AMB-C3-08 prefix path): only W78 resolved is the outcome
         List<Record> records = pregnancy(P1, DUM);
         records.add(condition(P1, "CID10", "O26.8", dum(56), "2", dum(200)));
-        assertThat(episodeRow(compute(records), EP1).reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_08");
+        EvidenceItem row = episodeRow(compute(records), EP1);
+        assertThat(row.reasonCode()).isEqualTo("ELEGIVEL_DATA_SUBSTITUTIVA_294D");
+        assertThat(row.eventDate()).isEqualTo(SUBSTITUTE_END.toString());
     }
 
     @Test
@@ -455,7 +459,7 @@ class C3ReviewCasesTest {
         records.add(registrationVersion(
                 P1, LINKED_ON, INE, new SourceRef("pec", "tb_fat_cad_individual", "1"), false, false, true));
         records.add(anchor(P1, dum(56), DUM));
-        assertThat(episodeRow(compute(records), EP1).reasonCode()).isEqualTo("SEM_VINCULO");
+        assertThat(episodeRow(compute(records), EP1).reasonCode()).isEqualTo("EXCLUIDO_SEM_VINCULO");
     }
 
     @Test
@@ -475,15 +479,15 @@ class C3ReviewCasesTest {
         records.add(person(P1, null));
         records.add(registration(P1, LocalDate.of(2025, 12, 5), INE, null));
         records.add(anchor(P1, dum(56), DUM));
-        assertThat(episodeRow(compute(records), EP1).reasonCode()).isEqualTo("SEM_VINCULO");
+        assertThat(episodeRow(compute(records), EP1).reasonCode()).isEqualTo("EXCLUIDO_SEM_VINCULO");
     }
 
     @Test
-    void teamTypeObservedWithoutDateCounts() {
+    void teamTypeObservedWithoutDateProvesNothing() {
+        // integration review I5: an observation without a date does not prove the type
         List<Record> records = pregnancy(P1, DUM);
         records.add(team(INE, "76", null));
-        EvidenceItem e = practice(compute(records), EP1, "E");
-        assertThat(e.decision()).isEqualTo(EvidenceDecision.PRACTICE_EXEMPT);
+        assertNotMet(practice(compute(records), EP1, "E"));
     }
 
     @Test
@@ -511,8 +515,8 @@ class C3ReviewCasesTest {
         for (int i = 0; i < 6; i++) {
             records.add(bloodPressure(P1, dum(101 + i), NURSE));
         }
-        records.add(collectivePressure(P1, dum(120), "05", "01"));
-        assertAmbiguous(practice(compute(records), EP1, "C"), "19");
+        records.add(collectivePressure(P1, dum(120), "05", "20")); // LEDI 20 = antropometria (ficha 01)
+        assertMet(practice(compute(records), EP1, "C"), 9);
     }
 
     @Test
@@ -546,9 +550,8 @@ class C3ReviewCasesTest {
     @Test
     void unmappedPuerperalCiapIsNotACertainPuerperalConsultation() {
         List<Record> records = pregnancy(P1, DUM);
-        records.add(care(P1, SUBSTITUTE_END.plusDays(10))
-                .ciap(C3Codes.PUERPERIUM_CIAP_UNMAPPED.get(0))
-                .build());
+        records.add(care(P1, SUBSTITUTE_END.plusDays(10)).ciap("48").build());
+        assertThat(C3Codes.PUERPERIUM_CIAP).doesNotContain("48", "49");
         assertAmbiguous(practice(compute(records), EP1, "I"), "11");
     }
 

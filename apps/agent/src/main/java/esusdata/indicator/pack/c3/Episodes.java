@@ -28,10 +28,7 @@ final class Episodes {
 
     static List<Episode> of(PersonRecords person) {
         NavigableMap<LocalDate, EventRef> candidates = candidates(person.individualCare());
-        Ends ends = new Ends(
-                outcomeDates(person.outcomes()),
-                resolutionDates(person.conditions(), CodeMatch.EXACT),
-                resolutionDates(person.conditions(), CodeMatch.PREFIX));
+        Ends ends = new Ends(outcomeDates(person.outcomes()), resolutionDates(person.conditions()));
         List<Episode> episodes = new ArrayList<>();
         while (!candidates.isEmpty()) {
             LocalDate first = candidates.firstKey();
@@ -53,9 +50,8 @@ final class Episodes {
         return episodes;
     }
 
-    /** The dates that can end a pregnancy: recorded outcomes and LPC resolutions (exact, prefix). */
-    private record Ends(
-            NavigableSet<LocalDate> outcomes, NavigableSet<LocalDate> resolutions, NavigableSet<LocalDate> prefixed) {
+    /** The dates that can end a pregnancy: recorded outcomes and resolutions of W78 in the LPC. */
+    private record Ends(NavigableSet<LocalDate> outcomes, NavigableSet<LocalDate> resolutions) {
 
         /** The end D by precedence: recorded outcome, LPC resolution, DUM + 294 (EMENDA 1). */
         GestationWindow window(LocalDate dum) {
@@ -72,20 +68,15 @@ final class Episodes {
         /**
          * AMB-C3-05: without an outcome recorded in {@code (c0, c0 + 294]}, one recorded in {@code
          * (c0 + 294, c0 + 336]} — whatever the end used — or, on the substitute end, a late LPC
-         * resolution; AMB-C3-08: on the substitute end, an LPC resolution matching only by prefix.
+         * resolution.
          */
         Ambiguity ambiguity(GestationWindow primary) {
             LocalDate limit = primary.dum().plusDays(GestationWindow.MAX_PREGNANCY_DAYS);
-            boolean substitute = primary.endSource() == GestationWindow.EndSource.SUBSTITUTE_294;
             boolean lateOutcome = primary.endSource() != GestationWindow.EndSource.RECORDED_OUTCOME
                     && within(outcomes, limit, GestationWindow.PUERPERIUM_DAYS) != null;
-            boolean lateResolution = substitute && within(resolutions, limit, GestationWindow.PUERPERIUM_DAYS) != null;
-            if (lateOutcome || lateResolution) {
-                return Ambiguity.AMB_C3_05;
-            }
-            boolean prefixOnly =
-                    substitute && within(prefixed, primary.dum(), GestationWindow.MAX_PREGNANCY_DAYS) != null;
-            return prefixOnly ? Ambiguity.AMB_C3_08 : null;
+            boolean lateResolution = primary.endSource() == GestationWindow.EndSource.SUBSTITUTE_294
+                    && within(resolutions, limit, GestationWindow.PUERPERIUM_DAYS) != null;
+            return lateOutcome || lateResolution ? Ambiguity.AMB_C3_05 : null;
         }
     }
 
@@ -123,7 +114,11 @@ final class Episodes {
         if (careDate == null || weeks == null || !WEEKS.matcher(weeks.strip()).matches()) {
             return null;
         }
-        return careDate.minusDays((long) DAYS_PER_WEEK * Integer.parseInt(weeks.strip()));
+        int value = Integer.parseInt(weeks.strip());
+        if (value < 1 || value > C3Codes.MAX_GESTATIONAL_WEEKS) {
+            return null; // LEDI accepts 1 to 42 weeks
+        }
+        return careDate.minusDays((long) DAYS_PER_WEEK * value);
     }
 
     private static EventRef earlier(EventRef a, EventRef b) {
@@ -142,15 +137,17 @@ final class Episodes {
     }
 
     /**
-     * The resolution dates of pregnancy conditions (24 f) marked resolved in the LPC, whose code
-     * matches as {@code match}: the PEC writes the outcome date there (gap L2).
+     * The resolution dates of the pregnancy condition W78 (CIAP-2, exact) marked resolved in the
+     * LPC: the PEC resolves it on the outcome (guia T3, manual do PEC; gap L2). Other 24 f codes
+     * resolved do not end the pregnancy.
      */
-    private static NavigableSet<LocalDate> resolutionDates(List<CanonicalCondition> conditions, CodeMatch match) {
+    private static NavigableSet<LocalDate> resolutionDates(List<CanonicalCondition> conditions) {
         NavigableSet<LocalDate> dates = new TreeSet<>();
         for (CanonicalCondition condition : conditions) {
             LocalDate date = C3Dates.parse(condition.resolvedDate());
-            boolean matches = CodeMatch.of(condition, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID) == match;
-            if (date != null && matches && C3Codes.resolved(condition)) {
+            boolean pregnancy = CodeMatch.CIAP2.equals(C3Codes.token(condition.codeSystem()))
+                    && C3Codes.PREGNANCY_CONDITION_CIAP.equals(C3Codes.normalized(condition.code()));
+            if (date != null && pregnancy && C3Codes.resolved(condition)) {
                 dates.add(date);
             }
         }

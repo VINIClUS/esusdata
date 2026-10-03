@@ -31,11 +31,16 @@ class MiacMatchTest {
     }
 
     @Test
-    void theFichaPracticesHaveNoLediCodeYet() {
-        assertThat(C3Codes.MIAC_PRACTICES).isEmpty();
-        assertThat(C3Codes.MIAC_PRACTICES_ANTHROPOMETRY).isEmpty();
-        assertThat(C3Codes.MIAC_PRACTICES_ORAL_HEALTH).isEmpty();
+    void theFichaPracticesAreReadAsLediCodes() {
+        // ficha 01 antropometria = LEDI 20, 02 flúor = 2, 04 escovação = 9 (capacidades-dw-v2 §3.7)
+        assertThat(C3Codes.MIAC_PRACTICES).containsExactly("20", "2", "9");
+        assertThat(C3Codes.MIAC_PRACTICES_ANTHROPOMETRY).containsExactly("20");
+        assertThat(C3Codes.MIAC_PRACTICES_ORAL_HEALTH).containsExactly("2", "9");
         assertThat(MiacMatch.of(activity("05", "02"), C3Codes.MIAC_PRACTICES_ORAL_HEALTH))
+                .isEqualTo(MiacMatch.BOTH);
+        assertThat(MiacMatch.of(activity("05", "01"), C3Codes.MIAC_PRACTICES_ANTHROPOMETRY))
+                .isEqualTo(MiacMatch.ONE);
+        assertThat(MiacMatch.of(activity("4", "20"), C3Codes.MIAC_PRACTICES_ANTHROPOMETRY))
                 .isEqualTo(MiacMatch.ONE);
     }
 }

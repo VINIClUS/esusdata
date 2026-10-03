@@ -2,6 +2,7 @@ package esusdata.indicator.pack.c3;
 
 import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CboGroups;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -38,9 +39,6 @@ final class C3Codes {
     static final List<String> PUERPERIUM_CIAP =
             List.of("P29", "W18", "W19", "W70", "W90", "W91", "W92", "W93", "W94", "W95", "W96");
 
-    /** The two items of the CIAP-2 puerperium list that are not CIAP-2 codes (AMB-C3-09). */
-    static final List<String> PUERPERIUM_CIAP_UNMAPPED = List.of("48", "49");
-
     static final List<String> PUERPERIUM_CID = cid(
             "F53", "F53.0", "F53.1", "F53.8", "F53.9", "M83.0", "O10", "O15.2", "O26.6", "O72.2", "O72.3", "O85", "O86",
             "O87", "O90", "O91", "O92", "O94", "O98", "O99", "Z37.0", "Z37.1", "Z37.2", "Z37.3", "Z37.4", "Z37.5",
@@ -57,10 +55,14 @@ final class C3Codes {
     /** 24 c (p.2) and Quadro 02 (p.5): consultations of A, B and I — médicos and enfermeiros. */
     static final CboGroups CONSULT_CBO = CboGroups.of("2251", "2252", "2253", "2231", "2235");
 
-    /** Quadro 03 (p.6): blood pressure (C). Without 5151-05 (AMB-C3-14). */
+    /**
+     * Quadro 03 (p.6): blood pressure (C). Without 5151-05 (AMB-C3-14). "3224 Técnicos em Saúde
+     * Bucal" read as the TSB occupations 3224-05 and 3224-25 (dicionário do DW); another occupation
+     * of the family 3224 is AMB-C3-20.
+     */
     static final CboGroups BLOOD_PRESSURE_CBO = CboGroups.of(
             "2251", "2252", "2253", "2231", "2235", "3222", "2232", "2234", "2236", "2238", "2237", "2241", "2239",
-            "3224");
+            "3224-05", "3224-25");
 
     /** The ACS occupation the Quadro 03 leaves out while accepting the MIVDT (AMB-C3-14 (i)). */
     static final CboGroups ACS_CBO = CboGroups.of("5151-05");
@@ -90,8 +92,14 @@ final class C3Codes {
     /** The Quadro 07 CBO outside the 24 c consultation list: their MIAI records are AMB-C3-18 (iv). */
     static final CboGroups TEST_CBO_OUTSIDE_CONSULT = CboGroups.of("2234", "3222");
 
-    /** Quadro 08 (p.8): oral health (K) — cirurgião-dentista and TSB. */
-    static final CboGroups DENTAL_CBO = CboGroups.of("2232", "3224");
+    /**
+     * Quadro 08 (p.8): oral health (K) — cirurgião-dentista and TSB, the TSB read as the
+     * occupations 3224-05 (TSB) and 3224-25 (TSB da ESF) of the DW dictionary.
+     */
+    static final CboGroups DENTAL_CBO = CboGroups.of("2232", "3224-05", "3224-25");
+
+    /** The family 3224 (ASB, protético …): only "talvez" for C and K (AMB-C3-20). */
+    static final CboGroups ORAL_HEALTH_FAMILY = CboGroups.of("3224");
 
     // ---- SIGTAP (24 h, p.3–4; Quadros 03, 04 e 07), digits only ----
 
@@ -157,20 +165,20 @@ final class C3Codes {
 
     /*
      * "Práticas em Saúde" — 24 e: "códigos 01, 02, 04"; Quadro 04 (p.7, D): "código 01"; Quadro 08
-     * (p.8, K): "códigos 02 e 04". The ficha's numbering is not the LEDI PraticasEmSaude the DW
-     * returns (LEDI has no 1 nor 4; 2 is "aplicação tópica de flúor"; docs/discovery/capacidades-dw-v2.md
-     * §3.7), and no document maps one onto the other. Until a mapping is documented the lists below,
-     * in LEDI codes, stay empty: a MIAC with activity 05/06 is then only "talvez" (AMB-C3-19).
+     * (p.8, K): "códigos 02 e 04". The ficha numbers them as the FAC/CDS form does; the DW returns
+     * LEDI PraticasEmSaude codes. Declared reading (AMB-C3-19; docs/discovery/capacidades-dw-v2.md
+     * §3.7): 01 antropometria → LEDI 20, 02 aplicação tópica de flúor → LEDI 2, 04 escovação dental
+     * supervisionada → LEDI 9.
      */
 
-    /** LEDI codes of the 24 e practices (01, 02, 04), used for C: none documented. */
-    static final List<String> MIAC_PRACTICES = List.of();
+    /** LEDI codes of the 24 e practices (01, 02, 04), used for C. */
+    static final List<String> MIAC_PRACTICES = List.of("20", "2", "9");
 
-    /** LEDI codes of the Quadro 04 practice (01), used for D: none documented. */
-    static final List<String> MIAC_PRACTICES_ANTHROPOMETRY = List.of();
+    /** LEDI code of the Quadro 04 practice (01, antropometria), used for D. */
+    static final List<String> MIAC_PRACTICES_ANTHROPOMETRY = List.of("20");
 
-    /** LEDI codes of the Quadro 08 practices (02, 04), used for K: none documented. */
-    static final List<String> MIAC_PRACTICES_ORAL_HEALTH = List.of();
+    /** LEDI codes of the Quadro 08 practices (02, 04), used for K. */
+    static final List<String> MIAC_PRACTICES_ORAL_HEALTH = List.of("2", "9");
 
     // ---- Lista de problemas e condições (LPC) ----
 
@@ -197,6 +205,15 @@ final class C3Codes {
     /** CNES team type 76, eAP: E and J "consideram a pontuação integral" (24 b). */
     static final String EAP_TEAM_TYPE = "76";
 
+    /** CNES team types 70 (eSF) and 76 (eAP): the teams the ficha considers (24 b). */
+    static final List<String> TEAM_TYPES_IN_SCOPE = List.of("70", EAP_TEAM_TYPE);
+
+    /** The pregnancy condition the PEC resolves on the outcome (guia T3, manual do PEC). */
+    static final String PREGNANCY_CONDITION_CIAP = "W78";
+
+    /** The largest gestational age LEDI accepts, in weeks. */
+    static final int MAX_GESTATIONAL_WEEKS = 42;
+
     // ---- Saída do cadastro (item 15, p.1–2; LEDI MotivoSaida, dicionário do DW) ----
 
     /** LEDI {@code MotivoSaida} 135 — Óbito. */
@@ -220,6 +237,18 @@ final class C3Codes {
     /** True when the LPC condition is active or latent ("0", "1"); an unknown status is not. */
     static boolean active(CanonicalCondition condition) {
         return CONDITION_ACTIVE.contains(token(condition.status()));
+    }
+
+    /** True when the value parses as a decimal greater than zero (§1.7.1; never a {@code double}). */
+    static boolean positive(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        try {
+            return new BigDecimal(value.strip()).signum() > 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     /** True when a LEDI code is in the list, "5" and "05" being the same code. */

@@ -4,7 +4,7 @@ import esusdata.indicator.model.CanonicalProcedureEvent;
 
 /**
  * What the Quadros accept of a procedure event: performed or evaluated, never only requested
- * (CT-C3-47), and never the consolidated procedure record (Quadros 03, 04, 07 e 08).
+ * (CT-C3-47). The consolidated procedure record (Quadros 03, 04, 07 e 08) never reaches the rule.
  */
 final class Procedures {
 
@@ -13,10 +13,10 @@ final class Procedures {
 
     private Procedures() {}
 
-    /** Performed or evaluated, and not consolidated. */
+    /** Performed or evaluated (the consolidated record never reaches the rule). */
     static boolean counts(CanonicalProcedureEvent event) {
         String stage = C3Codes.token(event.stage());
-        return (PERFORMED.equals(stage) || EVALUATED.equals(stage)) && !consolidated(event);
+        return PERFORMED.equals(stage) || EVALUATED.equals(stage);
     }
 
     /** Counts, and came from the MIP. */
@@ -36,9 +36,5 @@ final class Procedures {
 
     static String digits(String code) {
         return code == null ? "" : code.replaceAll("\\D", "");
-    }
-
-    private static boolean consolidated(CanonicalProcedureEvent event) {
-        return C3Codes.token(event.origin()).contains("CONSOLIDADO");
     }
 }

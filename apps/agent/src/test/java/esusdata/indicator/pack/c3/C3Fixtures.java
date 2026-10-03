@@ -183,7 +183,7 @@ final class C3Fixtures {
                 CNES,
                 INE,
                 outcomeCode,
-                List.of("1"),
+                List.of("ACOMP_GESTANTE"),
                 weightKg,
                 heightCm);
     }

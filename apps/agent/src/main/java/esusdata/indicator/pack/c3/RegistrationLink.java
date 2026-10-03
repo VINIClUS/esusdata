@@ -9,7 +9,7 @@ import java.util.List;
  * The person's link at the cutoff, approximated by the local individual registration (item 14;
  * the national rule of NT 30/2025 is applied by the SIAPS — limitation L8): the most recent version
  * dated up to the cutoff, ignoring simplified and inactive ones (§1.7.3). {@code exclusion} is the
- * reason code when the link does not hold; {@code ine == null} means no team; {@code since} is the
+ * reason code when the link does not hold — a version without a team (INE) is no link; {@code since} is the
  * date of the version used (the date of an exit for death, 135).
  */
 record RegistrationLink(String exclusion, String cnes, String ine, LocalDate since) {
@@ -26,8 +26,10 @@ record RegistrationLink(String exclusion, String cnes, String ine, LocalDate sin
                 })
                 .max(RECENCY)
                 .orElse(null);
-        if (current == null || Boolean.TRUE.equals(current.refused())) {
-            return new RegistrationLink(C3Reasons.SEM_VINCULO, null, null, null);
+        if (current == null
+                || Boolean.TRUE.equals(current.refused())
+                || C3Codes.token(current.ine()).isEmpty()) {
+            return new RegistrationLink(C3Reasons.EXCLUIDO_SEM_VINCULO, null, null, null);
         }
         String exit = C3Codes.token(current.exitReason());
         String exclusion = null;

@@ -372,15 +372,17 @@ class C3PackTest {
 
         RuleOutcome computed = pack.compute(dataset(NOVEMBER, records), context(NOVEMBER));
         assertThat(computed.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
-        assertThat(computed.result().valueExact()).isEqualByComparingTo(ExactRatio.of(100, 3));
-        assertThat(computed.result().valueText()).isEqualTo("33.3333");
+        // P3's registration has no INE: no link (integration review B2), so two eligible episodes
+        assertThat(episodeRow(computed, episodeKey(P3, DUM)).reasonCode()).isEqualTo("EXCLUIDO_SEM_VINCULO");
+        assertThat(computed.result().valueExact()).isEqualByComparingTo(ExactRatio.of(100, 2));
+        assertThat(computed.result().valueText()).isEqualTo("50.0000");
         assertThat(computed.result().classification()).isEqualTo(Classification.SUFICIENTE);
 
         RuleOutcome outcome = pack.evaluate(dataset(NOVEMBER, records), context(NOVEMBER));
         IndicatorResult result = outcome.result();
         assertThat(result.status()).isEqualTo(IndicatorStatus.BLOCKED);
         assertThat(result.numerator()).isEqualTo(HUNDRED);
-        assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(3));
+        assertThat(result.denominator()).isEqualTo(BigInteger.TWO);
         assertThat(result.valueText()).isNull();
         assertThat(result.valueExact()).isNull();
         assertThat(result.classification()).isNull();
@@ -395,10 +397,10 @@ class C3PackTest {
                 .containsExactly("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K");
         assertThat(result.components()).allSatisfy(c -> {
             assertThat(c.numerator()).isEqualTo(BigInteger.ONE);
-            assertThat(c.denominator()).isEqualTo(BigInteger.valueOf(3));
+            assertThat(c.denominator()).isEqualTo(BigInteger.TWO);
         });
 
-        assertThat(outcome.teams()).extracting(TeamResult::ine).containsExactly(INE, OTHER_INE, null);
+        assertThat(outcome.teams()).extracting(TeamResult::ine).containsExactly(INE, OTHER_INE);
         TeamResult first = outcome.teams().get(0);
         assertThat(first.cnes()).isEqualTo(CNES);
         assertThat(first.result().status()).isEqualTo(IndicatorStatus.BLOCKED);
@@ -406,7 +408,6 @@ class C3PackTest {
         assertThat(first.result().denominator()).isEqualTo(BigInteger.ONE);
         assertThat(outcome.teams().get(1).result().numerator()).isEqualTo(BigInteger.ZERO);
         assertThat(outcome.teams().get(1).result().denominator()).isEqualTo(BigInteger.ONE);
-        assertThat(outcome.teams().get(2).result().denominator()).isEqualTo(BigInteger.ONE);
         assertThat(outcome.teams())
                 .allSatisfy(t -> assertThat(t.result().valueText()).isNull());
     }
@@ -451,7 +452,7 @@ class C3PackTest {
                 .toList();
         assertThat(episodes).hasSize(5);
         assertThat(episodeRow(outcome, episodeKey(P1, DUM)).reasonCode()).isEqualTo("ELEGIVEL_DATA_SUBSTITUTIVA_294D");
-        assertExcluded(outcome, P2, "SEM_VINCULO");
+        assertExcluded(outcome, P2, "EXCLUIDO_SEM_VINCULO");
         assertExcluded(outcome, P3, "INTERROMPIDO_MUDANCA_TERRITORIO");
         assertExcluded(outcome, P4, "EXCLUIDO_OBITO");
         assertExcluded(outcome, P5, "EXCLUIDO_ABORTO");

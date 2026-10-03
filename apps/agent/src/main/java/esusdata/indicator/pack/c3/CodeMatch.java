@@ -14,7 +14,7 @@ enum CodeMatch {
     PREFIX,
     NONE;
 
-    private static final String CIAP2 = "CIAP2";
+    static final String CIAP2 = "CIAP2";
     private static final String CID10 = "CID10";
 
     /** The best match of any of the event's codes against the two lists. */

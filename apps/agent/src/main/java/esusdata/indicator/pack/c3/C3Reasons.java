@@ -9,7 +9,8 @@ final class C3Reasons {
 
     // ---- cohort ----
 
-    static final String SEM_VINCULO = "SEM_VINCULO";
+    static final String EXCLUIDO_SEM_VINCULO = "EXCLUIDO_SEM_VINCULO";
+    static final String EXCLUIDO_EQUIPE_FORA_DO_ESCOPO = "EXCLUIDO_EQUIPE_FORA_DO_ESCOPO";
     static final String INTERROMPIDO_MUDANCA_TERRITORIO = "INTERROMPIDO_MUDANCA_TERRITORIO";
     static final String EXCLUIDO_OBITO = "EXCLUIDO_OBITO";
     static final String EXCLUIDO_ABORTO = "EXCLUIDO_ABORTO";

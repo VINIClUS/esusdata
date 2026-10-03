@@ -190,10 +190,11 @@ public final class C3Pack implements IndicatorRule {
         }
         LocalDate cutoff = context.dataCutoff();
         SortedMap<String, PersonRecords> people = RecordIndex.of(data, context.municipalityIbge());
+        TeamTypes teamTypes = new TeamTypes(data.teams(), cutoff);
         Subjects builder = new Subjects(
-                new Cohort(context.competencia(), cutoff),
+                new Cohort(context.competencia(), cutoff, teamTypes),
                 new PracticeEvaluator(convention),
-                new TeamTypes(data.teams(), cutoff),
+                teamTypes,
                 cutoff);
         SortedMap<String, Subject> byKey = new TreeMap<>();
         for (PersonRecords person : people.values()) {
@@ -203,7 +204,7 @@ public final class C3Pack implements IndicatorRule {
         }
         List<Subject> subjects = List.copyOf(byKey.values());
         PracticeWeights weights = new PracticeWeights(DESCRIPTOR.components());
-        C3Results results = new C3Results(DESCRIPTOR, context, weights);
+        C3Results results = new C3Results(DESCRIPTOR, context, weights, teamTypes);
         EvidenceRows rows = new EvidenceRows(weights);
         List<EvidenceItem> evidence = new ArrayList<>();
         subjects.forEach(s -> evidence.addAll(rows.of(s)));

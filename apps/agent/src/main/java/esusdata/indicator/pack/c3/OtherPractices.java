@@ -25,12 +25,11 @@ final class OtherPractices {
 
     /**
      * F: a dose of "57" is certain in {@code [DUM + 140, D)} by a listed CBO; "talvez" in {@code
-     * DUM + 133..139} (AMB-C3-01), in {@code [D, D + 42]} from DUM + 133 on (AMB-C3-17 (i)),
-     * without a date (AMB-C3-17 (ii)) or by a CBO outside the lists (AMB-C3-13). Before DUM + 133
-     * it never counts, even after an early D.
+     * DUM + 133..139} (AMB-C3-01), in {@code [D, D + 42]} from DUM + 133 on (AMB-C3-17 (i)) or by
+     * a CBO outside the lists (AMB-C3-13). Before DUM + 133 it never counts, even after an early D.
+     * The application date is the capability's scope column, never missing (EMENDA 1).
      */
     static PracticeOutcome dtpa(PersonRecords person, GestationWindow window) {
-        List<TallyMark> marks = new ArrayList<>();
         SortedMap<LocalDate, TallyMark> byDate = new TreeMap<>();
         for (CanonicalImmunization dose : person.immunizations()) {
             TallyMark mark = C3Codes.DTPA_ADULT.equals(C3Codes.token(dose.immunobiologicalCode()))
@@ -39,15 +38,9 @@ final class OtherPractices {
             if (mark == null) {
                 continue;
             }
-            LocalDate date = mark.events().get(0).date();
-            if (date == null) {
-                marks.add(mark);
-            } else {
-                byDate.merge(date, mark, OtherPractices::sameDose);
-            }
+            byDate.merge(mark.events().get(0).date(), mark, OtherPractices::sameDose);
         }
-        marks.addAll(byDate.values());
-        return Tally.decide(1, marks);
+        return Tally.decide(1, List.copyOf(byDate.values()));
     }
 
     /**
@@ -63,20 +56,21 @@ final class OtherPractices {
 
     /**
      * K: an individual dental encounter (MIAOI), or a collective activity (MIAC) with activity
-     * 05/06 and practice 02/04 — only one of them being AMB-C3-19 — by a dentist or TSB during the
-     * pregnancy.
+     * 05/06 and practice flúor/escovação (LEDI 2, 9) — only one of them being AMB-C3-19 — by a
+     * dentist or TSB during the pregnancy; another occupation of the family 3224 is AMB-C3-20.
      */
     static PracticeOutcome dental(PersonRecords person, GestationWindow window) {
         List<TallyMark> marks = new ArrayList<>();
         for (CanonicalCareEvent event : person.dentalCare()) {
-            if (C3Codes.DENTAL_CBO.matches(event.cbo())) {
-                addPregnancy(marks, EventRef.of(event), null, window);
+            if (CboRule.DENTAL.accepts(event.cbo())) {
+                addPregnancy(marks, EventRef.of(event), CboRule.DENTAL.ambiguityOf(event.cbo()), window);
             }
         }
         for (CanonicalMeasurement activity : person.measurements()) {
             MiacMatch miac = MiacMatch.of(activity, C3Codes.MIAC_PRACTICES_ORAL_HEALTH);
-            if (miac.counts() && C3Codes.DENTAL_CBO.matches(activity.cbo())) {
-                addPregnancy(marks, EventRef.of(activity), miac.ambiguity(null), window);
+            if (miac.counts() && CboRule.DENTAL.accepts(activity.cbo())) {
+                Ambiguity byCbo = CboRule.DENTAL.ambiguityOf(activity.cbo());
+                addPregnancy(marks, EventRef.of(activity), miac.ambiguity(byCbo), window);
             }
         }
         return Tally.decide(1, marks);
@@ -93,7 +87,7 @@ final class OtherPractices {
     private static TallyMark dtpaMark(EventRef dose, GestationWindow window) {
         LocalDate date = dose.date();
         if (date == null) {
-            return TallyMark.of(dose, Ambiguity.AMB_C3_17);
+            return null; // guard only: the capability never returns a dose without its date
         }
         long day = window.day(date);
         if (day < DTPA_ORDINAL_FROM) {

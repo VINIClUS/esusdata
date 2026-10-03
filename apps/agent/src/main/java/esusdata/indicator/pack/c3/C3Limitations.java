@@ -21,11 +21,19 @@ final class C3Limitations {
             "O tipo de equipe não está no DW: sem tipo comprovado, a pontuação integral de E e J para eAP"
                     + " tipo 76 não é aplicada (24 b, p.2; lacuna L1; AMB-C3-13).",
             "A data de desfecho da gestação não está no DW: usa-se a data de resolução da condição de"
-                    + " gravidez na LPC (manual do PEC) e, sem ela, DUM+294 (item 17, p.2; lacuna L2; MET-21).",
+                    + " gravidez W78 na LPC (guia T3; manual do PEC) e, sem ela, DUM+294 (item 17, p.2; lacuna L2;"
+                    + " MET-21).",
             "A pressão arterial da visita domiciliar não é lida (Quadro 03, p.6; lacuna L6).",
-            "Os códigos de \"Práticas em Saúde\" da ficha (01, 02, 04) não correspondem aos códigos LEDI que"
-                    + " o DW grava e não há mapeamento documentado: o MIAC com atividade 05/06 fica"
-                    + " RULE_AMBIGUITY em C, D e K (24 e, p.3; Quadros 04 e 08; AMB-C3-19).",
+            "As \"Práticas em Saúde\" da ficha seguem a numeração da ficha CDS e são lidas como LEDI: 01"
+                    + " antropometria = 20, 02 flúor = 2, 04 escovação = 9 (leitura declarada); MIAC com só"
+                    + " uma das condições (atividade 05/06, prática) fica RULE_AMBIGUITY (24 e, p.3; Quadros 04"
+                    + " e 08; AMB-C3-19).",
+            "\"3224 Técnico em Saúde Bucal\" é lido como as ocupações 3224-05 e 3224-25; outra ocupação"
+                    + " da família 3224 fica RULE_AMBIGUITY em C e K (Quadros 03 e 08; AMB-C3-20).",
+            "Equipe sem tipo 70 ou 76 comprovado no corte exclui o episódio; cadastro sem INE não é"
+                    + " vínculo (24 b, p.2; item 14, p.1).",
+            "O mês entra na consolidação quando um episódio atinge D+42, lido como o 42º dia de puerpério;"
+                    + " a leitura D+41 mudaria o mês em alguns casos (AMB-C3-04 (ii)).",
             "Em K, procedimentos do MIP não são avaliados: a ficha não lista SIGTAP para eles (Quadro 08," + " p.8).",
             "Os códigos rápidos ABP de pré-natal e de puerpério não são enumerados pela ficha e não são"
                     + " usados (24 f, p.3; AMB-C3-10).",

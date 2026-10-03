@@ -40,7 +40,9 @@ enum Ambiguity {
     /** Tests: HTLV and MIAI records by CBO 2234/3222. */
     AMB_C3_18,
     /** MIAC with only one of the two code conditions (activity type, health practice). */
-    AMB_C3_19;
+    AMB_C3_19,
+    /** CBO granularity: another occupation of the family 3224 than the TSB (C, K). */
+    AMB_C3_20;
 
     /** The transcription's id, e.g. {@code AMB-C3-01}. */
     String id() {

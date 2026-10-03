@@ -6,8 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Practices E and J: home visits by ACS/TACS (Quadro 05, p.7), any reason and any outcome
- * (CT-C3-34). E counts visits after the 1ª consultation of the prenatal care; J, visits in the
+ * Practices E and J: home visits by ACS/TACS (Quadro 05, p.7) with some "motivo de visita"
+ * filled (Quadro 05; 24 e, p.3), any outcome (CT-C3-34). E counts visits after the 1ª consultation of the prenatal care; J, visits in the
  * puerperium.
  */
 final class VisitPractices {
@@ -31,7 +31,7 @@ final class VisitPractices {
         List<DayTally.DayItem> items = new ArrayList<>();
         for (CanonicalHomeVisit visit : person.visits()) {
             EventRef event = EventRef.of(visit);
-            if (event.date() != null && !event.date().isBefore(first.any()) && CboRule.VISIT.accepts(visit.cbo())) {
+            if (counts(visit) && !event.date().isBefore(first.any())) {
                 GestationWindow.Phase phase = window.phaseOf(event.date());
                 if (phase == GestationWindow.Phase.PREGNANCY) {
                     items.add(DayTally.DayItem.of(event, first.ambiguityOf(event, visit.cbo())));
@@ -72,12 +72,19 @@ final class VisitPractices {
         }
     }
 
+    /** A dated visit by an accepted CBO with at least one reason recorded. */
+    private static boolean counts(CanonicalHomeVisit visit) {
+        return C3Dates.parse(visit.visitDate()) != null
+                && CboRule.VISIT.accepts(visit.cbo())
+                && visit.reasonCodes().stream().anyMatch(r -> r != null && !r.isBlank());
+    }
+
     /** J: at least 1 visit during the puerperium. */
     static PracticeOutcome puerperal(PersonRecords person, GestationWindow window) {
         List<TallyMark> marks = new ArrayList<>();
         for (CanonicalHomeVisit visit : person.visits()) {
             EventRef event = EventRef.of(visit);
-            if (event.date() != null && CboRule.VISIT.accepts(visit.cbo())) {
+            if (counts(visit)) {
                 GestationWindow.Phase phase = window.phaseOf(event.date());
                 if (phase.puerperal()) {
                     marks.add(TallyMark.of(event, phase.inPuerperium(CboRule.VISIT.ambiguityOf(visit.cbo()))));

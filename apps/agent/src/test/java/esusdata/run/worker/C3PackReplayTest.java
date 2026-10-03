@@ -35,7 +35,7 @@ import org.junit.jupiter.api.io.TempDir;
  * recorded outcome, so the pregnancy ends on the substitute DUM+294 = 2025-10-22 (MET-21). She has
  * A (first consultation in week 7), F (dTpa in week 21), K (dental encounter), I (puerperal
  * consultation on D+19) and J (ACS visit on D+21): 10 + 4 × 9 = 46 points. {@code p2} has a
- * pregnancy but no registration: excluded as {@code SEM_VINCULO}, still in the evidence (ENG-36).
+ * pregnancy but no registration: excluded as {@code EXCLUIDO_SEM_VINCULO}, still in the evidence (ENG-36).
  */
 class C3PackReplayTest {
 
@@ -116,7 +116,7 @@ class C3PackReplayTest {
                 .containsExactly(
                         tuple("p1#2025-01-01", "ELIGIBLE", "ELEGIVEL_DATA_SUBSTITUTIVA_294D", "46", "2025-10-22"),
                         tuple("p1#2025-01-01", "SUPPORTING_EVENT", "MARCO_DUM", null, "2025-01-01"),
-                        tuple("p2#2025-01-01", "EXCLUDED", "SEM_VINCULO", null, "2025-10-22"));
+                        tuple("p2#2025-01-01", "EXCLUDED", "EXCLUIDO_SEM_VINCULO", null, "2025-10-22"));
         assertThat(evidence)
                 .filteredOn(row -> row.component() != null && !"SUPPORTING_EVENT".equals(row.decision()))
                 .extracting(EvidenceRecord::component, EvidenceRecord::decision, EvidenceRecord::points)
