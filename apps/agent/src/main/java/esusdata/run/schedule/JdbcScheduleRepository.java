@@ -3,7 +3,10 @@ package esusdata.run.schedule;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
-/** {@code source_schedule} (V9): one row per source, written by every tick and by the switch. */
+/**
+ * {@code source_schedule} (V9, {@code last_pack} since V10): one row per source, written by every
+ * tick and by the switch.
+ */
 public final class JdbcScheduleRepository {
 
     private static final RowMapper<ScheduleState> MAPPER = (rs, rowNum) -> new ScheduleState(
@@ -13,7 +16,8 @@ public final class JdbcScheduleRepository {
             rs.getString("last_outcome"),
             rs.getString("last_detail"),
             rs.getString("last_job_id"),
-            rs.getString("last_period"));
+            rs.getString("last_period"),
+            rs.getString("last_pack"));
 
     private final JdbcTemplate jdbc;
 
@@ -35,15 +39,16 @@ public final class JdbcScheduleRepository {
     }
 
     /** Records a tick's conclusion; never touches {@code enabled}. */
-    public void recordTick(String sourceId, String tickAt, String outcome, String detail, String jobId, String period) {
+    public void recordTick(
+            String sourceId, String tickAt, String outcome, String detail, String jobId, String period, String pack) {
         jdbc.update("""
                 INSERT INTO source_schedule (source_id, last_tick_at, last_outcome, last_detail, last_job_id,
-                    last_period)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    last_period, last_pack)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source_id) DO UPDATE SET
                     last_tick_at = excluded.last_tick_at, last_outcome = excluded.last_outcome,
                     last_detail = excluded.last_detail, last_job_id = excluded.last_job_id,
-                    last_period = excluded.last_period
-                """, sourceId, tickAt, outcome, detail, jobId, period);
+                    last_period = excluded.last_period, last_pack = excluded.last_pack
+                """, sourceId, tickAt, outcome, detail, jobId, period, pack);
     }
 }

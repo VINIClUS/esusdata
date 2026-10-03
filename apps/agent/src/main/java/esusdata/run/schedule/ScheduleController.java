@@ -8,12 +8,14 @@ import esusdata.source.SourceIsolationService;
 import esusdata.source.SourceRepository;
 import esusdata.source.model.LastCoverage;
 import esusdata.source.model.SourceRecord;
+import esusdata.source.pec.UnsupportedSourceException;
 import esusdata.web.ApiNotFoundException;
 import java.time.Instant;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,7 +26,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The Execução screen's source side (ADR 0028): what can be run and the competência scheduler.
+ * The Execução screen's source side (ADR 0028): what can be run — per pack since ADR 0030 — and the
+ * competência scheduler.
  * Every route takes {@code RUN_INDICATOR} or {@code MANAGE_SOURCE} in the source's municipality —
  * the manager runs indicators, the admin manages the source, and neither gains the other's
  * permission here: the responses are aggregates and settings, never records nor secrets. The two
@@ -38,18 +41,21 @@ public class ScheduleController {
     private final JdbcScheduleRepository scheduleRepository;
     private final CoverageScheduler scheduler;
     private final ApiAuthorization authorization;
+    private final SourcePacks sourcePacks;
 
     public ScheduleController(
             SourceRepository sourceRepository,
             ResultRepository resultRepository,
             JdbcScheduleRepository scheduleRepository,
             CoverageScheduler scheduler,
-            ApiAuthorization authorization) {
+            ApiAuthorization authorization,
+            SourcePacks sourcePacks) {
         this.sourceRepository = sourceRepository;
         this.resultRepository = resultRepository;
         this.scheduleRepository = scheduleRepository;
         this.scheduler = scheduler;
         this.authorization = authorization;
+        this.sourcePacks = sourcePacks;
     }
 
     /** Toggles one source's scheduler. */
@@ -63,11 +69,12 @@ public class ScheduleController {
         authorization.requireObjectScopeForEither(
                 session, municipalityIbge, Permission.RUN_INDICATOR, Permission.MANAGE_SOURCE);
         Map<String, LastCoverage> coverages = sourceRepository.findLastCoverages();
-        Set<String> published = new HashSet<>(resultRepository.findPublishedPeriods(municipalityIbge));
+        Map<String, List<String>> publishedPacks =
+                packsByPeriod(resultRepository.findPublishedPeriodsByPack(municipalityIbge));
         return sourceRepository.findAll().stream()
                 .filter(source -> municipalityIbge.equals(source.municipalityIbge()))
                 .filter(SourceIsolationService::canCheck)
-                .map(source -> toResponse(source, coverages.get(source.id()), published))
+                .map(source -> toResponse(source, coverages.get(source.id()), publishedPacks))
                 .toList();
     }
 
@@ -106,8 +113,14 @@ public class ScheduleController {
         return source;
     }
 
-    private RunSourceResponse toResponse(SourceRecord source, LastCoverage coverage, Set<String> published) {
+    private RunSourceResponse toResponse(
+            SourceRecord source, LastCoverage coverage, Map<String, List<String>> publishedPacks) {
         LastCoverage current = coverage != null && coverage.appliesTo(source) ? coverage : null;
+        List<SourcePacks.Availability> packs = sourcePacks.of(source);
+        List<String> computable = packs.stream()
+                .filter(SourcePacks.Availability::available)
+                .map(SourcePacks.Availability::indicatorPack)
+                .toList();
         return new RunSourceResponse(
                 source.id(),
                 source.pecVersion(),
@@ -116,12 +129,40 @@ public class ScheduleController {
                 current == null
                         ? List.of()
                         : current.periods().stream()
-                                .map(period -> new RunSourceResponse.Period(
-                                        period.referencePeriod(),
-                                        period.count(),
-                                        published.contains(period.referencePeriod())))
+                                .map(period -> period(period, computable, publishedPacks))
                                 .toList(),
+                packs.stream().map(ScheduleController::pack).toList(),
                 schedule(scheduleRepository.find(source.id())));
+    }
+
+    /** Published when every pack the source can compute is: never for a source that computes none. */
+    private static RunSourceResponse.Period period(
+            LastCoverage.PeriodCount period, List<String> computable, Map<String, List<String>> publishedPacks) {
+        List<String> published = publishedPacks.getOrDefault(period.referencePeriod(), List.of());
+        return new RunSourceResponse.Period(
+                period.referencePeriod(),
+                period.count(),
+                !computable.isEmpty() && published.containsAll(computable),
+                published);
+    }
+
+    private static RunSourceResponse.Pack pack(SourcePacks.Availability availability) {
+        return new RunSourceResponse.Pack(
+                availability.indicatorPack(),
+                availability.rule().descriptor().ruleVersion(),
+                availability.available() ? "AVAILABLE" : UnsupportedSourceException.CODE,
+                availability.missingCapabilities());
+    }
+
+    /** {@code competência → packs published in it}, packs in id order (C1 first). */
+    private static Map<String, List<String>> packsByPeriod(Map<String, Set<String>> periodsByPack) {
+        Map<String, List<String>> byPeriod = new TreeMap<>();
+        new TreeMap<>(periodsByPack)
+                .forEach((pack, periods) -> periods.forEach(period ->
+                        byPeriod.computeIfAbsent(period, p -> new ArrayList<>()).add(pack)));
+        Map<String, List<String>> readOnly = new TreeMap<>();
+        byPeriod.forEach((period, packs) -> readOnly.put(period, List.copyOf(packs)));
+        return readOnly;
     }
 
     private RunSourceResponse.Schedule schedule(ScheduleState state) {

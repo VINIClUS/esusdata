@@ -32,6 +32,9 @@ import tools.jackson.databind.ObjectMapper;
  * reproduzível." So it both downgrades {@code reproducibility_level} <em>and</em> adds an
  * explicit entry to {@code limitations_json} — the one field nothing in this store lets a reader
  * miss, unlike a dimension column a caller has to know to inspect.
+ *
+ * <p>ADR 0030 (V10): the value kind, the exact value, the practices or subgroups, the per-team
+ * results and the consolidation eligibility travel from staging to the published row unchanged.
  */
 public final class PublicationService {
 
@@ -57,7 +60,13 @@ public final class PublicationService {
             rs.getString("calculation_policy_version"),
             rs.getString("limitations_json"),
             rs.getString("input_fingerprint"),
-            rs.getString("evidence_grain"));
+            rs.getString("evidence_grain"),
+            rs.getString("value_kind"),
+            rs.getString("value_exact_numerator"),
+            rs.getString("value_exact_denominator"),
+            rs.getString("components_json"),
+            rs.getString("team_results_json"),
+            rs.getInt("consolidation_eligible"));
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactionTemplate;
@@ -115,8 +124,10 @@ public final class PublicationService {
                         calculation_policy_version, limitations_json, input_fingerprint,
                         result_nature, validation_status, completeness_status, consistency_level,
                         reproducibility_level, canonical_schema_version, evidence_grain,
-                        app_build, published_at)
-                    VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?,?, ?,?,?,?)
+                        app_build, published_at, value_kind, value_exact_numerator,
+                        value_exact_denominator, components_json, team_results_json,
+                        consolidation_eligible)
+                    VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?,?,?,?,?)
                     """,
                     resultId,
                     staging.jobId(),
@@ -147,7 +158,13 @@ public final class PublicationService {
                     request.extractionManifest().canonicalSchemaVersion(),
                     staging.evidenceGrain(),
                     request.appBuild(),
-                    request.publishedAt().toString());
+                    request.publishedAt().toString(),
+                    staging.valueKind(),
+                    staging.valueExactNumerator(),
+                    staging.valueExactDenominator(),
+                    staging.componentsJson(),
+                    staging.teamResultsJson(),
+                    staging.consolidationEligible());
 
             int stagingUpdated = jdbc.update(
                     "update result_staging set state = 'PUBLISHED' where staging_id = ? and state = 'SEALED'",
@@ -234,5 +251,11 @@ public final class PublicationService {
             String calculationPolicyVersion,
             String limitationsJson,
             String inputFingerprint,
-            String evidenceGrain) {}
+            String evidenceGrain,
+            String valueKind,
+            String valueExactNumerator,
+            String valueExactDenominator,
+            String componentsJson,
+            String teamResultsJson,
+            int consolidationEligible) {}
 }

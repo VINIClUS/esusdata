@@ -5,7 +5,8 @@ import java.util.List;
 /**
  * {@code GET /api/v1/quality-component} (ADR 0030): the Nota Final do Componente III of one
  * quadrimestre, per team and for the municipality. Every number travels as a canonical decimal or
- * integer string (§1.7.1); {@code null} means "not available", never zero.
+ * integer string (§1.7.1); {@code null} means "not available", never zero. {@code inputFingerprint}
+ * is the SHA-256 of the sorted ids of every published result read.
  */
 public record QualityComponentResponse(
         String municipalityIbge,
@@ -16,16 +17,13 @@ public record QualityComponentResponse(
         List<String> limitations,
         List<Unit> units) {
 
-    /** An exact fraction as integer strings. */
-    public record Exact(String numerator, String denominator) {}
-
     /** One team (INE) or, with {@code ine == null}, the municipality. */
     public record Unit(
             String ine,
             String cnes,
             String status,
             String score,
-            Exact scoreExact,
+            ExactValue scoreExact,
             String methodologicalClassification,
             String financialTransferClassification,
             List<String> limitations,
@@ -39,7 +37,7 @@ public record QualityComponentResponse(
             List<String> monthsUsed,
             List<String> resultIds,
             String mean,
-            Exact meanExact,
+            ExactValue meanExact,
             String classification,
             String factor) {}
 }
