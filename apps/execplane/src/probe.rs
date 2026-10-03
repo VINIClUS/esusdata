@@ -1,5 +1,6 @@
 use postgres::Transaction;
 use serde_json::{json, Map, Value};
+use std::collections::HashMap;
 use std::error::Error;
 
 /// Ports `JdbcCompatibilityCatalog`'s raw-data measurement, marker by marker, over this crate's
@@ -18,33 +19,93 @@ pub fn probe_object(
     fields.insert("columns".to_string(), Value::Array(columns));
 
     for marker in columns_used {
-        if let Some(csv) = marker.strip_prefix("UNIQUE_KEY=") {
-            let (matched_type, violation) = probe_unique_key(txn, object, csv)?;
-            fields.insert(
-                "unique_key".to_string(),
-                json!({
-                    "matched_constraint_type": matched_type,
-                    "uniqueness_violation_found": violation,
-                }),
-            );
-        } else if marker.starts_with("REQUIRED_DIMENSIONS=") {
-            let violating = probe_required_dimensions(txn)?;
-            fields.insert(
-                "required_dimensions".to_string(),
-                json!({ "violating_fact_event_id": violating }),
-            );
-        } else if let Some(csv) = marker.strip_prefix("LEAF_SEMANTICS=") {
-            let rows = probe_leaf_semantics(txn, csv)?;
-            fields.insert("leaf_semantics".to_string(), json!({ "rows": rows }));
-        } else if let Some(csv) = marker.strip_prefix("LEAF_IDS=") {
-            let found = probe_leaf_ids(txn, csv)?;
-            fields.insert("leaf_ids".to_string(), json!({ "found_ids": found }));
+        if let Some((field, measured)) = probe_marker(txn, object, marker)? {
+            fields.insert(field.to_string(), measured);
         }
-        // A plain column name needs nothing beyond "columns" — CompatibilityFingerprint looks it
-        // up there by name (plan finding: the map is looked up by key, never iterated in order).
     }
 
     Ok(Value::Object(fields))
+}
+
+/// The measurement one `columns_used` marker asks for, under the key the probe message carries it.
+/// A plain column name needs nothing beyond "columns" — `CompatibilityFingerprint` looks it up there
+/// by name (plan finding: the map is looked up by key, never iterated in order).
+fn probe_marker(
+    txn: &mut Transaction,
+    object: &str,
+    marker: &str,
+) -> Result<Option<(&'static str, Value)>, Box<dyn Error>> {
+    if let Some(csv) = marker.strip_prefix("UNIQUE_KEY=") {
+        let (matched_type, violation) = probe_unique_key(txn, object, csv)?;
+        return Ok(Some((
+            "unique_key",
+            json!({
+                "matched_constraint_type": matched_type,
+                "uniqueness_violation_found": violation,
+            }),
+        )));
+    }
+    if marker.starts_with("REQUIRED_DIMENSIONS=") {
+        let violating = probe_required_dimensions(txn)?;
+        return Ok(Some((
+            "required_dimensions",
+            json!({ "violating_fact_event_id": violating }),
+        )));
+    }
+    if let Some(csv) = marker.strip_prefix("LEAF_SEMANTICS=") {
+        let rows = probe_leaf_semantics(txn, csv)?;
+        return Ok(Some(("leaf_semantics", json!({ "rows": rows }))));
+    }
+    if let Some(csv) = marker.strip_prefix("LEAF_IDS=") {
+        let found = probe_leaf_ids(txn, csv)?;
+        return Ok(Some(("leaf_ids", json!({ "found_ids": found }))));
+    }
+    Ok(None)
+}
+
+/// `probe_object` for a canonical v2 probe (ADR 0030), where several parts' matrix entries often
+/// name the same objects (`tb_dim_tempo`, `tb_dim_municipio`, …): each object's columns and each
+/// (object, marker) measurement run once per acquisition — inside the same snapshot, so a repeat
+/// could only return the same answer — and every part still gets its own complete report.
+#[derive(Default)]
+pub struct ProbeCache {
+    columns: HashMap<String, Value>,
+    markers: HashMap<(String, String), Option<(&'static str, Value)>>,
+}
+
+impl ProbeCache {
+    pub fn probe_object(
+        &mut self,
+        txn: &mut Transaction,
+        object: &str,
+        columns_used: &[String],
+    ) -> Result<Value, Box<dyn Error>> {
+        require_safe_identifier(object)?;
+        let columns = if let Some(columns) = self.columns.get(object) {
+            columns.clone()
+        } else {
+            let columns = Value::Array(fetch_columns(txn, object)?);
+            self.columns.insert(object.to_string(), columns.clone());
+            columns
+        };
+
+        let mut fields = Map::new();
+        fields.insert("columns".to_string(), columns);
+        for marker in columns_used {
+            let key = (object.to_string(), marker.clone());
+            let measured = if let Some(measured) = self.markers.get(&key) {
+                measured.clone()
+            } else {
+                let measured = probe_marker(txn, object, marker)?;
+                self.markers.insert(key, measured.clone());
+                measured
+            };
+            if let Some((field, value)) = measured {
+                fields.insert(field.to_string(), value);
+            }
+        }
+        Ok(Value::Object(fields))
+    }
 }
 
 const COLUMNS_QUERY: &str =
