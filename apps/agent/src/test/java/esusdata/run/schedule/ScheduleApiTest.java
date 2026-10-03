@@ -3,14 +3,20 @@ package esusdata.run.schedule;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.auth.model.Role;
+import esusdata.indicator.model.EvaluationContext;
+import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.RuleOutcomes;
+import esusdata.indicator.pack.c2.C2Pack;
 import esusdata.source.model.LastCoverage;
 import esusdata.source.model.SourceRecord;
 import esusdata.web.ApiFixtureSupport;
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.time.YearMonth;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.annotation.DirtiesContext;
@@ -116,7 +122,78 @@ class ScheduleApiTest extends ApiFixtureSupport {
 
         assertThat(response.body())
                 .contains("\"coverageOutcome\":\"CHECKED\"")
-                .contains("{\"referencePeriod\":\"2026-03\",\"count\":10029,\"published\":false}");
+                .contains("{\"referencePeriod\":\"2026-03\",\"count\":10029,\"published\":false,"
+                        + "\"publishedPacks\":[]}");
+    }
+
+    /**
+     * ADR 0030: each competência says which packs are published in it and is "published" once every
+     * pack the source can compute is; each source lists every runnable pack with its availability —
+     * only C1 until the canonical v2 capabilities are validated live.
+     */
+    @Test
+    void eachCompetenciaListsItsPublishedPacksAndEachSourceItsAvailablePacks() throws Exception {
+        String municipality = "3509502";
+        String manager = createUser("manager-" + System.nanoTime());
+        grantMunicipality(manager, Role.MANAGER, municipality);
+        String sourceId = "src-" + System.nanoTime();
+        registerSource(sourceId, municipality);
+        sourceRepository.recordCoverage(
+                sourceId,
+                new LastCoverage(
+                        1,
+                        "2024-09",
+                        "2026-10",
+                        "CHECKED",
+                        List.of(
+                                new LastCoverage.PeriodCount("2026-03", 10),
+                                new LastCoverage.PeriodCount("2026-02", 20)),
+                        "2026-09-30T12:00:00Z"));
+        publishResult(manager, municipality, "2026-03", c1(municipality, "2026-03"), List.of());
+        publishResult(
+                manager,
+                municipality,
+                "2026-02",
+                "c2-desenvolvimento-infantil",
+                RuleOutcomes.pending(
+                                new C2Pack().descriptor(),
+                                EvaluationContext.endOfMonth(municipality, YearMonth.of(2026, 2)),
+                                "Regra em implementação (ADR 0030).")
+                        .result(),
+                List.of(),
+                List.of());
+
+        String body = get(sessionCookie(manager), "/api/v1/run-sources?municipalityIbge=" + municipality)
+                .body();
+
+        assertThat(body)
+                .contains("{\"referencePeriod\":\"2026-03\",\"count\":10,\"published\":true,"
+                        + "\"publishedPacks\":[\"c1-mais-acesso\"]}")
+                .contains("{\"referencePeriod\":\"2026-02\",\"count\":20,\"published\":false,"
+                        + "\"publishedPacks\":[\"c2-desenvolvimento-infantil\"]}")
+                .contains("{\"indicatorPack\":\"c1-mais-acesso\",\"ruleVersion\":\"c1-mais-acesso@0.1.0\","
+                        + "\"availability\":\"AVAILABLE\",\"missingCapabilities\":[]}")
+                .contains("{\"indicatorPack\":\"c2-desenvolvimento-infantil\","
+                        + "\"ruleVersion\":\"c2-desenvolvimento-infantil@0.1.0\",\"availability\":\"UNSUPPORTED_SOURCE\","
+                        + "\"missingCapabilities\":[\"citizen\",\"individual_registration\",\"care_encounter\"")
+                .contains("\"indicatorPack\":\"c7-prevencao-cancer\"")
+                .doesNotContain("componente-iii-nota-final");
+    }
+
+    private static IndicatorResult c1(String municipality, String period) {
+        return new IndicatorResult(
+                IndicatorResult.IndicatorStatus.BLOCKED,
+                null,
+                BigInteger.ONE,
+                BigInteger.TWO,
+                "PROGRAMADOS_MAIS_ESPONTANEOS",
+                null,
+                period,
+                "c1-mais-acesso@0.1.0",
+                YearMonth.parse(period).atEndOfMonth().toString(),
+                municipality,
+                List.of(),
+                "c1-exact-ratio@1");
     }
 
     @Test

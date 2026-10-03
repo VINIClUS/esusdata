@@ -19,6 +19,8 @@ public final class JdbcEvidenceRepository implements EvidenceRepository {
 
     private static final RowMapper<EvidenceRecord> MAPPER = (rs, rowNum) -> new EvidenceRecord(
             rs.getLong("seq"),
+            rs.getString("subject_kind"),
+            rs.getString("subject_key"),
             rs.getString("source_entity_type"),
             rs.getString("source_record_id"),
             rs.getString("care_date"),
@@ -26,7 +28,10 @@ public final class JdbcEvidenceRepository implements EvidenceRepository {
             rs.getString("cnes"),
             rs.getString("ine"),
             rs.getString("cbo"),
+            rs.getString("component"),
             rs.getString("decision"),
+            rs.getString("reason_code"),
+            rs.getString("points_text"),
             rs.getString("criterion_version"));
 
     private final JdbcTemplate jdbc;

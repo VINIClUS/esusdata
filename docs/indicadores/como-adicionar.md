@@ -65,9 +65,9 @@ nunca chaves substitutas do DW (`co_seq_dim_*`). O mapeamento coluna a coluna es
 
 | Parâmetro | Como casa | O registro traz |
 |---|---|---|
-| `procedure_codes` | igualdade com `tb_dim_procedimento.co_proced`, que guarda SIGTAP só com dígitos (`0202010503`) **ou** código AB literal (`ABEX001`, `ABP022`); liste os dois quando a ficha listar os dois (a equivalência AB↔SIGTAP do DW é inferida e não é usada) | `sigtap_code` como o DW grava |
+| `procedure_codes` | igualdade com `tb_dim_procedimento.co_proced`, que guarda SIGTAP só com dígitos (`0202010503`) **ou** código AB de exame/procedimento literal (`ABEX001`); liste os dois quando a ficha listar os dois (a equivalência AB↔SIGTAP do DW é inferida e não é usada) | `sigtap_code` como o DW grava |
 | `cid_codes` | pela categoria: um código da lista casa com todo código do DW que começa com ele, sem ponto (`E11` casa `E11`, `E119`, `E11.9`); um código completo casa só ele | o código como o DW grava |
-| `ciap_codes` | igualdade com `tb_dim_ciap.nu_ciap` (que pode trazer códigos AB, ex.: `ABP022`) | idem |
+| `ciap_codes` | igualdade com `tb_dim_ciap.nu_ciap`, que também guarda os códigos AB de problema/condição (`ABP022`, `ABP023`: "São armazenados todos os códigos AB presentes no CDS") — um código `ABP…` da ficha é problema avaliado, nunca procedimento | idem |
 | `immunobiological_codes` | igualdade com o código LEDI do imunobiológico (`42` penta) | idem |
 
 Lista vazia ⇒ nenhuma linha daquela parte (nunca "tudo").

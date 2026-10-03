@@ -1,26 +1,29 @@
-import { useEffect, useRef, useState } from 'react'
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useInfiniteQuery, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { USE_MOCKS, ApiError, apiFetch, apiFetchBlob, ensureApiReady, resolveMock } from '../client'
-import { execucaoFixture, fontesExecucaoFixture, pacotesFixture } from '../fixtures/execucao'
+import { catalogoFixture } from '../fixtures/catalogo'
+import { execucaoFixture, fontesExecucaoFixture } from '../fixtures/execucao'
 import { fonteFixture, fonteSourceFixture, requisitosFixture } from '../fixtures/fonteDados'
-import { findIndicadorDetalhe, indicadoresFixture } from '../fixtures/indicadores'
+import { COMPETENCIA_DEMO, paginaDeEvidenciaDemo, resultadosFixture } from '../fixtures/indicadores'
 import { isolamentoSourcesFixture } from '../fixtures/isolamento'
 import { demoContext } from '../fixtures/context'
-import { overviewFixture, painelFixture } from '../fixtures/painel'
+import { overviewFixture } from '../fixtures/painel'
 import { exportPeriodsFixture, exportsFixture } from '../fixtures/relatorios'
 import { useScope } from '@/app/scope-context'
 import {
+  disponibilidadeNaVisaoGeral,
   exportContentPath,
   exportsPath,
   formatInstant,
+  historicoIndicador,
   indicatorResultsPath,
   isPecSource,
   isRunTerminal,
+  normalizeIndicadorDetalhe,
   normalizeIndicatorPacks,
   normalizeExport,
-  normalizeIndicatorResult,
   normalizeOverview,
-  overviewPacks,
+  normalizeOverviewIndicators,
   normalizeRequirements,
   normalizeSource,
   pickSource,
@@ -28,10 +31,12 @@ import {
 } from '../normalizers'
 import type {
   CreateRunRequest,
+  Disponibilidade,
   EvidencePage,
   Exportacao,
   ExportResponse,
   Fonte,
+  HistoricoPonto,
   IndicatorPack,
   IndicadorDetalhe,
   IndicatorResultResponse,
@@ -48,12 +53,6 @@ import type {
   CoverageResponse,
 } from '../types'
 
-function resolveMockIndicadorDetalhe(codigo: string): Promise<IndicadorDetalhe> {
-  const detalhe = findIndicadorDetalhe(codigo)
-  if (!detalhe) return Promise.reject(new Error(`Detalhes indisponíveis para ${codigo}`))
-  return resolveMock(detalhe)
-}
-
 interface ApiScope {
   municipalityIbge?: string
   referencePeriod?: string
@@ -61,20 +60,46 @@ interface ApiScope {
 
 const NO_MUNICIPALITY = 'Nenhum município autorizado para leitura de resultados.'
 
-function resolveApiIndicadorDetalhe(
+const PACOTES_KEY = ['indicadores', 'pacotes']
+
+/** `GET /indicator-packs`: the same catalog for every authenticated session. */
+function fetchPacotes(): Promise<IndicatorPack[]> {
+  return USE_MOCKS ? resolveMock(catalogoFixture) : apiFetch<IndicatorPack[]>('/indicator-packs')
+}
+
+/**
+ * The detail of a pack: its catalog entry (cached, shared with the other screens) and, when the
+ * municipality has a published competência, the result of the scope's competência.
+ */
+async function resolveIndicadorDetalhe(
+  queryClient: QueryClient,
   codigo: string,
   { municipalityIbge, referencePeriod }: ApiScope,
 ): Promise<IndicadorDetalhe> {
-  if (!municipalityIbge) return Promise.reject(new Error(NO_MUNICIPALITY))
-  if (!referencePeriod)
-    return Promise.reject(new Error(`Nenhum resultado publicado para ${codigo}.`))
-
-  return apiFetch<IndicatorResultResponse[]>(
-    indicatorResultsPath({ municipalityIbge, indicatorPack: codigo, referencePeriod }),
-  ).then((results) => {
-    const result = results[0]
-    if (!result) throw new Error(`Nenhum resultado publicado para ${codigo}.`)
-    return normalizeIndicatorResult(result)
+  if (!USE_MOCKS && !municipalityIbge) throw new Error(NO_MUNICIPALITY)
+  // The cached catalog when there is one: it only changes with a new release.
+  const packs = await queryClient.query({
+    queryKey: PACOTES_KEY,
+    queryFn: fetchPacotes,
+    staleTime: 'static',
+  })
+  const pack = packs.find((p) => p.id === codigo)
+  if (!pack) throw new Error(`O indicador ${codigo} não está no catálogo.`)
+  if (USE_MOCKS) {
+    return normalizeIndicadorDetalhe(pack, resultadosFixture[codigo], {
+      competencia: COMPETENCIA_DEMO,
+      municipioIbge: overviewFixture.municipalityIbge,
+    })
+  }
+  const results =
+    municipalityIbge && referencePeriod
+      ? await apiFetch<IndicatorResultResponse[]>(
+          indicatorResultsPath({ municipalityIbge, indicatorPack: codigo, referencePeriod }),
+        )
+      : []
+  return normalizeIndicadorDetalhe(pack, results[0], {
+    competencia: referencePeriod,
+    municipioIbge: municipalityIbge,
   })
 }
 
@@ -88,11 +113,6 @@ async function resolveApiFonte(municipalityIbge: string | undefined): Promise<Fo
   const source = pickSource(await apiFetch<SourceResponse[]>('/sources'), municipalityIbge)
   if (!source) throw new Error('Nenhuma fonte cadastrada que você possa administrar.')
   return normalizeSource(source)
-}
-
-function overviewPacksList(overview: OverviewResponse) {
-  const { packs, results } = overviewPacks(overview)
-  return normalizeIndicatorPacks(packs, results)
 }
 
 /**
@@ -115,9 +135,6 @@ function useOverviewSelect<T>(select: (overview: OverviewResponse) => T) {
 }
 
 const asIs = (overview: OverviewResponse) => overview
-// The demo keeps its own richer Painel and catalog; the overview fixture feeds the other screens.
-const demoPainel = () => painelFixture
-const demoIndicadores = () => indicadoresFixture
 
 const lastUpdateOf = (overview: OverviewResponse) =>
   overview.lastUpdate ? formatInstant(overview.lastUpdate) : null
@@ -133,24 +150,19 @@ export function useVisaoGeral() {
 }
 
 export function usePainelResumo() {
-  return useOverviewSelect(USE_MOCKS ? demoPainel : normalizeOverview)
+  return useOverviewSelect(normalizeOverview)
 }
 
+/** Indicadores: the catalog with the competência's results and availability, from the overview. */
 export function useIndicadores() {
-  return useOverviewSelect(USE_MOCKS ? demoIndicadores : overviewPacksList)
+  return useOverviewSelect(normalizeOverviewIndicators)
 }
+
+const catalogList = (packs: IndicatorPack[]) => normalizeIndicatorPacks(packs)
 
 /** The pack catalog alone, for screens that only list the indicators by name. */
 export function useCatalogoIndicadores() {
-  return useQuery({
-    queryKey: ['indicadores', 'catalogo'],
-    queryFn: () =>
-      USE_MOCKS
-        ? resolveMock(indicadoresFixture)
-        : apiFetch<IndicatorPack[]>('/indicator-packs').then((packs) =>
-            normalizeIndicatorPacks(packs),
-          ),
-  })
+  return useQuery({ queryKey: PACOTES_KEY, queryFn: fetchPacotes, select: catalogList })
 }
 
 /**
@@ -162,6 +174,7 @@ export function useEvidencias(resultId: string | undefined) {
   return useInfiniteQuery({
     queryKey: ['results', 'evidence', resultId, municipalityIbge],
     queryFn: ({ pageParam }): Promise<EvidencePage> => {
+      if (USE_MOCKS) return resolveMock(paginaDeEvidenciaDemo(resultId ?? '', pageParam))
       const params = new URLSearchParams({ municipalityIbge: municipalityIbge ?? '' })
       if (pageParam) params.set('cursor', pageParam)
       return apiFetch<EvidencePage>(
@@ -170,30 +183,41 @@ export function useEvidencias(resultId: string | undefined) {
     },
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
-    enabled: !USE_MOCKS && !!resultId && !!municipalityIbge,
+    enabled: !!resultId && (USE_MOCKS || !!municipalityIbge),
   })
 }
 
 export function useIndicadorDetalhe(codigo: string) {
+  const queryClient = useQueryClient()
   const { municipalityIbge, referencePeriod, isLoading } = useScope()
   return useQuery({
     queryKey: ['indicadores', codigo, municipalityIbge, referencePeriod],
     queryFn: () =>
-      USE_MOCKS
-        ? resolveMockIndicadorDetalhe(codigo)
-        : resolveApiIndicadorDetalhe(codigo, { municipalityIbge, referencePeriod }),
+      resolveIndicadorDetalhe(queryClient, codigo, { municipalityIbge, referencePeriod }),
     enabled: !isLoading,
   })
 }
 
-/** The pack catalog as the API returns it: what a run needs (`id`, `ruleVersion`, `executionEnabled`). */
+/** What the overview says of one pack: whether the sources can compute it, and its history. */
+export function useIndicadorNaVisaoGeral(codigo: string) {
+  const select = useCallback(
+    (
+      overview: OverviewResponse,
+    ): {
+      disponibilidade: Disponibilidade | null
+      historico: HistoricoPonto[]
+    } => ({
+      disponibilidade: disponibilidadeNaVisaoGeral(overview, codigo),
+      historico: historicoIndicador(overview, codigo),
+    }),
+    [codigo],
+  )
+  return useOverviewSelect(select)
+}
+
+/** The pack catalog as the API returns it: what a run needs (`id`, `ruleVersion`, `runnable`). */
 export function usePacotesIndicadores(enabled = true) {
-  return useQuery({
-    queryKey: ['indicadores', 'pacotes'],
-    enabled,
-    queryFn: () =>
-      USE_MOCKS ? resolveMock(pacotesFixture) : apiFetch<IndicatorPack[]>('/indicator-packs'),
-  })
+  return useQuery({ queryKey: PACOTES_KEY, enabled, queryFn: fetchPacotes })
 }
 
 /** The municipality's PEC sources a run can read, with their competências and scheduler (ADR 0028). */
@@ -509,10 +533,10 @@ export function useExportacoes() {
   return useQuery({
     queryKey: ['exportacoes', municipalityIbge],
     queryFn: (): Promise<Exportacao[]> => {
-      if (USE_MOCKS) return resolveMock(exportsFixture.map(normalizeExport))
+      if (USE_MOCKS) return resolveMock(exportsFixture.map((e) => normalizeExport(e)))
       if (!municipalityIbge) return Promise.reject(new Error(NO_MUNICIPALITY))
       return apiFetch<ExportResponse[]>(exportsPath(municipalityIbge)).then((exports) =>
-        exports.map(normalizeExport),
+        exports.map((e) => normalizeExport(e)),
       )
     },
     enabled: !isLoading,
@@ -551,13 +575,30 @@ export async function gerarExportacao(
   })
 }
 
+/** The CSV's columns (ADR 0024, amended by ADR 0030: `valor` + `unidade`), for the demo file. */
+const CSV_COLUMNS = [
+  'municipio_ibge',
+  'indicador',
+  'versao_regra',
+  'competencia',
+  'status',
+  'numerador',
+  'denominador',
+  'valor',
+  'unidade',
+  'classificacao',
+  'data_corte',
+  'publicado_em',
+  'execucao',
+]
+
 /** Downloads through fetch, so an expired export shows a message instead of an error page. */
 export async function baixarExportacao(
   exportacao: Exportacao,
   municipalityIbge: string,
 ): Promise<void> {
   const blob = USE_MOCKS
-    ? new Blob(['\uFEFF"municipio_ibge";"indicador"\r\n'], { type: 'text/csv' })
+    ? new Blob([`\uFEFF${CSV_COLUMNS.map((c) => `"${c}"`).join(';')}\r\n`], { type: 'text/csv' })
     : await apiFetchBlob(exportContentPath(exportacao.id, municipalityIbge))
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')

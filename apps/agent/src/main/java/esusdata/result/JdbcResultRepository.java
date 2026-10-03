@@ -2,9 +2,15 @@ package esusdata.result;
 
 import esusdata.result.model.PublishedResult;
 import esusdata.result.model.ResultRepository;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 
 /**
@@ -42,7 +48,13 @@ public final class JdbcResultRepository implements ResultRepository {
             rs.getString("canonical_schema_version"),
             rs.getString("evidence_grain"),
             rs.getString("app_build"),
-            rs.getString("published_at"));
+            rs.getString("published_at"),
+            rs.getString("value_kind"),
+            rs.getString("value_exact_numerator"),
+            rs.getString("value_exact_denominator"),
+            rs.getString("components_json"),
+            rs.getString("team_results_json"),
+            rs.getInt("consolidation_eligible") == 1);
 
     /**
      * Newest first, in time order. {@code published_at} is {@code Instant.toString()}: UTC, ending in
@@ -110,6 +122,21 @@ public final class JdbcResultRepository implements ResultRepository {
                  where municipality_ibge = ?
                  order by reference_period desc
                 """, String.class, municipalityIbge);
+    }
+
+    @Override
+    public Map<String, Set<String>> findPublishedPeriodsByPack(String municipalityIbge) {
+        requireScope(municipalityIbge);
+        Map<String, Set<String>> byPack = new TreeMap<>();
+        jdbc.query(
+                "select distinct indicator_pack, reference_period from results where municipality_ibge = ?",
+                (RowCallbackHandler)
+                        rs -> byPack.computeIfAbsent(rs.getString("indicator_pack"), pack -> new TreeSet<>())
+                                .add(rs.getString("reference_period")),
+                municipalityIbge);
+        Map<String, Set<String>> readOnly = new TreeMap<>();
+        byPack.forEach((pack, periods) -> readOnly.put(pack, Collections.unmodifiableSet(periods)));
+        return Collections.unmodifiableMap(readOnly);
     }
 
     /**

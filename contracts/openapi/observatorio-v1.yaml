@@ -961,8 +961,9 @@ paths:
         from the published monthly results of C1–C7 — never acquired, enqueued or stored. Per team
         (INE) and for the municipality: the months that entered each mean, the exact mean, its band
         and factor, the weighted score, the methodological classification and, apart, the financial
-        classification of the 2026–2027 transition. A unit stays BLOCKED or NO_DENOMINATOR while any
-        component is missing or blocked: no zero is imputed and no weight is redistributed.
+        classification of the 2026–2027 transition. A unit has no score (BLOCKED, NO_DENOMINATOR,
+        RULE_AMBIGUITY or UNSUPPORTED_SOURCE, with the reason in its limitations) while any component
+        is missing, blocked or without a value: no zero is imputed and no weight is redistributed.
         READ_CLINICAL municipality-wide, like GET /results.
       parameters:
         - name: municipalityIbge

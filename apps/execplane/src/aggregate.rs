@@ -171,16 +171,16 @@ fn period(start: &str, end_exclusive: &str) -> Result<(NaiveDate, NaiveDate), Bo
     Ok((start, end_exclusive))
 }
 
-/// Java's answer to the `probe` message.
+/// Java's answer to the `probe` message — here and on the canonical v2 acquisition.
 #[derive(Debug, PartialEq, Eq)]
-enum Decision {
+pub enum Decision {
     Proceed,
     Abort,
     Unexpected,
 }
 
 impl Decision {
-    fn of(line: &str) -> Self {
+    pub fn of(line: &str) -> Self {
         if line.contains("\"type\":\"abort\"") {
             Self::Abort
         } else if line.contains("\"type\":\"proceed\"") {
