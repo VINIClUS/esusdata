@@ -1,8 +1,12 @@
 use serde::Deserialize;
+use std::collections::BTreeMap;
 
 /// The `{"type":"acquire",...}` message — field names and shape are pinned by
 /// `SubprocessAcquisitionAdapter.writeAcquireEnvelope`, not by plan prose. Rust field names are
 /// already the wire's `snake_case`, so no `#[serde(rename)]` is needed anywhere but `type`.
+///
+/// A canonical v2 acquisition (ADR 0030) adds `canonical_schema_version` and `parts`; both
+/// default to empty, so C1's v1 envelope parses exactly as before and keeps its v1 path.
 #[derive(Deserialize)]
 pub struct AcquireEnvelope {
     #[serde(rename = "type")]
@@ -48,6 +52,32 @@ pub struct AcquireEnvelope {
     #[serde(default)]
     pub tls_root_cert: Option<String>,
     pub budget: Budget,
+    /// `"2"` for a canonical v2 acquisition; absent in C1's v1 envelope.
+    #[serde(default)]
+    pub canonical_schema_version: Option<String>,
+    /// The capabilities a canonical v2 acquisition reads, in part order, all in one transaction;
+    /// empty in C1's v1 envelope.
+    #[serde(default)]
+    pub parts: Vec<PartRequest>,
+}
+
+/// One capability of a canonical v2 acquisition — the wire mirror of Java's `AcquisitionPart`
+/// (ADR 0030), written by `ExecPlaneAcquisition`: which frozen query, the version, checksum and
+/// record kind Java expects of it, its window and the values of its named binds.
+#[derive(Debug, Deserialize)]
+pub struct PartRequest {
+    pub capability: String,
+    pub adapter_version: String,
+    pub query_checksum: String,
+    pub record_kind: String,
+    pub period_start: String,
+    pub period_end_exclusive: String,
+    /// `TEXT_ARRAY` binds (code lists), by bind name, values in bind order.
+    #[serde(default)]
+    pub array_params: BTreeMap<String, Vec<String>>,
+    /// `DATE` binds, by bind name, as ISO `yyyy-MM-dd`.
+    #[serde(default)]
+    pub date_params: BTreeMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -224,6 +254,73 @@ mod tests {
             envelope.tls_root_cert.as_deref(),
             Some("/etc/observatorio-aps/pec-ca.pem")
         );
+    }
+
+    /// An acquire envelope as `ExecPlaneAcquisition` writes it, with `extra` fields appended.
+    fn acquire_json(extra: &str) -> String {
+        format!(
+            r#"{{"type":"acquire","source_id":"s","host":"127.0.0.1","port":5432,"database":"esus",
+                "user":"u","password":"p","municipality_ibge":"3541307","pec_version":"5.5.28",
+                "read_model":"PEC_DW","installation_role":"PRONTUARIO","extraction_id":"e",
+                "period_start":"2026-01-01","period_end_exclusive":"2026-04-01",
+                "source_zone_id":"America/Sao_Paulo","extract_temp_path":"/tmp/e.jsonl.gz.tmp",
+                "query_checksum":"sha256:c","adapter_version":"0.1.0","tls_root_cert":null,
+                "budget":{{"connect_timeout_ms":1,"acquisition_timeout_ms":2,
+                "statement_timeout_ms":3,"lock_timeout_ms":4,"idle_in_transaction_timeout_ms":5,
+                "max_rows":6,"max_duration_ms":7,"max_payload_bytes":8,
+                "max_temp_file_bytes":9}}{extra}}}"#
+        )
+    }
+
+    /// C1's envelope carries neither field: it parses unchanged and keeps the v1 path.
+    #[test]
+    fn a_v1_acquire_envelope_has_no_parts() {
+        let envelope: AcquireEnvelope = serde_json::from_str(&acquire_json("")).unwrap();
+        assert!(envelope.parts.is_empty());
+        assert_eq!(envelope.canonical_schema_version, None);
+        assert_eq!(envelope.adapter_version, "0.1.0");
+        assert_eq!(envelope.budget.max_temp_file_bytes, 9);
+    }
+
+    #[test]
+    fn a_v2_acquire_envelope_carries_its_parts_in_order() {
+        let envelope: AcquireEnvelope = serde_json::from_str(&acquire_json(
+            r#","canonical_schema_version":"2","parts":[
+                {"capability":"procedure_performed","adapter_version":"0.1.0",
+                 "query_checksum":"sha256:a","record_kind":"procedure_event",
+                 "period_start":"2026-01-01","period_end_exclusive":"2026-04-01",
+                 "array_params":{"procedure_codes":["0301010080","ABEX001"]},
+                 "date_params":{"birth_date_to":"2024-12-31","birth_date_from":"2024-01-01"}},
+                {"capability":"citizen","adapter_version":"0.1.0","query_checksum":"sha256:b",
+                 "record_kind":"person","period_start":"2026-03-01",
+                 "period_end_exclusive":"2026-04-01"}]"#,
+        ))
+        .unwrap();
+        assert_eq!(envelope.canonical_schema_version.as_deref(), Some("2"));
+        assert_eq!(envelope.parts.len(), 2);
+        let procedures = &envelope.parts[0];
+        assert_eq!(procedures.capability, "procedure_performed");
+        assert_eq!(procedures.record_kind, "procedure_event");
+        assert_eq!(
+            procedures.array_params["procedure_codes"],
+            ["0301010080", "ABEX001"]
+        );
+        assert_eq!(
+            procedures.date_params.keys().collect::<Vec<_>>(),
+            ["birth_date_from", "birth_date_to"]
+        );
+        // Absent maps are empty, never a parse failure: the registry check names what is missing.
+        assert!(envelope.parts[1].array_params.is_empty());
+        assert!(envelope.parts[1].date_params.is_empty());
+    }
+
+    #[test]
+    fn a_v2_part_without_its_window_is_rejected() {
+        let parsed: Result<AcquireEnvelope, _> = serde_json::from_str(&acquire_json(
+            r#","canonical_schema_version":"2","parts":[{"capability":"citizen",
+                "adapter_version":"0.1.0","query_checksum":"sha256:b","record_kind":"person"}]"#,
+        ));
+        assert!(parsed.is_err());
     }
 
     #[test]

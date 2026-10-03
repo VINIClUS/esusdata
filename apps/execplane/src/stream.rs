@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 const PROGRAMADO_IDS: [i64; 2] = [2, 3];
 const ESPONTANEO_IDS: [i64; 3] = [5, 6, 7];
-const PROGRESS_INTERVAL: i64 = 1000;
+pub const PROGRESS_INTERVAL: i64 = 1000;
 
 #[expect(
     clippy::struct_field_names,
@@ -23,6 +23,7 @@ pub struct Budget {
     pub max_payload_bytes: i64,
 }
 
+#[derive(Debug)]
 pub enum StreamOutcome {
     /// The extract's data file was written in full — `main.rs` still has to call
     /// `ExtractSink::finish` itself (this function only holds a `&mut` borrow, not ownership) and
@@ -72,15 +73,10 @@ pub fn stream_query(
     start: Instant,
     sink: &mut crate::extract::ExtractSink,
 ) -> Result<StreamOutcome, Box<dyn Error>> {
-    let cancel_requested = Arc::new(AtomicBool::new(false));
-    let duration_exceeded = Arc::new(AtomicBool::new(false));
-    spawn_cancel_listener(canceller.clone(), Arc::clone(&cancel_requested));
-    spawn_duration_watchdog(
-        canceller,
-        start,
-        budget.max_duration_ms,
-        Arc::clone(&duration_exceeded),
-    );
+    let Interrupts {
+        cancel_requested,
+        duration_exceeded,
+    } = Interrupts::spawn(canceller, start, budget.max_duration_ms);
 
     let positional_query = to_positional_placeholders(query_text);
     let params: [&(dyn postgres::types::ToSql + Sync); 3] =
@@ -190,8 +186,42 @@ pub fn stream_query(
     Ok(StreamOutcome::Success)
 }
 
+/// The two signals that stop a streaming read from outside its own row loop (plan §2.7): Java's
+/// `{"type":"cancel"}` — or stdin's EOF, the parent gone — and the `max_duration_ms` deadline.
+/// One copy for C1's v1 stream and the canonical v2 read (ADR 0030); a test sets the flags itself
+/// instead of spawning the threads.
+#[derive(Clone, Default)]
+pub struct Interrupts {
+    pub cancel_requested: Arc<AtomicBool>,
+    pub duration_exceeded: Arc<AtomicBool>,
+}
+
+impl Interrupts {
+    /// Starts the stdin cancel listener and the duration watchdog, both firing `canceller`.
+    pub fn spawn(canceller: Canceller, start: Instant, max_duration_ms: i64) -> Self {
+        let interrupts = Self::default();
+        spawn_cancel_listener(canceller.clone(), Arc::clone(&interrupts.cancel_requested));
+        spawn_duration_watchdog(
+            canceller,
+            start,
+            max_duration_ms,
+            Arc::clone(&interrupts.duration_exceeded),
+        );
+        interrupts
+    }
+
+    pub fn cancelled(&self) -> bool {
+        self.cancel_requested.load(Ordering::SeqCst)
+    }
+
+    /// `classify_failure` against these flags.
+    pub fn classify(&self, err: &postgres::Error) -> StreamOutcome {
+        classify_failure(err, &self.cancel_requested, &self.duration_exceeded)
+    }
+}
+
 /// A write the extract sink refused, as the outcome this stream reports for it.
-fn sink_failure(err: crate::extract::ExtractError) -> StreamOutcome {
+pub fn sink_failure(err: crate::extract::ExtractError) -> StreamOutcome {
     match err {
         crate::extract::ExtractError::InvalidRecord(detail) => StreamOutcome::InvalidRecord(detail),
         crate::extract::ExtractError::BudgetExceeded(detail) => {
