@@ -85,12 +85,10 @@ public final class C2Pack implements IndicatorRule {
                     + " a inclusão na coorte, ambígua.",
             "Prática E (AMB-C2-09 iv, AMB-C2-10 ii/iii): doses são aplicações em datas distintas; a leitura pelo"
                     + " campo dose não é avaliada (domínio LEDI de dose não congelado); SCR sem intervalo mínimo; só"
-                    + " o Esquema Primário do 24 g; transcrição registrada depois do corte não é conhecida no corte;"
-                    + " o código do imunobiológico é comparado como a ficha escreve (09), formato a confirmar no"
-                    + " Portão C.",
+                    + " o Esquema Primário do 24 g; transcrição registrada depois do corte não é conhecida no corte.",
             "Prática C: só valores numéricos maiores que zero comprovam peso ou altura; o campo"
-                    + " \"Antropometria\" do MIAC (Quadro 03) não é lido até o código LEDI ser confirmado no Portão C;"
-                    + " linha de participante do MIAC sem CBO é aceita.",
+                    + " \"Antropometria\" do MIAC (Quadro 03, prática LEDI 20) sem os valores conta como registro"
+                    + " isolado, ambíguo como o 01.01.04.002-4 (AMB-C2-07 i); linha do MIAC sem CBO é aceita.",
             "Cadastros não unificados (AMB-C2-14) contam como pessoas distintas; o corte local não reproduz o"
                     + " 20º dia útil do Siaps (AMB-C2-16).",
             "Leituras declaradas: CBO de quatro dígitos é família (AMB-C2-13); visitas com motivo diferente de"
@@ -260,7 +258,7 @@ public final class C2Pack implements IndicatorRule {
         if (Capabilities.PROCEDURE_PERFORMED.equals(capability)) {
             lists.put(Capabilities.PROCEDURE_CODES, C2Codes.PROCEDURE_CODES);
         } else if (Capabilities.IMMUNIZATION_HISTORY.equals(capability)) {
-            lists.put(Capabilities.IMMUNOBIOLOGICAL_CODES, C2Codes.IMMUNOBIOLOGICAL_CODES);
+            lists.put(Capabilities.IMMUNOBIOLOGICAL_CODES, C2Codes.IMMUNOBIOLOGICAL_BIND);
         }
         return lists;
     }

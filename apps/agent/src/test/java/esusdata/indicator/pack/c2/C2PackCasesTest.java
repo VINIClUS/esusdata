@@ -1377,7 +1377,7 @@ class C2PackCasesTest {
                 .containsExactlyInAnyOrder(
                         "0101040024", "0101040083", "0101040075", "0301010269", "0301010277", "0301010250");
         assertThat(parte(requisitos, Capabilities.IMMUNIZATION_HISTORY).arrayParams())
-                .containsEntry(Capabilities.IMMUNOBIOLOGICAL_CODES, C2Codes.IMMUNOBIOLOGICAL_CODES);
+                .containsEntry(Capabilities.IMMUNOBIOLOGICAL_CODES, C2Codes.IMMUNOBIOLOGICAL_BIND);
         assertThat(C2Codes.IMMUNOBIOLOGICAL_CODES)
                 .containsExactlyInAnyOrder(
                         "09", "17", "22", "24", "26", "29", "39", "42", "43", "46", "47", "56", "58", "59", "106",

@@ -425,6 +425,34 @@ class C2PackReviewTest {
         }
     }
 
+    @Test
+    void item8_codigoInteiroSemZeroAEsquerdaEAHepatiteBEVaiNoBind() {
+        assertThat(C2Codes.IMMUNOBIOLOGICAL_BIND).contains("09", "9").containsAll(C2Codes.IMMUNOBIOLOGICAL_CODES);
+        CanonicalDataset.Builder data = child();
+        for (int i = 0; i < 3; i++) {
+            LocalDate day = BIRTH.plusDays(60L * (i + 1));
+            data.add(dose(day, "9")).add(dose(day, "46")).add(dose(day, "17")).add(dose(day, "22"));
+        }
+        data.add(dose(BIRTH.plusMonths(12), "24"))
+                .add(dose(BIRTH.plusMonths(15), "24"))
+                .add(dose(BIRTH.plusDays(60), "26"))
+                .add(dose(BIRTH.plusDays(120), "26"));
+        assertThat(practice(C2Pack.compute(data.build(), CONTEXT), "E").decision())
+                .isEqualTo(EvidenceDecision.PRACTICE_MET);
+    }
+
+    @Test
+    void item6_campoAntropometriaDoMiacSemValoresEAmbiguo() {
+        CanonicalDataset.Builder data = child();
+        for (int i = 1; i <= 8; i++) {
+            data.add(measured(BIRTH.plusDays(40L * i), NURSE, "7.0", "65.0"));
+        }
+        data.add(CanonicalFixtures.collectiveActivity(
+                KEY, BIRTH.plusDays(400), null, null, NURSE, "05", List.of(C2Codes.MIAC_ANTHROPOMETRY_PRACTICE)));
+        assertThat(practice(C2Pack.compute(data.build(), CONTEXT), "C").reasonCode())
+                .isEqualTo("AMBIGUIDADE:AMB-C2-07");
+    }
+
     private static CanonicalImmunization dose(LocalDate day, String code) {
         return CanonicalFixtures.dose(KEY, day, code, null);
     }

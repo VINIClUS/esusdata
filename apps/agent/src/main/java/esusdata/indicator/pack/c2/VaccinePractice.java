@@ -157,7 +157,9 @@ final class VaccinePractice {
             boolean transcription = Boolean.TRUE.equals(i.transcription());
             LocalDate registered =
                     transcription && i.registrationDate() != null ? LocalDate.parse(i.registrationDate()) : date;
-            String code = i.immunobiologicalCode();
+            String code = C2Codes.HEPATITIS_B_ONLY.equals("0" + i.immunobiologicalCode())
+                    ? C2Codes.HEPATITIS_B_ONLY
+                    : i.immunobiologicalCode();
             // A transcription recorded after the cutoff was not known on the cutoff.
             boolean known = child.inScope(date) && !registered.isAfter(child.cutoff());
             if (C2Codes.IMMUNOBIOLOGICAL_CODES.contains(code) && known) {

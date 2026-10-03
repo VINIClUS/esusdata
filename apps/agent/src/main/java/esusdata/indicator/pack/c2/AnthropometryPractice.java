@@ -140,7 +140,19 @@ final class AnthropometryPractice {
                 Support support =
                         new Support(m.sourceRef(), LocalDate.parse(m.measuredDate()), m.cbo(), null, null, m.origin());
                 addValues(child, measures, support, m.weightKg(), m.heightCm());
+                addAnthropometryField(child, measures, support, m);
             }
+        }
+    }
+
+    /** MIAC "registros no campo “Antropometria”" without both values: a lone record (AMB-C2-07 i). */
+    private static void addAnthropometryField(
+            ChildRecords child, List<Measure> measures, Support support, CanonicalMeasurement m) {
+        boolean field =
+                MIAC.equals(m.origin()) && m.healthPracticeCodes().contains(C2Codes.MIAC_ANTHROPOMETRY_PRACTICE);
+        boolean pair = ChildRecords.present(m.weightKg()) && ChildRecords.present(m.heightCm());
+        if (field && !pair && child.inScope(support.date())) {
+            measures.add(new Measure(support.date(), false, false, null, true, support));
         }
     }
 

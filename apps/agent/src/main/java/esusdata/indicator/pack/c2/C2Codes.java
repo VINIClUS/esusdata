@@ -2,6 +2,7 @@ package esusdata.indicator.pack.c2;
 
 import esusdata.indicator.model.CboGroups;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Códigos da ficha C2 (Nota Metodológica C2, SEI 0054824593, edição de 19–22/06/2026), literais e
@@ -81,6 +82,17 @@ public final class C2Codes {
     /** Os 16 códigos distintos do Quadro 05 (p.6), parâmetro {@code immunobiological_codes}. */
     public static final List<String> IMMUNOBIOLOGICAL_CODES =
             List.of("09", "17", "22", "24", "26", "29", "39", "42", "43", "46", "47", "56", "58", "59", "106", "107");
+
+    /**
+     * O bind {@code immunobiological_codes}: os 16 códigos do Quadro 05 e também {@code 9}, porque a
+     * consulta compara com {@code CAST(nu_identificador AS text)} e a coluna pode ser inteira no DW
+     * ({@code docs/discovery/capacidades-dw-v2.md} §1.6). A regra lê {@code 9} como {@code 09}.
+     */
+    public static final List<String> IMMUNOBIOLOGICAL_BIND =
+            Stream.concat(IMMUNOBIOLOGICAL_CODES.stream(), Stream.of("9")).toList();
+
+    /** Prática em saúde "antropometria" do MIAC (LEDI 20, {@code st_prat_saude_antropometria}): o campo "Antropometria" do Quadro 03. */
+    static final String MIAC_ANTHROPOMETRY_PRACTICE = "20";
 
     /**
      * Motivo da visita "recém-nascido" (24 e, p.3). Domínio da fonte: coluna {@code
