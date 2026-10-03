@@ -57,14 +57,14 @@ class SqliteConfigTest {
         try (Connection c = ds.getConnection();
                 Statement st = c.createStatement();
                 ResultSet rs = st.executeQuery(
-                        "select version from flyway_schema_history where success = 1 order by version")) {
+                        "select version from flyway_schema_history where success = 1 order by installed_rank")) {
             java.util.List<String> appliedVersions = new java.util.ArrayList<>();
             while (rs.next()) {
                 appliedVersions.add(rs.getString(1));
             }
-            assertThat(appliedVersions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9");
+            assertThat(appliedVersions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
         }
-        assertThat(migration.migrationsExecuted()).isEqualTo(9);
+        assertThat(migration.migrationsExecuted()).isEqualTo(10);
     }
 
     @Test

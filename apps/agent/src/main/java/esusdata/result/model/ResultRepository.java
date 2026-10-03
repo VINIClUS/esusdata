@@ -1,7 +1,9 @@
 package esusdata.result.model;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Reads published results. Every method requires an explicit municipality scope — §1.12.1:
@@ -20,6 +22,12 @@ public interface ResultRepository {
 
     /** Reference periods with at least one published result in the municipality, newest first. */
     List<String> findPublishedPeriods(String municipalityIbge);
+
+    /**
+     * The competências with a published result of each pack in the municipality (ADR 0030:
+     * "publicado" is per pack), by pack id, each set in ascending order.
+     */
+    Map<String, Set<String>> findPublishedPeriodsByPack(String municipalityIbge);
 
     /**
      * Looks up a result by id, scoped to a municipality. An object that exists but is out of

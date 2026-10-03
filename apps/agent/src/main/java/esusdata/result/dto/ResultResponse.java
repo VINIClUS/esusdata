@@ -9,6 +9,11 @@ import java.util.List;
  * directly — this is the API's own shape. {@code value}/{@code numerator}/{@code denominator}
  * travel as canonical strings (§1.7.1 L245, ENG-26); {@code value == null} is distinct from
  * {@code value == "0"}.
+ *
+ * <p>ADR 0030: {@code valueKind} says what the value means, {@code valueExact} is the value as an
+ * exact fraction (null unless it exists), {@code components} lists the practices or subgroups,
+ * {@code teams} the same result per INE and {@code consolidationEligible} whether the month enters
+ * the quadrimestral mean.
  */
 public record ResultResponse(
         String resultId,
@@ -29,6 +34,11 @@ public record ResultResponse(
         String denominator,
         String denominatorKind,
         String classification,
+        String valueKind,
+        ExactValue valueExact,
+        List<ResultComponentResponse> components,
+        List<TeamResultResponse> teams,
+        boolean consolidationEligible,
         String dataCutoff,
         List<String> limitations,
         List<String> sourceRefs,
