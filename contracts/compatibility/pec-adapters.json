@@ -150,6 +150,771 @@
       "test_notes": "Validated 2026-09-30 live against the municipal production PEC 5.5.28 / PostgreSQL 9.6.13 through an SSH tunnel, with this entry marked VALIDATED locally and the execution plane rebuilt from it (ADR 0023 recipe): ExecPlaneLivePecTest coverage case CHECKED for the window 2024-09..2026-10 (exclusive), 24 (co_ibge, month) groups, all 3541307, byte-identical to the same frozen query over JDBC, 4.5 s; competencia 2026-03 = 10029, the same total every earlier evidence counted.",
       "approved_at": "2026-09-30",
       "approved_by": "vinicius0zero0@gmail.com"
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "citizen",
+      "status": "NOT_TESTED",
+      "status_reason": "Consulta escrita sobre o dicionário oficial do DW (docs/discovery/2026-10-02-dw-dicionario-c2-c7.md) e testada só na fixture sintética PostgreSQL 9.6 (fixture_checksum). Falta a validação ao vivo da ADR 0023 num PEC real (runbook docs/discovery/runbook-validacao-capacidades.md): as signature_fingerprint abaixo são as da fixture, não as do PEC, e precisam ser recapturadas por CapabilityFingerprintCaptureLiveTest antes de qualquer promoção a VALIDATED. Nomes inferidos a confirmar no inventário estão em docs/discovery/capacidades-dw-v2.md.",
+      "objects_used": [
+        {
+          "object": "tb_fat_cad_individual",
+          "columns_used": ["co_seq_fat_cad_individual", "co_dim_identidade_genero", "co_dim_municipio", "co_dim_sexo", "co_dim_tempo", "co_fat_cidadao_pec", "dt_nascimento", "dt_obito"],
+          "signature_fingerprint": "sha256:32dd7f765471d68d35a17793d92f756fb450ce1b9556d3c75ff24aaefaa00315"
+        },
+        {
+          "object": "tb_dim_cidadao_pec_grupo",
+          "columns_used": ["co_cidadao", "co_cidadao_master", "co_fat_cidadao_pec"],
+          "signature_fingerprint": "sha256:e1b0982fd163acb97434127245c73ac9c19a1e3b31763b1917fa678188571142"
+        },
+        {
+          "object": "tb_dim_identidade_genero",
+          "columns_used": ["co_seq_dim_identidade_genero", "nu_identificador", "UNIQUE_KEY=co_seq_dim_identidade_genero"],
+          "signature_fingerprint": "sha256:3210f57bc56574f4858491d19d352b5bbc7ea0783e63b6a956d2d62146b5b5a7"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:d9b9d03c6cec444ca0fbd78e572cf24915b0d2c23b873572b839d9752fc746b6"
+        },
+        {
+          "object": "tb_dim_sexo",
+          "columns_used": ["co_seq_dim_sexo", "nu_identificador", "UNIQUE_KEY=co_seq_dim_sexo"],
+          "signature_fingerprint": "sha256:de987a795f3dbaa02ab421b28da2248f1359e8ff3952c80d70ecac9e37be6013"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:ed106a7558268037666b4f6c901c7adbc10cbee774bdaaf204999108d5aa1556"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
+      },
+      "query_checksum": "sha256:6f7fddff33b54e42a58513b3024b6511cf1de40b27737508731da7748de43d50",
+      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
+      "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "individual_registration",
+      "status": "NOT_TESTED",
+      "status_reason": "Consulta escrita sobre o dicionário oficial do DW (docs/discovery/2026-10-02-dw-dicionario-c2-c7.md) e testada só na fixture sintética PostgreSQL 9.6 (fixture_checksum). Falta a validação ao vivo da ADR 0023 num PEC real (runbook docs/discovery/runbook-validacao-capacidades.md): as signature_fingerprint abaixo são as da fixture, não as do PEC, e precisam ser recapturadas por CapabilityFingerprintCaptureLiveTest antes de qualquer promoção a VALIDATED. Nomes inferidos a confirmar no inventário estão em docs/discovery/capacidades-dw-v2.md.",
+      "objects_used": [
+        {
+          "object": "tb_fat_cad_individual",
+          "columns_used": ["co_seq_fat_cad_individual", "co_dim_equipe", "co_dim_municipio", "co_dim_tempo", "co_dim_tipo_saida_cadastro", "co_dim_unidade_saude", "co_fat_cidadao_pec", "dt_nascimento", "st_diabete", "st_ficha_inativa", "st_gestante", "st_hipertensao_arterial", "st_recusa_cadastro"],
+          "signature_fingerprint": "sha256:f8f41aa0c97d0192ab389c3a2a2ea2ac901a1b05fcb96abce567251153b892d7"
+        },
+        {
+          "object": "tb_dim_cidadao_pec_grupo",
+          "columns_used": ["co_cidadao", "co_cidadao_master", "co_fat_cidadao_pec"],
+          "signature_fingerprint": "sha256:e1b0982fd163acb97434127245c73ac9c19a1e3b31763b1917fa678188571142"
+        },
+        {
+          "object": "tb_dim_equipe",
+          "columns_used": ["co_seq_dim_equipe", "nu_ine", "UNIQUE_KEY=co_seq_dim_equipe"],
+          "signature_fingerprint": "sha256:cef2ac02e86774740645637104057bffe8eabb699961a877bdb400f681a2b3df"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:d9b9d03c6cec444ca0fbd78e572cf24915b0d2c23b873572b839d9752fc746b6"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:ed106a7558268037666b4f6c901c7adbc10cbee774bdaaf204999108d5aa1556"
+        },
+        {
+          "object": "tb_dim_tipo_saida_cadastro",
+          "columns_used": ["co_seq_dim_tipo_saida_cadastro", "nu_identificador", "UNIQUE_KEY=co_seq_dim_tipo_saida_cadastro"],
+          "signature_fingerprint": "sha256:89c7d8b59a95d41f6c1d220d6647d8818b915c586587c37270e730fb92e487d9"
+        },
+        {
+          "object": "tb_dim_unidade_saude",
+          "columns_used": ["co_seq_dim_unidade_saude", "nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude"],
+          "signature_fingerprint": "sha256:8cc3d820df61cc5e6b3b82da4179a854157da602df7b240bfec4cc03adda72ca"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
+      },
+      "query_checksum": "sha256:f9f511d801a36fd444576fb90f7248ff98bee1d33e6526934d91785a9c0b102c",
+      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
+      "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "care_encounter",
+      "status": "NOT_TESTED",
+      "status_reason": "Consulta escrita sobre o dicionário oficial do DW (docs/discovery/2026-10-02-dw-dicionario-c2-c7.md) e testada só na fixture sintética PostgreSQL 9.6 (fixture_checksum). Falta a validação ao vivo da ADR 0023 num PEC real (runbook docs/discovery/runbook-validacao-capacidades.md): as signature_fingerprint abaixo são as da fixture, não as do PEC, e precisam ser recapturadas por CapabilityFingerprintCaptureLiveTest antes de qualquer promoção a VALIDATED. Nomes inferidos a confirmar no inventário estão em docs/discovery/capacidades-dw-v2.md.",
+      "objects_used": [
+        {
+          "object": "tb_fat_atd_ind_problemas",
+          "columns_used": ["co_dim_ciap", "co_dim_cid", "co_fat_atd_ind", "st_avaliado"],
+          "signature_fingerprint": "sha256:884ba41050765e61a9aa047fd89d13b6335fe21aec146f9eea68e96a49b1d5de"
+        },
+        {
+          "object": "tb_fat_atd_ind_procedimentos",
+          "columns_used": ["co_dim_procedimento_avaliado", "co_dim_procedimento_solicitado", "co_fat_atd_ind"],
+          "signature_fingerprint": "sha256:b3fb4ce193612ed7b2a8e6e2a45d4c7ecc464312c165e0ea07ed5e6f303208f4"
+        },
+        {
+          "object": "tb_fat_atendimento_individual",
+          "columns_used": ["co_seq_fat_atd_ind", "co_dim_cbo_1", "co_dim_equipe_1", "co_dim_local_atendimento", "co_dim_municipio", "co_dim_tempo", "co_dim_tempo_dum", "co_dim_tipo_atendimento", "co_dim_tp_particip_cidadao", "co_dim_unidade_saude_1", "co_fat_cidadao_pec", "dt_nascimento", "nu_altura", "nu_idade_gestacional_semanas", "nu_medicao_pressao_diastolica", "nu_medicao_pressao_sistolica", "nu_peso"],
+          "signature_fingerprint": "sha256:6fee7e811b921c7d1ea444b8c487538f3c648f66de2d0cba653bb36be4fc5017"
+        },
+        {
+          "object": "tb_fat_cad_individual",
+          "columns_used": ["co_seq_fat_cad_individual", "co_dim_municipio", "co_dim_tempo", "co_fat_cidadao_pec", "dt_nascimento"],
+          "signature_fingerprint": "sha256:4762fba8c4be6168079d3df219b4603852fe97999e188b1a7548d6166b960d2b"
+        },
+        {
+          "object": "tb_dim_cbo",
+          "columns_used": ["co_seq_dim_cbo", "nu_cbo", "UNIQUE_KEY=co_seq_dim_cbo"],
+          "signature_fingerprint": "sha256:0d0690dc0ee3f3f8fe27544ad5d464d7753fb0291349ece447e2b2650842e3a0"
+        },
+        {
+          "object": "tb_dim_ciap",
+          "columns_used": ["co_seq_dim_ciap", "nu_ciap", "UNIQUE_KEY=co_seq_dim_ciap"],
+          "signature_fingerprint": "sha256:edce1ffad2439d3945fc3a0f4954f7a16d5cf452d719cba7a83d20077e9e1f95"
+        },
+        {
+          "object": "tb_dim_cid",
+          "columns_used": ["co_seq_dim_cid", "nu_cid", "UNIQUE_KEY=co_seq_dim_cid"],
+          "signature_fingerprint": "sha256:60e4aa7d2041e9427455c0bd74abed628bcbbe7fb1eefde8ec526366196bb484"
+        },
+        {
+          "object": "tb_dim_cidadao_pec_grupo",
+          "columns_used": ["co_cidadao", "co_cidadao_master", "co_fat_cidadao_pec"],
+          "signature_fingerprint": "sha256:e1b0982fd163acb97434127245c73ac9c19a1e3b31763b1917fa678188571142"
+        },
+        {
+          "object": "tb_dim_equipe",
+          "columns_used": ["co_seq_dim_equipe", "nu_ine", "UNIQUE_KEY=co_seq_dim_equipe"],
+          "signature_fingerprint": "sha256:cef2ac02e86774740645637104057bffe8eabb699961a877bdb400f681a2b3df"
+        },
+        {
+          "object": "tb_dim_local_atendimento",
+          "columns_used": ["co_seq_dim_local_atendimento", "nu_identificador", "UNIQUE_KEY=co_seq_dim_local_atendimento"],
+          "signature_fingerprint": "sha256:65e86d9bfe2c51e2969da0076e0d598d50b78e685f7704337772d8f868ec76ea"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:d9b9d03c6cec444ca0fbd78e572cf24915b0d2c23b873572b839d9752fc746b6"
+        },
+        {
+          "object": "tb_dim_procedimento",
+          "columns_used": ["co_seq_dim_procedimento", "co_proced", "UNIQUE_KEY=co_seq_dim_procedimento"],
+          "signature_fingerprint": "sha256:1161396325f386661151641abf6bfd65621fae340125e95f95e92053aac9994d"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:ed106a7558268037666b4f6c901c7adbc10cbee774bdaaf204999108d5aa1556"
+        },
+        {
+          "object": "tb_dim_tipo_atendimento",
+          "columns_used": ["co_seq_dim_tipo_atendimento", "nu_identificador", "UNIQUE_KEY=co_seq_dim_tipo_atendimento"],
+          "signature_fingerprint": "sha256:e66718388d3dc864d96dd2f15441b5923f6a7efc2cce0011224bc32864850038"
+        },
+        {
+          "object": "tb_dim_tp_participacao_atend",
+          "columns_used": ["co_seq_dim_tp_particip_atend", "nu_identificador", "UNIQUE_KEY=co_seq_dim_tp_particip_atend"],
+          "signature_fingerprint": "sha256:87f6448e8b6010b4e56b394bab0e591add109c3755243f46c9d7c3bcb1f4e098"
+        },
+        {
+          "object": "tb_dim_unidade_saude",
+          "columns_used": ["co_seq_dim_unidade_saude", "nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude"],
+          "signature_fingerprint": "sha256:8cc3d820df61cc5e6b3b82da4179a854157da602df7b240bfec4cc03adda72ca"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
+      },
+      "query_checksum": "sha256:9743ea5ee615612f450cfbfbb79f4971e6cb816b51c03aa1501045676c9760ad",
+      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
+      "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "dental_encounter",
+      "status": "NOT_TESTED",
+      "status_reason": "Consulta escrita sobre o dicionário oficial do DW (docs/discovery/2026-10-02-dw-dicionario-c2-c7.md) e testada só na fixture sintética PostgreSQL 9.6 (fixture_checksum). Falta a validação ao vivo da ADR 0023 num PEC real (runbook docs/discovery/runbook-validacao-capacidades.md): as signature_fingerprint abaixo são as da fixture, não as do PEC, e precisam ser recapturadas por CapabilityFingerprintCaptureLiveTest antes de qualquer promoção a VALIDATED. Nomes inferidos a confirmar no inventário estão em docs/discovery/capacidades-dw-v2.md.",
+      "objects_used": [
+        {
+          "object": "tb_fat_atend_odonto_problemas",
+          "columns_used": ["co_dim_ciap", "co_dim_cid", "co_fat_atd_odnt", "st_avaliado"],
+          "signature_fingerprint": "sha256:8e13695026249430153ffc3d2940923f799462406c94d1eaedc515682d0d5ae2"
+        },
+        {
+          "object": "tb_fat_atend_odonto_proced",
+          "columns_used": ["co_dim_procedimento", "co_fat_atd_odnt"],
+          "signature_fingerprint": "sha256:e74fa207ba909e01fea8fe40c1ccc51cb3e36787fcc33d93fa1418f3eef27465"
+        },
+        {
+          "object": "tb_fat_atendimento_odonto",
+          "columns_used": ["co_seq_fat_atd_odnt", "co_dim_cbo_1", "co_dim_equipe_1", "co_dim_local_atendimento", "co_dim_municipio", "co_dim_tempo", "co_dim_tipo_atendimento", "co_dim_tp_particip_cidadao", "co_dim_unidade_saude_1", "co_fat_cidadao_pec", "dt_nascimento", "nu_altura", "nu_peso", "st_gestante"],
+          "signature_fingerprint": "sha256:7333ee81f8235919dfe722c6881aadc9190b414bd00432b6f130fc3297ff0275"
+        },
+        {
+          "object": "tb_fat_cad_individual",
+          "columns_used": ["co_seq_fat_cad_individual", "co_dim_municipio", "co_dim_tempo", "co_fat_cidadao_pec", "dt_nascimento"],
+          "signature_fingerprint": "sha256:4762fba8c4be6168079d3df219b4603852fe97999e188b1a7548d6166b960d2b"
+        },
+        {
+          "object": "tb_dim_cbo",
+          "columns_used": ["co_seq_dim_cbo", "nu_cbo", "UNIQUE_KEY=co_seq_dim_cbo"],
+          "signature_fingerprint": "sha256:0d0690dc0ee3f3f8fe27544ad5d464d7753fb0291349ece447e2b2650842e3a0"
+        },
+        {
+          "object": "tb_dim_ciap",
+          "columns_used": ["co_seq_dim_ciap", "nu_ciap", "UNIQUE_KEY=co_seq_dim_ciap"],
+          "signature_fingerprint": "sha256:edce1ffad2439d3945fc3a0f4954f7a16d5cf452d719cba7a83d20077e9e1f95"
+        },
+        {
+          "object": "tb_dim_cid",
+          "columns_used": ["co_seq_dim_cid", "nu_cid", "UNIQUE_KEY=co_seq_dim_cid"],
+          "signature_fingerprint": "sha256:60e4aa7d2041e9427455c0bd74abed628bcbbe7fb1eefde8ec526366196bb484"
+        },
+        {
+          "object": "tb_dim_cidadao_pec_grupo",
+          "columns_used": ["co_cidadao", "co_cidadao_master", "co_fat_cidadao_pec"],
+          "signature_fingerprint": "sha256:e1b0982fd163acb97434127245c73ac9c19a1e3b31763b1917fa678188571142"
+        },
+        {
+          "object": "tb_dim_equipe",
+          "columns_used": ["co_seq_dim_equipe", "nu_ine", "UNIQUE_KEY=co_seq_dim_equipe"],
+          "signature_fingerprint": "sha256:cef2ac02e86774740645637104057bffe8eabb699961a877bdb400f681a2b3df"
+        },
+        {
+          "object": "tb_dim_local_atendimento",
+          "columns_used": ["co_seq_dim_local_atendimento", "nu_identificador", "UNIQUE_KEY=co_seq_dim_local_atendimento"],
+          "signature_fingerprint": "sha256:65e86d9bfe2c51e2969da0076e0d598d50b78e685f7704337772d8f868ec76ea"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:d9b9d03c6cec444ca0fbd78e572cf24915b0d2c23b873572b839d9752fc746b6"
+        },
+        {
+          "object": "tb_dim_procedimento",
+          "columns_used": ["co_seq_dim_procedimento", "co_proced", "UNIQUE_KEY=co_seq_dim_procedimento"],
+          "signature_fingerprint": "sha256:1161396325f386661151641abf6bfd65621fae340125e95f95e92053aac9994d"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:ed106a7558268037666b4f6c901c7adbc10cbee774bdaaf204999108d5aa1556"
+        },
+        {
+          "object": "tb_dim_tipo_atendimento",
+          "columns_used": ["co_seq_dim_tipo_atendimento", "nu_identificador", "UNIQUE_KEY=co_seq_dim_tipo_atendimento"],
+          "signature_fingerprint": "sha256:e66718388d3dc864d96dd2f15441b5923f6a7efc2cce0011224bc32864850038"
+        },
+        {
+          "object": "tb_dim_tp_participacao_atend",
+          "columns_used": ["co_seq_dim_tp_particip_atend", "nu_identificador", "UNIQUE_KEY=co_seq_dim_tp_particip_atend"],
+          "signature_fingerprint": "sha256:87f6448e8b6010b4e56b394bab0e591add109c3755243f46c9d7c3bcb1f4e098"
+        },
+        {
+          "object": "tb_dim_unidade_saude",
+          "columns_used": ["co_seq_dim_unidade_saude", "nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude"],
+          "signature_fingerprint": "sha256:8cc3d820df61cc5e6b3b82da4179a854157da602df7b240bfec4cc03adda72ca"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
+      },
+      "query_checksum": "sha256:39b8fe497491052c08c915d991ce2042f0f5e81b928ce2b178209e3703e58da4",
+      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
+      "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "home_visit",
+      "status": "NOT_TESTED",
+      "status_reason": "Consulta escrita sobre o dicionário oficial do DW (docs/discovery/2026-10-02-dw-dicionario-c2-c7.md) e testada só na fixture sintética PostgreSQL 9.6 (fixture_checksum). Falta a validação ao vivo da ADR 0023 num PEC real (runbook docs/discovery/runbook-validacao-capacidades.md): as signature_fingerprint abaixo são as da fixture, não as do PEC, e precisam ser recapturadas por CapabilityFingerprintCaptureLiveTest antes de qualquer promoção a VALIDATED. Nomes inferidos a confirmar no inventário estão em docs/discovery/capacidades-dw-v2.md.",
+      "objects_used": [
+        {
+          "object": "tb_fat_cad_individual",
+          "columns_used": ["co_seq_fat_cad_individual", "co_dim_municipio", "co_dim_tempo", "co_fat_cidadao_pec", "dt_nascimento"],
+          "signature_fingerprint": "sha256:4762fba8c4be6168079d3df219b4603852fe97999e188b1a7548d6166b960d2b"
+        },
+        {
+          "object": "tb_fat_visita_domiciliar",
+          "columns_used": ["co_seq_fat_visita_domiciliar", "co_dim_cbo", "co_dim_desfecho_visita", "co_dim_equipe", "co_dim_municipio", "co_dim_tempo", "co_dim_unidade_saude", "co_fat_cidadao_pec", "dt_nascimento", "nu_altura", "nu_peso", "st_acomp_condi_bolsa_familia", "st_acomp_condi_vulnerab_social", "st_acomp_crianca", "st_acomp_domiciliados_acamados", "st_acomp_gestante", "st_acomp_pessoa_asma", "st_acomp_pessoa_cancer", "st_acomp_pessoa_desnutricao", "st_acomp_pessoa_diabetes", "st_acomp_pessoa_doenca_cronica", "st_acomp_pessoa_dpoc_enfisema", "st_acomp_pessoa_hanseniase", "st_acomp_pessoa_hipertensao", "st_acomp_pessoa_idosa", "st_acomp_pessoa_reabil_deficie", "st_acomp_pessoa_tuberculose", "st_acomp_puerpera", "st_acomp_recem_nascido", "st_acomp_saude_mental", "st_acomp_sintomaticos_respirat", "st_acomp_tabagista", "st_acomp_usuario_alcool", "st_acomp_usuario_outras_drogra", "st_busca_ativa_bolsa_familia", "st_busca_ativa_consulta", "st_busca_ativa_exame", "st_busca_ativa_vacina", "st_ctrl_amb_vet_acao_educativa", "st_ctrl_amb_vet_acao_mecanica", "st_ctrl_amb_vet_imovel_foco", "st_ctrl_amb_vet_tratamnt_focal", "st_mot_vis_cad_att", "st_mot_vis_convte_atvidd_cltva", "st_mot_vis_egresso_internacao", "st_mot_vis_orintacao_prevncao", "st_mot_vis_outros", "st_mot_vis_visita_periodica"],
+          "signature_fingerprint": "sha256:0f93596cc0c5e796b5b95f7ca3e2b6a1c3308e21b316484c8ce726e096598ed7"
+        },
+        {
+          "object": "tb_dim_cbo",
+          "columns_used": ["co_seq_dim_cbo", "nu_cbo", "UNIQUE_KEY=co_seq_dim_cbo"],
+          "signature_fingerprint": "sha256:0d0690dc0ee3f3f8fe27544ad5d464d7753fb0291349ece447e2b2650842e3a0"
+        },
+        {
+          "object": "tb_dim_cidadao_pec_grupo",
+          "columns_used": ["co_cidadao", "co_cidadao_master", "co_fat_cidadao_pec"],
+          "signature_fingerprint": "sha256:e1b0982fd163acb97434127245c73ac9c19a1e3b31763b1917fa678188571142"
+        },
+        {
+          "object": "tb_dim_desfecho_visita",
+          "columns_used": ["co_seq_dim_desfecho_visita", "nu_identificador", "UNIQUE_KEY=co_seq_dim_desfecho_visita"],
+          "signature_fingerprint": "sha256:c7e84bf279fb9396e08ddd0edccb3de844ebcbff97225066e232448acb405c87"
+        },
+        {
+          "object": "tb_dim_equipe",
+          "columns_used": ["co_seq_dim_equipe", "nu_ine", "UNIQUE_KEY=co_seq_dim_equipe"],
+          "signature_fingerprint": "sha256:cef2ac02e86774740645637104057bffe8eabb699961a877bdb400f681a2b3df"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:d9b9d03c6cec444ca0fbd78e572cf24915b0d2c23b873572b839d9752fc746b6"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:ed106a7558268037666b4f6c901c7adbc10cbee774bdaaf204999108d5aa1556"
+        },
+        {
+          "object": "tb_dim_unidade_saude",
+          "columns_used": ["co_seq_dim_unidade_saude", "nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude"],
+          "signature_fingerprint": "sha256:8cc3d820df61cc5e6b3b82da4179a854157da602df7b240bfec4cc03adda72ca"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
+      },
+      "query_checksum": "sha256:d62b4dd658badb6fc2cb0cfdddac40dbb3c093c4dbd58cc556f15b259410764b",
+      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
+      "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "immunization_history",
+      "status": "NOT_TESTED",
+      "status_reason": "Consulta escrita sobre o dicionário oficial do DW (docs/discovery/2026-10-02-dw-dicionario-c2-c7.md) e testada só na fixture sintética PostgreSQL 9.6 (fixture_checksum). Falta a validação ao vivo da ADR 0023 num PEC real (runbook docs/discovery/runbook-validacao-capacidades.md): as signature_fingerprint abaixo são as da fixture, não as do PEC, e precisam ser recapturadas por CapabilityFingerprintCaptureLiveTest antes de qualquer promoção a VALIDATED. Nomes inferidos a confirmar no inventário estão em docs/discovery/capacidades-dw-v2.md.",
+      "objects_used": [
+        {
+          "object": "tb_fat_cad_individual",
+          "columns_used": ["co_seq_fat_cad_individual", "co_dim_municipio", "co_dim_tempo", "co_fat_cidadao_pec", "dt_nascimento"],
+          "signature_fingerprint": "sha256:4762fba8c4be6168079d3df219b4603852fe97999e188b1a7548d6166b960d2b"
+        },
+        {
+          "object": "tb_fat_vacinacao",
+          "columns_used": ["co_seq_fat_vacinacao", "co_dim_cbo", "co_dim_equipe", "co_dim_municipio", "co_dim_tempo", "co_dim_unidade_saude", "co_fat_cidadao_pec", "dt_nascimento", "UNIQUE_KEY=co_seq_fat_vacinacao"],
+          "signature_fingerprint": "sha256:ef30196f88267ba643f278ff3615039e8bff72a4fca9b5f9c02a8b6c1a54e9a7"
+        },
+        {
+          "object": "tb_fat_vacinacao_vacina",
+          "columns_used": ["co_seq_fat_vacinacao_vacina", "co_dim_dose_imunobiologico", "co_dim_estrategia_vacinacao", "co_dim_imunobiologico", "co_dim_tempo_vacina_aplicada", "co_fat_vacinacao", "st_registro_anterior"],
+          "signature_fingerprint": "sha256:86d5e28c29a4d6aeb6581224e3238720c145c632f68f11c913767de6ecffa5f0"
+        },
+        {
+          "object": "tb_dim_cbo",
+          "columns_used": ["co_seq_dim_cbo", "nu_cbo", "UNIQUE_KEY=co_seq_dim_cbo"],
+          "signature_fingerprint": "sha256:0d0690dc0ee3f3f8fe27544ad5d464d7753fb0291349ece447e2b2650842e3a0"
+        },
+        {
+          "object": "tb_dim_cidadao_pec_grupo",
+          "columns_used": ["co_cidadao", "co_cidadao_master", "co_fat_cidadao_pec"],
+          "signature_fingerprint": "sha256:e1b0982fd163acb97434127245c73ac9c19a1e3b31763b1917fa678188571142"
+        },
+        {
+          "object": "tb_dim_dose_imunobiologico",
+          "columns_used": ["co_seq_dim_dose_imunobiologico", "nu_identificador", "UNIQUE_KEY=co_seq_dim_dose_imunobiologico"],
+          "signature_fingerprint": "sha256:7b0ee15808db7cfb00f56193c196c435928ee66c33df2e0914b6bd100c7f66fb"
+        },
+        {
+          "object": "tb_dim_equipe",
+          "columns_used": ["co_seq_dim_equipe", "nu_ine", "UNIQUE_KEY=co_seq_dim_equipe"],
+          "signature_fingerprint": "sha256:cef2ac02e86774740645637104057bffe8eabb699961a877bdb400f681a2b3df"
+        },
+        {
+          "object": "tb_dim_estrategia_vacinacao",
+          "columns_used": ["co_seq_dim_estrategia_vacinacao", "nu_identificador", "UNIQUE_KEY=co_seq_dim_estrategia_vacinacao"],
+          "signature_fingerprint": "sha256:e6187763db2c3f81a83824c1860bded79b87fcc246c9216d23ba26bd1449b542"
+        },
+        {
+          "object": "tb_dim_imunobiologico",
+          "columns_used": ["co_seq_dim_imunobiologico", "nu_identificador", "UNIQUE_KEY=co_seq_dim_imunobiologico"],
+          "signature_fingerprint": "sha256:a60f536f2ade91fa99adbc19c1d0778a952ebaaa560384c4c611b259d688b5ab"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:d9b9d03c6cec444ca0fbd78e572cf24915b0d2c23b873572b839d9752fc746b6"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:ed106a7558268037666b4f6c901c7adbc10cbee774bdaaf204999108d5aa1556"
+        },
+        {
+          "object": "tb_dim_unidade_saude",
+          "columns_used": ["co_seq_dim_unidade_saude", "nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude"],
+          "signature_fingerprint": "sha256:8cc3d820df61cc5e6b3b82da4179a854157da602df7b240bfec4cc03adda72ca"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
+      },
+      "query_checksum": "sha256:b3dbb5e710afa0cf0625216a70807e496ea94377333dcd5bc9c09cbffb2d9064",
+      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
+      "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "exam_request_evaluation",
+      "status": "NOT_TESTED",
+      "status_reason": "Consulta escrita sobre o dicionário oficial do DW (docs/discovery/2026-10-02-dw-dicionario-c2-c7.md) e testada só na fixture sintética PostgreSQL 9.6 (fixture_checksum). Falta a validação ao vivo da ADR 0023 num PEC real (runbook docs/discovery/runbook-validacao-capacidades.md): as signature_fingerprint abaixo são as da fixture, não as do PEC, e precisam ser recapturadas por CapabilityFingerprintCaptureLiveTest antes de qualquer promoção a VALIDATED. Nomes inferidos a confirmar no inventário estão em docs/discovery/capacidades-dw-v2.md.",
+      "objects_used": [
+        {
+          "object": "tb_fat_atd_ind_procedimentos",
+          "columns_used": ["co_seq_fat_atend_ind_proced", "co_dim_procedimento_avaliado", "co_dim_procedimento_solicitado", "co_fat_atd_ind"],
+          "signature_fingerprint": "sha256:22cb808ca2aa9f8bf33c04c8fdaa7b92305b8186b1a53ba48b72b407f5f4b248"
+        },
+        {
+          "object": "tb_fat_atendimento_individual",
+          "columns_used": ["co_seq_fat_atd_ind", "co_dim_cbo_1", "co_dim_equipe_1", "co_dim_municipio", "co_dim_tempo", "co_dim_unidade_saude_1", "co_fat_cidadao_pec", "dt_nascimento", "UNIQUE_KEY=co_seq_fat_atd_ind"],
+          "signature_fingerprint": "sha256:6df8ca3a9cc3e81387abe2562c0f1683d796caf2812c6b164635d982301da754"
+        },
+        {
+          "object": "tb_fat_cad_individual",
+          "columns_used": ["co_seq_fat_cad_individual", "co_dim_municipio", "co_dim_tempo", "co_fat_cidadao_pec", "dt_nascimento"],
+          "signature_fingerprint": "sha256:4762fba8c4be6168079d3df219b4603852fe97999e188b1a7548d6166b960d2b"
+        },
+        {
+          "object": "tb_dim_cbo",
+          "columns_used": ["co_seq_dim_cbo", "nu_cbo", "UNIQUE_KEY=co_seq_dim_cbo"],
+          "signature_fingerprint": "sha256:0d0690dc0ee3f3f8fe27544ad5d464d7753fb0291349ece447e2b2650842e3a0"
+        },
+        {
+          "object": "tb_dim_cidadao_pec_grupo",
+          "columns_used": ["co_cidadao", "co_cidadao_master", "co_fat_cidadao_pec"],
+          "signature_fingerprint": "sha256:e1b0982fd163acb97434127245c73ac9c19a1e3b31763b1917fa678188571142"
+        },
+        {
+          "object": "tb_dim_equipe",
+          "columns_used": ["co_seq_dim_equipe", "nu_ine", "UNIQUE_KEY=co_seq_dim_equipe"],
+          "signature_fingerprint": "sha256:cef2ac02e86774740645637104057bffe8eabb699961a877bdb400f681a2b3df"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:d9b9d03c6cec444ca0fbd78e572cf24915b0d2c23b873572b839d9752fc746b6"
+        },
+        {
+          "object": "tb_dim_procedimento",
+          "columns_used": ["co_seq_dim_procedimento", "co_proced", "UNIQUE_KEY=co_seq_dim_procedimento"],
+          "signature_fingerprint": "sha256:1161396325f386661151641abf6bfd65621fae340125e95f95e92053aac9994d"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:ed106a7558268037666b4f6c901c7adbc10cbee774bdaaf204999108d5aa1556"
+        },
+        {
+          "object": "tb_dim_unidade_saude",
+          "columns_used": ["co_seq_dim_unidade_saude", "nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude"],
+          "signature_fingerprint": "sha256:8cc3d820df61cc5e6b3b82da4179a854157da602df7b240bfec4cc03adda72ca"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
+      },
+      "query_checksum": "sha256:bfab781a5d5fcf489597e237c6f3ba5eb1f036b035d758518dd71eb97782a13e",
+      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
+      "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "procedure_performed",
+      "status": "NOT_TESTED",
+      "status_reason": "Consulta escrita sobre o dicionário oficial do DW (docs/discovery/2026-10-02-dw-dicionario-c2-c7.md) e testada só na fixture sintética PostgreSQL 9.6 (fixture_checksum). Falta a validação ao vivo da ADR 0023 num PEC real (runbook docs/discovery/runbook-validacao-capacidades.md): as signature_fingerprint abaixo são as da fixture, não as do PEC, e precisam ser recapturadas por CapabilityFingerprintCaptureLiveTest antes de qualquer promoção a VALIDATED. Nomes inferidos a confirmar no inventário estão em docs/discovery/capacidades-dw-v2.md.",
+      "objects_used": [
+        {
+          "object": "tb_fat_atend_odonto_proced",
+          "columns_used": ["co_seq_fat_atend_odonto_proced", "co_dim_procedimento", "co_fat_atd_odnt"],
+          "signature_fingerprint": "sha256:ecb24464d7ff7100c606cf9e46b486f6d2be97533e13488675b2f116d5298185"
+        },
+        {
+          "object": "tb_fat_atendimento_odonto",
+          "columns_used": ["co_seq_fat_atd_odnt", "co_dim_cbo_1", "co_dim_equipe_1", "co_dim_municipio", "co_dim_tempo", "co_dim_unidade_saude_1", "co_fat_cidadao_pec", "dt_nascimento", "UNIQUE_KEY=co_seq_fat_atd_odnt"],
+          "signature_fingerprint": "sha256:b5a3b7ca62f1f3c1cd0e77c5a81be11d93c704fb2c0e07939b85a9f9b0602801"
+        },
+        {
+          "object": "tb_fat_cad_individual",
+          "columns_used": ["co_seq_fat_cad_individual", "co_dim_municipio", "co_dim_tempo", "co_fat_cidadao_pec", "dt_nascimento"],
+          "signature_fingerprint": "sha256:4762fba8c4be6168079d3df219b4603852fe97999e188b1a7548d6166b960d2b"
+        },
+        {
+          "object": "tb_fat_proced_atend_proced",
+          "columns_used": ["co_seq_fat_proced_atend_proced", "co_dim_procedimento", "co_fat_cidadao_pec", "co_fat_procedimento", "dt_nascimento"],
+          "signature_fingerprint": "sha256:ba356e50a4e9b395d00b9616a2a51f3a1ab4415725951df7db024a8d5738d8cd"
+        },
+        {
+          "object": "tb_fat_procedimento",
+          "columns_used": ["co_seq_fat_procedimento", "co_dim_cbo", "co_dim_equipe", "co_dim_municipio", "co_dim_tempo", "co_dim_unidade_saude", "UNIQUE_KEY=co_seq_fat_procedimento"],
+          "signature_fingerprint": "sha256:2a98f29996199e62618da0e599ef8a7e20de88f0a135718cb7733a10018dfc99"
+        },
+        {
+          "object": "tb_dim_cbo",
+          "columns_used": ["co_seq_dim_cbo", "nu_cbo", "UNIQUE_KEY=co_seq_dim_cbo"],
+          "signature_fingerprint": "sha256:0d0690dc0ee3f3f8fe27544ad5d464d7753fb0291349ece447e2b2650842e3a0"
+        },
+        {
+          "object": "tb_dim_cidadao_pec_grupo",
+          "columns_used": ["co_cidadao", "co_cidadao_master", "co_fat_cidadao_pec"],
+          "signature_fingerprint": "sha256:e1b0982fd163acb97434127245c73ac9c19a1e3b31763b1917fa678188571142"
+        },
+        {
+          "object": "tb_dim_equipe",
+          "columns_used": ["co_seq_dim_equipe", "nu_ine", "UNIQUE_KEY=co_seq_dim_equipe"],
+          "signature_fingerprint": "sha256:cef2ac02e86774740645637104057bffe8eabb699961a877bdb400f681a2b3df"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:d9b9d03c6cec444ca0fbd78e572cf24915b0d2c23b873572b839d9752fc746b6"
+        },
+        {
+          "object": "tb_dim_procedimento",
+          "columns_used": ["co_seq_dim_procedimento", "co_proced", "UNIQUE_KEY=co_seq_dim_procedimento"],
+          "signature_fingerprint": "sha256:1161396325f386661151641abf6bfd65621fae340125e95f95e92053aac9994d"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:ed106a7558268037666b4f6c901c7adbc10cbee774bdaaf204999108d5aa1556"
+        },
+        {
+          "object": "tb_dim_unidade_saude",
+          "columns_used": ["co_seq_dim_unidade_saude", "nu_cnes", "UNIQUE_KEY=co_seq_dim_unidade_saude"],
+          "signature_fingerprint": "sha256:8cc3d820df61cc5e6b3b82da4179a854157da602df7b240bfec4cc03adda72ca"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
+      },
+      "query_checksum": "sha256:f96469372d2a8fe12042844cb9e13d218283bcc14829ee2fd6532ebe45d460dd",
+      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
+      "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "condition_list",
+      "status": "NOT_TESTED",
+      "status_reason": "Consulta escrita sobre o dicionário oficial do DW (docs/discovery/2026-10-02-dw-dicionario-c2-c7.md) e testada só na fixture sintética PostgreSQL 9.6 (fixture_checksum). Falta a validação ao vivo da ADR 0023 num PEC real (runbook docs/discovery/runbook-validacao-capacidades.md): as signature_fingerprint abaixo são as da fixture, não as do PEC, e precisam ser recapturadas por CapabilityFingerprintCaptureLiveTest antes de qualquer promoção a VALIDATED. Nomes inferidos a confirmar no inventário estão em docs/discovery/capacidades-dw-v2.md.",
+      "objects_used": [
+        {
+          "object": "tb_fat_atd_ind_problemas",
+          "columns_used": ["co_seq_fat_atend_ind_problemas", "co_dim_ciap", "co_dim_cid", "co_dim_data_fim_problema", "co_dim_situacao", "co_fat_atd_ind", "st_avaliado"],
+          "signature_fingerprint": "sha256:25b65ba2c4808bf572f45047f0f369c9f43650f782cc75d99c05512766e6040b"
+        },
+        {
+          "object": "tb_fat_atend_odonto_problemas",
+          "columns_used": ["co_seq_fat_atnd_odonto_probl", "co_dim_ciap", "co_dim_cid", "co_dim_data_fim_problema", "co_dim_situacao", "co_fat_atd_odnt", "st_avaliado"],
+          "signature_fingerprint": "sha256:e25cc8e6979c7250d6dc389fbb59db7ad1ca434c4ddbaaf61a7da604619a7417"
+        },
+        {
+          "object": "tb_fat_atendimento_individual",
+          "columns_used": ["co_seq_fat_atd_ind", "co_dim_cbo_1", "co_dim_municipio", "co_dim_tempo", "co_fat_cidadao_pec", "dt_nascimento", "UNIQUE_KEY=co_seq_fat_atd_ind"],
+          "signature_fingerprint": "sha256:a0df9237b83f610d7ce118a686d78b1aa444d0869a61de8e3081a80b13fc8eec"
+        },
+        {
+          "object": "tb_fat_atendimento_odonto",
+          "columns_used": ["co_seq_fat_atd_odnt", "co_dim_cbo_1", "co_dim_municipio", "co_dim_tempo", "co_fat_cidadao_pec", "dt_nascimento", "UNIQUE_KEY=co_seq_fat_atd_odnt"],
+          "signature_fingerprint": "sha256:1c10cffd2fac69e1f9a3d6fd875e4a6152af23a563185855eef5376974fa2e12"
+        },
+        {
+          "object": "tb_fat_cad_individual",
+          "columns_used": ["co_seq_fat_cad_individual", "co_dim_municipio", "co_dim_tempo", "co_fat_cidadao_pec", "dt_nascimento"],
+          "signature_fingerprint": "sha256:4762fba8c4be6168079d3df219b4603852fe97999e188b1a7548d6166b960d2b"
+        },
+        {
+          "object": "tb_dim_cbo",
+          "columns_used": ["co_seq_dim_cbo", "nu_cbo", "UNIQUE_KEY=co_seq_dim_cbo"],
+          "signature_fingerprint": "sha256:0d0690dc0ee3f3f8fe27544ad5d464d7753fb0291349ece447e2b2650842e3a0"
+        },
+        {
+          "object": "tb_dim_ciap",
+          "columns_used": ["co_seq_dim_ciap", "nu_ciap", "UNIQUE_KEY=co_seq_dim_ciap"],
+          "signature_fingerprint": "sha256:edce1ffad2439d3945fc3a0f4954f7a16d5cf452d719cba7a83d20077e9e1f95"
+        },
+        {
+          "object": "tb_dim_cid",
+          "columns_used": ["co_seq_dim_cid", "nu_cid", "UNIQUE_KEY=co_seq_dim_cid"],
+          "signature_fingerprint": "sha256:60e4aa7d2041e9427455c0bd74abed628bcbbe7fb1eefde8ec526366196bb484"
+        },
+        {
+          "object": "tb_dim_cidadao_pec_grupo",
+          "columns_used": ["co_cidadao", "co_cidadao_master", "co_fat_cidadao_pec"],
+          "signature_fingerprint": "sha256:e1b0982fd163acb97434127245c73ac9c19a1e3b31763b1917fa678188571142"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:d9b9d03c6cec444ca0fbd78e572cf24915b0d2c23b873572b839d9752fc746b6"
+        },
+        {
+          "object": "tb_dim_situacao_problema",
+          "columns_used": ["co_seq_dim_situacao", "nu_identificador", "UNIQUE_KEY=co_seq_dim_situacao"],
+          "signature_fingerprint": "sha256:bd97921d4b951581dc9c1bcaddbc996ec127eb88eb8d41d55af77a5a3578045f"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:ed106a7558268037666b4f6c901c7adbc10cbee774bdaaf204999108d5aa1556"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
+      },
+      "query_checksum": "sha256:18adbe9c53537b7ad695cd90c78d1913355917596d62754607343257a0e83588",
+      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
+      "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
+    },
+    {
+      "pec_versions": ["5.5.28"],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_DW",
+      "installation_role": "PRONTUARIO",
+      "capability": "measurement_record",
+      "status": "NOT_TESTED",
+      "status_reason": "Consulta escrita sobre o dicionário oficial do DW (docs/discovery/2026-10-02-dw-dicionario-c2-c7.md) e testada só na fixture sintética PostgreSQL 9.6 (fixture_checksum). Falta a validação ao vivo da ADR 0023 num PEC real (runbook docs/discovery/runbook-validacao-capacidades.md): as signature_fingerprint abaixo são as da fixture, não as do PEC, e precisam ser recapturadas por CapabilityFingerprintCaptureLiveTest antes de qualquer promoção a VALIDATED. Nomes inferidos a confirmar no inventário estão em docs/discovery/capacidades-dw-v2.md.",
+      "objects_used": [
+        {
+          "object": "tb_fat_atividade_coletiva",
+          "columns_used": ["co_seq_fat_atividade_coletiva", "co_dim_cbo", "co_dim_municipio", "co_dim_tempo", "co_dim_tipo_atividade", "UNIQUE_KEY=co_seq_fat_atividade_coletiva"],
+          "signature_fingerprint": "sha256:f7f5c05363229e0bd6a5bd5bc4af59aa29923ef0be6d042b791ecf9d413a69e3"
+        },
+        {
+          "object": "tb_fat_atvdd_coletiva_ext",
+          "columns_used": ["co_fat_atividade_coletiva", "st_prat_saude_antropometria", "st_prat_saude_aplic_topi_fluor", "st_prat_saude_desenv_linguagem", "st_prat_saude_escov_supervisio", "st_prat_saude_fornec_kit_bucal", "st_prat_saude_outras", "st_prat_saude_outro_procedimen", "st_prat_saude_pnct_1", "st_prat_saude_pnct_2", "st_prat_saude_pnct_3", "st_prat_saude_pnct_4", "st_prat_saude_prt_corp_atv_fis", "st_prat_saude_saude_auditiva", "st_prat_saude_saude_ocular", "st_prat_saude_situacao_vacinal"],
+          "signature_fingerprint": "sha256:11e51ff91b312c5d78dd17c3eafd59d186a725c256657d5fa6a2394e54e6d793"
+        },
+        {
+          "object": "tb_fat_atvdd_coletiva_part",
+          "columns_used": ["co_seq_fat_atvdd_cltv_part", "co_fat_atividade_coletiva", "co_fat_cidadao_pec", "dt_participante_nascimento", "nu_participante_altura", "nu_participante_peso"],
+          "signature_fingerprint": "sha256:71fdac7f883a52c3cd49fe9f1c7a7484bf13989787e75f20bb4d30e4c65f0257"
+        },
+        {
+          "object": "tb_fat_cad_individual",
+          "columns_used": ["co_seq_fat_cad_individual", "co_dim_municipio", "co_dim_tempo", "co_fat_cidadao_pec", "dt_nascimento"],
+          "signature_fingerprint": "sha256:4762fba8c4be6168079d3df219b4603852fe97999e188b1a7548d6166b960d2b"
+        },
+        {
+          "object": "tb_fat_proced_atend",
+          "columns_used": ["co_seq_fat_proced_atend", "co_fat_cidadao_pec", "co_fat_procedimento", "dt_nascimento", "nu_altura", "nu_medicao_pressao_diastolica", "nu_medicao_pressao_sistolica", "nu_peso"],
+          "signature_fingerprint": "sha256:121fa3beec4c69ad9afb48fc062aaaf71b8c766c13c40174b2cd2076e30c01f5"
+        },
+        {
+          "object": "tb_fat_procedimento",
+          "columns_used": ["co_seq_fat_procedimento", "co_dim_cbo", "co_dim_municipio", "co_dim_tempo", "UNIQUE_KEY=co_seq_fat_procedimento"],
+          "signature_fingerprint": "sha256:55e94f7ec53d5dfaf1a43e5d6f1fbc1ad8596b229753b787f7f4fe2f0b0757da"
+        },
+        {
+          "object": "tb_dim_cbo",
+          "columns_used": ["co_seq_dim_cbo", "nu_cbo", "UNIQUE_KEY=co_seq_dim_cbo"],
+          "signature_fingerprint": "sha256:0d0690dc0ee3f3f8fe27544ad5d464d7753fb0291349ece447e2b2650842e3a0"
+        },
+        {
+          "object": "tb_dim_cidadao_pec_grupo",
+          "columns_used": ["co_cidadao", "co_cidadao_master", "co_fat_cidadao_pec"],
+          "signature_fingerprint": "sha256:e1b0982fd163acb97434127245c73ac9c19a1e3b31763b1917fa678188571142"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": ["co_seq_dim_municipio", "co_ibge", "UNIQUE_KEY=co_seq_dim_municipio"],
+          "signature_fingerprint": "sha256:d9b9d03c6cec444ca0fbd78e572cf24915b0d2c23b873572b839d9752fc746b6"
+        },
+        {
+          "object": "tb_dim_tempo",
+          "columns_used": ["co_seq_dim_tempo", "dt_registro", "UNIQUE_KEY=co_seq_dim_tempo"],
+          "signature_fingerprint": "sha256:ed106a7558268037666b4f6c901c7adbc10cbee774bdaaf204999108d5aa1556"
+        },
+        {
+          "object": "tb_dim_tipo_atividade",
+          "columns_used": ["co_seq_dim_tipo_atividade", "nu_identificador", "UNIQUE_KEY=co_seq_dim_tipo_atividade"],
+          "signature_fingerprint": "sha256:0ae785ad3b52e9bc9ce82560dee186d71a040a46fdabb589a16eeac40193594d"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
+      },
+      "query_checksum": "sha256:7125b64f42f908520ba2fe379e62f233b165338ee52dfa5453a63d2ad79c140f",
+      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
+      "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
     }
   ]
 }

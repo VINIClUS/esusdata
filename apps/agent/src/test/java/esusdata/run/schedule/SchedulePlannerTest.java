@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -46,6 +47,47 @@ class SchedulePlannerTest {
     @Test
     void nothingCoveredIsNothingToDo() {
         assertThat(SchedulePlanner.next(List.of(), Set.of(), Set.of(), LocalDate.of(2026, 10, 10), 5))
+                .isEmpty();
+    }
+
+    /** ADR 0030: packs in the order given (C1 first), oldest competência first within a pack. */
+    @Test
+    void perPackTheGivenPackOrderComesFirstAndEachPackFillsItsOwnHistory() {
+        LocalDate today = LocalDate.of(2026, 10, 10);
+        List<SchedulePlanner.Candidate> pending = SchedulePlanner.pending(
+                List.of(SEPTEMBER, MARCH, APRIL),
+                List.of("c1", "c2"),
+                Map.of("c1", Set.of(MARCH), "c2", Set.of(APRIL)),
+                today,
+                5);
+
+        assertThat(pending)
+                .containsExactly(
+                        new SchedulePlanner.Candidate("c1", APRIL),
+                        new SchedulePlanner.Candidate("c1", SEPTEMBER),
+                        new SchedulePlanner.Candidate("c2", MARCH),
+                        new SchedulePlanner.Candidate("c2", SEPTEMBER));
+    }
+
+    @Test
+    void perPackNextTakesAtMostMaxJobsAndSkipsWhatThatPackFailedRecently() {
+        LocalDate today = LocalDate.of(2026, 10, 10);
+        List<YearMonth> covered = List.of(MARCH, APRIL);
+        Map<String, Set<YearMonth>> published = Map.of("c1", Set.of(MARCH));
+
+        assertThat(SchedulePlanner.next(covered, List.of("c1", "c2"), published, Set.of(), today, 5, 1))
+                .containsExactly(new SchedulePlanner.Candidate("c1", APRIL));
+        assertThat(SchedulePlanner.next(
+                        covered,
+                        List.of("c1", "c2"),
+                        published,
+                        Set.of(new SchedulePlanner.Candidate("c1", APRIL)),
+                        today,
+                        5,
+                        2))
+                .containsExactly(
+                        new SchedulePlanner.Candidate("c2", MARCH), new SchedulePlanner.Candidate("c2", APRIL));
+        assertThat(SchedulePlanner.next(covered, List.of(), published, Set.of(), today, 5, 3))
                 .isEmpty();
     }
 

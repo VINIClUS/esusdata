@@ -3,10 +3,19 @@ import { expectNoHorizontalOverflow } from '../support/layout.ts'
 import { IBGE, expect, test, type ApiStub } from './api.ts'
 import {
   PERIOD,
+  c1Pack,
+  c4Blocked,
+  c4Pack,
+  c7Pack,
+  component,
   exportResponse,
+  notaFinalPack,
   pack,
   overview,
   overviewIndicator,
+  overviewOfPack,
+  personRow,
+  qualityComponent,
   result,
   source,
 } from './data.ts'
@@ -191,6 +200,40 @@ test.describe('painel', () => {
     ).toHaveText('Falhou')
   })
 
+  test('a Nota Final fica fora da contagem e o botão leva ao pacote pendente', async ({
+    page,
+    api,
+  }) => {
+    manager(api, [PERIOD])
+    stubOverview(api, () =>
+      overview(
+        [
+          overviewOfPack(c1Pack(), 'COMPUTED', '70'),
+          overviewOfPack(c4Pack()),
+          overviewOfPack(notaFinalPack()),
+        ],
+        {
+          pendingPeriods: [
+            {
+              sourceId: 'pec-a',
+              referencePeriod: '2026-02',
+              count: 9500,
+              indicatorPacks: ['c4-cuidado-diabetes'],
+            },
+          ],
+        },
+      ),
+    )
+    execucaoOpens(api)
+    await page.goto('/painel')
+    await expectSettled(page, 'Painel Principal')
+    await expect(page.getByText('1 / 2', { exact: true })).toBeVisible()
+    await expect(page.getByText('A calcular: C4')).toBeVisible()
+    await expect(page.getByText('C4 – Cuidado da pessoa com diabetes')).toBeVisible()
+    await page.getByRole('button', { name: 'Executar nova importação de dados' }).click()
+    await expect(page).toHaveURL('/execucao?competencia=2026-02&indicador=c4-cuidado-diabetes')
+  })
+
   test('erro da API', async ({ page, api }) => {
     manager(api)
     api.get(/^\/overview\?/, serverError)
@@ -202,18 +245,54 @@ test.describe('painel', () => {
 })
 
 test.describe('indicadores', () => {
-  test('lista os pacotes da API', async ({ page, api }) => {
+  test('lista C1–C7 e a Nota Final nas suas categorias, com a disponibilidade', async ({
+    page,
+    api,
+  }) => {
     manager(api)
     stubOverview(api, () =>
       overview([
-        overviewIndicator('c1-mais-acesso'),
+        overviewOfPack(c1Pack()),
+        overviewOfPack(c4Pack(), null, null, {
+          availability: 'UNSUPPORTED_SOURCE',
+          missingCapabilities: ['condition_list'],
+        }),
+        overviewOfPack(notaFinalPack()),
+        // An API before ADR 0030: the family alone says the category.
         overviewIndicator('previne-pre-natal', null, null, { family: 'PREVINE_BRASIL' }),
       ]),
     )
     await page.goto('/indicadores')
     await expectSettled(page, 'Indicadores')
-    await expect(page.getByText('Mostrando 1–2 de 2 indicadores')).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Previne Brasil / ISF (1)' })).toHaveCount(0)
+    await expect(page.getByText('Mostrando 1–4 de 4 indicadores')).toBeVisible()
+    await expect(page.getByRole('tab')).toHaveText([
+      'Todos (4)',
+      'Previne Brasil (1)',
+      'C1 – C7 (2)',
+      'Componente III (1)',
+    ])
+    const c4 = page.getByRole('row', { name: /C4 – Cuidado da pessoa com diabetes/ })
+    await expect(c4).toContainText('Fonte sem suporte')
+    await expect(c4).toContainText('Faltam: condition_list')
+    await expect(page.getByRole('row', { name: /Componente III – Nota Final/ })).toContainText(
+      'Não executável',
+    )
+    await expect(page.getByRole('row', { name: /C1 – Mais acesso/ })).toContainText('Disponível')
+    // The pack id stays on the row: the CSV export and the URLs use it.
+    await expect(page.getByRole('row', { name: /c1-mais-acesso/ })).toBeVisible()
+  })
+
+  test('sem fonte do PEC no município, nenhum pacote está disponível', async ({ page, api }) => {
+    manager(api)
+    stubOverview(api, () =>
+      overview([
+        overviewOfPack(c1Pack(), null, null, { availability: 'NO_SOURCE' }),
+        overviewOfPack(c4Pack(), null, null, { availability: 'NO_SOURCE' }),
+      ]),
+    )
+    await page.goto('/indicadores')
+    await expectSettled(page, 'Indicadores')
+    await expect(page.getByText('Sem fonte do PEC')).toHaveCount(2)
   })
 
   test('a competência escolhida é a do escopo e troca os resultados da lista', async ({
@@ -240,7 +319,7 @@ test.describe('indicadores', () => {
     await expect(page.getByRole('option')).toHaveText(['03/2026', '02/2026'])
     await page.getByRole('option', { name: '02/2026' }).click()
     await expect(row.getByRole('status')).toHaveText('Concluído')
-    await expect(row.getByText('70,0%')).toBeVisible()
+    await expect(row.getByText('70,00%')).toBeVisible()
     // The choice is the global scope's: the top bar follows it.
     await expect(page.getByRole('banner').getByText('02/2026')).toBeVisible()
     expect(api.calls.some((c) => c.path.includes('referencePeriod=2026-02'))).toBe(true)
@@ -294,7 +373,7 @@ test.describe('indicadores', () => {
     })
     await page.goto('/indicadores')
     await expectSettled(page, 'Indicadores')
-    await page.getByRole('button', { name: 'Ações de c1-mais-acesso' }).click()
+    await page.getByRole('button', { name: 'Ações de C1 – Mais acesso' }).click()
     const download = page.waitForEvent('download')
     await page.getByRole('menuitem', { name: 'Exportar CSV da competência' }).click()
     expect((await download).suggestedFilename()).toMatch(/\.csv$/)
@@ -306,7 +385,7 @@ test.describe('indicadores', () => {
     })
 
     execucaoOpens(api)
-    await page.getByRole('button', { name: 'Ações de c1-mais-acesso' }).click()
+    await page.getByRole('button', { name: 'Ações de C1 – Mais acesso' }).click()
     await page.getByRole('menuitem', { name: 'Executar novamente' }).click()
     await expect(page).toHaveURL(`/execucao?indicador=c1-mais-acesso&competencia=${PERIOD}`)
   })
@@ -340,7 +419,7 @@ test.describe('indicadores', () => {
       await expect(competencia).toHaveText(/03\/2026/)
       await competencia.click()
       await page.getByRole('option', { name: '02/2026' }).click()
-      await expect(page.getByText('70,0%')).toBeVisible()
+      await expect(page.getByText('70,00%')).toBeVisible()
       await page.getByRole('combobox', { name: 'Status' }).click()
       await page.getByRole('option', { name: 'Bloqueado' }).click()
       await expect(page.getByText('C2 – Cuidado')).toBeVisible()
@@ -373,24 +452,230 @@ test.describe('indicadores', () => {
     await expectSettled(page, 'Indicadores')
   })
 
-  test('detalhe com resultado publicado', async ({ page, api }) => {
+  test('detalhe do C1 com resultado publicado: catálogo, resultado e visão geral', async ({
+    page,
+    api,
+  }) => {
     manager(api, [PERIOD])
+    api.get('/indicator-packs', { json: [c1Pack()] })
+    stubOverview(api, () => overview([overviewOfPack(c1Pack(), 'COMPUTED', '70')]))
     api.get(
       `/results?municipalityIbge=${IBGE}&indicatorPack=c1-mais-acesso&referencePeriod=${PERIOD}`,
-      {
-        json: [result('c1-mais-acesso', '70')],
-      },
+      { json: [result('c1-mais-acesso', '70', { classification: 'OTIMO' })] },
     )
     await page.goto('/indicadores/c1-mais-acesso')
-    await expect(page.getByText('Resultado publicado para a competência 2026-03.')).toBeVisible()
-    await expectSettled(page, await page.getByRole('heading', { level: 1 }).innerText())
+    await expectSettled(page, 'C1 – Mais acesso')
+    await expect(page.getByText('70,00%')).toBeVisible()
+    await expect(page.getByText('Ótimo')).toBeVisible()
+    await expect(page.getByText('42', { exact: true })).toBeVisible()
   })
 
-  test('detalhe sem competência publicada', async ({ page, api }) => {
+  test('detalhe sem competência publicada: a ficha, sem contagem inventada', async ({
+    page,
+    api,
+  }) => {
     manager(api)
-    await page.goto('/indicadores/c1-mais-acesso')
+    api.get('/indicator-packs', { json: [c4Pack()] })
+    stubOverview(api, () => overview([overviewOfPack(c4Pack())], { referencePeriod: null }))
+    await page.goto('/indicadores/c4-cuidado-diabetes')
+    await expectSettled(page, 'C4 – Cuidado da pessoa com diabetes')
+    await expect(
+      page.getByText('O município ainda não tem nenhuma competência publicada.'),
+    ).toBeVisible()
+    await expect(page.getByRole('row', { name: /^A Ter pelo menos/ })).toContainText(
+      'Não publicado',
+    )
+    expect(api.calls.filter((c) => c.path.startsWith('/results?'))).toEqual([])
+  })
+
+  test('um pacote fora do catálogo mostra a indisponibilidade', async ({ page, api }) => {
+    manager(api, [PERIOD])
+    api.get('/indicator-packs', { json: [c1Pack()] })
+    stubOverview(api, () => overview([overviewOfPack(c1Pack())]))
+    await page.goto('/indicadores/c9-inexistente')
     await expect(page.getByRole('heading', { name: 'Detalhes indisponíveis' })).toBeVisible()
-    await expectSettled(page, 'c1-mais-acesso')
+    await expect(page.getByText(/O indicador c9-inexistente não está no catálogo/)).toBeVisible()
+    await expectSettled(page, 'c9-inexistente')
+  })
+
+  test('detalhe do C4 bloqueado: práticas, equipes e evidência por pessoa, página a página', async ({
+    page,
+    api,
+  }) => {
+    manager(api, [PERIOD])
+    api.get('/indicator-packs', { json: [c4Pack()] })
+    stubOverview(api, () => overview([overviewOfPack(c4Pack(), 'BLOCKED')]))
+    api.get(
+      `/results?municipalityIbge=${IBGE}&indicatorPack=c4-cuidado-diabetes&referencePeriod=${PERIOD}`,
+      { json: [c4Blocked()] },
+    )
+    const evidence = `/results/r-c4-cuidado-diabetes/evidence?municipalityIbge=${IBGE}`
+    api.get(evidence, {
+      json: {
+        items: [
+          personRow('p-1a2b3c', 'ELIGIBLE'),
+          personRow('p-1a2b3c', 'PRACTICE_MET', { component: 'A', points: '20' }),
+          personRow('p-1a2b3c', 'SUPPORTING_EVENT', {
+            component: 'A',
+            sourceEntityType: 'tb_fat_atendimento_individual',
+            sourceRecordId: '880412',
+            careDate: '2026-02-11',
+          }),
+          personRow('p-1a2b3c', 'PRACTICE_AMBIGUOUS', { component: 'B', reasonCode: 'AMB-C4-03' }),
+        ],
+        nextCursor: 'cursor-2',
+      },
+    })
+    api.get(`${evidence}&cursor=cursor-2`, {
+      json: {
+        items: [personRow('p-9f8e7d', 'EXCLUDED', { reasonCode: 'EXCLUIDO_SAIDA_TERRITORIO' })],
+        nextCursor: null,
+      },
+    })
+    await page.goto('/indicadores/c4-cuidado-diabetes')
+    await expectSettled(page, 'C4 – Cuidado da pessoa com diabetes')
+    await expect(page.getByText('Indisponível', { exact: true })).toBeVisible()
+    await expect(page.getByText('1.700')).toBeVisible()
+    await expect(page.getByText('Sem valor: bloqueado')).toBeVisible()
+    const praticas = page.getByRole('table')
+    await expect(praticas.getByRole('row', { name: /^A / })).toContainText('75,00%')
+    const b = praticas.getByRole('row', { name: /^B / })
+    await expect(b.getByRole('status')).toHaveText('Ambiguidade na regra')
+    await expect(b).not.toContainText('%')
+
+    await page.getByRole('tab', { name: 'População e filtros' }).click()
+    const equipes = page.getByRole('table').getByRole('row')
+    await expect(equipes.nth(1)).toContainText('INE 0000000011')
+    await expect(equipes.nth(2)).toContainText('Sem equipe')
+    await expectNoA11yViolations(page)
+
+    await page.getByRole('tab', { name: 'Evidências' }).click()
+    const ambigua = page.getByRole('row', { name: /AMB-C4-03/ })
+    await expect(ambigua).toContainText('Ambígua')
+    await expect(ambigua).toContainText('p-1a2b3c')
+    await expect(page.getByRole('row', { name: /880412/ })).toContainText('Evento de suporte')
+    await page.getByRole('button', { name: 'Carregar mais' }).click()
+    await expect(page.getByRole('row', { name: /EXCLUIDO_SAIDA_TERRITORIO/ })).toContainText(
+      'Excluído',
+    )
+    expect(api.callsTo('GET', `${evidence}&cursor=cursor-2`)).toHaveLength(1)
+    await expectNoA11yViolations(page)
+  })
+
+  test('detalhe do C7: subgrupos com o seu par, e a ambiguidade sem valor', async ({
+    page,
+    api,
+  }) => {
+    manager(api, [PERIOD])
+    api.get('/indicator-packs', { json: [c7Pack()] })
+    stubOverview(api, () => overview([overviewOfPack(c7Pack(), 'RULE_AMBIGUITY')]))
+    api.get(
+      `/results?municipalityIbge=${IBGE}&indicatorPack=c7-prevencao-cancer&referencePeriod=${PERIOD}`,
+      {
+        json: [
+          result('c7-prevencao-cancer', null, {
+            status: 'RULE_AMBIGUITY',
+            valueKind: 'COMPOSITE_SCORE',
+            numerator: null,
+            denominator: null,
+            denominatorKind: null,
+            components: [
+              component('A', 'SUBGROUP', '20', '702', '1450', 'COMPUTED', '0.4841'),
+              component('C', 'SUBGROUP', '30', '640', '2100', 'RULE_AMBIGUITY'),
+            ],
+            teams: [],
+          }),
+        ],
+      },
+    )
+    await page.goto('/indicadores/c7-prevencao-cancer')
+    await expectSettled(page, 'C7 – Cuidado da mulher na prevenção do câncer')
+    await expect(page.getByRole('heading', { name: 'Subgrupos (soma ponderada)' })).toBeVisible()
+    await expect(page.getByText('Cada subgrupo tem o seu par.')).toBeVisible()
+    await expect(page.getByRole('row', { name: /^A / })).toContainText('48,41%')
+    const c = page.getByRole('row', { name: /^C / })
+    await expect(c).toContainText('2.100')
+    await expect(c.getByRole('status')).toHaveText('Ambiguidade na regra')
+  })
+})
+
+test.describe('componente III', () => {
+  const Q1 = `/quality-component?municipalityIbge=${IBGE}&quadrimestre=2026-Q1`
+
+  test('lê a Nota Final do quadrimestre do escopo, sem nota para a unidade bloqueada', async ({
+    page,
+    api,
+  }) => {
+    manager(api, [PERIOD])
+    api.get('/indicator-packs', { json: [c1Pack(), c4Pack(), notaFinalPack()] })
+    api.get(Q1, {
+      json: qualityComponent(
+        '2026-Q1',
+        ['2026-01', '2026-02', '2026-03', '2026-04'],
+        [
+          {
+            ine: '0000000011',
+            cnes: '1000001',
+            status: 'COMPUTED',
+            score: '8.2500',
+            scoreExact: { numerator: '33', denominator: '4' },
+            methodologicalClassification: 'OTIMO',
+            financialTransferClassification: 'BOM',
+            limitations: [],
+            indicators: [
+              {
+                indicatorPack: 'c1-mais-acesso',
+                weight: '1',
+                status: 'COMPUTED',
+                monthsUsed: ['2026-01', '2026-02'],
+                resultIds: ['r-1', 'r-2'],
+                mean: '60.3935',
+                meanExact: { numerator: '120787', denominator: '2000' },
+                classification: 'OTIMO',
+                factor: '1.00',
+              },
+            ],
+          },
+          {
+            ine: null,
+            cnes: null,
+            status: 'BLOCKED',
+            score: null,
+            scoreExact: null,
+            methodologicalClassification: null,
+            financialTransferClassification: null,
+            limitations: ['C4 bloqueado pelos portões de liberação.'],
+            indicators: [],
+          },
+        ],
+        { limitations: ['C4 bloqueado pelos portões de liberação.'] },
+      ),
+    })
+    await page.goto('/indicadores/componente-iii')
+    await expectSettled(page, 'Componente III – Nota Final')
+    await expect(page.getByRole('combobox', { name: 'Quadrimestre' })).toHaveText(
+      /1º quadrimestre de 2026 \(jan–abr\)/,
+    )
+    await expect(page.getByText('Nota Final indisponível neste quadrimestre')).toBeVisible()
+    const unidades = page.getByRole('table').first().getByRole('row')
+    // The municipality first, without a note; the team with its note and both classifications.
+    await expect(unidades.nth(1)).toContainText('Município')
+    await expect(unidades.nth(1).getByRole('status')).toHaveText('Bloqueado')
+    await expect(unidades.nth(1)).not.toContainText(/\d,\d/)
+    await expect(unidades.nth(2)).toContainText('8,3')
+    await expect(unidades.nth(2)).toContainText('Ótimo')
+    await expect(unidades.nth(2)).toContainText('Bom')
+    await expect(page.getByRole('row', { name: /C1 – Mais acesso/ })).toContainText('60,39%')
+    expect(api.callsTo('GET', Q1)).toHaveLength(1)
+  })
+
+  test('erro da API', async ({ page, api }) => {
+    manager(api, [PERIOD])
+    api.get('/indicator-packs', { json: [c1Pack()] })
+    api.get(Q1, serverError)
+    await page.goto('/indicadores/componente-iii')
+    await expect(page.getByText('Falha interna da API.')).toBeVisible()
+    await expectSettled(page, 'Componente III – Nota Final')
   })
 })
 
@@ -738,6 +1023,35 @@ test.describe('relatórios', () => {
       page.getByText('A exportação expirou ou não está mais disponível. Gere uma nova.'),
     ).toBeVisible()
     await expect(page.getByText('Nenhuma exportação disponível.')).toBeVisible()
+  })
+
+  test('a Nota Final não se exporta, e cada exportação traz o nome do catálogo', async ({
+    page,
+    api,
+  }) => {
+    reports(api, [
+      exportResponse({
+        indicatorPack: 'c4-cuidado-diabetes',
+        fileName: `esusdata-${IBGE}-c4-cuidado-diabetes-2026-01_2026-03.csv`,
+      }),
+    ])
+    api.get('/indicator-packs', { json: [c1Pack(), c4Pack(), notaFinalPack()] })
+    await page.goto('/relatorios')
+    await expectSettled(page, 'Relatórios')
+    await expect(
+      page
+        .getByRole('row', { name: /c4-cuidado-diabetes/ })
+        .getByText('C4 – Cuidado da pessoa com diabetes'),
+    ).toBeVisible()
+    await expect(
+      page.getByText('Valor publicado e unidade (percentual, escore ou escore composto)'),
+    ).toBeVisible()
+    await page.getByRole('combobox', { name: 'Indicador' }).click()
+    await expect(page.getByRole('option')).toHaveText([
+      'Todos os indicadores',
+      'C1 – Mais acesso',
+      'C4 – Cuidado da pessoa com diabetes',
+    ])
   })
 
   test('erro da API', async ({ page, api }) => {

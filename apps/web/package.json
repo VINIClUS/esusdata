@@ -10,7 +10,7 @@
     "lint": "oxlint --deny-warnings && eslint --max-warnings 0 .",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" scripts tests \"playwright.*.config.ts\" eslint.config.js",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" scripts tests \"playwright.*.config.ts\" eslint.config.js",
-    "test:data": "node --experimental-strip-types --test scripts/data-contracts.test.mjs",
+    "test:data": "node --experimental-strip-types --test \"scripts/*.test.mjs\"",
     "test:ui": "playwright test -c playwright.ui.config.ts",
     "test:e2e": "playwright test -c playwright.e2e.config.ts",
     "preview": "vite preview",

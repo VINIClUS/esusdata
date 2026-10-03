@@ -20,11 +20,14 @@ import tools.jackson.databind.JsonNode;
  * The ENG-43 compatibility verdict on a child's {@code probe} message, shared by every
  * conversation that runs a frozen query — the acquisition ({@link ExecPlaneAcquisition}) and the
  * municipal isolation check ({@link ExecPlaneIsolationCheck}). One copy, so both refuse the same
- * schema drift the same way.
+ * schema drift the same way; a canonical v2 acquisition (ADR 0030) runs the same check once per part.
  */
 final class ExecPlaneProbeVerifier {
 
     private static final Logger log = LoggerFactory.getLogger(ExecPlaneProbeVerifier.class);
+
+    private static final String POSTGRES_VERSION = "postgres_version";
+    private static final String QUERY_CHECKSUM = "query_checksum";
 
     private ExecPlaneProbeVerifier() {}
 
@@ -42,7 +45,69 @@ final class ExecPlaneProbeVerifier {
             String expectedQueryChecksum,
             PecSourceIdentity identity,
             JsonNode probe) {
-        String postgresVersion = ExecPlaneProcess.text(probe, "postgres_version");
+        return mismatch(
+                matrix,
+                capability,
+                adapterVersion,
+                expectedQueryChecksum,
+                identity,
+                ExecPlaneProcess.text(probe, POSTGRES_VERSION),
+                ExecPlaneProcess.text(probe, QUERY_CHECKSUM),
+                probe.get("objects"));
+    }
+
+    /**
+     * The canonical v2 probe (ADR 0030): one report per requested part, in part order, each checked
+     * against its own capability's exact matrix entry exactly as {@link #mismatch} checks C1's one
+     * capability — the part's query checksum from the command, the child's from its report.
+     *
+     * @return {@code null} when every part matches, otherwise the first part that does not, and why
+     */
+    static String mismatchV2(
+            PecCompatibilityMatrix matrix, List<AcquisitionPart> parts, PecSourceIdentity identity, JsonNode probe) {
+        JsonNode reported = probe.get("parts");
+        if (reported == null || !reported.isArray() || reported.size() != parts.size()) {
+            int count = reported == null || !reported.isArray() ? 0 : reported.size();
+            return "execution plane probed " + count + " parts for the " + parts.size() + " requested";
+        }
+        String postgresVersion = ExecPlaneProcess.text(probe, POSTGRES_VERSION);
+        for (int index = 0; index < parts.size(); index++) {
+            AcquisitionPart part = parts.get(index);
+            JsonNode partProbe = reported.get(index);
+            String probedCapability = ExecPlaneProcess.text(partProbe, "capability");
+            String probedVersion = ExecPlaneProcess.text(partProbe, "adapter_version");
+            String label = "part " + index + " (" + part.capability() + "): ";
+            if (partProbe.path("index").asInt(-1) != index
+                    || !part.capability().equals(probedCapability)
+                    || !part.adapterVersion().equals(probedVersion)) {
+                return label + "execution plane probed " + probedCapability + "@" + probedVersion + " at index "
+                        + partProbe.path("index");
+            }
+            String mismatch = mismatch(
+                    matrix,
+                    part.capability(),
+                    part.adapterVersion(),
+                    part.queryChecksum(),
+                    identity,
+                    postgresVersion,
+                    ExecPlaneProcess.text(partProbe, QUERY_CHECKSUM),
+                    partProbe.get("objects"));
+            if (mismatch != null) {
+                return label + mismatch;
+            }
+        }
+        return null;
+    }
+
+    private static String mismatch(
+            PecCompatibilityMatrix matrix,
+            String capability,
+            String adapterVersion,
+            String expectedQueryChecksum,
+            PecSourceIdentity identity,
+            String postgresVersion,
+            String probeQueryChecksum,
+            JsonNode objects) {
         PecCompatibilityMatrix.Entry entry;
         try {
             entry = matrix.findExact(capability, adapterVersion, identity, postgresVersion);
@@ -52,14 +117,12 @@ final class ExecPlaneProbeVerifier {
         if (!expectedQueryChecksum.equals(entry.queryChecksum())) {
             return "query checksum mismatch: matrix has " + entry.queryChecksum();
         }
-        String probeQueryChecksum = ExecPlaneProcess.text(probe, "query_checksum");
         if (!entry.queryChecksum().equals(probeQueryChecksum)) {
             // The one place the child's own query text is checked against the frozen contract
             // (plan §2.3) — without this, a child running a different query would still pass.
             return "query checksum mismatch: matrix has " + entry.queryChecksum() + " but execution plane reported "
                     + probeQueryChecksum;
         }
-        JsonNode objects = probe.get("objects");
         for (Map.Entry<String, String> expected : entry.objectFingerprints().entrySet()) {
             String object = expected.getKey();
             JsonNode objectNode = objects == null ? null : objects.get(object);
