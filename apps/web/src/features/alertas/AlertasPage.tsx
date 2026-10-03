@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import { useVisaoGeral } from '@/api/hooks'
-import { overviewAlert } from '@/api/normalizers'
+import { contextoAlertas, overviewAlert } from '@/api/normalizers'
 import type { OverviewAlert } from '@/api/types'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
@@ -29,6 +29,7 @@ export function AlertasPage() {
   if (isPending) return <PageSkeleton title={TITLE} />
   if (isError) return <PageUnavailable title={TITLE} subtitle={SUBTITLE} error={error} />
   const alerts = data.alerts.filter((a) => tab === 'todos' || a.severity === tab)
+  const contexto = contextoAlertas(data)
 
   return (
     <>
@@ -46,7 +47,7 @@ export function AlertasPage() {
       <Paper sx={{ px: 2, py: 1 }}>
         {alerts.length > 0 ? (
           alerts.map((alert, index) => {
-            const alerta = overviewAlert(alert, index)
+            const alerta = overviewAlert(alert, index, contexto)
             return <AlertRow key={alerta.id} alerta={alerta} />
           })
         ) : (

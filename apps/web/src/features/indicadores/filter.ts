@@ -3,6 +3,7 @@ import type { IndicadorResumo } from '../../api/types'
 const categoriaKey: Record<string, string> = {
   'Previne Brasil': 'previne',
   'C1 – C7': 'c1c7',
+  'Componente III': 'componente3',
   'Vínculo / Acompanhamento': 'vinculo',
   'IGM (Municipal)': 'igm',
 }

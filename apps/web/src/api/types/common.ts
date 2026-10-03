@@ -13,6 +13,12 @@ export type StatusKey =
   | 'falhou'
   | 'cancelado'
   | 'nao_executado'
+  // ADR 0030: the ficha leaves the case undefined; the source lacks a capability; the
+  // municipality has no PEC source; the Nota Final, computed on read and never run.
+  | 'ambiguidade'
+  | 'sem_suporte'
+  | 'sem_fonte'
+  | 'na_leitura'
 
 export type Severity = 'success' | 'info' | 'warning' | 'error'
 

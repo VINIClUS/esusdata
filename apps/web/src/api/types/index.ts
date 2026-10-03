@@ -1,6 +1,7 @@
 export * from './common'
 export * from './painel'
 export * from './indicadores'
+export * from './componente3'
 export * from './execucao'
 export * from './fonteDados'
 export * from './isolamento'

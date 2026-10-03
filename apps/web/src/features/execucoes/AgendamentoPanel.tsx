@@ -158,8 +158,9 @@ export function AgendamentoPanel({
           A cada {schedule.intervalHours} horas o agendador confere quais competências a base do PEC
           tem para o município e enfileira no máximo uma execução por vez: a competência fechada
           mais antiga — a partir do dia {schedule.settleDays} do mês seguinte — que tem atendimentos
-          e ainda não tem resultado publicado. Uma competência que falhou só é tentada de novo 24
-          horas depois. As execuções usam o primeiro gestor habilitado do município.
+          e ainda não tem publicado um indicador que esta fonte calcula, o C1 primeiro. Um indicador
+          sem suporte na fonte nunca é enfileirado. Uma competência que falhou só é tentada de novo
+          24 horas depois. As execuções usam o primeiro gestor habilitado do município.
         </Callout>
       </Box>
     </SectionCard>
