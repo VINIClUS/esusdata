@@ -100,7 +100,8 @@ public final class QualityComponentService {
                     result.resultId(),
                     status,
                     status == IndicatorStatus.COMPUTED ? result.valueExact() : null,
-                    result.consolidationEligible()));
+                    result.consolidationEligible(),
+                    result.ruleVersion()));
             for (ResultJson.StoredTeam team : ResultJson.readTeams(result.teamResultsJson())) {
                 if (team.ine() == null) {
                     continue; // the no-team bucket: its records are already in the municipal unit
@@ -114,7 +115,8 @@ public final class QualityComponentService {
                                 result.resultId(),
                                 teamStatus,
                                 value,
-                                team.consolidationEligible()));
+                                team.consolidationEligible(),
+                                result.ruleVersion()));
                 if (team.cnes() != null) {
                     cnesByTeam.putIfAbsent(team.ine(), team.cnes());
                 }

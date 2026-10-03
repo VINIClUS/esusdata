@@ -150,13 +150,16 @@ class QualityComponentConsolidationTest extends ApiFixtureSupport {
 
     /** A computed month, or — {@code value == null} — a month without a cohort event (C2/C3). */
     private static IndicatorResult result(String pack, String period, Long value) {
+        return value == null ? withoutCohortEvent(pack, period) : computed(pack, period, value);
+    }
+
+    private static IndicatorResult computed(String pack, String period, long value) {
         boolean c1 = "c1-mais-acesso".equals(pack);
-        ExactRatio exact = value == null ? null : ExactRatio.of(value, 1);
         return new IndicatorResult(
-                value == null ? IndicatorStatus.NO_DENOMINATOR : IndicatorStatus.COMPUTED,
-                value == null ? null : value + ".0000",
-                c1 && value != null ? BigInteger.valueOf(value) : null,
-                c1 && value != null ? BigInteger.valueOf(100) : null,
+                IndicatorStatus.COMPUTED,
+                value + ".0000",
+                c1 ? BigInteger.valueOf(value) : null,
+                c1 ? BigInteger.valueOf(100) : null,
                 c1 ? "PROGRAMADOS_MAIS_ESPONTANEOS" : null,
                 null,
                 period,
@@ -166,9 +169,30 @@ class QualityComponentConsolidationTest extends ApiFixtureSupport {
                 List.of(),
                 pack + "-policy@1",
                 c1 ? ValueKind.PERCENTAGE : ValueKind.SCORE,
-                exact,
+                ExactRatio.of(value, 1),
                 List.of(),
-                value != null);
+                true);
+    }
+
+    private static IndicatorResult withoutCohortEvent(String pack, String period) {
+        boolean c1 = "c1-mais-acesso".equals(pack);
+        return new IndicatorResult(
+                IndicatorStatus.NO_DENOMINATOR,
+                null,
+                null,
+                null,
+                c1 ? "PROGRAMADOS_MAIS_ESPONTANEOS" : null,
+                null,
+                period,
+                pack + "@0.1.0",
+                YearMonth.parse(period).atEndOfMonth().toString(),
+                IBGE,
+                List.of(),
+                pack + "-policy@1",
+                c1 ? ValueKind.PERCENTAGE : ValueKind.SCORE,
+                null,
+                List.of(),
+                false);
     }
 
     private static IndicatorResult blocked(String pack, String period) {
