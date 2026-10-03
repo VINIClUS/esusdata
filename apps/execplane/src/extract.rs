@@ -262,6 +262,22 @@ impl ExtractSink {
         Ok(())
     }
 
+    /// Writes one canonical v2 line (ADR 0030), `{"part":i,"kind":"…","record":{…}}` already
+    /// serialized by `canonical.rs`, which checked the record against its own part's window and
+    /// the bound municipality before handing it over — the per-part scope this sink's single
+    /// period cannot express. The free-space check and the gzip/digest/bounded chain are `write`'s.
+    pub fn write_canonical_line(&mut self, mut line: Vec<u8>) -> Result<(), ExtractError> {
+        let remaining = self
+            .max_bytes
+            .saturating_sub(self.written.load(Ordering::Relaxed));
+        ensure_free_space(&self.base_dir, remaining)?;
+
+        line.push(b'\n');
+        self.gz.write_all(&line)?;
+        self.row_count += 1;
+        Ok(())
+    }
+
     /// Closes the gzip stream, fsyncs, and returns the manifest-bound counts and checksum. Never
     /// touches the lock, the manifest, or publication — Java hard-links this same `.tmp` path
     /// into place after its own metadata/integrity check (ADR 0011).
@@ -339,7 +355,7 @@ fn is_blank(value: &str) -> bool {
     value.trim().is_empty()
 }
 
-fn is_seven_digit_ibge(value: &str) -> bool {
+pub fn is_seven_digit_ibge(value: &str) -> bool {
     value.len() == 7 && value.chars().all(|c| c.is_ascii_digit())
 }
 
@@ -503,6 +519,50 @@ mod tests {
         assert!(
             matches!(result, Err(ExtractError::BudgetExceeded(msg)) if msg.contains("ceiling"))
         );
+
+        std::fs::remove_file(&temp_path).ok();
+        std::fs::remove_dir(&dir).ok();
+    }
+
+    /// A canonical v2 line goes through the same gzip/digest/bounded chain, one line per record.
+    #[test]
+    fn canonical_lines_round_trip_through_gzip_and_checksum() {
+        use std::io::Read;
+
+        let dir = test_dir("canonical");
+        let temp_path = dir.join(format!("canonical-{}.jsonl.gz.tmp", rand_suffix()));
+        let lines = [
+            r#"{"part":0,"kind":"person","record":{"person_key":"p1"}}"#,
+            r#"{"part":1,"kind":"condition","record":{"code":"E11"}}"#,
+        ];
+
+        let mut sink = ExtractSink::open(&temp_path, 1_048_576, scope()).unwrap();
+        for line in lines {
+            sink.write_canonical_line(line.as_bytes().to_vec()).unwrap();
+        }
+        let completion = sink.finish().unwrap();
+
+        assert_eq!((completion.row_count, completion.exclusion_count), (2, 0));
+        let raw = std::fs::read(&temp_path).unwrap();
+        assert_eq!(crate::hex_encode(Sha256::digest(&raw)), completion.checksum);
+        let mut decompressed = String::new();
+        flate2::read::GzDecoder::new(&raw[..])
+            .read_to_string(&mut decompressed)
+            .unwrap();
+        assert_eq!(decompressed, format!("{}\n{}\n", lines[0], lines[1]));
+
+        std::fs::remove_file(&temp_path).ok();
+        std::fs::remove_dir(&dir).ok();
+    }
+
+    #[test]
+    fn a_canonical_line_respects_the_compressed_byte_ceiling() {
+        let dir = test_dir("canonical-ceiling");
+        let temp_path = dir.join(format!("canonical-ceiling-{}.jsonl.gz.tmp", rand_suffix()));
+
+        let mut sink = ExtractSink::open(&temp_path, 8, scope()).unwrap();
+        let result = sink.write_canonical_line(br#"{"part":0}"#.to_vec());
+        assert!(matches!(result, Err(ExtractError::BudgetExceeded(_))));
 
         std::fs::remove_file(&temp_path).ok();
         std::fs::remove_dir(&dir).ok();

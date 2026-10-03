@@ -10,6 +10,7 @@ import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { UnderlineTabs } from '@/components/ui/Tabs'
 import { AgendamentoPanel } from './AgendamentoPanel'
 import { ExecucaoUnica } from './ExecucaoUnica'
+import { PacotesDaFonte } from './PacotesDaFonte'
 
 const TITLE = 'Execução de Dados'
 const SUBTITLE = 'Gerencie a atualização dos dados e a execução dos indicadores do e-SUS PEC.'
@@ -18,7 +19,8 @@ const NO_SOURCE = new Error('Nenhuma fonte do e-SUS PEC cadastrada para este mun
 export function ExecucaoPage() {
   const { municipalityIbge, municipalities, isLoading } = useScope()
   // A technical admin has no clinical municipality: the page follows the PEC sources they manage.
-  const fontesPec = useFontesPec(!USE_MOCKS && !isLoading && !municipalityIbge)
+  // So does the demo, which has no municipality either.
+  const fontesPec = useFontesPec(!isLoading && !municipalityIbge)
   const ibge = municipalityIbge ?? fontesPec.data?.[0]?.municipalityIbge
   // RUN_INDICATOR comes with the manager role, like READ_CLINICAL: the clinical municipalities are
   // the ones a run may target. Anyone else here manages the source and only sees its scheduler.
@@ -86,14 +88,17 @@ export function ExecucaoPage() {
           onVerCobertura={() => setTab('agendamento')}
         />
       ) : (
-        <AgendamentoPanel
-          fonte={fonte}
-          onEnfileirada={(jobId) => {
-            if (!podeExecutar) return
-            setAcompanhando(jobId)
-            setTab('unica')
-          }}
-        />
+        <>
+          <AgendamentoPanel
+            fonte={fonte}
+            onEnfileirada={(jobId) => {
+              if (!podeExecutar) return
+              setAcompanhando(jobId)
+              setTab('unica')
+            }}
+          />
+          <PacotesDaFonte fonte={fonte} />
+        </>
       )}
     </>
   )

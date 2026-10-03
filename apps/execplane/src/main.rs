@@ -1,4 +1,6 @@
 mod aggregate;
+mod canonical;
+mod capabilities;
 mod coverage;
 mod envelope;
 mod extract;
@@ -47,7 +49,16 @@ fn run() -> Result<i32, Box<dyn Error>> {
         .ok_or("stdin closed before an envelope was received")??;
     let message: serde_json::Value = serde_json::from_str(&first_line)?;
     match message.get("type").and_then(serde_json::Value::as_str) {
-        Some("acquire") => acquire(serde_json::from_value(message)?, lines),
+        Some("acquire") => {
+            let envelope: AcquireEnvelope = serde_json::from_value(message)?;
+            // A canonical v2 acquisition (ADR 0030) lists its parts; C1's v1 envelope has none
+            // and keeps its own path, unchanged.
+            if envelope.parts.is_empty() {
+                acquire(envelope, lines)
+            } else {
+                canonical::acquire(envelope, lines)
+            }
+        }
         Some("diagnose") => diagnose(serde_json::from_value(message)?),
         Some("check_isolation") => {
             isolation::check_isolation(serde_json::from_value(message)?, lines)

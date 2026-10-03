@@ -4,11 +4,13 @@ import esusdata.auth.GrantRevalidator;
 import esusdata.auth.ScopeResolver;
 import esusdata.config.SqliteConfig;
 import esusdata.config.SqliteProperties;
+import esusdata.indicator.IndicatorRuleRegistry;
 import esusdata.result.JdbcEvidenceRepository;
 import esusdata.result.JdbcExtractionManifestRepository;
 import esusdata.result.JdbcResultRepository;
 import esusdata.result.JdbcResultStagingArea;
 import esusdata.result.PublicationService;
+import esusdata.result.QualityComponentService;
 import esusdata.result.ReproducibilityCheck;
 import esusdata.result.model.EvidenceRepository;
 import esusdata.result.model.ExtractionManifestRepository;
@@ -29,6 +31,7 @@ import esusdata.run.job.JobRepository;
 import esusdata.run.job.RetryPolicy;
 import esusdata.run.schedule.CoverageScheduler;
 import esusdata.run.schedule.JdbcScheduleRepository;
+import esusdata.run.schedule.SourcePacks;
 import esusdata.run.worker.AcquisitionGuard;
 import esusdata.run.worker.CancellationRegistry;
 import esusdata.run.worker.IdempotencyResolver;
@@ -46,6 +49,7 @@ import esusdata.source.SourceIsolationService;
 import esusdata.source.SourceRepository;
 import esusdata.source.SourceRequirementsService;
 import esusdata.source.pec.AllowedDestinations;
+import esusdata.source.pec.CapabilityEligibility;
 import esusdata.source.pec.EnvFileSecretResolver;
 import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecSecretResolver;
@@ -189,9 +193,34 @@ public class RunConfig {
         return new SourceCoverageService(sourceRepository, allowedDestinations, sourceCoverageCheck, clock);
     }
 
+    /** The packaged compatibility matrix, read once (§1.6.2). */
     @Bean
-    public SourceRequirementsService sourceRequirementsService() {
-        return new SourceRequirementsService(PecCompatibilityMatrix.fromClasspathResource());
+    public PecCompatibilityMatrix pecCompatibilityMatrix() {
+        return PecCompatibilityMatrix.fromClasspathResource();
+    }
+
+    @Bean
+    public SourceRequirementsService sourceRequirementsService(PecCompatibilityMatrix pecCompatibilityMatrix) {
+        return new SourceRequirementsService(pecCompatibilityMatrix);
+    }
+
+    /** ADR 0030: which capabilities a source's PEC version has VALIDATED, checked before any child. */
+    @Bean
+    public CapabilityEligibility capabilityEligibility(PecCompatibilityMatrix pecCompatibilityMatrix) {
+        return new CapabilityEligibility(pecCompatibilityMatrix);
+    }
+
+    /** ADR 0030: the packs each source can compute — for the scheduler, Execução and the Painel. */
+    @Bean
+    public SourcePacks sourcePacks(CapabilityEligibility capabilityEligibility) {
+        return new SourcePacks(capabilityEligibility);
+    }
+
+    /** ADR 0030: the Nota Final do Componente III, computed on read from published results. */
+    @Bean
+    @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
+    public QualityComponentService qualityComponentService(ResultRepository resultRepository, Clock clock) {
+        return new QualityComponentService(resultRepository, clock);
     }
 
     // --- jobrunner -------------------------------------------------------------------------
@@ -283,6 +312,7 @@ public class RunConfig {
         return report;
     }
 
+    /** Dispatches by the compiled rule registry (ADR 0030): the release's C1–C7, nothing else. */
     @Bean
     public RunExecutor indicatorRunExecutor(
             ExtractStore extractStore,
@@ -295,7 +325,8 @@ public class RunConfig {
             SourceRepository sourceRepository,
             Acquisition acquisitionPort,
             AcquisitionGuard acquisitionGuard,
-            Duration liveAcquisitionCooldownMargin) {
+            Duration liveAcquisitionCooldownMargin,
+            CapabilityEligibility capabilityEligibility) {
         return new RunExecutor(
                 extractStore,
                 jobRepository,
@@ -307,7 +338,9 @@ public class RunConfig {
                 sourceRepository,
                 acquisitionPort,
                 acquisitionGuard,
-                liveAcquisitionCooldownMargin);
+                liveAcquisitionCooldownMargin,
+                capabilityEligibility,
+                IndicatorRuleRegistry::require);
     }
 
     // JobWorker implements SmartLifecycle — Spring's lifecycle processor calls start()/stop()
@@ -346,7 +379,9 @@ public class RunConfig {
     /**
      * Off unless {@code observatorio.scheduler.enabled}: the packaged platform defaults turn it on,
      * tests and a bare {@code java -jar} never spawn the execution plane on their own. Like
-     * {@link JobWorker}, a SmartLifecycle started after the context refreshed.
+     * {@link JobWorker}, a SmartLifecycle started after the context refreshed. {@code
+     * max-jobs-per-tick} (ADR 0030) bounds how many pack/competência jobs one tick enqueues per
+     * source; 1 is the load ADR 0028 was approved with.
      */
     @Bean
     @DependsOn("jobRecoveryReport")
@@ -358,10 +393,12 @@ public class RunConfig {
             ScopeResolver scopeResolver,
             JdbcScheduleRepository scheduleRepository,
             Clock clock,
+            SourcePacks sourcePacks,
             @Value("${observatorio.scheduler.enabled:false}") boolean enabled,
             @Value("${observatorio.scheduler.interval:PT6H}") Duration interval,
             @Value("${observatorio.scheduler.initial-delay:PT2M}") Duration initialDelay,
-            @Value("${observatorio.scheduler.settle-days:5}") int settleDays) {
+            @Value("${observatorio.scheduler.settle-days:5}") int settleDays,
+            @Value("${observatorio.scheduler.max-jobs-per-tick:1}") int maxJobsPerTick) {
         return new CoverageScheduler(
                 sourceRepository,
                 sourceCoverageService,
@@ -370,7 +407,8 @@ public class RunConfig {
                 scopeResolver,
                 scheduleRepository,
                 clock,
-                new CoverageScheduler.Settings(enabled, interval, initialDelay, settleDays));
+                new CoverageScheduler.Settings(enabled, interval, initialDelay, settleDays, maxJobsPerTick),
+                sourcePacks);
     }
 
     /**

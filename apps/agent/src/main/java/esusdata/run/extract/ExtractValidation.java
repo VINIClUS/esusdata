@@ -1,6 +1,7 @@
 package esusdata.run.extract;
 
 import esusdata.indicator.model.CanonicalEncounter;
+import esusdata.indicator.model.RecordKind;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.DateTimeException;
@@ -8,6 +9,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /** Shared validation rules for the immutable extract publication and read boundaries. */
 final class ExtractValidation {
@@ -51,7 +55,8 @@ final class ExtractValidation {
             throw new IllegalStateException("Extract completeness status must be exactly COMPLETE, got "
                     + manifest.completenessStatus() + " for extractionId=" + manifest.extractionId());
         }
-        if (!ExtractionManifest.CANONICAL_SCHEMA_VERSION.equals(manifest.canonicalSchemaVersion())) {
+        if (!ExtractionManifest.CANONICAL_SCHEMA_VERSION.equals(manifest.canonicalSchemaVersion())
+                && !manifest.isCanonicalV2()) {
             throw new IllegalStateException("Unsupported canonical schema version " + manifest.canonicalSchemaVersion()
                     + " for extractionId=" + manifest.extractionId());
         }
@@ -93,6 +98,75 @@ final class ExtractValidation {
             throw new IllegalStateException("Manifest queryChecksum must be a SHA-256 digest");
         }
         requireNonBlank(manifest.adapterVersion(), "adapterVersion");
+        validateParts(manifest, periodStart, periodEnd);
+    }
+
+    /**
+     * ADR 0030: a v1 manifest lists no part; a v2 manifest lists every part it read, each inside the
+     * manifest period, with its binds and their checksum as {@link ManifestChecksums} defines them;
+     * the row count is their sum and the manifest-level query checksum is their composite.
+     */
+    private static void validateParts(ExtractionManifest manifest, LocalDate periodStart, LocalDate periodEnd) {
+        List<ManifestPart> parts = manifest.parts();
+        if (!manifest.isCanonicalV2()) {
+            if (!parts.isEmpty()) {
+                throw new IllegalStateException("A canonical v1 manifest lists no parts, got " + parts.size()
+                        + " for extractionId=" + manifest.extractionId());
+            }
+            return;
+        }
+        if (parts.isEmpty()) {
+            throw new IllegalStateException(
+                    "A canonical v2 manifest lists its parts; none for extractionId=" + manifest.extractionId());
+        }
+        Set<Integer> indexes = new HashSet<>();
+        Set<String> capabilities = new HashSet<>();
+        long rows = 0;
+        for (ManifestPart part : parts) {
+            requireNonBlank(part.capability(), "part capability");
+            if (!indexes.add(part.index()) || !capabilities.add(part.capability())) {
+                throw partError(part, "repeats the index " + part.index() + " or its capability");
+            }
+            validatePart(part, periodStart, periodEnd);
+            rows = Math.addExact(rows, part.rowCount());
+        }
+        if (rows != manifest.rowCount()) {
+            throw new IllegalStateException(
+                    "Manifest rowCount " + manifest.rowCount() + " is not the sum of its parts' row counts " + rows);
+        }
+        if (!ManifestChecksums.compositeQueryChecksum(parts).equals(manifest.queryChecksum())) {
+            throw new IllegalStateException(
+                    "Manifest queryChecksum is not the composite checksum of its parts (ADR 0030)");
+        }
+    }
+
+    private static void validatePart(ManifestPart part, LocalDate periodStart, LocalDate periodEnd) {
+        requireNonBlank(part.adapterVersion(), "part adapterVersion");
+        if (!isSha256Digest(part.queryChecksum())) {
+            throw partError(part, "queryChecksum must be a SHA-256 digest");
+        }
+        try {
+            RecordKind.fromWireName(part.recordKind());
+        } catch (IllegalArgumentException e) {
+            IllegalStateException failure = partError(part, "has an unknown record kind");
+            failure.initCause(e);
+            throw failure;
+        }
+        LocalDate start = parseDate(part.periodStart(), "part period start");
+        LocalDate end = parseDate(part.periodEndExclusive(), "part period end");
+        if (!end.isAfter(start) || start.isBefore(periodStart) || end.isAfter(periodEnd)) {
+            throw partError(
+                    part,
+                    "window [" + start + ", " + end + ") is empty or outside the manifest period [" + periodStart + ", "
+                            + periodEnd + ")");
+        }
+        if (!ManifestChecksums.paramsChecksum(part.params()).equals(part.paramsChecksum())) {
+            throw partError(part, "paramsChecksum does not match its params");
+        }
+    }
+
+    private static IllegalStateException partError(ManifestPart part, String problem) {
+        return new IllegalStateException("Manifest part " + part.capability() + " " + problem);
     }
 
     static boolean isSha256Digest(String value) {

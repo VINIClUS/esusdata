@@ -46,10 +46,11 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code ACCESS_REVOKED}.
  *
  * <p>{@code indicatorPack}/{@code ruleVersion} are NOT validated here against {@code
- * IndicatorPackCatalog} — {@code RunExecutor.requireC1} is the one authority on what is
- * computable, and an unsupported pack surfaces as a FAILED job with {@code INVALID_REQUEST}
- * through the exact same taxonomy any other definitive failure does (§1.10 L399), not as a
- * different shape swallowed at the door.
+ * IndicatorPackCatalog} — the rule registry {@code RunExecutor} dispatches through ({@code
+ * IndicatorRuleRegistry.require}, ADR 0030) is the one authority on what is computable, and an
+ * unknown pack surfaces as a FAILED job with {@code INVALID_REQUEST} — a pack the source cannot
+ * serve as {@code UNSUPPORTED_SOURCE} — through the exact same taxonomy any other definitive
+ * failure does (§1.10 L399), not as a different shape swallowed at the door.
  */
 @RestController
 public class RunController {

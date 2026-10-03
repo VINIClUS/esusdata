@@ -21,10 +21,12 @@ import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import tools.jackson.databind.JsonNode;
 
@@ -56,6 +58,14 @@ import tools.jackson.databind.JsonNode;
  * both are required; either alone is a protocol violation. {@link DelegatedExtractPublication}
  * checks that report against the file's actual size and a fresh raw SHA-256 before publishing —
  * see its class doc for exactly what that check does and does not prove.
+ *
+ * <p>A canonical v2 command (ADR 0030, {@link AcquisitionCommand#isCanonicalV2()}) runs the same
+ * conversation over several capabilities read in one transaction: the envelope adds {@code
+ * canonical_schema_version} and its {@code parts}, the {@code probe} reports each part's objects
+ * and query checksum — verified part by part against that capability's own exact matrix entry —
+ * and {@code complete} adds {@code part_row_counts}, one entry per requested part, before {@link
+ * DelegatedExtractPublication#publishV2} publishes the v2 manifest. C1's v1 conversation does not
+ * change.
  */
 public final class ExecPlaneAcquisition implements Acquisition {
 
@@ -63,6 +73,8 @@ public final class ExecPlaneAcquisition implements Acquisition {
     private static final String TYPE = "type";
 
     private static final String CAPABILITY = "individual_encounter_modality";
+
+    private static final String CAPABILITY_FIELD = "capability";
 
     private final List<String> command;
     private final PecSecretResolver secretResolver;
@@ -197,7 +209,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
         ExecPlaneProcess.drainStderr(process);
 
         try {
-            writeAcquireEnvelope(process.getOutputStream(), acquisitionCommand, validatedHost, publication.tempFile());
+            writeAcquireEnvelope(process.getOutputStream(), acquisitionCommand, validatedHost, publication);
             BufferedReader reader =
                     new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
 
@@ -223,13 +235,16 @@ public final class ExecPlaneAcquisition implements Acquisition {
                         process, cancellation, listener, "expected a 'probe' message, got: " + probe);
             }
 
-            String mismatch = ExecPlaneProbeVerifier.mismatch(
-                    matrix,
-                    CAPABILITY,
-                    IndividualEncounterModalityContract.ADAPTER_VERSION,
-                    IndividualEncounterModalityContract.QUERY_CHECKSUM,
-                    acquisitionCommand.sourceIdentity(),
-                    probe);
+            String mismatch = acquisitionCommand.isCanonicalV2()
+                    ? ExecPlaneProbeVerifier.mismatchV2(
+                            matrix, acquisitionCommand.parts(), acquisitionCommand.sourceIdentity(), probe)
+                    : ExecPlaneProbeVerifier.mismatch(
+                            matrix,
+                            CAPABILITY,
+                            IndividualEncounterModalityContract.ADAPTER_VERSION,
+                            IndividualEncounterModalityContract.QUERY_CHECKSUM,
+                            acquisitionCommand.sourceIdentity(),
+                            probe);
             if (mismatch != null) {
                 ExecPlaneProcess.writeLine(
                         process.getOutputStream(),
@@ -250,7 +265,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             });
 
             return consumeUntilComplete(
-                    process, reader, publication, cancellation, listener, startedAt, acquisitionCommand.sourceZoneId());
+                    process, reader, publication, cancellation, listener, startedAt, acquisitionCommand);
         } catch (RuntimeException e) { // NOPMD - kill the child on any failure, then rethrow
             // A bad AcquisitionCommand or a stdin write racing the child's exit can throw
             // unchecked after spawn. Every path that should flag ENG-51 uncertainty already does
@@ -278,7 +293,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             CancellationSignal cancellation,
             AcquisitionListener listener,
             Instant startedAt,
-            String sourceZoneId) {
+            AcquisitionCommand acquisitionCommand) {
         JsonNode complete = null;
         while (true) {
             JsonNode message;
@@ -305,7 +320,8 @@ public final class ExecPlaneAcquisition implements Acquisition {
                 return abnormalTermination(process, cancellation, listener, "unexpected message type: " + type);
             }
         }
-        return publishAfterCleanExit(process, complete, publication, cancellation, listener, startedAt, sourceZoneId);
+        return publishAfterCleanExit(
+                process, complete, publication, cancellation, listener, startedAt, acquisitionCommand);
     }
 
     /** Requires exit code 0 after a {@code complete} message, then publishes what the child reported. */
@@ -316,7 +332,7 @@ public final class ExecPlaneAcquisition implements Acquisition {
             CancellationSignal cancellation,
             AcquisitionListener listener,
             Instant startedAt,
-            String sourceZoneId) {
+            AcquisitionCommand acquisitionCommand) {
         int exitValue = waitForExit(process);
         if (exitValue != 0 || complete == null) {
             listener.onUncertainOutcome("execution plane exited " + exitValue
@@ -332,13 +348,23 @@ public final class ExecPlaneAcquisition implements Acquisition {
         long compressedBytes = complete.path("compressed_bytes").asLong(-1);
 
         try {
+            if (acquisitionCommand.isCanonicalV2()) {
+                return publication.publishV2(
+                        rowCount,
+                        exclusionCount,
+                        checksum,
+                        compressedBytes,
+                        startedAt,
+                        acquisitionCommand.sourceZoneId(),
+                        partRowCounts(complete, acquisitionCommand.parts()));
+            }
             return publication.publish(
                     rowCount,
                     exclusionCount,
                     checksum,
                     compressedBytes,
                     startedAt,
-                    sourceZoneId,
+                    acquisitionCommand.sourceZoneId(),
                     IndividualEncounterModalityContract.QUERY_CHECKSUM,
                     IndividualEncounterModalityContract.ADAPTER_VERSION,
                     "COMPLETE",
@@ -353,6 +379,39 @@ public final class ExecPlaneAcquisition implements Acquisition {
             throw new PecAcquisitionException(
                     "could not publish execution plane extract: " + publishFailure.getMessage(), publishFailure);
         }
+    }
+
+    /**
+     * The {@code part_row_counts} of a canonical v2 {@code complete}, in part order: exactly one
+     * entry per requested part, each naming that part's index, capability and record kind. A
+     * missing, repeated or unknown part, or one read as another capability or kind, is never
+     * published — {@link IllegalStateException}, like any other report that does not match the
+     * extract. The counts themselves are checked by {@link DelegatedExtractPublication#publishV2}.
+     */
+    private static List<Long> partRowCounts(JsonNode complete, List<AcquisitionPart> parts) {
+        JsonNode reported = complete.get("part_row_counts");
+        if (reported == null || !reported.isArray() || reported.size() != parts.size()) {
+            int count = reported == null || !reported.isArray() ? 0 : reported.size();
+            throw new IllegalStateException(
+                    "execution plane reported part_row_counts for " + count + " parts, not " + parts.size());
+        }
+        Long[] counts = new Long[parts.size()];
+        for (JsonNode entry : reported) {
+            int index = entry.path("part").asInt(-1);
+            if (index < 0 || index >= counts.length || counts[index] != null) {
+                throw new IllegalStateException(
+                        "execution plane reported part_row_counts for an unknown or repeated part: " + entry);
+            }
+            AcquisitionPart part = parts.get(index);
+            String capability = ExecPlaneProcess.text(entry, CAPABILITY_FIELD);
+            String kind = ExecPlaneProcess.text(entry, "kind");
+            if (!part.capability().equals(capability) || !part.recordKind().equals(kind)) {
+                throw new IllegalStateException("execution plane reported part " + index + " as " + capability + "/"
+                        + kind + ", not " + part.capability() + "/" + part.recordKind());
+            }
+            counts[index] = entry.path("row_count").asLong(-1);
+        }
+        return List.of(counts);
     }
 
     private ExtractionManifest failFromErrorMessage(
@@ -404,6 +463,16 @@ public final class ExecPlaneAcquisition implements Acquisition {
             // itself refused to write is never retried unchanged.
             return new IllegalArgumentException("execution plane rejected an extract record: " + detail);
         }
+        if ("UNKNOWN_CAPABILITY".equals(code) || "INVALID_REQUEST".equals(code)) {
+            // Canonical v2 (ADR 0030): a part this build of the child does not have exactly, or
+            // binds that do not fit its capability — refused before any connection, so INVALID_REQUEST.
+            return new IllegalArgumentException("execution plane refused the request: " + detail);
+        }
+        if ("UNSUPPORTED_COLUMN_TYPE".equals(code) || "QUERY_CONTRACT_MISMATCH".equals(code)) {
+            // The frozen query does not deliver what its capability descriptor declares: an
+            // incompatible extract, never retried unchanged.
+            return new IllegalStateException("execution plane query does not match its capability contract: " + detail);
+        }
         if (sqlState != null) {
             return new PecAcquisitionException(detail, new SQLException(detail, sqlState));
         }
@@ -411,7 +480,11 @@ public final class ExecPlaneAcquisition implements Acquisition {
     }
 
     private void writeAcquireEnvelope(
-            OutputStream stdin, AcquisitionCommand acquisitionCommand, String validatedHost, Path extractTempPath) {
+            OutputStream stdin,
+            AcquisitionCommand acquisitionCommand,
+            String validatedHost,
+            DelegatedExtractPublication publication) {
+        boolean canonicalV2 = acquisitionCommand.isCanonicalV2();
         char[] password =
                 secretResolver.resolve(acquisitionCommand.connectionProperties().secretRef());
         try {
@@ -454,17 +527,54 @@ public final class ExecPlaneAcquisition implements Acquisition {
             // Fatia 3 / ADR 0011: the child writes the extract's data file itself, at this one
             // reserved path — the same path DelegatedExtractPublication already took the
             // .extract.lock for and reconciled, before this process was ever spawned.
-            envelope.put("extract_temp_path", extractTempPath.toString());
-            envelope.put("query_checksum", IndividualEncounterModalityContract.QUERY_CHECKSUM);
-            envelope.put("adapter_version", IndividualEncounterModalityContract.ADAPTER_VERSION);
+            envelope.put("extract_temp_path", publication.tempFile().toString());
+            // A v2 envelope names the whole plan here, as its manifest will; each part names its own.
+            envelope.put(
+                    "query_checksum",
+                    canonicalV2
+                            ? publication.canonicalV2QueryChecksum()
+                            : IndividualEncounterModalityContract.QUERY_CHECKSUM);
+            envelope.put(
+                    "adapter_version",
+                    canonicalV2
+                            ? DelegatedExtractPublication.CANONICAL_V2_ADAPTER_VERSION
+                            : IndividualEncounterModalityContract.ADAPTER_VERSION);
             envelope.put("tls_root_cert", transport.rootCertificate());
             envelope.put("budget", budgetFields);
+            if (canonicalV2) {
+                envelope.put("canonical_schema_version", ExtractionManifest.CANONICAL_SCHEMA_VERSION_V2);
+                envelope.put("parts", envelopeParts(acquisitionCommand.parts()));
+            }
             ExecPlaneProcess.writeLine(stdin, envelope);
         } finally {
             // Mirrors PecDataSourceFactory.create()'s finally — the parent's copy is zeroed the
             // moment it has been handed to the child, whether or not the write succeeded.
             Arrays.fill(password, '\0');
         }
+    }
+
+    /**
+     * Each {@link AcquisitionPart} as the child's {@code PartRequest} reads it: its capability,
+     * version, query checksum and record kind — which the child checks against the capability it
+     * was built with before connecting — its window, and its binds by name, dates as ISO text.
+     */
+    private static List<Map<String, Object>> envelopeParts(List<AcquisitionPart> parts) {
+        List<Map<String, Object>> envelopeParts = new ArrayList<>(parts.size());
+        for (AcquisitionPart part : parts) {
+            Map<String, String> dates = new TreeMap<>();
+            part.dateParams().forEach((name, date) -> dates.put(name, date.toString()));
+            Map<String, Object> fields = new LinkedHashMap<>();
+            fields.put(CAPABILITY_FIELD, part.capability());
+            fields.put("adapter_version", part.adapterVersion());
+            fields.put("query_checksum", part.queryChecksum());
+            fields.put("record_kind", part.recordKind());
+            fields.put("period_start", part.periodStart().toString());
+            fields.put("period_end_exclusive", part.periodEndExclusive().toString());
+            fields.put("array_params", part.arrayParams());
+            fields.put("date_params", dates);
+            envelopeParts.add(fields);
+        }
+        return envelopeParts;
     }
 
     /** Waits for the child to exit (killing it if it overruns the grace period) and returns its exit code. */

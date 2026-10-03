@@ -6,7 +6,12 @@ import { expect, test } from '../support/test.ts'
 const protectedRoutes = [
   { path: '/painel', heading: 'Painel Principal' },
   { path: '/indicadores', heading: 'Indicadores' },
-  { path: '/indicadores/PB-01', heading: 'PB-01 – Pré-natal adequado' },
+  { path: '/indicadores/c4-cuidado-diabetes', heading: 'C4 – Cuidado da pessoa com diabetes' },
+  {
+    path: '/indicadores/c7-prevencao-cancer',
+    heading: 'C7 – Cuidado da mulher na prevenção do câncer',
+  },
+  { path: '/indicadores/componente-iii', heading: 'Componente III – Nota Final' },
   { path: '/execucao', heading: 'Execução de Dados' },
   { path: '/relatorios', heading: 'Relatórios' },
   { path: '/configuracoes', heading: 'Configuração da Fonte de Dados' },

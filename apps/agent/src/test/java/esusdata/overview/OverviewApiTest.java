@@ -97,11 +97,43 @@ class OverviewApiTest extends ApiFixtureSupport {
         // The current month is not settled, so it is not pending.
         assertThat(body)
                 .contains("\"pendingPeriods\":[{\"sourceId\":\"" + sourceId + "\",\"referencePeriod\":\"" + older
-                        + "\",\"count\":800},{\"sourceId\":\"" + sourceId + "\",\"referencePeriod\":\"" + old
-                        + "\",\"count\":900}]")
+                        + "\",\"count\":800,\"indicatorPacks\":[\"c1-mais-acesso\"]},{\"sourceId\":\"" + sourceId
+                        + "\",\"referencePeriod\":\"" + old
+                        + "\",\"count\":900,\"indicatorPacks\":[\"c1-mais-acesso\"]}]")
                 .contains("\"code\":\"PENDING_PERIODS\",\"severity\":\"INFO\",\"subject\":null,\"referencePeriod\":\""
                         + older + "\",\"sourceId\":\"" + sourceId + "\",\"detail\":\"2\"")
                 .contains("{\"code\":\"PEC_COVERAGE\",\"sourceId\":\"" + sourceId + "\",\"status\":\"OK\"");
+    }
+
+    /**
+     * ADR 0030: every catalog pack says what it is and whether some PEC source of the municipality
+     * can compute it — C1 only, until the canonical v2 capabilities are validated live; the Nota
+     * Final is computed on read, never run.
+     */
+    @Test
+    void everyIndicatorSaysWhatItIsAndWhetherASourceOfTheMunicipalityCanComputeIt() throws Exception {
+        String ibge = "3500709";
+        String manager = manager(ibge);
+
+        assertThat(overview(manager, ibge, null).body())
+                .contains("{\"indicatorPack\":\"c1-mais-acesso\",\"ruleVersion\":\"c1-mais-acesso@0.1.0\","
+                        + "\"family\":\"QUALIDADE_ESF_EAP\",\"unit\":\"percentual\",\"code\":\"C1\","
+                        + "\"title\":\"Mais acesso\",\"valueKind\":\"PERCENTAGE\",\"runnable\":true,"
+                        + "\"availability\":\"NO_SOURCE\",\"missingCapabilities\":[]");
+
+        registerSource("src-" + System.nanoTime(), ibge);
+        String body = overview(manager, ibge, null).body();
+
+        assertThat(body)
+                .contains("\"code\":\"C1\",\"title\":\"Mais acesso\",\"valueKind\":\"PERCENTAGE\",\"runnable\":true,"
+                        + "\"availability\":\"AVAILABLE\",\"missingCapabilities\":[]")
+                .contains("\"code\":\"C2\",\"title\":\"Cuidado no desenvolvimento infantil\",\"valueKind\":\"SCORE\","
+                        + "\"runnable\":true,\"availability\":\"UNSUPPORTED_SOURCE\",\"missingCapabilities\":"
+                        + "[\"citizen\",\"individual_registration\",\"care_encounter\"")
+                .contains("\"code\":\"C7\"")
+                .contains("\"valueKind\":\"COMPOSITE_SCORE\"")
+                .contains("\"indicatorPack\":\"componente-iii-nota-final\"")
+                .contains("\"valueKind\":\"FINAL_SCORE\",\"runnable\":false,\"availability\":\"UNSUPPORTED_SOURCE\"");
     }
 
     @Test

@@ -1,5 +1,6 @@
 package esusdata.run.extract;
 
+import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalEncounter;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -23,5 +24,14 @@ public final class FileExtractStore implements ExtractStore {
     @Override
     public List<CanonicalEncounter> readEncounters(ExtractionManifest manifest) throws IOException {
         return reader.readEncounters(baseDir, manifest);
+    }
+
+    /** A canonical v2 extract part by part (ADR 0030); a v1 extract as its encounters, as before. */
+    @Override
+    public CanonicalDataset readDataset(ExtractionManifest manifest, String v1Capability) throws IOException {
+        if (manifest.isCanonicalV2()) {
+            return reader.readDataset(baseDir, manifest);
+        }
+        return ExtractStore.super.readDataset(manifest, v1Capability);
     }
 }

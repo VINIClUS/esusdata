@@ -8,6 +8,7 @@ import { useTheme } from '@mui/material/styles'
 import { ChevronRight, SlidersHorizontal } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { useCompetencia, useIndicadores } from '@/api/hooks'
+import { indicadorPath } from '@/api/normalizers'
 import type { IndicadorResumo } from '@/api/types'
 import { DataTable, type Column } from '@/components/data/DataTable'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -19,13 +20,25 @@ import { Pagination } from '@/components/ui/Pagination'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { PillTabs } from '@/components/ui/Tabs'
 import { formatReferencePeriod } from '@/app/display-context'
-import { formatPercent } from '@/lib/format'
 import { colors } from '@/theme/tokens'
 import { AcoesIndicador } from './AcoesIndicador'
+import { DisponibilidadeTexto } from './Disponibilidade'
 import { matchesIndicatorTab } from './filter'
 
 const PAGE_SIZE = 10
 const TODAS = 'Todas'
+
+/** The status filter's options and the statuses each one keeps. */
+const STATUS_OPTIONS: Record<string, (status: IndicadorResumo['status']) => boolean> = {
+  Todos: () => true,
+  Concluído: (s) => s === 'concluido',
+  Bloqueado: (s) => s === 'bloqueado',
+  Atenção: (s) => s === 'atencao',
+  'Ambiguidade na regra': (s) => s === 'ambiguidade',
+  'Fonte sem suporte': (s) => s === 'sem_suporte',
+  'Em execução': (s) => s.startsWith('em_execucao'),
+  Pendente: (s) => s === 'pendente',
+}
 
 const phoneStatus = (s: IndicadorResumo['status']) => (s === 'concluido' ? 'calculado' : s)
 
@@ -35,9 +48,17 @@ function IndicadorCard({ item }: { item: IndicadorResumo }) {
       sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, py: 1.25, cursor: 'pointer' }}
     >
       <Typography
-        sx={{ fontSize: 13, fontWeight: 700, color: colors.navy, width: 52, flexShrink: 0 }}
+        sx={{
+          fontSize: 13,
+          fontWeight: 700,
+          color: colors.navy,
+          minWidth: 52,
+          maxWidth: 88,
+          flexShrink: 0,
+          overflowWrap: 'anywhere',
+        }}
       >
-        {item.codigo}
+        {item.sigla}
       </Typography>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography sx={{ fontSize: 12.5, color: colors.navy, lineHeight: 1.3 }}>
@@ -50,14 +71,17 @@ function IndicadorCard({ item }: { item: IndicadorResumo }) {
             color:
               item.status === 'pendente'
                 ? colors.error
-                : item.status === 'atencao' || item.status === 'bloqueado'
+                : item.resultado === null
                   ? colors.warningText
                   : colors.success,
             mt: 0.25,
           }}
         >
-          {item.resultado === null ? '--' : formatPercent(item.resultado)}
+          {item.resultado ?? '--'}
         </Typography>
+        {item.disponibilidade && item.disponibilidade.situacao !== 'disponivel' && (
+          <DisponibilidadeTexto disponibilidade={item.disponibilidade} compacta />
+        )}
       </Box>
       <StatusChip status={phoneStatus(item.status)} size="sm" withIcon={false} />
       <ChevronRight size={18} color={colors.primary} />
@@ -84,12 +108,7 @@ export function IndicadoresListPage() {
       if (!matchesIndicatorTab(i, categoria)) return false
       if (busca && !`${i.codigo} ${i.nome}`.toLowerCase().includes(busca.toLowerCase()))
         return false
-      if (status === 'Concluído' && i.status !== 'concluido') return false
-      if (status === 'Pendente' && i.status !== 'pendente') return false
-      if (status === 'Em execução' && !i.status.startsWith('em_execucao')) return false
-      if (status === 'Bloqueado' && i.status !== 'bloqueado') return false
-      if (status === 'Atenção' && i.status !== 'atencao') return false
-      return true
+      return STATUS_OPTIONS[status]?.(i.status) ?? true
     })
   }, [data, categoria, busca, status])
 
@@ -115,10 +134,17 @@ export function IndicadoresListPage() {
       key: 'codigo',
       header: 'Código',
       sortable: true,
+      sx: { maxWidth: 190 },
+      // The short code, and the pack id the CSV exports and the URLs use.
       render: (r) => (
-        <Typography sx={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>
-          {r.codigo}
-        </Typography>
+        <>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>
+            {r.sigla}
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: colors.textSecondary, overflowWrap: 'anywhere' }}>
+            {r.codigo}
+          </Typography>
+        </>
       ),
     },
     {
@@ -139,6 +165,12 @@ export function IndicadoresListPage() {
     },
     { key: 'status', header: 'Status', render: (r) => <StatusChip status={r.status} /> },
     {
+      key: 'disponibilidade',
+      header: 'Disponibilidade',
+      sx: { minWidth: 150, maxWidth: 260 },
+      render: (r) => <DisponibilidadeTexto disponibilidade={r.disponibilidade} />,
+    },
+    {
       key: 'ultima',
       header: 'Última execução',
       sortable: true,
@@ -154,8 +186,10 @@ export function IndicadoresListPage() {
       sortable: true,
       align: 'center',
       render: (r) => (
-        <Typography sx={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>
-          {r.resultado === null ? '--' : formatPercent(r.resultado)}
+        <Typography
+          sx={{ fontSize: 14, fontWeight: 700, color: colors.navy, whiteSpace: 'nowrap' }}
+        >
+          {r.resultado ?? '--'}
         </Typography>
       ),
     },
@@ -164,9 +198,7 @@ export function IndicadoresListPage() {
       header: '',
       align: 'center',
       width: 56,
-      render: (r) => (
-        <AcoesIndicador codigo={r.codigo} competencia={competencia} onErro={setErro} />
-      ),
+      render: (r) => <AcoesIndicador item={r} competencia={competencia} onErro={setErro} />,
     },
   ]
 
@@ -177,7 +209,7 @@ export function IndicadoresListPage() {
     <FilterSelect
       label="Status"
       value={status}
-      options={['Todos', 'Concluído', 'Bloqueado', 'Atenção', 'Em execução', 'Pendente']}
+      options={Object.keys(STATUS_OPTIONS)}
       onChange={(v) => {
         setStatus(v)
         setPage(1)
@@ -322,7 +354,7 @@ export function IndicadoresListPage() {
             getRowKey={(r) => r.codigo}
             cardMode
             renderCard={(r) => <IndicadorCard item={r} />}
-            onRowClick={(r) => void navigate(`/indicadores/${r.codigo}`)}
+            onRowClick={(r) => void navigate(indicadorPath(r))}
           />
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
             <Pagination page={current} count={pageCount} onChange={setPage} />
@@ -335,7 +367,7 @@ export function IndicadoresListPage() {
             rows={rows}
             getRowKey={(r) => r.codigo}
             bordered
-            onRowClick={(r) => void navigate(`/indicadores/${r.codigo}`)}
+            onRowClick={(r) => void navigate(indicadorPath(r))}
             sx={{
               border: 0,
               borderRadius: 0,
