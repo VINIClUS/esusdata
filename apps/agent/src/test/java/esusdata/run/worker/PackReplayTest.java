@@ -3,8 +3,17 @@ package esusdata.run.worker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.Capabilities;
+import esusdata.indicator.model.Classification;
+import esusdata.indicator.model.DataRequirements;
+import esusdata.indicator.model.EvaluationContext;
+import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.PackDescriptor;
+import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.pack.c1.C1Pack;
 import esusdata.indicator.pack.c2.C2Pack;
 import esusdata.indicator.pack.c3.C3Pack;
@@ -24,6 +33,7 @@ import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.junit.jupiter.api.AfterEach;
@@ -34,9 +44,11 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * ENG-19 for a canonical v2 pack (ADR 0030), the way every pack's own replay test runs it: a
  * synthetic extract written by {@link ExtractFixturesV2} replayed through {@code
- * RunExecutor.runFromExtract}, with no PEC. The C2 skeleton has no rule yet, so it publishes {@code
- * BLOCKED} without counts — never a zero — and no evidence; and only an extract whose parts are
- * exactly what the rule asks for is accepted.
+ * RunExecutor.runFromExtract}, with no PEC. A pack whose rule is still pending ({@link SkeletonRule}:
+ * C2's identity and parts, no calculation) publishes {@code BLOCKED} without counts — never a zero —
+ * and no evidence; and only an extract whose parts are exactly what the rule asks for is accepted.
+ * The pending rule keeps this test about the pipeline, not about C2's own rule (ENG-19 of each
+ * pack lives in its {@code <Pacote>ReplayTest}).
  */
 class PackReplayTest {
 
@@ -61,7 +73,7 @@ class PackReplayTest {
     }
 
     private ExtractionManifest c2Extract(String extractionId) throws Exception {
-        return ExtractFixturesV2.forRule(new C2Pack(), COMPETENCIA)
+        return ExtractFixturesV2.forRule(new SkeletonRule(), COMPETENCIA)
                 .add(CanonicalFixtures.person("p1", LocalDate.of(2024, 5, 10), "FEMININO"))
                 .add(CanonicalFixtures.registration("p1", LocalDate.of(2025, 9, 1), "2750325", "0000346268"))
                 .add(
@@ -71,10 +83,10 @@ class PackReplayTest {
     }
 
     @Test
-    void eng19_theC2SkeletonPublishesBlockedWithoutCountsFromASyntheticExtract() throws Exception {
+    void eng19_aPendingPackPublishesBlockedWithoutCountsFromASyntheticExtract() throws Exception {
         ExtractionManifest extract = c2Extract("ext-c2-2026-03");
 
-        RunExecutor.RunOutcome run = fixture.replay(extract, new C2Pack(), COMPETENCIA, "gestor");
+        RunExecutor.RunOutcome run = fixture.replay(extract, new SkeletonRule(), COMPETENCIA, "gestor");
 
         PublishedResult published = fixture.published(run.resultId(), IBGE);
         assertThat(published.indicatorPack()).isEqualTo(C2Pack.ID);
@@ -83,7 +95,8 @@ class PackReplayTest {
         assertThat(published.valueText()).isNull();
         assertThat(published.numeratorText()).isNull();
         assertThat(published.denominatorText()).isNull();
-        assertThat(published.denominatorKind()).isEqualTo("CRIANCAS_ATE_2_ANOS_VINCULADAS");
+        assertThat(published.denominatorKind())
+                .isEqualTo(new SkeletonRule().descriptor().denominatorKind());
         assertThat(published.valueKind()).isEqualTo("SCORE");
         assertThat(published.valueExact()).isNull();
         assertThat(published.consolidationEligible()).isFalse();
@@ -107,12 +120,12 @@ class PackReplayTest {
         ExtractionManifest extract = c2Extract("ext-c2-twice");
 
         String first = fixture.published(
-                        fixture.replay(extract, new C2Pack(), COMPETENCIA, "gestor")
+                        fixture.replay(extract, new SkeletonRule(), COMPETENCIA, "gestor")
                                 .resultId(),
                         IBGE)
                 .inputFingerprint();
         String second = fixture.published(
-                        fixture.replay(extract, new C2Pack(), COMPETENCIA, "gestor")
+                        fixture.replay(extract, new SkeletonRule(), COMPETENCIA, "gestor")
                                 .resultId(),
                         IBGE)
                 .inputFingerprint();
@@ -135,7 +148,7 @@ class PackReplayTest {
         ExtractionManifest v1 = ExtractFixtures.write(fixture.extractsDir, "ext-v1", "src-1", IBGE, "2026-03", 1, 1, 0);
         ExtractionManifest v2 = c2Extract("ext-v2");
 
-        assertThatThrownBy(() -> fixture.replay(v1, new C2Pack(), COMPETENCIA, "gestor"))
+        assertThatThrownBy(() -> fixture.replay(v1, new SkeletonRule(), COMPETENCIA, "gestor"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("canonical v1");
         assertThatThrownBy(() -> fixture.replay(v2, new C1Pack(), COMPETENCIA, "gestor"))
@@ -145,7 +158,7 @@ class PackReplayTest {
 
     @Test
     void aPartReadWithOtherBindsIsRefusedEvenWithConsistentChecksums() throws Exception {
-        List<ManifestPart> parts = new ArrayList<>(ExtractFixturesV2.parts(new C2Pack(), COMPETENCIA));
+        List<ManifestPart> parts = new ArrayList<>(ExtractFixturesV2.parts(new SkeletonRule(), COMPETENCIA));
         ManifestPart procedures = parts.stream()
                 .filter(part -> Capabilities.PROCEDURE_PERFORMED.equals(part.capability()))
                 .findFirst()
@@ -187,8 +200,39 @@ class PackReplayTest {
                     parts));
         }
 
-        assertThatThrownBy(() -> fixture.replay(tampered, new C2Pack(), COMPETENCIA, "gestor"))
+        assertThatThrownBy(() -> fixture.replay(tampered, new SkeletonRule(), COMPETENCIA, "gestor"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(Capabilities.PROCEDURE_PERFORMED);
+    }
+
+    /**
+     * C2's identity, parts and bands with no calculation — what every pack published before its
+     * rule existed — so the real C2 can land without touching this test.
+     */
+    private static final class SkeletonRule implements IndicatorRule {
+
+        private static final String PENDING = "Regra em implementação (ADR 0030): o pacote ainda não calcula.";
+
+        private final C2Pack pack = new C2Pack();
+
+        @Override
+        public PackDescriptor descriptor() {
+            return pack.descriptor();
+        }
+
+        @Override
+        public DataRequirements requirements(YearMonth competencia) {
+            return pack.requirements(competencia);
+        }
+
+        @Override
+        public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
+            return RuleOutcomes.pending(pack.descriptor(), context, PENDING);
+        }
+
+        @Override
+        public Optional<Classification> classify(ExactRatio value) {
+            return pack.classify(value);
+        }
     }
 }
