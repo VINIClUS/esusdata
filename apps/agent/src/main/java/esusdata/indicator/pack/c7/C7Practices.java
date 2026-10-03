@@ -1,7 +1,9 @@
 package esusdata.indicator.pack.c7;
 
 import esusdata.indicator.model.AgeAt;
+import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalDataset;
+import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.SourceRef;
 import esusdata.indicator.pack.c7.C7Cohort.Member;
@@ -14,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Predicate;
 
 /**
@@ -30,9 +33,12 @@ final class C7Practices {
     static final String AMB_C7_06 = "AMB_C7_06_DOSE_HPV_ALEM_60_MESES";
     static final String AMB_C7_05 = "AMB_C7_05_HOMEM_TRANSGENERO_9_14";
 
+    private static final String PROFESSIONAL = "PROFESSIONAL";
+
     private final Map<String, List<Fact>> procedures;
     private final Map<String, List<Fact>> encounters;
     private final Map<String, List<Fact>> doses;
+    private final Map<String, List<Fact>> problems;
     private final LocalDate reference;
     private final DateWindow hpvMolecularWindow;
     private final Map<C7Subgroup, DateWindow> windows = new EnumMap<>(C7Subgroup.class);
@@ -47,15 +53,23 @@ final class C7Practices {
         AMBIGUOUS_DENOMINATOR
     }
 
-    /** One record that may support a practice, already normalized. */
+    /**
+     * One record that may support a practice, already normalized: {@code codes} are SIGTAP/AB,
+     * CIAP-2/ABP or vaccine codes, {@code cids} the CID-10 of an encounter (never mixed with CIAP-2:
+     * CIAP N93 is not CID N93). {@code modality} names the information model and stage the
+     * evidence shows; {@code content} identifies the same event written twice (MET-32).
+     */
     record Fact(
             String personKey,
             SourceRef sourceRef,
             LocalDate date,
             Set<String> codes,
+            Set<String> cids,
             String cbo,
             String cnes,
-            String ine) {}
+            String ine,
+            String modality,
+            String content) {}
 
     /**
      * A person's decision for one subgroup: the distinct records that support it, or — when the
@@ -71,49 +85,103 @@ final class C7Practices {
         this.hpvMolecularWindow = DateWindow.lastCivilMonths(competencia, C7Subgroup.HPV_MOLECULAR_MONTHS);
         this.hpvMolecularCounts = !competencia.isBefore(C7Codes.HPV_MOLECULAR_DESDE);
         this.procedures = byPerson(data.procedureEvents().stream()
-                .map(e -> new Fact(
+                .filter(C7Practices::acceptedProcedure)
+                .map(e -> fact(
                         e.personKey(),
                         e.sourceRef(),
-                        LocalDate.parse(e.eventDate()),
+                        e.eventDate(),
                         C7Codes.normalizedSet(List.of(e.sigtapCode())),
+                        Set.of(),
                         e.cbo(),
                         e.cnes(),
-                        e.ine()))
+                        e.ine(),
+                        e.origin() + ":" + e.stage()))
                 .toList());
-        // CIAP-2, CID-10 and ABP codes evaluated in the encounter ("Bloco Avaliação")
-        this.encounters = byPerson(data.careEvents().stream()
-                .map(e -> new Fact(
-                        e.personKey(),
-                        e.sourceRef(),
-                        LocalDate.parse(e.careDate()),
-                        C7Codes.normalizedSet(e.ciapCodes(), e.cidCodes()),
-                        e.cbo(),
-                        e.cnes(),
-                        e.ine()))
+        // the "Bloco Avaliação" of the encounter (C) and, for A and D, ABP022/ABP023 evaluated
+        List<Fact> evaluated = new ArrayList<>();
+        for (CanonicalCareEvent e : data.careEvents()) {
+            evaluated.add(fact(
+                    e.personKey(),
+                    e.sourceRef(),
+                    e.careDate(),
+                    C7Codes.normalizedSet(e.ciapCodes()),
+                    C7Codes.normalizedSet(e.cidCodes()),
+                    e.cbo(),
+                    e.cnes(),
+                    e.ine(),
+                    "MIAI:" + e.form()));
+        }
+        this.encounters = byPerson(evaluated);
+        this.problems = byPerson(data.conditions().stream()
+                .filter(c -> PROFESSIONAL.equals(c.basis()))
+                .map(c -> fact(
+                        c.personKey(),
+                        c.sourceRef(),
+                        c.recordedDate(),
+                        C7Codes.normalizedSet(List.of(c.code())),
+                        Set.of(),
+                        c.cbo(),
+                        null,
+                        null,
+                        "MIAI:PROBLEMA_AVALIADO"))
                 .toList());
         this.doses = byPerson(data.immunizations().stream()
-                .map(e -> new Fact(
+                .map(e -> fact(
                         e.personKey(),
                         e.sourceRef(),
-                        LocalDate.parse(e.applicationDate()),
+                        e.applicationDate(),
                         C7Codes.normalizedSet(List.of(e.immunobiologicalCode())),
+                        Set.of(),
                         e.cbo(),
                         e.cnes(),
-                        e.ine()))
+                        e.ine(),
+                        Boolean.TRUE.equals(e.transcription())
+                                ? "MIV:TRANSCRICAO:" + e.doseCode()
+                                : "MIV:" + e.doseCode()))
                 .toList());
+    }
+
+    /**
+     * Quadros 02 and 05 (pp. 5–6): the MIAI (exams requested or evaluated) and the MIP. A record of
+     * another model, stage or with neither is never accepted silently as one of them.
+     */
+    private static boolean acceptedProcedure(CanonicalProcedureEvent e) {
+        boolean miai = "MIAI".equals(e.origin()) && ("REQUESTED".equals(e.stage()) || "EVALUATED".equals(e.stage()));
+        boolean mip = "MIP".equals(e.origin()) && "PERFORMED".equals(e.stage());
+        return miai || mip;
+    }
+
+    private static Fact fact(
+            String personKey,
+            SourceRef ref,
+            String date,
+            Set<String> codes,
+            Set<String> cids,
+            String cbo,
+            String cnes,
+            String ine,
+            String modality) {
+        String content = String.join(
+                "|",
+                personKey,
+                date,
+                String.valueOf(new TreeSet<>(codes)),
+                String.valueOf(new TreeSet<>(cids)),
+                modality);
+        return new Fact(personKey, ref, LocalDate.parse(date), codes, cids, cbo, cnes, ine, modality, content);
     }
 
     Decision decide(C7Subgroup subgroup, Member member) {
         return switch (subgroup) {
             case A -> cervical(member);
             case B -> hpvVaccine(member);
-            case C -> byProfessional(encounters, member, C7Subgroup.C, C7Codes.C_PROBLEMAS);
-            case D -> byProfessional(procedures, member, C7Subgroup.D, C7Codes.D_CODIGOS);
+            case C -> byProfessional(encounters, member, C7Subgroup.C, C7Practices::sexualHealthCode);
+            case D -> breast(member);
         };
     }
 
     /**
-     * A (Quadro 02): a listed code by a physician or nurse in 36 months; 02.02.10.025-1 in 60
+     * A (Quadro 02): a listed exam, or "ABP022" evaluated, by a physician or nurse in 36 months; 02.02.10.025-1 in 60
      * months only from the competência 2026-01 on. A record of it dated before 2026-01 counts in one
      * reading of the footnote 4 and not in the other (AMB-C7-08).
      */
@@ -123,10 +191,10 @@ final class C7Practices {
         Predicate<Fact> hpv = professional.and(f -> hpvMolecularCounts
                 && f.codes().contains(C7Codes.A_SIGTAP_HPV_MOLECULAR)
                 && hpvMolecularWindow.contains(f.date()));
-        Predicate<Fact> listed =
-                professional.and(f -> windows.get(C7Subgroup.A).contains(f.date()) && hasAny(f, C7Codes.A_36_MESES));
+        Predicate<Fact> listed = professional.and(f -> windows.get(C7Subgroup.A).contains(f.date())
+                && (hasAny(f, C7Codes.A_36_MESES) || f.codes().contains(C7Codes.A_ABP)));
         return decide(
-                procedures.get(m.personKey()),
+                concat(procedures.get(m.personKey()), problems.get(m.personKey())),
                 listed.or(hpv.and(f -> !f.date().isBefore(since))),
                 hpv.and(f -> f.date().isBefore(since)),
                 AMB_C7_08);
@@ -153,25 +221,62 @@ final class C7Practices {
                 AMB_C7_06);
     }
 
-    /** C (Quadro 04; item 24, g) and D (Quadro 05): a listed code by a physician or nurse in the window. */
-    private Decision byProfessional(Map<String, List<Fact>> facts, Member m, C7Subgroup subgroup, Set<String> codes) {
-        DateWindow window = windows.get(subgroup);
+    /** C (Quadro 04; item 24, g): a listed CIAP-2/ABP or CID-10 evaluated by a physician or nurse. */
+    private Decision byProfessional(
+            Map<String, List<Fact>> facts, Member m, C7Subgroup subgroup, Predicate<Fact> codes) {
         return decide(
-                facts.get(m.personKey()),
-                f -> C7Codes.MEDICOS_ENFERMEIROS.matches(f.cbo()) && window.contains(f.date()) && hasAny(f, codes),
+                facts.get(m.personKey()), professionalIn(windows.get(subgroup)).and(codes), f -> false, null);
+    }
+
+    /**
+     * D (Quadro 05): mammography in the MIAI (S/A) or MIP, or "ABP023 Rastreamento de câncer de
+     * mama" evaluated, by a physician or nurse in 24 months.
+     */
+    private Decision breast(Member m) {
+        Predicate<Fact> inWindow = professionalIn(windows.get(C7Subgroup.D));
+        return decide(
+                concat(procedures.get(m.personKey()), problems.get(m.personKey())),
+                inWindow.and(f -> hasAny(f, C7Codes.D_CODIGOS) || f.codes().contains(C7Codes.D_ABP)),
                 f -> false,
                 null);
     }
 
+    private static Predicate<Fact> professionalIn(DateWindow window) {
+        return f -> C7Codes.MEDICOS_ENFERMEIROS.matches(f.cbo()) && window.contains(f.date());
+    }
+
+    private static boolean sexualHealthCode(Fact f) {
+        if (hasAny(f, C7Codes.C_CIAP2_ABP)) {
+            return true;
+        }
+        for (String cid : f.cids()) {
+            if (C7Codes.cidListed(cid)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Fact> concat(List<Fact> first, List<Fact> second) {
+        List<Fact> all = new ArrayList<>();
+        if (first != null) {
+            all.addAll(first);
+        }
+        if (second != null) {
+            all.addAll(second);
+        }
+        return all;
+    }
+
     private static Decision decide(
             List<Fact> facts, Predicate<Fact> certain, Predicate<Fact> ambiguous, String ambiguityReason) {
-        Map<SourceRef, Fact> support = new LinkedHashMap<>();
-        Map<SourceRef, Fact> undecided = new LinkedHashMap<>();
+        Map<String, Fact> support = new LinkedHashMap<>();
+        Map<String, Fact> undecided = new LinkedHashMap<>();
         for (Fact f : facts == null ? List.<Fact>of() : facts) {
             if (certain.test(f)) {
-                support.putIfAbsent(f.sourceRef(), f);
+                support.putIfAbsent(f.content(), f);
             } else if (ambiguous.test(f)) {
-                undecided.putIfAbsent(f.sourceRef(), f);
+                undecided.putIfAbsent(f.content(), f);
             }
         }
         if (!support.isEmpty()) {

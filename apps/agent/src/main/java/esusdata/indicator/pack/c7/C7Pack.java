@@ -76,8 +76,10 @@ public final class C7Pack implements IndicatorRule {
             "Tipo de equipe eSF 70 / eAP 76 e SCNES (item 24, b) sem fonte no DW (lacuna L1): a equipe não é validada.",
             "AMB-C7-09: só médicos (2251, 2252, 2253, 2231) e enfermeiros (2235) dos Quadros 02, 04 e 05 contam em A, C "
                     + "e D; a lista maior do item 24, d e a habilitação de CBO na tabela SIGTAP não são aplicadas.",
-            "AMB-C7-16: em A e D, os códigos AB (ABEX001, ABP022, ABP023) vão na consulta com os SIGTAP e o ABP do "
-                    + "bloco Avaliação do atendimento só é lido para C; o registro rápido não é definido pela ficha.",
+            "AMB-C7-14/16: ABEX001 conta em A como exame (com os SIGTAP); ABP022 (A) e ABP023 (D) contam como problema "
+                    + "avaliado por médico ou enfermeiro na lista de problemas (data do registro tomada como data da "
+                    + "avaliação, a confirmar no Portão C); um mesmo atendimento pode cumprir C e A ou D; o registro "
+                    + "rápido não é definido pela ficha.",
             "Calendário do Siaps (item 11; NT nº 8/2026, item 2.7): o PEC local contém registros não enviados ou "
                     + "enviados fora do prazo, que o Siaps não contaria.",
             "AMB-C7-03/04: idade em anos completos no último dia da competência, limites inclusivos, aniversário de "
@@ -118,7 +120,8 @@ public final class C7Pack implements IndicatorRule {
                     Capabilities.CARE_ENCOUNTER,
                     Capabilities.PROCEDURE_PERFORMED,
                     Capabilities.EXAM_REQUEST_EVALUATION,
-                    Capabilities.IMMUNIZATION_HISTORY),
+                    Capabilities.IMMUNIZATION_HISTORY,
+                    Capabilities.CONDITION_LIST),
             COMPONENTS,
             ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
@@ -142,8 +145,10 @@ public final class C7Pack implements IndicatorRule {
     /**
      * The least the ficha needs, in civil months: registration versions (24, the link), encounters
      * of C (12), procedures and exams of A and D (36, or 60 from 2026-01 for 02.02.10.025-1) and
-     * doses of B (72). Each part reads only the ages of the subgroups that use it. {@code citizen}
-     * binds no period; it carries the dose window only because a part needs one.
+     * doses of B (72), and ABP022/ABP023 evaluated as problems for A and D (36; the condition's
+     * recorded date is taken as the evaluation date — to confirm in Portão C). Each part reads only
+     * the ages of the subgroups that use it. {@code citizen} binds no period; it carries the dose
+     * window only because a part needs one.
      */
     static List<PartRequirement> parts(YearMonth competencia) {
         LocalDate end = competencia.atEndOfMonth();
@@ -172,6 +177,11 @@ public final class C7Pack implements IndicatorRule {
                 PartRequirement.personScoped(
                         Capabilities.EXAM_REQUEST_EVALUATION, procedures, screened, procedureCodes),
                 PartRequirement.personScoped(
+                        Capabilities.CONDITION_LIST,
+                        DateWindow.lastCivilMonths(competencia, C7Subgroup.A.months()),
+                        screened,
+                        problemCodes()),
+                PartRequirement.personScoped(
                         Capabilities.IMMUNIZATION_HISTORY,
                         doses,
                         births(end, C7Subgroup.B.minAge(), C7Subgroup.B.maxAge()),
@@ -194,6 +204,13 @@ public final class C7Pack implements IndicatorRule {
      */
     private static DateWindow births(LocalDate end, int minAge, int maxAge) {
         return DateWindow.inclusive(end.minusYears(maxAge + 1L), end.minusYears(minAge));
+    }
+
+    /** ABP022 (A) and ABP023 (D) are evaluated problems: {@code ciap_codes}, no CID-10. */
+    private static SortedMap<String, List<String>> problemCodes() {
+        SortedMap<String, List<String>> lists = codes(Capabilities.CIAP_CODES, List.of(C7Codes.A_ABP, C7Codes.D_ABP));
+        lists.put(Capabilities.CID_CODES, List.of());
+        return lists;
     }
 
     private static SortedMap<String, List<String>> codes(String name, List<String> values) {

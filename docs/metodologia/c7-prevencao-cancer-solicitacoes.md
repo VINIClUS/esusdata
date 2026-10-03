@@ -17,9 +17,12 @@ limitação permanente em `C7Pack.STANDING_LIMITATIONS`.
   na consulta.
 - **Impacto.** Sem o bind, um rastreamento registrado só pelo código AB não é lido e A/D podem sair
   subestimados. A regra já compara `ABEX001`, `ABP022` e `ABP023` se chegarem no código do evento.
-
-  os SIGTAP (`co_proced` guarda os dois). **Atendido no pacote**: `C7Codes.procedureCodes` envia
-  `ABEX001`, `ABP022` e `ABP023`.
+- **Resposta da fundação (9526ac6, corrigida em c0d2242).** Sem bind novo. `procedure_codes` aceita o
+  código AB de exame literal (`ABEX001`, em `tb_dim_procedimento.co_proced`); os `ABP…` são problema
+  avaliado (`tb_dim_ciap`) e chegam em `ciap_codes`. **Atendido no pacote**: `ABEX001` vai em
+  `procedure_codes` com os SIGTAP; `ABP022` (A) e `ABP023` (D) são lidos em `condition_list`
+  (problema avaliado por médico ou enfermeiro, data do registro como data da avaliação, a confirmar
+  no Portão C), e o `ABP022`/`ABP023` do atendimento continua contando para C.
 
 ## S-C7-02 — Problemas avaliados com códigos ABP em `care_encounter`
 

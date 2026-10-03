@@ -41,6 +41,8 @@ final class C7Cohort {
     static final String EXCLUIDO_CADASTRO_SIMPLIFICADO = "EXCLUIDO_CADASTRO_SIMPLIFICADO";
     static final String EXCLUIDO_VINCULO_CONFLITANTE = "EXCLUIDO_VINCULO_CONFLITANTE";
     static final String EXCLUIDO_PESSOA_CONFLITANTE = "EXCLUIDO_PESSOA_CONFLITANTE";
+    /** A "saída do cidadão do cadastro" with a reason outside 135/136: out, never silently kept. */
+    static final String EXCLUIDO_SAIDA_MOTIVO_DESCONHECIDO = "EXCLUIDO_SAIDA_MOTIVO_DESCONHECIDO";
 
     private C7Cohort() {}
 
@@ -194,6 +196,9 @@ final class C7Cohort {
         }
         if (C7Codes.SAIDA_OBITO.equals(r.exitReason())) {
             return EXCLUIDO_OBITO;
+        }
+        if (r.exitReason() != null) {
+            return EXCLUIDO_SAIDA_MOTIVO_DESCONHECIDO;
         }
         if (Boolean.TRUE.equals(r.refused())) {
             return EXCLUIDO_RECUSA_CADASTRO;

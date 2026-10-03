@@ -44,14 +44,20 @@ public final class C7Codes {
      */
     public static final YearMonth HPV_MOLECULAR_DESDE = YearMonth.of(2026, 1);
 
-    /** Quadro 02 (p. 6): "ABEX001 Citopatológico" e "ABP022 Rastreamento de câncer do colo do útero". */
-    public static final List<String> A_CODIGOS_AB = List.of("ABEX001", "ABP022");
+    /** Quadro 02 (p. 6): "ABEX001 Citopatológico" — código AB de exame, lido como procedimento. */
+    public static final List<String> A_CODIGOS_ABEX = List.of("ABEX001");
+
+    /**
+     * Quadro 02 (p. 6): "ABP022 Rastreamento de câncer do colo do útero" — código AB de problema
+     * avaliado ({@code tb_dim_ciap}), lido na lista de problemas, nunca como procedimento.
+     */
+    public static final String A_ABP = "ABP022";
 
     /** Quadro 05 (p. 6), prática D: 02.04.03.003-0 Mamografia; 02.04.03.018-8 Mamografia bilateral para rastreamento. */
     public static final List<String> D_SIGTAP = List.of("0204030030", "0204030188");
 
     /** Quadro 05 (p. 6): "ABP023 Rastreamento de câncer de mama". */
-    public static final List<String> D_CODIGOS_AB = List.of("ABP023");
+    public static final String D_ABP = "ABP023";
 
     /** Quadro 03 (p. 6) e item 24, i (p. 4): "67 - Vacina HPV quadrivalente"; "93 - Vacina HPV nonavalente". */
     public static final List<String> B_VACINAS_HPV = List.of("67", "93");
@@ -76,8 +82,8 @@ public final class C7Codes {
     public static final List<String> C_CODIGOS_ABP = List.of("ABP003", "ABP022", "ABP023");
 
     /**
-     * Domain codes of the source (LEDI, {@code docs/discovery/2026-10-02-dw-dicionario-c2-c7.md}
-     * §2.9; correspondence with the ficha's labels unverified — AMB-C7-12).
+     * Sex as {@code CanonicalPerson} carries it, in words (como-adicionar.md, convenções); the
+     * correspondence with the ficha's "Registro de sexo" is AMB-C7-12.
      */
     public static final String SEXO_FEMININO = "FEMININO";
 
@@ -98,10 +104,12 @@ public final class C7Codes {
 
     private static final Pattern SEPARATORS = Pattern.compile("[-.\\s]");
 
-    static final Set<String> A_36_MESES = normalizedSet(A_SIGTAP_36_MESES, A_CODIGOS_AB);
-    static final Set<String> D_CODIGOS = normalizedSet(D_SIGTAP, D_CODIGOS_AB);
+    static final Set<String> A_36_MESES = normalizedSet(A_SIGTAP_36_MESES, A_CODIGOS_ABEX);
+    static final Set<String> D_CODIGOS = normalizedSet(D_SIGTAP);
     static final Set<String> B_VACINAS = normalizedSet(B_VACINAS_HPV);
-    static final Set<String> C_PROBLEMAS = normalizedSet(C_CIAP2, C_CID10, C_CODIGOS_ABP);
+
+    /** CIAP-2 (and the ABP codes, stored with them) of the item 24, g — never compared with CID-10. */
+    static final Set<String> C_CIAP2_ABP = normalizedSet(C_CIAP2, C_CODIGOS_ABP);
 
     private C7Codes() {}
 
@@ -111,19 +119,35 @@ public final class C7Codes {
     }
 
     /**
-     * Codes bound as {@code procedure_codes}: SIGTAP digits only and the AB codes literal, as
+     * Codes bound as {@code procedure_codes}: SIGTAP digits only and the ABEX exam code literal, as
      * {@code tb_dim_procedimento.co_proced} stores both (como-adicionar.md, convenções) — A (36 and
-     * 60 months) and D.
+     * 60 months) and D. The ABP codes are evaluated problems and go to {@code condition_list}.
      */
     static List<String> procedureCodes(YearMonth competencia) {
         List<String> codes = new ArrayList<>(A_SIGTAP_36_MESES);
         if (!competencia.isBefore(HPV_MOLECULAR_DESDE)) {
             codes.add(A_SIGTAP_HPV_MOLECULAR);
         }
-        codes.addAll(A_CODIGOS_AB);
+        codes.addAll(A_CODIGOS_ABEX);
         codes.addAll(D_SIGTAP);
-        codes.addAll(D_CODIGOS_AB);
         return List.copyOf(codes);
+    }
+
+    /**
+     * CID-10 by category, as the capability matches it (como-adicionar.md): a listed code matches
+     * every source code that starts with it once the dot is gone ({@code O03} matches {@code O03.9}).
+     */
+    static boolean cidListed(String sourceCode) {
+        String code = normalized(sourceCode);
+        if (code.isEmpty()) {
+            return false;
+        }
+        for (String listed : C_CID10) {
+            if (code.startsWith(listed)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @SafeVarargs

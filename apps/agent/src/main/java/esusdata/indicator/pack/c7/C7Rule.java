@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeMap;
@@ -76,9 +77,20 @@ public final class C7Rule {
         List<TeamResult> teams = new ArrayList<>(byTeam.size());
         for (Map.Entry<String, List<Evaluated>> team : byTeam.entrySet()) {
             List<Evaluated> group = team.getValue();
-            teams.add(new TeamResult(team.getKey(), group.get(0).member().cnes(), result(group, context)));
+            teams.add(new TeamResult(team.getKey(), commonCnes(group), result(group, context)));
         }
         return new RuleOutcome(result(eligible, context), teams, evidence(evaluated));
+    }
+
+    /** The CNES of the team's links, or null when they disagree — never the first one by order. */
+    private static String commonCnes(List<Evaluated> group) {
+        String cnes = group.get(0).member().cnes();
+        for (Evaluated e : group) {
+            if (!Objects.equals(cnes, e.member().cnes())) {
+                return null;
+            }
+        }
+        return cnes;
     }
 
     /** A person with the decision of each subgroup of their age (empty when not eligible). */
@@ -205,7 +217,7 @@ public final class C7Rule {
                             f.cnes(),
                             f.ine(),
                             f.cbo(),
-                            null));
+                            f.modality()));
                 }
             }
         }

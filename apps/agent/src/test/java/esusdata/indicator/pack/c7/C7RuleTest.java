@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import esusdata.indicator.model.CanonicalCareEvent;
+import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.CanonicalImmunization;
@@ -917,6 +918,164 @@ class C7RuleTest {
                 null,
                 null,
                 null);
+    }
+
+    // ---- Integration review: CIAP-2 and CID-10 are separate lists (item 24, g) ----
+    @Test
+    void codes_ciapN93AndN95AreNotTheCidCategoriesN93AndN95() {
+        LocalDate thirty = d("1996-01-10");
+        RuleOutcome outcome = new Scenario()
+                .woman("ciapN95", thirty)
+                .woman("ciapN93", thirty)
+                .woman("cidN95", thirty)
+                .add(CanonicalFixtures.encounterWithProblems(
+                        "ciapN95", d("2026-05-10"), ENFERMEIRO, List.of("N95"), List.of()))
+                .add(CanonicalFixtures.encounterWithProblems(
+                        "ciapN93", d("2026-05-10"), MEDICO, List.of("N93"), List.of()))
+                .add(CanonicalFixtures.encounterWithProblems(
+                        "cidN95", d("2026-05-10"), MEDICO, List.of(), List.of("N95")))
+                .compute(JUN_2026);
+
+        assertThat(practiceRow(outcome, "ciapN95", "C").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+        assertThat(practiceRow(outcome, "ciapN93", "C").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+        assertThat(practiceRow(outcome, "cidN95", "C").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+    }
+
+    // ---- CID-10 by category, as the capability matches it (como-adicionar.md) ----
+    @Test
+    void codes_cidSubcategoryOfAListedCategoryCounts() {
+        RuleOutcome outcome = new Scenario()
+                .woman("abortion", d("1996-01-10"))
+                .add(CanonicalFixtures.encounterWithProblems(
+                        "abortion", d("2026-05-10"), MEDICO, List.of(), List.of("O03.9")))
+                .compute(JUN_2026);
+
+        assertThat(practiceRow(outcome, "abortion", "C").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+    }
+
+    // ---- ABP022 (A) and ABP023 (D) are evaluated problems; ABP in an encounter still meets C ----
+    @Test
+    void abp022AndAbp023EvaluatedAsProblemsMeetAAndD() {
+        RuleOutcome outcome = new Scenario()
+                .woman("cervix", d("1986-01-10"))
+                .woman("breast", d("1971-01-10"))
+                .woman("selfReported", d("1986-01-10"))
+                .add(CanonicalFixtures.encounterWithProblems(
+                        "cervix", d("2026-05-10"), ENFERMEIRO, List.of("ABP022"), List.of()))
+                .add(CanonicalFixtures.conditionEvaluatedBy(
+                        "cervix", "CIAP2", "ABP022", d("2024-01-10"), "0", ENFERMEIRO))
+                .add(CanonicalFixtures.conditionEvaluatedBy("breast", "CIAP2", "ABP023", d("2025-01-10"), "0", MEDICO))
+                .add(new CanonicalCondition(
+                        CanonicalFixtures.ref("tb_fat_cad_individual"),
+                        CanonicalFixtures.IBGE,
+                        "selfReported",
+                        "CIAP2",
+                        "ABP022",
+                        "2026-01-10",
+                        "0",
+                        null,
+                        "SELF_REPORTED",
+                        null))
+                .compute(JUN_2026);
+
+        assertThat(practiceRow(outcome, "cervix", "C").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(practiceRow(outcome, "cervix", "A").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(practiceRow(outcome, "breast", "D").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(practiceRow(outcome, "selfReported", "A").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+        assertThat(rows(
+                        outcome,
+                        e -> "breast".equals(e.subjectKey()) && e.decision() == EvidenceDecision.SUPPORTING_EVENT))
+                .extracting(EvidenceItem::modality)
+                .containsExactly("MIAI:PROBLEMA_AVALIADO");
+    }
+
+    // ---- Quadros 02/05: MIAI requested or evaluated and MIP; ABEX001 is an exam; MIAO never counts ----
+    @Test
+    void procedures_onlyMiaiRequestOrEvaluationAndMipCountWithTheirModelInTheEvidence() {
+        LocalDate fiftyFive = d("1971-01-10");
+        RuleOutcome outcome = new Scenario()
+                .woman("requested", fiftyFive)
+                .woman("evaluated", fiftyFive)
+                .woman("dental", fiftyFive)
+                .woman("miaiPerformed", fiftyFive)
+                .add(miai("requested", MAMOGRAFIA, "REQUESTED", "MIAI"))
+                .add(miai("requested", "ABEX001", "REQUESTED", "MIAI"))
+                .add(miai("evaluated", MAMOGRAFIA_RASTREAMENTO, "EVALUATED", "MIAI"))
+                .add(miai("dental", MAMOGRAFIA, "REQUESTED", "MIAO"))
+                .add(miai("dental", COLETA_CITO, "PERFORMED", "MIAO"))
+                .add(miai("miaiPerformed", MAMOGRAFIA, "PERFORMED", "MIAI"))
+                .compute(JUN_2026);
+
+        assertThat(practiceRow(outcome, "requested", "D").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(practiceRow(outcome, "requested", "A").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(practiceRow(outcome, "evaluated", "D").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(practiceRow(outcome, "dental", "A").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+        assertThat(practiceRow(outcome, "dental", "D").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+        assertThat(practiceRow(outcome, "miaiPerformed", "D").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+        assertThat(rows(
+                        outcome,
+                        e -> "evaluated".equals(e.subjectKey()) && e.decision() == EvidenceDecision.SUPPORTING_EVENT))
+                .extracting(EvidenceItem::modality)
+                .containsExactly("MIAI:EVALUATED");
+    }
+
+    // ---- MET-32 by content: the same dose written in two rows (distinct sourceRefs) is one event ----
+    @Test
+    void met32_sameDoseInTwoRowsIsOneSupportingEvent() {
+        RuleOutcome outcome = new Scenario()
+                .woman("girl", d("2014-01-10"))
+                .add(CanonicalFixtures.dose("girl", d("2024-02-01"), "67", "1"))
+                .add(CanonicalFixtures.dose("girl", d("2024-02-01"), "67", "1"))
+                .compute(JUN_2026);
+
+        assertComponent(outcome.result(), "B", 1, 1, IndicatorStatus.COMPUTED);
+        assertThat(supportingRefs(outcome, "girl", "B")).hasSize(1);
+    }
+
+    // ---- Item 15: an exit with a reason outside 135/136 is never kept silently; team CNES never by order ----
+    @Test
+    void item15_unknownExitReasonExcludesAndDivergentCnesLeavesTheTeamCnesNull() {
+        LocalDate thirty = d("1996-01-10");
+        RuleOutcome outcome = new Scenario()
+                .woman("unknownExit", thirty)
+                .add(version("unknownExit", d("2025-01-01"), INE_1, "999", false, false, false))
+                .woman("otherUnit", thirty)
+                .add(new CanonicalRegistration(
+                        CanonicalFixtures.ref("tb_fat_cad_individual"),
+                        CanonicalFixtures.IBGE,
+                        "otherUnit",
+                        "2025-01-01",
+                        "2999999",
+                        INE_1,
+                        false,
+                        false,
+                        false,
+                        null,
+                        null,
+                        null,
+                        null))
+                .woman("plain", thirty)
+                .compute(JUN_2026);
+
+        assertThat(personReasons(outcome)).containsEntry("unknownExit", "EXCLUIDO_SAIDA_MOTIVO_DESCONHECIDO");
+        assertThat(outcome.teams()).singleElement().satisfies(t -> {
+            assertThat(t.ine()).isEqualTo(INE_1);
+            assertThat(t.cnes()).isNull();
+        });
+    }
+
+    private static CanonicalProcedureEvent miai(String key, String code, String stage, String origin) {
+        return new CanonicalProcedureEvent(
+                CanonicalFixtures.ref("tb_fat_atd_ind_procedimentos"),
+                CanonicalFixtures.IBGE,
+                key,
+                "2026-03-10",
+                code,
+                stage,
+                MEDICO,
+                null,
+                null,
+                origin);
     }
 
     private static Scenario met24() {

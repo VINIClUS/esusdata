@@ -88,17 +88,15 @@ class C7PackTest {
                             "0201020076",
                             "0201020084",
                             "ABEX001",
-                            "ABP022",
                             "0204030030",
-                            "0204030188",
-                            "ABP023");
+                            "0204030188");
 
             PartRequirement after = parts(YearMonth.of(2026, 1)).get(capability);
             assertThat(after.periodStart()).isEqualTo(LocalDate.of(2021, 2, 1));
             assertThat(after.periodEndExclusive()).isEqualTo(LocalDate.of(2026, 2, 1));
             assertThat(after.arrayParams().get(Capabilities.PROCEDURE_CODES))
                     .contains("0202100251")
-                    .allMatch(code -> code.matches("\\d{10}|AB[A-Z]*\\d{3}"));
+                    .allMatch(code -> code.matches("\\d{10}|ABEX\\d{3}"));
             assertBirths(after, LocalDate.of(1956, 1, 31), LocalDate.of(2001, 1, 31));
         }
     }
@@ -128,8 +126,9 @@ class C7PackTest {
                         + "Z206;Z30;Z300;Z301;Z302;Z303;Z304;Z305;Z308;Z309;Z31;Z310;Z311;Z312;Z313;Z314;Z315;Z316;"
                         + "Z318;Z319;Z320;Z600;Z630;Z640;Z70;Z700;Z701;Z702;Z703;Z708;Z709;Z717;Z725");
         assertThat(C7Codes.C_CODIGOS_ABP).containsExactly("ABP003", "ABP022", "ABP023");
-        assertThat(C7Codes.A_CODIGOS_AB).containsExactly("ABEX001", "ABP022");
-        assertThat(C7Codes.D_CODIGOS_AB).containsExactly("ABP023");
+        assertThat(C7Codes.A_CODIGOS_ABEX).containsExactly("ABEX001");
+        assertThat(C7Codes.A_ABP).isEqualTo("ABP022");
+        assertThat(C7Codes.D_ABP).isEqualTo("ABP023");
     }
 
     @Test
