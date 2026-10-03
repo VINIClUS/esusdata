@@ -30,6 +30,10 @@ const map: Record<StatusKey, StatusDef> = {
   regular: { label: 'Regular', color: colors.primary, bg: colors.infoBg },
   conforme: { label: 'Conforme', color: colors.success, bg: colors.successBg },
   verificado: { label: 'Verificado', color: colors.primary, bg: colors.infoBg },
+  ambiguidade: { label: 'Ambiguidade na regra', color: colors.warningText, bg: colors.warningBg },
+  sem_suporte: { label: 'Fonte sem suporte', color: colors.error, bg: colors.errorBg },
+  sem_fonte: { label: 'Sem fonte', color: colors.textSecondary, bg: '#eef2f7' },
+  na_leitura: { label: 'Calculada na leitura', color: colors.primary, bg: colors.infoBg },
 }
 
 interface StatusChipProps {

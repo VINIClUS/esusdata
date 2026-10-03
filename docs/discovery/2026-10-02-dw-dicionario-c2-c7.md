@@ -599,6 +599,8 @@ Texto da doc (objetivo/regras/notas):
   - Registro de uma visita domiciliar no aplicativo e-SUS Território.
 
 > Sem data própria: a data da visita só existe via `co_dim_tempo`. `st_nao_possui_cpf` e `co_dim_just_nao_possui_cpf` entraram na v5.5.21→5.5.23 (**ausentes no 5.4.37**). LEDI FVDT tem `pressaoSistolica` e `pressaoDiastolica` separadas, mas o DW documenta só `nu_medicao_pressao_arterial` (sem referência LEDI): formato a verificar. Visitas a imóveis sem cidadão são possíveis (`co_dim_tipo_imovel`); o comportamento de `co_fat_cidadao_pec` nesses casos não está documentado.
+>
+> **Motivos no LEDI** (acréscimo da fase 1c; fonte: LEDI `/ledi/documentacao/referencias/dicionario.html#motivovisita`, Alterado em 10/09/2026, acesso em 2026-10-02). O DW guarda cada motivo numa coluna `st_*` própria, sem dimensão; o código LEDI correspondente, pela descrição: cadastramento/atualização 1; visita periódica 29; busca ativa de consulta 2, exame 3, vacina 4, condicionalidades do Bolsa Família 30; acompanhamento de gestante 5, puérpera 6, recém-nascido 7, criança 8, desnutrição 9, reabilitação ou deficiência 10, hipertensão 11, diabetes 12, asma 13, DPOC/enfisema 14, câncer 15, outras doenças crônicas 16, hanseníase 17, tuberculose 18, sintomáticos respiratórios 32, tabagista 33, domiciliados/acamados 19, vulnerabilidade social 20, condicionalidades do Bolsa Família 21, saúde mental 22, álcool 23, outras drogas 24, pessoa idosa 38; controle ambiental: ação educativa 34, imóvel com foco 35, ação mecânica 36, tratamento focal 37; egresso de internação 25; convite para atividades coletivas 27; orientação/prevenção 31; outros 28. A capacidade `home_visit` entrega o nome da coluna (convenção do guia `docs/indicadores/como-adicionar.md`), não esse código.
 
 | Seção da doc | Coluna | LEDI | Descrição (doc oficial) | Marcação |
 |---|---|---|---|---|
@@ -778,6 +780,8 @@ Texto da doc (objetivo/regras/notas):
   - O tipo de atividade da `tb_fat_atividade_coletiva` vinculada refere-se a ações de saúde direcionadas aos usuários.
 
 > Só existe para tipos de atividade de "ação de saúde com usuários". `st_prat_saude_pnct_manutencao` entrou na v5.5.25→5.5.26 (ausente no 5.4.37). Prática relevante: `st_prat_saude_antropometria`.
+>
+> **Códigos LEDI das práticas** (acréscimo da fase 1c; fonte: LEDI `/ledi/documentacao/referencias/dicionario.html#praticasemsaude`, Alterado em 10/09/2026, acesso em 2026-10-02), pela descrição de cada coluna: antropometria **20**; aplicação tópica de flúor **2**; desenvolvimento da linguagem **23**; escovação dental supervisionada **9**; práticas corporais e atividade física **11**; PNCT 1 a 4 **25** a **28**; saúde auditiva **22**; saúde ocular **3**; verificação da situação vacinal **24**; outras **12**; outro procedimento coletivo **30**; fornecimento de kit bucal **33**; PNCT manutenção **34**. As fichas C2–C7 citam "Práticas em Saúde código 01", "02 e 04": essa numeração **não** é o código LEDI (o 4 nem existe no domínio). A correspondência com a ficha fica com a regra (AMB-C3-19 e equivalentes).
 
 | Seção da doc | Coluna | LEDI | Descrição (doc oficial) | Marcação |
 |---|---|---|---|---|
@@ -1944,6 +1948,19 @@ de dimensão.
 | `tb_dim_prof_finalizador_obs`, `tb_dim_cbo_finalizador_obs`, `tb_dim_ubs_finalizador_obs`, `tb_dim_equipe_finalizador_obs` | FAI | `co_dim_*_finalizador_obs` | Finalizador de atendimento em observação | Não ler |
 | `tb_dim_conclusao_modalidade_ad` | `tb_fat_avaliacao_elegibilidade` | — | Fora de C2–C7 | Não ler |
 | `tb_fat_cidadao_pec` | Alvo de `co_fat_cidadao_pec` em quase todos os fatos | `co_fat_cidadao_pec` | Sem página; listada na Tabela 1 de `/dw/fatos/index.html` como "Utilizada nos relatórios operacionais" (tabelas que "em breve" serão descontinuadas) | Tratar `co_fat_cidadao_pec` como chave opaca; **não fazer JOIN** com `tb_fat_cidadao_pec` sem inventário |
+
+**Nota da fase 1c sobre os nomes sem página** (inferência, a confirmar em `pg_constraint` na seção 1.9 do
+inventário). Nas páginas do FAI, o alvo das FKs sem página repete mecanicamente o nome da coluna:
+`co_dim_tp_particip_cidadao` → "`co_seq_dim_tp_particip_cidadao` da `tb_dim_tp_particip_cidadao`",
+`co_dim_tp_particip_prof_conv` → "`tb_dim_tp_particip_prof_conv`", `co_dim_tempo_dum` → "`tb_dim_tempo_dum`".
+A página do FAO, ao contrário, aponta as **duas** colunas de participação para a mesma tabela,
+"`co_seq_dim_tp_particip_atend` da `tb_dim_tp_participacao_atend`" (fonte:
+`/dw/fatos/atendimento_odontologico/tb_fat_atendimento_odonto.html`, Alterado em 11/09/2026), um nome que não
+sai da coluna e por isso parece escrito à mão. As consultas da fundação usam `tb_dim_tp_participacao_atend`
+para FAI e FAO: se o nome real for outro, a consulta falha fechada ("relation does not exist") na validação
+ao vivo. Para a DUM usam `tb_dim_tempo`, que existe de qualquer jeito: um alvo errado não falharia, então a
+FK real precisa ser conferida em `pg_constraint` e a plausibilidade das datas no diagnóstico
+`lmp_against_encounter_date` do teste ao vivo (`docs/discovery/capacidades-dw-v2.md`).
 | `tb_cidadao` | `tb_dim_cidadao_pec_grupo.co_cidadao` e `co_cidadao_master`; `tb_acomp_cidadaos_vinculados.co_cidadao` | — | Tabela **transacional** do PEC, fora do DW | Não ler (usar só os códigos) |
 | `tb_fat_rel_op_gestante`, `tb_fat_rel_op_crianca`, `tb_fat_cidadao`, `tb_fat_cidadao_territorio`, `tb_fat_consolidado_cidadao_fci`, `tb_fat_consolidado_cidadao_fvd`, `tb_fat_fichas`, `tb_fat_familia`, `tb_fat_familia_territorio`, `tb_fat_rel_op_risco_cardio` | Tabela 1 de `/dw/fatos/index.html` | — | Só nome e finalidade ("relatórios operacionais", "relatórios consolidados de cadastro" ou "registrar as fichas presentes no DW"); **colunas não documentadas**; as de relatório operacional são candidatas à descontinuação | Não usar como fonte de C2–C7. `tb_fat_rel_op_gestante` pode ser tentadora para a gestação, mas não tem contrato publicado |
 

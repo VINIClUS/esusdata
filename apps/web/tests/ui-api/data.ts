@@ -1,13 +1,19 @@
 // Minimal API payloads, typed by the client's own contracts so a contract change breaks the build.
 import type {
+  EvidenceEntry,
   ExportResponse,
   IndicatorPack,
   IndicatorResultResponse,
   OverviewIndicator,
   OverviewResponse,
+  PackComponentSpec,
+  QualityComponent,
+  QualityComponentUnit,
+  ResultComponentResponse,
   RunResponse,
   RunSourceResponse,
   SourceResponse,
+  TeamResultResponse,
 } from '../../src/api/types/index.ts'
 import { IBGE } from './api.ts'
 
@@ -188,6 +194,206 @@ export function overview(
     alerts: [],
     pendingPeriods: [],
     recentRuns: [],
+    ...overrides,
+  }
+}
+
+// ADR 0030: packs by practices, their results and the Nota Final do Componente III.
+
+const GATE = 'Portão A (fonte e vigência) incompleto'
+
+/** A pack of the quality package (qualidade-esf-eap-2026-06) as GET /indicator-packs serves it. */
+export function qualityPack(
+  id: string,
+  code: string,
+  title: string,
+  overrides: Partial<IndicatorPack> = {},
+): IndicatorPack {
+  return {
+    ...pack(id, 'QUALIDADE_ESF_EAP'),
+    unit: 'percentual',
+    executionEnabled: false,
+    blockedGates: [GATE],
+    code,
+    title,
+    packageId: 'qualidade-esf-eap-2026-06',
+    valueKind: 'PERCENTAGE',
+    components: [],
+    requiredCapabilities: ['individual_encounter_modality'],
+    methodologySources: ['docs/metodologia/c1-mais-acesso.md'],
+    standingLimitations: [],
+    runnable: true,
+    ...overrides,
+  }
+}
+
+const spec = (
+  code: string,
+  label: string,
+  weight: string,
+  kind: PackComponentSpec['kind'] = 'PRACTICE',
+): PackComponentSpec => ({ code, label, kind, weight, window: '12 meses' })
+
+export const c1Pack = () => qualityPack('c1-mais-acesso', 'C1', 'Mais acesso')
+
+export const c4Pack = () =>
+  qualityPack('c4-cuidado-diabetes', 'C4', 'Cuidado da pessoa com diabetes', {
+    valueKind: 'SCORE',
+    components: [
+      spec('A', 'Ter pelo menos 01 (uma) consulta nos últimos 06 (seis) meses.', '20'),
+      spec('B', 'Ter pelo menos 01 (um) registro de pressão arterial.', '15'),
+    ],
+    requiredCapabilities: ['citizen', 'condition_list'],
+    standingLimitations: ['Sem registros de outros municípios.'],
+  })
+
+export const c7Pack = () =>
+  qualityPack('c7-prevencao-cancer', 'C7', 'Cuidado da mulher na prevenção do câncer', {
+    valueKind: 'COMPOSITE_SCORE',
+    components: [
+      spec('A', 'Rastreamento do câncer do colo do útero.', '20', 'SUBGROUP'),
+      spec('C', 'Atenção à saúde sexual e reprodutiva.', '30', 'SUBGROUP'),
+    ],
+  })
+
+/** The Nota Final do Componente III: in the catalog, computed on read, never run. */
+export const notaFinalPack = () =>
+  qualityPack('componente-iii-nota-final', 'Componente III', 'Nota Final do Componente III', {
+    packageId: 'cofin-quad-nt08-2026',
+    valueKind: 'FINAL_SCORE',
+    unit: 'pontos (0 a 10)',
+    components: [
+      spec('c1-mais-acesso', 'C1 — Mais acesso', '1', 'INDICATOR'),
+      spec('c4-cuidado-diabetes', 'C4 — Cuidado da pessoa com diabetes', '1', 'INDICATOR'),
+    ],
+    requiredCapabilities: [],
+    runnable: false,
+  })
+
+/** The overview's entry for a catalog pack, with the municipality's availability. */
+export function overviewOfPack(
+  p: IndicatorPack,
+  status: string | null = null,
+  value: string | null = null,
+  overrides: Partial<OverviewIndicator> = {},
+): OverviewIndicator {
+  return {
+    ...overviewIndicator(p.id, status, value, { family: p.family }),
+    code: p.code,
+    title: p.title,
+    valueKind: p.valueKind,
+    runnable: p.runnable,
+    availability: 'AVAILABLE',
+    missingCapabilities: [],
+    executionEnabled: p.executionEnabled,
+    blockedGates: p.blockedGates,
+    ...overrides,
+  }
+}
+
+export function component(
+  code: string,
+  kind: ResultComponentResponse['kind'],
+  weight: string,
+  numerator: string,
+  denominator: string,
+  status: ResultComponentResponse['status'],
+  value: string | null = null,
+): ResultComponentResponse {
+  return {
+    code,
+    kind,
+    weight,
+    numerator,
+    denominator,
+    value,
+    valueExact: value === null ? null : { numerator, denominator },
+    status,
+  }
+}
+
+export function team(
+  ine: string | null,
+  overrides: Partial<TeamResultResponse> = {},
+): TeamResultResponse {
+  return {
+    ine,
+    cnes: ine ? '1000001' : null,
+    status: 'BLOCKED',
+    value: null,
+    valueExact: null,
+    numerator: '600',
+    denominator: '12',
+    classification: null,
+    consolidationEligible: true,
+    components: [],
+    limitations: [GATE],
+    ...overrides,
+  }
+}
+
+/** C4 of PERIOD, withheld by the gates: the counts, practices and teams, no value. */
+export const c4Blocked = () =>
+  result('c4-cuidado-diabetes', null, {
+    status: 'BLOCKED',
+    ruleVersion: 'c4-cuidado-diabetes@0.1.0',
+    valueKind: 'SCORE',
+    numerator: '1700',
+    denominator: '40',
+    denominatorKind: 'PESSOAS_COM_DIABETES_VINCULADAS',
+    limitations: [GATE],
+    valueExact: null,
+    components: [
+      component('A', 'PRACTICE', '20', '30', '40', 'COMPUTED', '0.7500'),
+      component('B', 'PRACTICE', '15', '12', '40', 'RULE_AMBIGUITY'),
+    ],
+    teams: [
+      team(null, { numerator: '0', denominator: '0', status: 'NO_DENOMINATOR' }),
+      team('0000000011'),
+    ],
+    consolidationEligible: true,
+  })
+
+/** One evidence row of a person (C2–C7): an opaque key, never a name, CPF or CNS. */
+export function personRow(
+  subjectKey: string,
+  decision: NonNullable<EvidenceEntry['decision']>,
+  overrides: Partial<EvidenceEntry> = {},
+): EvidenceEntry {
+  return {
+    subjectKind: 'PERSON',
+    subjectKey,
+    sourceEntityType: null,
+    sourceRecordId: null,
+    careDate: '2026-03-31',
+    modality: null,
+    cnes: '1000001',
+    ine: '0000000011',
+    cbo: null,
+    component: null,
+    decision,
+    reasonCode: null,
+    points: null,
+    criterionVersion: 'c4-cuidado-diabetes@0.1.0',
+    ...overrides,
+  }
+}
+
+/** GET /quality-component of IBGE for `quadrimestre`, with the given units. */
+export function qualityComponent(
+  quadrimestre: string,
+  months: string[],
+  units: QualityComponentUnit[],
+  overrides: Partial<QualityComponent> = {},
+): QualityComponent {
+  return {
+    municipalityIbge: IBGE,
+    quadrimestre,
+    months,
+    ruleVersion: 'componente-iii-nota-final@0.1.0',
+    inputFingerprint: '',
+    limitations: [],
+    units,
     ...overrides,
   }
 }

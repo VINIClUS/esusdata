@@ -280,7 +280,7 @@ public final class DelegatedExtractPublication implements AutoCloseable {
         if (finishedAt.isBefore(startedAt)) {
             throw new IllegalStateException("Manifest timestamps are not ordered");
         }
-        return publishFiles(new ExtractionManifest(
+        ExtractionManifest manifest = new ExtractionManifest(
                 extractionId,
                 acquisitionScope.sourceId(),
                 acquisitionScope.municipalityIbge(),
@@ -297,7 +297,9 @@ public final class DelegatedExtractPublication implements AutoCloseable {
                 checksum,
                 queryChecksum,
                 CANONICAL_V2_ADAPTER_VERSION,
-                parts));
+                parts);
+        ExtractValidation.validateManifest(manifest);
+        return publishFiles(manifest);
     }
 
     private void requireCanonicalV2() {
