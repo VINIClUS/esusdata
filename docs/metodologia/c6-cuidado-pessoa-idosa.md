@@ -258,6 +258,42 @@ Tratamentos com o mesmo sentido de [C4](c4-cuidado-diabetes.md#ambiguidades): `R
 
 **AMB-C6-11 — Lista de CBO do item 24 d.** p. 2 («2239 - 05 - Terapeutas ocupacionais;», «2235 - Enfermeiros e afins;», «3222 - Técnicos e auxiliares de enfermagem;») × p. 4 (Quadro 03 com `2239` «Terapeutas ocupacionais, ortoptistas e psicomotricistas»; nota de rodapé 4). Impacto: antropometria registrada por ocupações do grupo `2239` diferentes de terapeuta ocupacional. **Tratamento: limitação**: o Quadro 03 (mais específico e alterado nesta edição) prevalece para B; quatro dígitos = prefixo, hífen = exato.
 
+### Convenções do pacote sem texto da ficha que as decida (registradas na integração, S-C6-05)
+
+A sessão do pacote adotou as leituras abaixo sem trecho da ficha que as decida. Ficam registradas
+para a revisão dos Portões A/B; cada uma está declarada nas limitações permanentes do `C6Pack`.
+
+**AMB-C6-12 — Aniversário de 29/02.** A ficha diz "60 anos ou mais" no último dia da competência e
+não trata o nascimento em 29/02. **Leitura do pacote:** `AnniversaryRule.CLAMP_TO_MONTH_END`
+(29/02 + 60 anos num ano não bissexto = 28/02), a mesma aritmética da faixa de nascimento do bind. Só
+muda o resultado para quem nasceu em 29/02 e completa 60 anos num ano não bissexto.
+
+**AMB-C6-13 — Vínculo local por versões do cadastro (§1.7.3; AMB-C6-04).** **Leitura do pacote:**
+vale a versão completa do cadastro individual de maior data até o corte; cadastro simplificado não
+vincula; cadastro vigente sem INE não vincula (`EXCLUIDO_SEM_VINCULO`); versões da mesma data que
+divergem em INE, CNES, saída, ficha inativa ou recusa excluem a pessoa como conflito
+(`EXCLUIDO_VINCULO_CONFLITANTE`) sem escolher uma delas. O item 15 manda usar os critérios de
+desempate da Portaria SAPS/MS nº 161/2024, que não estão transcritos aqui.
+
+**AMB-C6-14 — Exclusões locais que a ficha não lista.** A transcrição registra que a ficha não define
+exclusões além das interrupções. **Leitura do pacote:** recusa de cadastro, ficha inativa, data de
+nascimento divergente entre registros da mesma chave de pessoa (`EXCLUIDO_DATA_NASCIMENTO_DIVERGENTE`)
+e versões conflitantes (AMB-C6-13) excluem a pessoa com motivo próprio. A semântica de
+`st_ficha_inativa` no DW não está documentada: se o PEC marcar como inativas as versões substituídas,
+quem atualizou o cadastro depois do corte seria excluído de competências passadas — validar no
+Portão C.
+
+**AMB-C6-15 — Códigos de saída do cadastro.** Os códigos 136 (mudança de território) e 135 (óbito)
+vêm do LEDI (`MotivoSaida`, dicionário do DW), não da ficha (item 15, p. 1). Saída preenchida com
+outro código exclui a pessoa como `EXCLUIDO_SAIDA_CADASTRO_NAO_MAPEADA`, nunca em silêncio.
+
+**AMB-C6-16 — Consulta da prática A sem problema/condição avaliada.** Pela leitura literal do
+Quadro 02 (AMB-C6-06), a consulta não exige CIAP/CID avaliado.
+
+**AMB-C6-17 — Tipo de equipe contraditório.** Duas observações de tipo de equipe no mesmo instante
+mais recente com tipos diferentes deixam o resultado da equipe `RULE_AMBIGUITY` (prática C
+`PRACTICE_AMBIGUOUS`), sem escolher uma; observação sem data não é usada e é contada na limitação.
+
 ## Fora do alcance do PEC local
 
 - RIA/RNDS: «Registro de Imunobiológico Administrado (RIA)» e fonte de dados «RNDS» (item 26). Doses aplicadas em outro serviço ou município só aparecem na RNDS; a falta de integração não pode ser lida como ausência de vacinação (Tech Spec §2.4).
