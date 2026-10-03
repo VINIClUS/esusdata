@@ -206,7 +206,12 @@ class C5DescriptorTest {
                 .anySatisfy(text -> assertThat(text).startsWith("Lacuna L12:"))
                 .anySatisfy(text -> assertThat(text).startsWith("Lacuna L5:").contains("AMB-C5-06"))
                 .anySatisfy(text -> assertThat(text).startsWith("MIAO"));
-        assertThat(limitations).noneMatch(text -> text.startsWith("AMB-C5-06"));
+        assertThat(limitations)
+                .contains("AMB-C5-06 (provisória): MIAC aceito para PA e para peso e altura (Quadros 03 e 04).")
+                .contains("CNS profissional identificado (item 24 e) não conferido.")
+                .anySatisfy(text -> assertThat(text).startsWith("Ficha de procedimentos (MIP) só comprova B e C"))
+                .noneMatch(text -> text.startsWith("Motivo da visita"))
+                .noneMatch(text -> text.startsWith("Condição sem CBO"));
     }
 
     // ---- practices are matched to the descriptor by code ----

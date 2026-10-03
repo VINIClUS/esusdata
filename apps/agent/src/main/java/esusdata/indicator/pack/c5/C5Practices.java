@@ -8,6 +8,7 @@ import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CboGroups;
 import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -44,6 +46,15 @@ final class C5Practices {
     private static final String PERFORMED = "PERFORMED";
     private static final Pattern NOT_DIGIT = Pattern.compile("\\D");
 
+    /** Quadro 03: the SIGTAP code from the MIAI or the MIP. */
+    private static final Set<String> BLOOD_PRESSURE_PROCEDURES = Set.of(C5Event.MIAI, C5Event.MIP);
+
+    /** Quadro 04: SIGTAP codes only from the MIP; in the MIAI only the PEC's own fields count. */
+    private static final Set<String> ANTHROPOMETRY_PROCEDURES = Set.of(C5Event.MIP);
+
+    /** Measurements count only from a collective activity (MIAC); a MIP measure needs its code. */
+    private static final Set<String> COLLECTIVE = Set.of(C5Event.MIAC);
+
     /**
      * Orders records by date; {@link BinaryOperator#maxBy} and {@link BinaryOperator#minBy} keep
      * the first one read on the same date.
@@ -72,9 +83,13 @@ final class C5Practices {
             this(code, met, reasonCode, support, false);
         }
 
-        /** The same observation, undecided by the ficha for {@code reason}; its records stay as support. */
+        /**
+         * The same observation, undecided by the ficha for {@code reason}; its records stay as
+         * support and the reason code keeps what was observed ({@code AMB-C5-01:CUMPRIDA}), so the
+         * observed count can be rebuilt from the evidence (ENG-36).
+         */
         Outcome undecided(String reason) {
-            return new Outcome(code, met, reason, support, true);
+            return new Outcome(code, met, reason + ":" + reasonCode, support, true);
         }
     }
 
@@ -109,21 +124,23 @@ final class C5Practices {
 
     /**
      * B — Quadro 03 (p. 4–5): the PEC's «pressão arterial» (mmHg) field or SIGTAP «03.01.10.003-9»
-     * in the MIAI, the procedure in the MIP (stage performed), or the field in a MIP/MIAC
-     * measurement (AMB-C5-06). The visit form has no blood-pressure field in the canonical record.
+     * in the MIAI; the SIGTAP code in a procedure from the MIAI or the MIP («com os códigos SIGTAP
+     * especificados»); or the field in a collective activity (MIAC, AMB-C5-06). A MIP measurement
+     * without the code does not count, and the visit form has no blood-pressure field in the
+     * canonical record (lacuna L6).
      */
     private Outcome bloodPressure(String person) {
         Stream<C5Event> encounters = individual(person, C5Codes.CBO_AFERICAO_PA)
                 .filter(e -> hasPressure(e.systolicMmhg(), e.diastolicMmhg())
                         || hasCode(e.proceduresPerformed(), C5Codes.SIGTAP_AFERICAO_PA))
                 .map(C5Event::of);
-        Stream<C5Event> procedureEvents = performed(person, C5Codes.CBO_AFERICAO_PA)
+        Stream<C5Event> procedureEvents = performed(person, C5Codes.CBO_AFERICAO_PA, BLOOD_PRESSURE_PROCEDURES)
                 .filter(p -> C5Codes.SIGTAP_AFERICAO_PA.equals(digits(p.sigtapCode())))
                 .map(C5Event::of);
-        Stream<C5Event> measured = measured(person, C5Codes.CBO_AFERICAO_PA)
+        Stream<C5Event> collective = collective(person, C5Codes.CBO_AFERICAO_PA)
                 .filter(m -> hasPressure(m.systolicMmhg(), m.diastolicMmhg()))
                 .map(C5Event::of);
-        List<C5Event> found = Stream.of(encounters, procedureEvents, measured)
+        List<C5Event> found = Stream.of(encounters, procedureEvents, collective)
                 .flatMap(Function.identity())
                 .filter(e -> within(e, sixMonths))
                 .toList();
@@ -132,21 +149,17 @@ final class C5Practices {
 
     /**
      * C — Quadro 04 (p. 5): weight and height on the same civil date, from any combination of
-     * accepted records (AMB-C5-07); «01.01.04.002-4» alone gives both. Different days never meet.
+     * accepted records (AMB-C5-07): the PEC's own fields in the MIAI, the MIAC and the visit of an
+     * ACS/TACS with its reason (item 24 e), or the SIGTAP codes in a MIP procedure —
+     * «01.01.04.002-4» alone gives both. Different days never meet.
      */
     private Outcome anthropometry(String person) {
         C5Anthropometry days = new C5Anthropometry(e -> within(e, twelveMonths));
         CboGroups cbo = C5Codes.CBO_ANTROPOMETRIA;
-        individual(person, cbo)
-                .forEach(e -> days.add(
-                        C5Event.of(e),
-                        notBlank(e.weightKg()) || C5Anthropometry.givesWeight(digitsOf(e.proceduresPerformed())),
-                        notBlank(e.heightCm()) || C5Anthropometry.givesHeight(digitsOf(e.proceduresPerformed()))));
-        measured(person, cbo).forEach(m -> days.add(C5Event.of(m), notBlank(m.weightKg()), notBlank(m.heightCm())));
-        of(visits, person).stream()
-                .filter(v -> cbo.matches(v.cbo()))
-                .forEach(v -> days.add(C5Event.of(v), notBlank(v.weightKg()), notBlank(v.heightCm())));
-        performed(person, cbo).forEach(p -> {
+        individual(person, cbo).forEach(e -> days.add(C5Event.of(e), positive(e.weightKg()), positive(e.heightCm())));
+        collective(person, cbo).forEach(m -> days.add(C5Event.of(m), positive(m.weightKg()), positive(m.heightCm())));
+        reportedVisits(person).forEach(v -> days.add(C5Event.of(v), positive(v.weightKg()), positive(v.heightCm())));
+        performed(person, cbo, ANTHROPOMETRY_PROCEDURES).forEach(p -> {
             List<String> code = List.of(digits(p.sigtapCode()));
             days.add(C5Event.of(p), C5Anthropometry.givesWeight(code), C5Anthropometry.givesHeight(code));
         });
@@ -155,19 +168,19 @@ final class C5Practices {
     }
 
     /**
-     * D — Quadro 05 (p. 5): two home visits by ACS/TACS at least 30 days apart within 12 months,
-     * whatever the outcome (AMB-C5-09) or the reason (mandatory in the LEDI). Fewer than two
-     * distinct dates is no record of the practice; otherwise the latest and the earliest visit
-     * support the decision, and they are 30 days apart exactly when some pair is.
+     * D — Quadro 05 (p. 5): two home visits by ACS/TACS «com preenchimento do ‘‘motivo da visita’’»
+     * (item 24 e, p. 2–3) at least 30 days apart within 12 months, whatever the outcome
+     * (AMB-C5-09). Fewer than two distinct dates is no record of the practice (its visits still
+     * shown); otherwise the latest and the earliest visit support the decision, and they are 30
+     * days apart exactly when some pair is.
      */
     private Outcome homeVisits(String person) {
-        List<C5Event> found = of(visits, person).stream()
-                .filter(v -> C5Codes.CBO_VISITA.matches(v.cbo()))
+        List<C5Event> found = reportedVisits(person)
                 .map(C5Event::of)
                 .filter(e -> within(e, twelveMonths))
                 .toList();
         if (found.stream().map(C5Event::date).distinct().count() < 2) {
-            return notMet(D, NOT_RECORDED, List.of());
+            return notMet(D, NOT_RECORDED, found.stream().distinct().toList());
         }
         C5Event latest = found.stream().reduce(BinaryOperator.maxBy(BY_DATE)).orElseThrow();
         C5Event earliest = found.stream().reduce(BinaryOperator.minBy(BY_DATE)).orElseThrow();
@@ -183,21 +196,28 @@ final class C5Practices {
     }
 
     /**
-     * Procedures done (stage {@code PERFORMED}, or unknown) in a model of Quadros 03/04; a request
-     * proves nothing (§1.7) and a dental record ({@code MIAO}) is not accepted.
+     * Procedures done (stage {@code PERFORMED}) in one of {@code models}; a request proves nothing
+     * (§1.7), and a missing stage or origin is not assumed.
      */
-    private Stream<CanonicalProcedureEvent> performed(String person, CboGroups cbo) {
+    private Stream<CanonicalProcedureEvent> performed(String person, CboGroups cbo, Set<String> models) {
         return of(procedures, person).stream()
-                .filter(p -> p.stage() == null || PERFORMED.equalsIgnoreCase(p.stage()))
-                .filter(p -> C5Event.acceptedOrigin(p.origin()))
+                .filter(p -> PERFORMED.equalsIgnoreCase(p.stage()))
+                .filter(p -> C5Event.originIn(p.origin(), models))
                 .filter(p -> cbo.matches(p.cbo()));
     }
 
-    /** Measurements (MIP or MIAC, AMB-C5-06) of a model of Quadros 03/04 by the practice's CBO. */
-    private Stream<CanonicalMeasurement> measured(String person, CboGroups cbo) {
+    /** Collective-activity measurements (MIAC, AMB-C5-06) by the practice's CBO. */
+    private Stream<CanonicalMeasurement> collective(String person, CboGroups cbo) {
         return of(measurements, person).stream()
-                .filter(m -> C5Event.acceptedOrigin(m.origin()))
+                .filter(m -> C5Event.originIn(m.origin(), COLLECTIVE))
                 .filter(m -> cbo.matches(m.cbo()));
+    }
+
+    /** Visits by ACS/TACS (Quadro 05) with at least one reason filled in (item 24 e). */
+    private Stream<CanonicalHomeVisit> reportedVisits(String person) {
+        return of(visits, person).stream()
+                .filter(v -> C5Codes.CBO_VISITA.matches(v.cbo()))
+                .filter(v -> hasAny(v.reasonCodes()));
     }
 
     private boolean within(C5Event e, DateWindow window) {
@@ -218,7 +238,19 @@ final class C5Practices {
     }
 
     private static boolean hasPressure(String systolic, String diastolic) {
-        return notBlank(systolic) && notBlank(diastolic);
+        return positive(systolic) && positive(diastolic);
+    }
+
+    /** A measure counts only as a decimal greater than zero; invalid text does not count. */
+    private static boolean positive(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        try {
+            return new BigDecimal(value.strip()).signum() > 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     private static boolean hasAny(List<String> codes) {

@@ -21,12 +21,6 @@ record C5Event(SourceRef sourceRef, LocalDate date, String cbo, String cnes, Str
     static final String MIAC = "MIAC";
     static final String MIVDT = "MIVDT";
 
-    /** The model of a procedure or measurement whose source did not say where it came from. */
-    static final String NOT_INFORMED = "NAO_INFORMADO";
-
-    /** The models Quadros 03 and 04 (p. 4–5) accept for procedures and measurements; not MIAO. */
-    private static final Set<String> ACCEPTED_ORIGINS = Set.of(MIAI, MIP, MIAC);
-
     static C5Event of(CanonicalCareEvent e) {
         return new C5Event(e.sourceRef(), date(e.careDate()), e.cbo(), e.cnes(), e.ine(), MIAI);
     }
@@ -50,11 +44,11 @@ record C5Event(SourceRef sourceRef, LocalDate date, String cbo, String cnes, Str
     }
 
     /**
-     * Whether a procedure or measurement comes from a model of Quadros 03/04 ({@code MIAI}, {@code
-     * MIP}, {@code MIAC}) or does not say; a dental record ({@code MIAO}) does not count.
+     * Whether a procedure or measurement came from one of {@code models}; a missing origin is no
+     * model at all, and a dental record ({@code MIAO}) is in none of Quadros 03/04.
      */
-    static boolean acceptedOrigin(String origin) {
-        return origin == null || origin.isBlank() || ACCEPTED_ORIGINS.contains(normalizedOrigin(origin));
+    static boolean originIn(String origin, Set<String> models) {
+        return origin != null && models.contains(normalizedOrigin(origin));
     }
 
     /** The key a practice deduplicates its supporting events by: the source record. */
@@ -63,7 +57,7 @@ record C5Event(SourceRef sourceRef, LocalDate date, String cbo, String cnes, Str
     }
 
     private static String model(String origin) {
-        return origin == null || origin.isBlank() ? NOT_INFORMED : normalizedOrigin(origin);
+        return origin == null ? null : normalizedOrigin(origin);
     }
 
     private static String normalizedOrigin(String origin) {

@@ -105,6 +105,34 @@ final class C5Results {
         return build(scope, IndicatorStatus.COMPUTED, mean.get(), total, eligible, limitations, components);
     }
 
+    /**
+     * The run did not read a capability the rule needs (or read too short a window): no value, no
+     * counts and no components — never a zero from records that were not read (§1.6).
+     */
+    static IndicatorResult unsupported(Scope scope, List<String> unread) {
+        PackDescriptor descriptor = scope.descriptor();
+        EvaluationContext context = scope.context();
+        List<String> limitations = new ArrayList<>(unread);
+        limitations.addAll(descriptor.standingLimitations());
+        return new IndicatorResult(
+                IndicatorStatus.UNSUPPORTED_SOURCE,
+                null,
+                null,
+                null,
+                descriptor.denominatorKind(),
+                null,
+                context.referencePeriod(),
+                descriptor.ruleVersion(),
+                context.dataCutoff().toString(),
+                context.municipalityIbge(),
+                limitations,
+                descriptor.calculationPolicyVersion(),
+                descriptor.valueKind(),
+                null,
+                List.of(),
+                false);
+    }
+
     private static List<ResultComponent> components(List<ComponentSpec> specs, List<Scored> people) {
         List<ResultComponent> components = new ArrayList<>(specs.size());
         BigInteger eligible = BigInteger.valueOf(people.size());

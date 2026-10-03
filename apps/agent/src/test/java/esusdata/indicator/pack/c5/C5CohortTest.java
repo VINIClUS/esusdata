@@ -60,14 +60,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalDataset;
+import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.CanonicalHomeVisit;
 import esusdata.indicator.model.CanonicalMeasurement;
+import esusdata.indicator.model.CanonicalRegistration;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.EvidenceSubjectKind;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.model.SourceRef;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.util.List;
@@ -165,6 +168,7 @@ class C5CohortTest {
                 .ungated();
 
         assertPractices(outcome, P1);
+        assertThat(outcome.result().limitations()).noneMatch(text -> text.contains("fora do vocabulário"));
     }
 
     @Test
@@ -285,13 +289,46 @@ class C5CohortTest {
     }
 
     @Test
-    void conditions_withoutBasisIdentify() {
+    void conditions_unknownBasisDoesNotIdentifyAndIsCounted() {
+        // A basis outside PROFESSIONAL/SELF_REPORTED is not converted in silence (AMB-C5-04).
         RuleOutcome outcome = scenario()
                 .linked(P1)
                 .add(conditionWithoutBasis(P1, CIAP2, "K86", HYPERTENSION_DATE))
                 .ungated();
 
+        assertExcluded(outcome, P1, NO_CONDITION_IN_PERIOD);
+        assertThat(outcome.result().limitations())
+                .contains("AMB-C5-04: 1 linha(s) de condição com situação ou base fora do vocabulário (diagnóstico).");
+    }
+
+    @Test
+    void conditions_unknownOrMissingStatusIsNotResolvedAndIsCounted() {
+        RuleOutcome outcome = scenario()
+                .linked(P1)
+                .add(condition(P1, CID10, "I10", HYPERTENSION_DATE, "SUSPEITO"))
+                .linked(P2)
+                .add(condition(P2, CID10, "I10", HYPERTENSION_DATE, null))
+                .ungated();
+
         assertPractices(outcome, P1);
+        assertPractices(outcome, P2);
+        assertThat(outcome.result().limitations())
+                .contains("AMB-C5-04: 2 linha(s) de condição com situação ou base fora do vocabulário (diagnóstico).");
+    }
+
+    @Test
+    void conditions_resolvedByAnyProfessionalInterrupts() {
+        // Item 15 (p. 2): «marcados como "resolvidos" no PEC» — whoever marked it.
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .add(CanonicalFixtures.conditionEvaluatedBy(
+                        P1, CID10, "I10", LocalDate.of(2025, 6, 1), RESOLVED, "223405"))
+                .eligible(P2)
+                .add(CanonicalFixtures.conditionEvaluatedBy(P2, CID10, "I10", LocalDate.of(2025, 6, 1), RESOLVED, null))
+                .ungated();
+
+        assertExcluded(outcome, P1, ALL_RESOLVED);
+        assertExcluded(outcome, P2, ALL_RESOLVED);
     }
 
     @Test
@@ -368,6 +405,45 @@ class C5CohortTest {
 
         assertExcluded(outcome, P1, LEFT_TERRITORY);
         assertExcluded(outcome, P2, DEATH);
+    }
+
+    @Test
+    void interruptions_registrationWithoutIneIsNoLink() {
+        RuleOutcome outcome = scenario()
+                .add(link(P1, LINK_DATE, CNES, null), hypertension(P1))
+                .add(link(P2, LINK_DATE, CNES, " "), hypertension(P2))
+                .ungated();
+
+        assertExcluded(outcome, P1, NO_LINK);
+        assertExcluded(outcome, P2, NO_LINK);
+    }
+
+    @Test
+    void interruptions_sameDateVersionsAreDecidedByTheGreaterRecordId() {
+        // Numeric ids compare as numbers (10 > 9), whatever the reading order.
+        RuleOutcome outcome = scenario()
+                .add(hypertension(P1))
+                .add(registrationWithId("10", P1, INE_2), registrationWithId("9", P1, INE))
+                .ungated();
+
+        assertThat(decisionOf(outcome, P1).ine()).isEqualTo(INE_2);
+    }
+
+    private static CanonicalRegistration registrationWithId(String recordId, String key, String ine) {
+        return new CanonicalRegistration(
+                new SourceRef(CanonicalFixtures.SOURCE, "tb_fat_cad_individual", recordId),
+                CanonicalFixtures.IBGE,
+                key,
+                LINK_DATE.toString(),
+                CNES,
+                ine,
+                false,
+                false,
+                false,
+                null,
+                null,
+                null,
+                null);
     }
 
     @Test

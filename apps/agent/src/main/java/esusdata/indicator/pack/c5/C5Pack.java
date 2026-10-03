@@ -35,7 +35,6 @@ import esusdata.indicator.model.ValueKind;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -89,7 +88,11 @@ public final class C5Pack implements IndicatorRule {
             "Lacuna L6: PA da visita domiciliar (MIVDT) sem campo no registro canônico; não entra na prática B.",
             "Lacuna L5: o DW não tem PA de participante de atividade coletiva; o MIAC (AMB-C5-06) só"
                     + " comprova B se a medição vier com PA.",
-            "MIAO (atendimento odontológico) não aceito para PA, peso e altura: os Quadros 03 e 04 não o" + " citam.",
+            "MIAO (atendimento odontológico) não aceito para PA, peso e altura: os Quadros 03 e 04 não o citam.",
+            "Ficha de procedimentos (MIP) só comprova B e C pelo código SIGTAP; medida da escuta inicial sem código"
+                    + " não conta (conferir no Portão C se o PEC gera o código).",
+            "AMB-C5-06 (provisória): MIAC aceito para PA e para peso e altura (Quadros 03 e 04).",
+            "CNS profissional identificado (item 24 e) não conferido.",
             "Habilitação SIGTAP por CBO (item 24 g) não conferida: vale o CBO do quadro da prática.",
             "AMB-C5-02 (provisória): janelas de 6 e 12 meses civis completos até o fim da competência.",
             "AMB-C5-03 (provisória): visitas com intervalo de 30 dias corridos ou mais.",
@@ -98,8 +101,7 @@ public final class C5Pack implements IndicatorRule {
             "AMB-C5-05 (provisória): consulta da prática A só pelo MIAI; procedimento de consulta não conta.",
             "AMB-C5-07 (provisória): peso e altura na mesma data civil, de qualquer registro aceito.",
             "AMB-C5-08 (provisória): CBO de quatro dígitos casa pelo prefixo; com hífen, exato.",
-            "AMB-C5-09 (provisória): desfecho da visita domiciliar não filtrado.",
-            "Motivo da visita domiciliar não filtrado: campo obrigatório no LEDI.");
+            "AMB-C5-09 (provisória): desfecho da visita domiciliar não filtrado.");
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -181,6 +183,11 @@ public final class C5Pack implements IndicatorRule {
     /** The computed outcome before the release gates, so tests can see the value the gate hides. */
     RuleOutcome evaluateUngated(CanonicalDataset data, EvaluationContext context) {
         requireMunicipality(data, context.municipalityIbge());
+        C5Results.Scope scope = new C5Results.Scope(DESCRIPTOR, context);
+        List<String> unread = unreadCapabilities(data, context.competencia());
+        if (!unread.isEmpty()) {
+            return new RuleOutcome(C5Results.unsupported(scope, unread), List.of(), List.of());
+        }
         LocalDate cutoff = context.dataCutoff();
         List<ComponentSpec> specs = DESCRIPTOR.components();
         C5Practices practices = new C5Practices(data, context);
@@ -198,10 +205,33 @@ public final class C5Pack implements IndicatorRule {
                 evidence.add(C5Evidence.excluded(decision, cutoff));
             }
         }
-        List<String> limitations = limitations(data);
-        C5Results.Scope scope = new C5Results.Scope(DESCRIPTOR, context);
         return new RuleOutcome(
-                C5Results.of(scope, eligible, limitations), teams(scope, eligible, limitations), evidence);
+                C5Results.of(scope, eligible, limitations(data, cutoff)),
+                teams(scope, eligible, STANDING_LIMITATIONS),
+                evidence);
+    }
+
+    /**
+     * Capabilities the run did not read, or read for a shorter window than {@link #requirements}
+     * asks: their records would be missing, never zero (§1.6). A dataset without any window (a
+     * unit test's) is not checked.
+     */
+    private List<String> unreadCapabilities(CanonicalDataset data, YearMonth competencia) {
+        List<String> unread = new ArrayList<>();
+        if (data.windows().isEmpty()) {
+            return unread;
+        }
+        for (PartRequirement part : requirements(competencia).parts()) {
+            DateWindow read = data.windowOf(part.capability()).orElse(null);
+            boolean covered = read != null
+                    && !read.start().isAfter(part.periodStart())
+                    && !read.endExclusive().isBefore(part.periodEndExclusive());
+            if (!covered) {
+                unread.add("Capacidade " + part.capability() + " ausente ou lida com janela menor que a exigida ("
+                        + part.periodStart() + " a " + part.periodEndExclusive().minusDays(1) + ").");
+            }
+        }
+        return unread;
     }
 
     /**
@@ -225,11 +255,13 @@ public final class C5Pack implements IndicatorRule {
         return Bands.QUALIDADE_C2_C7.classify(value);
     }
 
-    /** One team (INE of the link) per group of eligible people, by INE, without a team last. */
+    /**
+     * One team (INE of the link) per group of eligible people, by INE; every eligible person has
+     * one. The CNES is the members' own, or {@code null} when they differ.
+     */
     private static List<TeamResult> teams(
             C5Results.Scope scope, List<C5Results.Scored> eligible, List<String> limitations) {
-        SortedMap<String, List<C5Results.Scored>> byTeam =
-                new TreeMap<>(Comparator.nullsLast(Comparator.naturalOrder()));
+        SortedMap<String, List<C5Results.Scored>> byTeam = new TreeMap<>();
         for (C5Results.Scored person : eligible) {
             byTeam.computeIfAbsent(person.decision().ine(), k -> new ArrayList<>())
                     .add(person);
@@ -237,21 +269,34 @@ public final class C5Pack implements IndicatorRule {
         List<TeamResult> teams = new ArrayList<>(byTeam.size());
         for (Map.Entry<String, List<C5Results.Scored>> team : byTeam.entrySet()) {
             List<C5Results.Scored> members = team.getValue();
-            teams.add(new TeamResult(
-                    team.getKey(), members.get(0).decision().cnes(), C5Results.of(scope, members, limitations)));
+            teams.add(new TeamResult(team.getKey(), sharedCnes(members), C5Results.of(scope, members, limitations)));
         }
         return teams;
     }
 
-    /** The standing limitations, plus the AMB-C5-04 diagnostic of this run when it applies. */
-    private static List<String> limitations(CanonicalDataset data) {
+    /**
+     * The standing limitations, plus the AMB-C5-04 diagnostics of this run when they apply (shown
+     * once, on the municipal result).
+     */
+    private static List<String> limitations(CanonicalDataset data, LocalDate cutoff) {
         List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
         long outOfList = C5Conditions.outOfListCount(data.conditions());
         if (outOfList > 0) {
             limitations.add("AMB-C5-04: " + outOfList
                     + " registro(s) de condição com código fora da lista literal da ficha (diagnóstico, não entram).");
         }
+        long outOfVocabulary = C5Conditions.of(data.conditions(), cutoff).outOfVocabularyCount();
+        if (outOfVocabulary > 0) {
+            limitations.add("AMB-C5-04: " + outOfVocabulary
+                    + " linha(s) de condição com situação ou base fora do vocabulário (diagnóstico).");
+        }
         return limitations;
+    }
+
+    private static String sharedCnes(List<C5Results.Scored> members) {
+        List<String> cnes =
+                members.stream().map(m -> m.decision().cnes()).distinct().toList();
+        return cnes.size() == 1 ? cnes.get(0) : null;
     }
 
     /** Every record must belong to the authorized municipality; otherwise nothing is computed. */

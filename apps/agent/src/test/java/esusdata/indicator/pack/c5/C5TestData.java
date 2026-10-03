@@ -10,11 +10,13 @@ import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CanonicalRegistration;
 import esusdata.indicator.model.CanonicalTeam;
+import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamResult;
@@ -111,6 +113,7 @@ final class C5TestData {
     private static final String VISIT_TABLE = "tb_fat_visita_domiciliar";
     private static final String INDIVIDUAL = "INDIVIDUAL";
     private static final String VISIT_DONE = "1";
+    private static final List<String> VISIT_REASONS = List.of("ACOMP_PESSOA_HIPERTENSAO");
 
     private C5TestData() {}
 
@@ -341,6 +344,22 @@ final class C5TestData {
         return CanonicalFixtures.procedure(key, date, code, stage, cbo);
     }
 
+    /** A SIGTAP procedure of {@code stage} from {@code origin} ({@code null} allowed for both). */
+    static CanonicalProcedureEvent procedureEvent(
+            String key, LocalDate date, String code, String stage, String cbo, String origin) {
+        return new CanonicalProcedureEvent(
+                CanonicalFixtures.ref("tb_fat_proced_atend_proced"),
+                IBGE,
+                key,
+                date.toString(),
+                code,
+                stage,
+                cbo,
+                null,
+                null,
+                origin);
+    }
+
     /** A performed SIGTAP procedure from the information model {@code origin}. */
     static CanonicalProcedureEvent procedureFrom(String key, LocalDate date, String code, String cbo, String origin) {
         return new CanonicalProcedureEvent(
@@ -388,12 +407,40 @@ final class C5TestData {
 
     // ---- home visits (MIVDT) ----
 
+    /** A done visit by {@code cbo} with its reason filled in (item 24 e). */
     static CanonicalHomeVisit visit(String key, LocalDate date, String cbo) {
-        return CanonicalFixtures.visit(key, date, cbo, VISIT_DONE);
+        return visit(key, date, cbo, VISIT_DONE);
     }
 
     static CanonicalHomeVisit visit(String key, LocalDate date, String cbo, String outcome) {
-        return CanonicalFixtures.visit(key, date, cbo, outcome);
+        return homeVisit(key, date, cbo, outcome, VISIT_REASONS, null, null);
+    }
+
+    /** A visit without «motivo da visita»: item 24 e does not count it. */
+    static CanonicalHomeVisit visitWithoutReason(String key, LocalDate date, String cbo) {
+        return homeVisit(key, date, cbo, VISIT_DONE, List.of(), null, null);
+    }
+
+    private static CanonicalHomeVisit homeVisit(
+            String key,
+            LocalDate date,
+            String cbo,
+            String outcome,
+            List<String> reasons,
+            String weightKg,
+            String heightCm) {
+        return new CanonicalHomeVisit(
+                CanonicalFixtures.ref(VISIT_TABLE),
+                IBGE,
+                key,
+                date.toString(),
+                cbo,
+                null,
+                null,
+                outcome,
+                reasons,
+                weightKg,
+                heightCm);
     }
 
     /** A visit that wrote weight and/or height in the visit form ({@code null} = not written). */
@@ -408,7 +455,7 @@ final class C5TestData {
                 null,
                 null,
                 VISIT_DONE,
-                List.of(),
+                VISIT_REASONS,
                 weightKg,
                 heightCm);
     }
@@ -424,7 +471,7 @@ final class C5TestData {
                 null,
                 null,
                 VISIT_DONE,
-                List.of(),
+                VISIT_REASONS,
                 null,
                 null);
     }
@@ -438,6 +485,20 @@ final class C5TestData {
     /** A dataset under construction for competência 2026-03 (or any context given). */
     static final class Scenario {
         private final CanonicalDataset.Builder builder = CanonicalDataset.builder();
+
+        /** Declares that the run read {@code capability} for {@code window} (§1.6). */
+        Scenario window(String capability, DateWindow window) {
+            builder.window(capability, window);
+            return this;
+        }
+
+        /** Declares every capability read exactly as {@code requirements(2026-03)} asks. */
+        Scenario readAsRequired() {
+            for (PartRequirement part : new C5Pack().requirements(MARCH_2026).parts()) {
+                window(part.capability(), new DateWindow(part.periodStart(), part.periodEndExclusive()));
+            }
+            return this;
+        }
 
         Scenario add(Record... records) {
             for (Record canonicalRecord : records) {

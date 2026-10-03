@@ -39,9 +39,12 @@ alternativa local declarada como limitação permanente do descritor.
 - **Por quê:** a interrupção por «todas as condições ou problemas marcados como "resolvidos"» (item
   15, p. 2) e por «Mudança de território» (item 15, p. 1) depende desses valores; as consultas da
   fundação ainda são provisórias e não dizem o que devolvem.
-- **Hoje:** o pacote aceita os dois vocabulários (código LEDI e texto) — `RESOLVIDO`/`RESOLVED`/`2`/
-  `CONCLUIDO`; `136`/`MUDANCA_TERRITORIO`; `135`/`OBITO` — e trata qualquer outro estado como não
-  resolvido. Valor fora disso não é convertido em silêncio.
+- **Hoje:** o pacote aceita os dois vocabulários (código LEDI e texto) — situação `0`/`1`/`2` e
+  `ATIVO`/`LATENTE`/`RESOLVIDO`/`RESOLVED`/`CONCLUIDO`; base `PROFESSIONAL`/`SELF_REPORTED`; saída
+  `136`/`MUDANCA_TERRITORIO`, `135`/`OBITO`. Situação fora do vocabulário (ou nula) conta como não
+  resolvida e base fora do vocabulário (ou nula) não identifica; as duas são contadas e, se houver,
+  aparecem no diagnóstico «AMB-C5-04: N linha(s) de condição com situação ou base fora do
+  vocabulário (diagnóstico).»
 - **Impacto:** denominador (interrupções). Comum a C4.
 
 ## SOL-C5-04 — Formato do CID-10 no bind `cid_codes`
@@ -51,9 +54,10 @@ alternativa local declarada como limitação permanente do descritor.
 - **O quê:** a consulta `condition_list` deve normalizar o CID-10 (com ou sem ponto) dos dois lados,
   ou o contrato deve dizer qual formato o PEC grava.
 - **Por quê:** a ficha escreve os subcódigos com ponto («I11.0», p. 3); o DW pode gravar `I110`.
-- **Hoje:** o pacote envia os 26 códigos com ponto **e** as variantes sem ponto, e compara em Java
-  ignorando o ponto (formato, não analogia: `I11.8` continua fora — AMB-C5-04).
-- **Impacto:** nenhum no valor, se o bind duplo bastar; confirmar no Portão C.
+- **Hoje:** o bind `cid_codes` é exatamente a lista literal de 26 códigos (com ponto); a consulta casa
+  pela categoria e o Java compara ignorando só o ponto (formato, não analogia: `I11.8` continua fora —
+  AMB-C5-04).
+- **Impacto:** nenhum no valor; confirmar no Portão C.
 
 ## SOL-C5-05 — Tipo de equipe (eSF 70 / eAP 76)
 

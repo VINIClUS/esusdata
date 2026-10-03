@@ -36,12 +36,14 @@ import static esusdata.indicator.pack.c5.C5TestData.encounterWithProcedures;
 import static esusdata.indicator.pack.c5.C5TestData.endOf;
 import static esusdata.indicator.pack.c5.C5TestData.practiceOf;
 import static esusdata.indicator.pack.c5.C5TestData.procedure;
+import static esusdata.indicator.pack.c5.C5TestData.procedureEvent;
 import static esusdata.indicator.pack.c5.C5TestData.procedureFrom;
 import static esusdata.indicator.pack.c5.C5TestData.remoteConsultation;
 import static esusdata.indicator.pack.c5.C5TestData.scenario;
 import static esusdata.indicator.pack.c5.C5TestData.supportingOf;
 import static esusdata.indicator.pack.c5.C5TestData.visit;
 import static esusdata.indicator.pack.c5.C5TestData.visitWithAnthropometry;
+import static esusdata.indicator.pack.c5.C5TestData.visitWithoutReason;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.indicator.model.AgeAt;
@@ -321,8 +323,24 @@ class C5PracticesTest {
         for (String key : List.of(P1, P2)) {
             assertPractices(outcome, key);
             assertThat(practiceOf(outcome, key, "D").reasonCode()).isEqualTo("SEM_REGISTRO_NA_JANELA");
-            assertThat(supportingOf(outcome, key, "D")).isEmpty();
         }
+        // The visits that were seen stay as support.
+        assertThat(supportingOf(outcome, P1, "D")).hasSize(1);
+        assertThat(supportingOf(outcome, P2, "D")).hasSize(2);
+        assertNoRepeatedSupport(outcome);
+    }
+
+    @Test
+    void practiceD_visitWithoutReasonDoesNotCount() {
+        // Item 24 e (p. 2–3): «com preenchimento do ‘‘motivo da visita’’».
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .add(visitWithoutReason(P1, LocalDate.of(2025, 11, 3), CBO_ACS))
+                .add(visit(P1, LocalDate.of(2026, 1, 3), CBO_ACS))
+                .ungated();
+
+        assertPractices(outcome, P1);
+        assertThat(supportingOf(outcome, P1, "D")).hasSize(1);
     }
 
     @Test
@@ -449,23 +467,100 @@ class C5PracticesTest {
     }
 
     @Test
-    void models_originIsNormalizedAndAMissingOneIsShownAsNotInformed() {
+    void models_originIsNormalizedAndAMissingOneIsNotAssumed() {
         LocalDate day = LocalDate.of(2026, 2, 2);
         RuleOutcome outcome = scenario()
                 .eligible(P1)
                 .add(bloodPressureMeasurement(P1, day, CBO_NURSE, null))
+                .add(procedureEvent(P1, day, SIGTAP_BLOOD_PRESSURE, "PERFORMED", CBO_NURSE, null))
+                .add(procedureEvent(P1, day, SIGTAP_BLOOD_PRESSURE, null, CBO_NURSE, ORIGIN_MIP))
                 .eligible(P2)
                 .add(bloodPressureMeasurement(P2, day, CBO_NURSE, "miac"))
                 .ungated();
 
-        assertPractices(outcome, P1, "B");
+        assertPractices(outcome, P1);
         assertPractices(outcome, P2, "B");
-        assertThat(supportingOf(outcome, P1, "B"))
-                .extracting(EvidenceItem::modality)
-                .containsExactly("NAO_INFORMADO");
         assertThat(supportingOf(outcome, P2, "B"))
                 .extracting(EvidenceItem::modality)
                 .containsExactly("MIAC");
+    }
+
+    @Test
+    void models_mipMeasureWithoutSigtapProvesNeitherBNorC() {
+        // Quadros 03/04, MIP: «com os códigos SIGTAP especificados»; the MIAC proves by its field.
+        LocalDate day = LocalDate.of(2026, 2, 2);
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .add(bloodPressureMeasurement(P1, day, CBO_NURSE, ORIGIN_MIP))
+                .add(anthropometryMeasurement(P1, day, CBO_NURSE, ORIGIN_MIP))
+                .eligible(P2)
+                .add(bloodPressureMeasurement(P2, day, CBO_NURSE, ORIGIN_MIAC))
+                .add(anthropometryMeasurement(P2, day, CBO_NURSE, ORIGIN_MIAC))
+                .ungated();
+
+        assertPractices(outcome, P1);
+        assertPractices(outcome, P2, "B", "C");
+    }
+
+    @Test
+    void practiceC_sigtapCountsOnlyFromTheMipAndVisitsOnlyFromAcsOrTacsWithReason() {
+        // Quadro 04: in the MIAI only the PEC's own fields; SIGTAP codes from the MIP.
+        LocalDate day = LocalDate.of(2026, 2, 2);
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .add(encounterWithProcedures(P1, day, CBO_NURSE, SIGTAP_ANTHROPOMETRY))
+                .add(procedureFrom(P1, day, SIGTAP_ANTHROPOMETRY, CBO_NURSE, "MIAI"))
+                .eligible(P2)
+                .add(procedureFrom(P2, day, SIGTAP_ANTHROPOMETRY, CBO_NURSE, ORIGIN_MIP))
+                .eligible(P3)
+                .add(visitWithAnthropometry(P3, day, CBO_NURSE, "70", "160"))
+                .eligible(P4)
+                .add(visitWithAnthropometry(P4, day, CBO_ACS, "70", "160"))
+                .ungated();
+
+        assertPractices(outcome, P1);
+        assertPractices(outcome, P2, "C");
+        assertPractices(outcome, P3); // a nurse's visit is not an ACS/TACS visit (item 24 e)
+        assertPractices(outcome, P4, "C");
+    }
+
+    @Test
+    void measures_onlyDecimalsGreaterThanZeroCount() {
+        LocalDate day = LocalDate.of(2026, 2, 2);
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .add(anthropometryEncounter(P1, day, CBO_NURSE, "0", "160"))
+                .add(anthropometryEncounter(P1, day.plusDays(1), CBO_NURSE, "70", "abc"))
+                .add(encounterWithMeasures(P1, day, "-120", "80"))
+                .eligible(P2)
+                .add(anthropometryEncounter(P2, day, CBO_NURSE, "70.5", "160"))
+                .add(encounterWithMeasures(P2, day, "120", "80"))
+                .ungated();
+
+        assertPractices(outcome, P1);
+        assertPractices(outcome, P2, "B", "C");
+    }
+
+    private static CanonicalCareEvent encounterWithMeasures(
+            String key, LocalDate day, String systolic, String diastolic) {
+        return CanonicalFixtures.encounterWithMeasures(key, day, CBO_NURSE, null, null, systolic, diastolic);
+    }
+
+    @Test
+    void met32_sameWeightAndHeightRepeatedOnTheSameDayCountOnce() {
+        LocalDate day = LocalDate.of(2026, 2, 2);
+        CanonicalCareEvent encounter = anthropometryEncounter(P1, day, CBO_NURSE, "70", "160");
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .add(encounter, encounter)
+                .add(procedureFrom(P1, day, SIGTAP_ANTHROPOMETRY, CBO_NURSE, "MIAI"))
+                .ungated();
+
+        assertPractices(outcome, P1, "C");
+        assertThat(supportingOf(outcome, P1, "C"))
+                .extracting(EvidenceItem::sourceRef)
+                .containsExactly(encounter.sourceRef());
+        assertNoRepeatedSupport(outcome);
     }
 
     // ---- T-C5-23 / MET-32: duplicated evidence never adds points ----

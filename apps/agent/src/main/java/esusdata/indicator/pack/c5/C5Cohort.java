@@ -4,6 +4,7 @@ import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalRegistration;
+import java.math.BigInteger;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 
 /**
  * The C5 denominator as of the cutoff (item 14, p. 1; item 15, p. 1–2): every person the extract
@@ -24,8 +26,9 @@ final class C5Cohort {
     static final String ELIGIBLE = "ELEGIVEL";
     static final String ONLY_SELF_REPORTED = "EXCLUIDO_SO_AUTORREFERIDO";
     /**
-     * A listed professional condition exists, but none recorded between 2013 and the cutoff — even
-     * if the person also reported hypertension.
+     * A listed condition that is not only self-reported exists, but none identifies the person: not
+     * recorded between 2013 and the cutoff, evaluated only by a CBO outside Quadro 02 or without
+     * CBO, or of a basis outside the vocabulary — even if the person also reported hypertension.
      */
     static final String NO_CONDITION_IN_PERIOD = "EXCLUIDO_SEM_CONDICAO_AVALIADA";
 
@@ -43,8 +46,9 @@ final class C5Cohort {
     /** Death recorded as the exit of the individual registration («Óbito no CadSUS», item 15, p. 2). */
     private static final Set<String> DEATH_EXITS = Set.of("135", "OBITO");
 
-    private final Map<String, C5Conditions.State> conditions;
-    private final Set<String> professional = new HashSet<>();
+    private static final Pattern NUMERIC = Pattern.compile("\\d+");
+
+    private final C5Conditions conditions;
     private final C5Teams teams;
     private final Map<String, CanonicalRegistration> links = new HashMap<>();
     private final Set<String> deaths = new HashSet<>();
@@ -58,12 +62,7 @@ final class C5Cohort {
 
     private C5Cohort(CanonicalDataset data, LocalDate cutoff, C5Teams teams) {
         this.teams = teams;
-        conditions = C5Conditions.professionalStates(data.conditions(), cutoff);
-        for (CanonicalCondition c : data.conditions()) {
-            if (C5Conditions.isEligible(c) && C5Conditions.isProfessional(c)) {
-                professional.add(c.personKey());
-            }
-        }
+        conditions = C5Conditions.of(data.conditions(), cutoff);
         for (CanonicalRegistration r : data.registrations()) {
             keepIfInForce(r, cutoff);
         }
@@ -102,7 +101,8 @@ final class C5Cohort {
     }
 
     /**
-     * The latest complete registration version up to the cutoff; on the same date the later one in
+     * The latest complete registration version up to the cutoff; on the same date the one with the
+     * greater source record id (numeric when both are, else text), so the choice does not depend on
      * reading order. A simplified record is not an individual registration (§1.7).
      */
     private void keepIfInForce(CanonicalRegistration r, LocalDate cutoff) {
@@ -111,9 +111,27 @@ final class C5Cohort {
             return;
         }
         CanonicalRegistration current = links.get(r.personKey());
-        if (current == null || !date.isBefore(C5Event.date(current.registrationDate()))) {
+        if (current == null || isLater(r, date, current)) {
             links.put(r.personKey(), r);
         }
+    }
+
+    private static boolean isLater(CanonicalRegistration r, LocalDate date, CanonicalRegistration current) {
+        int byDate = date.compareTo(C5Event.date(current.registrationDate()));
+        return byDate > 0 || (byDate == 0 && compareRecordIds(recordId(r), recordId(current)) > 0);
+    }
+
+    private static String recordId(CanonicalRegistration r) {
+        return r.sourceRef() == null || r.sourceRef().recordId() == null
+                ? ""
+                : r.sourceRef().recordId();
+    }
+
+    private static int compareRecordIds(String a, String b) {
+        if (NUMERIC.matcher(a).matches() && NUMERIC.matcher(b).matches()) {
+            return new BigInteger(a).compareTo(new BigInteger(b));
+        }
+        return a.compareTo(b);
     }
 
     private Decision decision(String person) {
@@ -126,9 +144,8 @@ final class C5Cohort {
 
     /** The first reason that applies, in the order of the contract; {@link #ELIGIBLE} otherwise. */
     private String reason(String person, CanonicalRegistration link) {
-        C5Conditions.State state = conditions.get(person);
-        if (state == null) {
-            return professional.contains(person) ? NO_CONDITION_IN_PERIOD : ONLY_SELF_REPORTED;
+        if (!conditions.isIdentified(person)) {
+            return conditions.hasNonSelfReportedRow(person) ? NO_CONDITION_IN_PERIOD : ONLY_SELF_REPORTED;
         }
         if (deaths.contains(person) || exitIn(link, DEATH_EXITS)) {
             return DEATH;
@@ -136,13 +153,22 @@ final class C5Cohort {
         if (exitIn(link, TERRITORY_EXITS)) {
             return LEFT_TERRITORY;
         }
-        if (link == null || Boolean.TRUE.equals(link.inactive()) || Boolean.TRUE.equals(link.refused())) {
+        if (!isLinked(link)) {
             return NO_LINK;
         }
         if (teams.isIneligible(link.ine())) {
             return TEAM_NOT_ELIGIBLE;
         }
-        return state == C5Conditions.State.ALL_RESOLVED ? CONDITIONS_RESOLVED : ELIGIBLE;
+        return conditions.state(person) == C5Conditions.State.ALL_RESOLVED ? CONDITIONS_RESOLVED : ELIGIBLE;
+    }
+
+    /** A registration in force, neither inactive nor refused, that names a team (item 14, p. 1). */
+    private static boolean isLinked(CanonicalRegistration link) {
+        return link != null
+                && !Boolean.TRUE.equals(link.inactive())
+                && !Boolean.TRUE.equals(link.refused())
+                && link.ine() != null
+                && !link.ine().isBlank();
     }
 
     private static boolean exitIn(CanonicalRegistration link, Set<String> exits) {

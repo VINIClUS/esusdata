@@ -7,6 +7,7 @@ import static esusdata.indicator.pack.c5.C5TestData.IBGE;
 import static esusdata.indicator.pack.c5.C5TestData.INE;
 import static esusdata.indicator.pack.c5.C5TestData.INE_2;
 import static esusdata.indicator.pack.c5.C5TestData.LINK_DATE;
+import static esusdata.indicator.pack.c5.C5TestData.MARCH_2026;
 import static esusdata.indicator.pack.c5.C5TestData.P1;
 import static esusdata.indicator.pack.c5.C5TestData.P2;
 import static esusdata.indicator.pack.c5.C5TestData.P3;
@@ -27,13 +28,16 @@ import static esusdata.indicator.pack.c5.C5TestData.team;
 import static esusdata.indicator.pack.c5.C5TestData.teamOf;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.Classification;
+import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.PackDescriptor;
+import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
@@ -120,7 +124,7 @@ class C5ResultTest {
         assertExactValue(eSf.valueExact(), 100, 1);
         assertThat(eSf.components()).extracting(ResultComponent::status).containsOnly(IndicatorStatus.COMPUTED);
         for (String key : List.of(P1, P2)) {
-            assertUndecidedD(ungated, key);
+            assertUndecidedD(ungated, key, "SEM_REGISTRO_NA_JANELA");
         }
         assertThat(decisionOf(ungated, P3).points()).isEqualTo(BigInteger.valueOf(100));
         assertThat(practiceOf(ungated, P3, "D").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
@@ -144,11 +148,14 @@ class C5ResultTest {
         });
     }
 
-    /** The person's D row is PRACTICE_AMBIGUOUS without points, and the person has no total. */
-    private static void assertUndecidedD(RuleOutcome outcome, String key) {
+    /**
+     * The person's D row is PRACTICE_AMBIGUOUS without points, its reason keeps what was observed
+     * (ENG-36), and the person has no total.
+     */
+    private static void assertUndecidedD(RuleOutcome outcome, String key, String observed) {
         EvidenceItem practiceD = practiceOf(outcome, key, "D");
         assertThat(practiceD.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
-        assertThat(practiceD.reasonCode()).isEqualTo("AMB-C5-01");
+        assertThat(practiceD.reasonCode()).isEqualTo("AMB-C5-01:" + observed);
         assertThat(practiceD.points()).isNull();
         EvidenceItem decision = decisionOf(outcome, key);
         assertThat(decision.decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
@@ -195,8 +202,8 @@ class C5ResultTest {
         assertComponents(result, 2, 2, 2, 2, 1); // D numerator: people whose D was observed
         assertOnlyDAmbiguous(result);
         assertThat(result.components()).extracting(ResultComponent::weight).containsOnly(BigInteger.valueOf(25));
-        assertUndecidedD(outcome, P1);
-        assertUndecidedD(outcome, P2);
+        assertUndecidedD(outcome, P1, "SEM_REGISTRO_NA_JANELA");
+        assertUndecidedD(outcome, P2, "CUMPRIDA");
         assertThat(supportingOf(outcome, P2, "D")).hasSize(2); // the visits stay as information
     }
 
@@ -340,7 +347,7 @@ class C5ResultTest {
     // ---- teams (item 21: granularity INE) ----
 
     @Test
-    void teams_twoTeamsAndAPersonWithoutIneYieldThreeTeamResults() {
+    void teams_twoTeamsAndAPersonWithoutIneExcludedYieldTwoTeamResults() {
         RuleOutcome outcome = scenario()
                 .eligible(P1)
                 .withAllPractices(P1)
@@ -351,15 +358,15 @@ class C5ResultTest {
                 .withAnthropometry(P4, LocalDate.of(2025, 7, 7))
                 .ungated();
 
-        assertThat(outcome.teams()).extracting(TeamResult::ine).containsExactly(INE, INE_2, null);
-        assertThat(outcome.teams()).extracting(TeamResult::cnes).containsExactly(CNES, CNES_2, null);
+        // Item 14: a registration that names no team is no link (EXCLUIDO_SEM_VINCULO).
+        assertExcluded(outcome, P4, "EXCLUIDO_SEM_VINCULO");
+        assertThat(outcome.teams()).extracting(TeamResult::ine).containsExactly(INE, INE_2);
+        assertThat(outcome.teams()).extracting(TeamResult::cnes).containsExactly(CNES, CNES_2);
         assertTeam(teamOf(outcome, INE).result(), 100, 2);
         assertComponents(teamOf(outcome, INE).result(), 2, 1, 1, 1, 1);
         assertTeam(teamOf(outcome, INE_2).result(), 25, 1);
         assertComponents(teamOf(outcome, INE_2).result(), 1, 1, 0, 0, 0);
-        assertTeam(teamOf(outcome, null).result(), 25, 1);
-        assertComponents(teamOf(outcome, null).result(), 1, 0, 0, 1, 0);
-        assertTeam(outcome.result(), 150, 4);
+        assertTeam(outcome.result(), 125, 3);
         assertThat(teamOf(outcome, INE).result().classification()).isEqualTo(Classification.SUFICIENTE);
         assertThat(teamOf(outcome, INE_2).result().classification()).isEqualTo(Classification.REGULAR);
     }
@@ -369,5 +376,72 @@ class C5ResultTest {
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(points));
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(people));
         assertExactValue(result.valueExact(), points, people);
+    }
+
+    @Test
+    void teams_cnesIsNullWhenMembersDifferAndRunDiagnosticsStayMunicipal() {
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .eligible(P2, CNES_2, INE)
+                .add(C5TestData.condition(P3, "CID10", "I11.8", LocalDate.of(2020, 1, 1), "ATIVO"))
+                .ungated();
+
+        assertThat(teamOf(outcome, INE).cnes()).isNull();
+        assertThat(outcome.result().limitations()).anyMatch(text -> text.startsWith("AMB-C5-04:"));
+        assertThat(teamOf(outcome, INE).result().limitations()).noneMatch(text -> text.startsWith("AMB-C5-04:"));
+    }
+
+    // ---- §1.6: a capability not read is never a zero ----
+
+    @Test
+    void capabilities_extractWithoutHomeVisitsIsUnsupportedSource() {
+        C5TestData.Scenario scenario = scenario().eligible(P1).withPracticesAbc(P1);
+        for (PartRequirement part : new C5Pack().requirements(MARCH_2026).parts()) {
+            if (!Capabilities.HOME_VISIT.equals(part.capability())) {
+                scenario.window(part.capability(), new DateWindow(part.periodStart(), part.periodEndExclusive()));
+            }
+        }
+
+        RuleOutcome gated = scenario.evaluate();
+
+        assertUnsupported(
+                gated.result(),
+                "Capacidade home_visit ausente ou lida com janela menor que a exigida" + " (2025-04-01 a 2026-03-31).");
+        assertThat(gated.teams()).isEmpty();
+        assertThat(gated.evidence()).isEmpty();
+    }
+
+    @Test
+    void capabilities_conditionsReadOnlySince2016IsUnsupportedSource() {
+        RuleOutcome outcome = scenario()
+                .readAsRequired()
+                .window(Capabilities.CONDITION_LIST, new DateWindow(LocalDate.of(2016, 1, 1), LocalDate.of(2026, 4, 1)))
+                .eligible(P1)
+                .ungated();
+
+        assertUnsupported(
+                outcome.result(),
+                "Capacidade condition_list ausente ou lida com janela menor que a"
+                        + " exigida (2013-01-01 a 2026-03-31).");
+    }
+
+    @Test
+    void capabilities_everyWindowAsRequiredComputes() {
+        RuleOutcome outcome =
+                scenario().readAsRequired().eligible(P1).withPracticesAbc(P1).ungated();
+
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertExactValue(outcome.result().valueExact(), 75, 1);
+    }
+
+    private static void assertUnsupported(IndicatorResult result, String limitation) {
+        assertThat(result.status()).isEqualTo(IndicatorStatus.UNSUPPORTED_SOURCE);
+        assertThat(result.valueText()).isNull();
+        assertThat(result.valueExact()).isNull();
+        assertThat(result.numerator()).isNull();
+        assertThat(result.denominator()).isNull();
+        assertThat(result.classification()).isNull();
+        assertThat(result.components()).isEmpty();
+        assertThat(result.limitations()).contains(limitation);
     }
 }
