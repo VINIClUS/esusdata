@@ -85,7 +85,9 @@ alternativa local declarada como limitação no descritor.
 - **Por quê:** 24 e (p.3): "Práticas em Saúde códigos 01, 02, 04"; Quadro 04 (p.7): "código 01";
   Quadro 08 (p.8): "códigos 02 e 04". O LEDI (`docs/discovery/capacidades-dw-v2.md` §3.7) não tem os
   códigos 1 nem 4, e o 2 é "aplicação tópica de flúor": a numeração da ficha não é a do LEDI.
-- **Alternativa local:** as listas LEDI das práticas ficam vazias em `C3Codes`; MIAC com atividade
-  05/06 conta só como "talvez" em C, D e K (AMB-C3-19), e o CT-C3-59 fica `RULE_AMBIGUITY` até o
-  mapeamento.
-- **Impacto:** atividades coletivas nunca cumprem sozinhas C, D ou K.
+- **Resposta da integração:** a correspondência é por nome da opção da Ficha de Atividade Coletiva do
+  CDS (01 antropometria, 02 aplicação tópica de flúor, 04 escovação dental supervisionada), coerente com
+  os quadros (D cita só 01; K cita 02 e 04): LEDI 20, 2 e 9. Leitura declarada (AMB-C3-19), a confirmar
+  no Portão C.
+- **Como o pacote ficou:** C usa {20, 2, 9}, D usa {20}, K usa {2, 9}; atividade 05/06 com a prática
+  conta; só uma das duas condições fica AMB-C3-19.
