@@ -150,13 +150,28 @@ class QualityComponentConsolidationTest extends ApiFixtureSupport {
 
     /** A computed month, or — {@code value == null} — a month without a cohort event (C2/C3). */
     private static IndicatorResult result(String pack, String period, Long value) {
+        if (value == null) {
+            return month(pack, period, IndicatorStatus.NO_DENOMINATOR, null, null, false);
+        }
+        BigInteger[] pair = "c1-mais-acesso".equals(pack)
+                ? new BigInteger[] {BigInteger.valueOf(value), BigInteger.valueOf(100)}
+                : null;
+        return month(pack, period, IndicatorStatus.COMPUTED, ExactRatio.of(value, 1), pair, true);
+    }
+
+    private static IndicatorResult blocked(String pack, String period) {
+        return month(pack, period, IndicatorStatus.BLOCKED, null, null, true);
+    }
+
+    /** C1 is a percentage with numerator and denominator ({@code pair}); C2–C7 are scores. */
+    private static IndicatorResult month(
+            String pack, String period, IndicatorStatus status, ExactRatio value, BigInteger[] pair, boolean eligible) {
         boolean c1 = "c1-mais-acesso".equals(pack);
-        ExactRatio exact = value == null ? null : ExactRatio.of(value, 1);
         return new IndicatorResult(
-                value == null ? IndicatorStatus.NO_DENOMINATOR : IndicatorStatus.COMPUTED,
-                value == null ? null : value + ".0000",
-                c1 && value != null ? BigInteger.valueOf(value) : null,
-                c1 && value != null ? BigInteger.valueOf(100) : null,
+                status,
+                value == null ? null : value.toScaledBigDecimal(4).toPlainString(),
+                pair == null ? null : pair[0],
+                pair == null ? null : pair[1],
                 c1 ? "PROGRAMADOS_MAIS_ESPONTANEOS" : null,
                 null,
                 period,
@@ -166,29 +181,9 @@ class QualityComponentConsolidationTest extends ApiFixtureSupport {
                 List.of(),
                 pack + "-policy@1",
                 c1 ? ValueKind.PERCENTAGE : ValueKind.SCORE,
-                exact,
+                value,
                 List.of(),
-                value != null);
-    }
-
-    private static IndicatorResult blocked(String pack, String period) {
-        return new IndicatorResult(
-                IndicatorStatus.BLOCKED,
-                null,
-                null,
-                null,
-                null,
-                null,
-                period,
-                pack + "@0.1.0",
-                YearMonth.parse(period).atEndOfMonth().toString(),
-                IBGE,
-                List.of("Portão A (fonte e vigência) incompleto"),
-                pack + "-policy@1",
-                ValueKind.SCORE,
-                null,
-                List.of(),
-                true);
+                eligible);
     }
 
     private static String sha256(String text) throws Exception {
