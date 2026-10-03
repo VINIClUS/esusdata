@@ -1,50 +1,14 @@
 // DEMO DATA — dados de demonstração; não usar como referência clínica ou operacional.
+// `GET /overview` (ADR 0029/0030) do município de demonstração, coerente com o catálogo e com os
+// resultados publicados em 2026-08. Imports com extensão: os testes de dados os leem pelo Node.
 import type {
-  Alerta,
-  IndicadorPendencia,
-  Kpi,
   OverviewCheck,
+  OverviewHistoryPoint,
+  OverviewIndicator,
   OverviewResponse,
-  PainelResumo,
 } from '../types'
-
-const kpi = (
-  id: Kpi['icone'],
-  label: string,
-  valor: string,
-  [chipLabel, chipValor]: [string, string],
-  variacao: string,
-  tom: 'up' | 'down',
-): Kpi => ({
-  id,
-  icone: id,
-  label,
-  valor,
-  chip: { label: chipLabel, valor: chipValor },
-  tendencia: { texto: `${variacao} em relação ao mês anterior`, tom },
-})
-
-const alerta = (
-  id: string,
-  severidade: Alerta['severidade'],
-  titulo: string,
-  descricao: string,
-  data: string,
-  hora: string,
-): Alerta => ({ id, severidade, titulo, descricao, data, hora })
-
-const pendencia = (
-  codigo: string,
-  indicador: string,
-  pendencias: number,
-  situacao: string,
-  status: IndicadorPendencia['status'],
-): IndicadorPendencia => ({
-  codigo,
-  indicador,
-  motivo: `${String(pendencias)} pendências · ${situacao}`,
-  status,
-})
+import { catalogoFixture } from './catalogo.ts'
+import { COMPETENCIA_DEMO, resultadosFixture } from './indicadores.ts'
 
 const check = (
   code: OverviewCheck['code'],
@@ -53,188 +17,156 @@ const check = (
   referencePeriod: string | null,
 ): OverviewCheck => ({ code, sourceId, status: 'OK', at, referencePeriod })
 
-export const painelFixture: PainelResumo = {
-  kpis: [
-    kpi('indicadores', 'Indicadores calculados', '8 / 27', ['', '30%'], '+2', 'up'),
-    kpi('cobertura', 'Cobertura da população', '76,3%', ['Meta', '≥ 70%'], '+1,2 p.p.', 'up'),
-    kpi('cadastros', 'Cadastros ativos', '28.452', ['Total', '28.452'], '+2,1%', 'up'),
-    {
-      ...kpi('pendencias', 'Pendências de dados', '124', ['Meta', '≤ 100'], '-30%', 'down'),
-      tomValor: 'error',
-    },
-  ],
-  evolucao: {
-    series: [
-      { key: 'cobertura', label: 'Cobertura da população', cor: '#1a6ef5' },
-      { key: 'cadastros', label: 'Cadastros ativos', cor: '#16a34a' },
-      { key: 'hipertensos', label: 'Acompanhamento de hipertensos', cor: '#f59e0b' },
-      { key: 'diabeticos', label: 'Acompanhamento de diabéticos', cor: '#8b5cf6' },
-    ],
-    pontos: [
-      { mes: 'Jan', cobertura: 63, cadastros: 42, hipertensos: 30, diabeticos: 20 },
-      { mes: 'Fev', cobertura: 67, cadastros: 47, hipertensos: 34, diabeticos: 23 },
-      { mes: 'Mar', cobertura: 68, cadastros: 51, hipertensos: 38, diabeticos: 27 },
-      { mes: 'Abr', cobertura: 71, cadastros: 56, hipertensos: 41, diabeticos: 30 },
-      { mes: 'Mai', cobertura: 74, cadastros: 60, hipertensos: 46, diabeticos: 33 },
-      { mes: 'Jun', cobertura: 76, cadastros: 63, hipertensos: 48, diabeticos: 35 },
-      { mes: 'Jul', cobertura: 79, cadastros: 66, hipertensos: 51, diabeticos: 36 },
-      { mes: 'Ago', cobertura: 82, cadastros: 69, hipertensos: 54, diabeticos: 38 },
-    ],
-  },
-  qualidade: {
-    percentual: 92,
-    titulo: 'Dados consistentes',
-    descricao: 'A qualidade dos dados está em um nível excelente.',
-  },
-  integridade: [
-    { label: 'Cadastros válidos', valor: '98,7%', ok: true },
-    { label: 'Equipes completas', valor: '100%', ok: true },
-    { label: 'Território configurado', valor: '100%', ok: true },
-    { label: 'Sem duplicidades críticas', valor: '99,2%', ok: true },
-  ],
-  alertas: [
-    alerta(
-      'a1',
-      'error',
-      'Pendência de dados identificada',
-      '124 fichas com inconsistências no cadastro',
-      'Hoje',
-      '10:05',
-    ),
-    alerta(
-      'a2',
-      'warning',
-      'Cobertura abaixo da meta',
-      'A cobertura da população está em 76,3% (meta: 80%).',
-      '15/08',
-      '14:32',
-    ),
-    alerta(
-      'a3',
-      'info',
-      'Execução de dados concluída',
-      'Processamento de Ago/2026 finalizado com sucesso.',
-      '15/08',
-      '10:18',
-    ),
-    alerta(
-      'a4',
-      'warning',
-      'Possíveis duplicidades',
-      '12 cadastros com possível duplicidade identificados.',
-      '14/08',
-      '16:45',
-    ),
-    alerta(
-      'a5',
-      'info',
-      'Nova versão disponível',
-      'Versão 0.4.0 com melhorias e correções.',
-      '12/08',
-      '09:20',
-    ),
-  ],
-  maiorPendencia: [
-    pendencia('PB-01', 'Pré-natal adequado', 86, 'Abaixo da meta na competência', 'critico'),
-    pendencia(
-      'PB-02',
-      'Cobertura de exame citopatológico',
-      64,
-      'Abaixo da meta na competência',
-      'critico',
-    ),
-    pendencia('PB-03', 'Acompanhamento de diabéticos', 42, 'Perto do limite da meta', 'atencao'),
-    pendencia('PB-04', 'Acompanhamento de hipertensos', 38, 'Perto do limite da meta', 'atencao'),
-    pendencia('PB-05', 'Vacinação em menores de 1 ano', 26, 'Perto do limite da meta', 'atencao'),
-    pendencia('PB-06', 'Consulta odontológica', 18, 'Dentro da meta', 'regular'),
-    pendencia('PB-07', 'Hipertensão com PA controlada', 12, 'Dentro da meta', 'regular'),
-    pendencia('PB-08', 'Diabetes com HbA1c solicitada', 8, 'Dentro da meta', 'regular'),
-  ],
-  ultimasExecucoes: [
-    ['16/08/2026 10:05', 'Ago/2026'],
-    ['10/08/2026 16:32', 'Jul/2026'],
-    ['12/07/2026 11:26', 'Jun/2026'],
-    ['15/06/2026 09:14', 'Mai/2026'],
-    ['13/05/2026 14:22', 'Abr/2026'],
-    ['14/04/2026 10:03', 'Mar/2026'],
-    ['12/03/2026 16:40', 'Fev/2026'],
-    ['16/02/2026 11:18', 'Jan/2026'],
-  ].map(([dataHora = '', competencia = ''], i) => ({
-    jobId: `job-demo-${String(i + 1)}`,
-    dataHora,
-    competencia,
-    status: 'concluida' as const,
-  })),
+/** The demo source lacks `dental_encounter`: C3 cannot run on it. */
+const semSuporte: Readonly<Record<string, string[]>> = {
+  'c3-gestacao-puerperio': ['dental_encounter'],
 }
+
+const indicators: OverviewIndicator[] = catalogoFixture.map((pack) => {
+  const result = resultadosFixture[pack.id]
+  const faltam = semSuporte[pack.id] ?? []
+  return {
+    indicatorPack: pack.id,
+    ruleVersion: pack.ruleVersion,
+    family: pack.family,
+    unit: pack.unit ?? '',
+    code: pack.code,
+    title: pack.title,
+    valueKind: pack.valueKind,
+    runnable: pack.runnable,
+    availability: faltam.length > 0 ? 'UNSUPPORTED_SOURCE' : 'AVAILABLE',
+    missingCapabilities: faltam,
+    executionEnabled: pack.executionEnabled,
+    blockedGates: pack.blockedGates,
+    resultId: result?.resultId ?? null,
+    status: result?.status ?? null,
+    value: result?.value ?? null,
+    limitations: result?.limitations ?? [],
+    publishedAt: result?.publishedAt ?? null,
+  }
+})
+
+/** C1 is computed every month; C2–C7 were published from 2026-07, withheld by the gates. */
+const c1Mensal: [string, string][] = [
+  ['2025-09', '52.1840'],
+  ['2025-10', '53.0412'],
+  ['2025-11', '54.7720'],
+  ['2025-12', '55.0018'],
+  ['2026-01', '56.3304'],
+  ['2026-02', '57.9001'],
+  ['2026-03', '58.2000'],
+  ['2026-04', '58.6650'],
+  ['2026-05', '59.1123'],
+  ['2026-06', '60.0471'],
+  ['2026-07', '61.0109'],
+  [COMPETENCIA_DEMO, resultadosFixture['c1-mais-acesso']?.value ?? '61.4037'],
+]
+
+const history: OverviewHistoryPoint[] = [
+  ...c1Mensal.map(([referencePeriod, value]) => ({
+    referencePeriod,
+    indicatorPack: 'c1-mais-acesso',
+    status: 'COMPUTED',
+    value,
+  })),
+  ...['2026-07', COMPETENCIA_DEMO].flatMap((referencePeriod) =>
+    Object.values(resultadosFixture)
+      .filter((r) => r.indicatorPack !== 'c1-mais-acesso')
+      .map((r) => ({
+        referencePeriod,
+        indicatorPack: r.indicatorPack,
+        status: r.status,
+        value: null,
+      })),
+  ),
+]
+
+const PENDENTES = [
+  'c2-desenvolvimento-infantil',
+  'c4-cuidado-diabetes',
+  'c5-cuidado-hipertensao',
+  'c6-cuidado-pessoa-idosa',
+  'c7-prevencao-cancer',
+]
 
 export const overviewFixture: OverviewResponse = {
   municipalityIbge: '3538704',
-  referencePeriod: '2026-08',
+  referencePeriod: COMPETENCIA_DEMO,
   lastUpdate: '2026-09-19T13:14:10Z',
-  indicators: [
-    {
-      indicatorPack: 'c1-mais-acesso',
-      ruleVersion: '1.0.0',
-      family: 'C1',
-      unit: 'PERCENT',
-      executionEnabled: true,
-      blockedGates: [],
-      resultId: 'r-demo',
-      status: 'BLOCKED',
-      value: null,
-      limitations: ['Portão A (fonte e vigência) incompleto'],
-      publishedAt: '2026-09-19T13:14:10Z',
-    },
-  ],
-  history: [
-    {
-      referencePeriod: '2026-06',
-      indicatorPack: 'c1-mais-acesso',
-      status: 'COMPUTED',
-      value: '58.2',
-    },
-    {
-      referencePeriod: '2026-07',
-      indicatorPack: 'c1-mais-acesso',
-      status: 'COMPUTED',
-      value: '61.4',
-    },
-    { referencePeriod: '2026-08', indicatorPack: 'c1-mais-acesso', status: 'BLOCKED', value: null },
-  ],
-  quality: { published: 1, completeSnapshot: 1 },
+  indicators,
+  history,
+  quality: { published: 6, completeSnapshot: 6 },
   checks: [
     check('SOURCE_CONNECTION', 'pec-demo', '2026-09-19T13:00:00Z', null),
-    check('MUNICIPAL_ISOLATION', 'pec-demo', '2026-09-19T13:05:00Z', '2026-08'),
+    check('MUNICIPAL_ISOLATION', 'pec-demo', '2026-09-19T13:05:00Z', COMPETENCIA_DEMO),
     check('PEC_COVERAGE', 'pec-demo', '2026-09-19T13:05:00Z', null),
-    check('SCHEDULER', 'pec-demo', '2026-09-19T13:05:00Z', '2026-08'),
-    check('RESULTS_PUBLISHED', null, null, '2026-08'),
+    check('SCHEDULER', 'pec-demo', '2026-09-19T13:05:00Z', COMPETENCIA_DEMO),
+    check('RESULTS_PUBLISHED', null, null, COMPETENCIA_DEMO),
   ],
   alerts: [
     {
-      code: 'RESULT_BLOCKED',
-      severity: 'WARNING',
-      subject: 'c1-mais-acesso',
-      referencePeriod: '2026-08',
+      code: 'RUN_FAILED',
+      severity: 'ERROR',
+      subject: 'c3-gestacao-puerperio',
+      referencePeriod: COMPETENCIA_DEMO,
+      sourceId: 'pec-demo',
+      detail: 'UNSUPPORTED_SOURCE',
+      at: '2026-09-19T13:20:00Z',
+    },
+    ...['c2-desenvolvimento-infantil', 'c4-cuidado-diabetes'].map((subject) => ({
+      code: 'RESULT_BLOCKED' as const,
+      severity: 'WARNING' as const,
+      subject,
+      referencePeriod: COMPETENCIA_DEMO,
       sourceId: null,
       detail: null,
       at: null,
-    },
+    })),
     {
       code: 'PENDING_PERIODS',
       severity: 'INFO',
       subject: null,
-      referencePeriod: '2026-09',
+      referencePeriod: '2026-06',
       sourceId: 'pec-demo',
       detail: '1',
       at: null,
     },
   ],
-  pendingPeriods: [{ sourceId: 'pec-demo', referencePeriod: '2026-09', count: 3120 }],
+  pendingPeriods: [
+    { sourceId: 'pec-demo', referencePeriod: '2026-06', count: 9632, indicatorPacks: PENDENTES },
+  ],
   recentRuns: [
     {
       jobId: 'job-demo',
+      indicatorPack: 'c4-cuidado-diabetes',
+      referencePeriod: '2026-06',
+      state: 'RUNNING',
+      createdAt: '2026-09-19T13:22:00Z',
+      finishedAt: null,
+      failureCode: null,
+    },
+    {
+      jobId: 'job-demo-c3',
+      indicatorPack: 'c3-gestacao-puerperio',
+      referencePeriod: COMPETENCIA_DEMO,
+      state: 'FAILED',
+      createdAt: '2026-09-19T13:19:00Z',
+      finishedAt: '2026-09-19T13:20:00Z',
+      failureCode: 'UNSUPPORTED_SOURCE',
+    },
+    {
+      jobId: 'job-demo-c4',
+      indicatorPack: 'c4-cuidado-diabetes',
+      referencePeriod: COMPETENCIA_DEMO,
+      state: 'SUCCEEDED',
+      createdAt: '2026-09-19T13:16:00Z',
+      finishedAt: '2026-09-19T13:18:30Z',
+      failureCode: null,
+    },
+    {
+      jobId: 'job-demo-c1',
       indicatorPack: 'c1-mais-acesso',
-      referencePeriod: '2026-08',
+      referencePeriod: COMPETENCIA_DEMO,
       state: 'SUCCEEDED',
       createdAt: '2026-09-19T13:12:00Z',
       finishedAt: '2026-09-19T13:14:10Z',

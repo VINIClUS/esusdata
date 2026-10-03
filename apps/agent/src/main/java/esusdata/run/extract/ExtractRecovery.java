@@ -15,7 +15,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.HashSet;
 import java.util.Set;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Reconciles extract publication pairs after a process interruption. A finalized data file with a
@@ -202,7 +201,7 @@ public final class ExtractRecovery {
         if (!Files.isRegularFile(dataFile, LinkOption.NOFOLLOW_LINKS)) {
             throw new IllegalStateException("Interrupted extract data file is not regular: " + dataFile);
         }
-        new ExtractReader().readDataFile(dataFile, manifest);
+        new ExtractReader().verifyDataFile(dataFile, manifest);
         publishNewFile(manifestTemp, manifestFile);
         deleteIfFound(dataTemp, dataTempExists);
         forceDirectory(baseDir);
@@ -220,8 +219,7 @@ public final class ExtractRecovery {
         }
         ExtractionManifest manifest;
         try (InputStream input = Files.newInputStream(manifestTemp, LinkOption.NOFOLLOW_LINKS)) {
-            manifest = new ObjectMapper()
-                    .readValue(new String(input.readAllBytes(), StandardCharsets.UTF_8), ExtractionManifest.class);
+            manifest = ExtractJson.readManifest(new String(input.readAllBytes(), StandardCharsets.UTF_8));
         }
         if (!extractionId.equals(manifest.extractionId())) {
             throw new IllegalStateException("Staged manifest extractionId does not match: " + extractionId);

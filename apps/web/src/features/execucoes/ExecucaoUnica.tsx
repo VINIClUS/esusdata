@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Grid from '@mui/material/Grid'
@@ -13,8 +13,19 @@ import {
   useExecucao,
   usePacotesIndicadores,
 } from '@/api/hooks'
-import { indicatorDisplayName, isRunTerminal, normalizeRunResponse } from '@/api/normalizers'
-import type { IndicatorPack, RunResponse, RunSourcePeriod, RunSourceResponse } from '@/api/types'
+import {
+  indicatorDisplayName,
+  isRunTerminal,
+  nomesIndicadores,
+  normalizeRunResponse,
+} from '@/api/normalizers'
+import type {
+  IndicatorPack,
+  RunResponse,
+  RunSourcePack,
+  RunSourcePeriod,
+  RunSourceResponse,
+} from '@/api/types'
 import { formatReferencePeriod } from '@/app/display-context'
 import { ExecutionStepper } from '@/components/data/ExecutionStepper'
 import { LogList } from '@/components/data/LogList'
@@ -36,21 +47,26 @@ function currentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
+/** Whether the pack is published in the competência; before ADR 0030, whether anything is. */
+function publicada(period: RunSourcePeriod, packId: string | undefined): boolean {
+  return period.publishedPacks && packId ? period.publishedPacks.includes(packId) : period.published
+}
+
 /** The newest closed competência with data and no published result; else the newest with data. */
-function defaultPeriod(periods: RunSourcePeriod[]): string | undefined {
+function defaultPeriod(periods: RunSourcePeriod[], packId: string | undefined): string | undefined {
   const month = currentMonth()
-  return (periods.find((p) => !p.published && p.referencePeriod < month) ?? periods[0])
+  return (periods.find((p) => !publicada(p, packId) && p.referencePeriod < month) ?? periods[0])
     ?.referencePeriod
 }
 
-function periodLabel(period: RunSourcePeriod): string {
-  const published = period.published ? ' · já publicada' : ''
+function periodLabel(period: RunSourcePeriod, packId: string | undefined): string {
+  const published = publicada(period, packId) ? ' · já publicada' : ''
   return `${formatReferencePeriod(period.referencePeriod)} · ${formatInt(period.count)} atendimentos${published}`
 }
 
-function runSummary(run: RunResponse): string {
+function runSummary(run: RunResponse, nomes: ReadonlyMap<string, string>): string {
   return [
-    indicatorDisplayName(run.indicatorPack),
+    nomes.get(run.indicatorPack) ?? indicatorDisplayName(run.indicatorPack),
     formatReferencePeriod(run.referencePeriod),
     run.sourceId ?? 'fonte não informada',
     `tentativa ${run.attempt} de ${run.maxAttempts}`,
@@ -107,16 +123,31 @@ export function ExecucaoUnica({
   const [limpas, setLimpas] = useState<{ jobId: string; linhas: number } | null>(null)
   const intencao = useRef<{ chave: string; idempotencyKey: string } | null>(null)
 
-  // Every listed pack runs, as it does for the scheduler; one without an approved rule (ENG-34)
-  // publishes a BLOCKED result with its reasons, never a value, and the form says so.
-  const disponiveis: IndicatorPack[] = pacotes.data ?? []
-  const referencePeriod = parametros.referencePeriod ?? defaultPeriod(fonte.periods)
-  const periodo = fonte.periods.find((p) => p.referencePeriod === referencePeriod)
+  // Every runnable pack runs, as it does for the scheduler; one without an approved rule (ENG-34)
+  // publishes a BLOCKED result with its reasons, never a value, and the form says so. The Nota
+  // Final is computed on read (ADR 0030): nothing enqueues it.
+  const disponiveis: IndicatorPack[] = useMemo(
+    () => (pacotes.data ?? []).filter((p) => p.runnable !== false),
+    [pacotes.data],
+  )
+  const nomes = useMemo(() => nomesIndicadores(pacotes.data ?? []), [pacotes.data])
   const pacote = disponiveis.find((p) => p.id === parametros.indicatorPack) ?? disponiveis[0]
+  const referencePeriod = parametros.referencePeriod ?? defaultPeriod(fonte.periods, pacote?.id)
+  const periodo = fonte.periods.find((p) => p.referencePeriod === referencePeriod)
+  const naFonte = (id: string): RunSourcePack | undefined =>
+    fonte.packs?.find((p) => p.indicatorPack === id)
+  const suporte = pacote ? naFonte(pacote.id) : undefined
+  const semSuporte = suporte?.availability === 'UNSUPPORTED_SOURCE'
+  const nomeDoPacote = (p: IndicatorPack) => {
+    const nome = nomes.get(p.id) ?? indicatorDisplayName(p.id)
+    return naFonte(p.id)?.availability === 'UNSUPPORTED_SOURCE'
+      ? `${nome} · fonte sem suporte`
+      : nome
+  }
   const ativa = run !== undefined && !isRunTerminal(run)
 
   async function executar() {
-    if (!referencePeriod || !pacote) return
+    if (!referencePeriod || !pacote || semSuporte) return
     const request = {
       municipalityIbge,
       indicatorPack: pacote.id,
@@ -161,7 +192,7 @@ export function ExecucaoUnica({
     }
   }
 
-  const detalhe = run ? normalizeRunResponse(run) : null
+  const detalhe = run ? normalizeRunResponse(run, nomes) : null
   const limpasDaExecucao = limpas && limpas.jobId === run?.jobId ? limpas.linhas : 0
   const linhas = detalhe ? detalhe.log.slice(limpasDaExecucao) : []
 
@@ -172,7 +203,7 @@ export function ExecucaoUnica({
           <Grid container spacing={2}>
             <Grid size={12}>
               <Typography sx={{ fontSize: 15, color: colors.textSecondary }}>
-                {runSummary(run)}
+                {runSummary(run, nomes)}
               </Typography>
             </Grid>
             <Grid size={{ xs: 12, lg: 6.6 }}>
@@ -270,7 +301,7 @@ export function ExecucaoUnica({
               </Button>
               <Button
                 variant="contained"
-                disabled={enviando || !pacote || !referencePeriod}
+                disabled={enviando || !pacote || !referencePeriod || semSuporte}
                 onClick={() => void executar()}
                 startIcon={<Play size={16} />}
                 sx={{ fontSize: 14 }}
@@ -311,12 +342,12 @@ export function ExecucaoUnica({
             <FilterSelect
               label="Competência"
               fullWidth
-              value={periodo ? periodLabel(periodo) : ''}
-              options={fonte.periods.map(periodLabel)}
+              value={periodo ? periodLabel(periodo, pacote?.id) : ''}
+              options={fonte.periods.map((x) => periodLabel(x, pacote?.id))}
               onChange={(label) =>
                 setParametros((p) => ({
                   ...p,
-                  referencePeriod: fonte.periods.find((x) => periodLabel(x) === label)
+                  referencePeriod: fonte.periods.find((x) => periodLabel(x, pacote?.id) === label)
                     ?.referencePeriod,
                 }))
               }
@@ -324,12 +355,12 @@ export function ExecucaoUnica({
             <FilterSelect
               label="Indicador"
               fullWidth
-              value={pacote ? indicatorDisplayName(pacote.id) : ''}
-              options={disponiveis.map((p) => indicatorDisplayName(p.id))}
+              value={pacote ? nomeDoPacote(pacote) : ''}
+              options={disponiveis.map(nomeDoPacote)}
               onChange={(label) =>
                 setParametros((p) => ({
                   ...p,
-                  indicatorPack: disponiveis.find((x) => indicatorDisplayName(x.id) === label)?.id,
+                  indicatorPack: disponiveis.find((x) => nomeDoPacote(x) === label)?.id,
                 }))
               }
             />
@@ -340,20 +371,37 @@ export function ExecucaoUnica({
             valueSize={15}
             stats={[
               { label: 'Fonte de dados', value: `${fonte.sourceId} · PEC ${fonte.pecVersion}` },
-              { label: 'Competência', value: periodo ? periodLabel(periodo) : '—' },
-              { label: 'Indicador', value: pacote ? indicatorDisplayName(pacote.id) : '—' },
+              { label: 'Competência', value: periodo ? periodLabel(periodo, pacote?.id) : '—' },
+              { label: 'Indicador', value: pacote ? nomeDoPacote(pacote) : '—' },
             ]}
           />
         )}
-        {podeExecutar && fonte.periods.length > 0 && pacote && !pacote.executionEnabled && (
+        {podeExecutar && fonte.periods.length > 0 && pacote && semSuporte && (
           <Box sx={{ mt: 1.5 }}>
-            <Callout variant="warning" title="O resultado sai bloqueado">
-              {indicatorDisplayName(pacote.id)} ainda não tem a regra aprovada para publicar valor
-              {pacote.blockedGates.length > 0 ? ` (${pacote.blockedGates.join('; ')})` : ''}. A
-              execução lê o PEC e publica o resultado como bloqueado, com esses motivos.
+            <Callout variant="error" title="Esta fonte não calcula este indicador">
+              {nomes.get(pacote.id) ?? indicatorDisplayName(pacote.id)} lê capacidades que a fonte{' '}
+              {fonte.sourceId} não tem validadas para o PEC {fonte.pecVersion}
+              {suporte.missingCapabilities.length > 0
+                ? `: ${suporte.missingCapabilities.join(', ')}`
+                : ''}
+              . A execução falharia antes de ler a fonte, então fica desabilitada.
             </Callout>
           </Box>
         )}
+        {podeExecutar &&
+          fonte.periods.length > 0 &&
+          pacote &&
+          !semSuporte &&
+          !pacote.executionEnabled && (
+            <Box sx={{ mt: 1.5 }}>
+              <Callout variant="warning" title="O resultado sai bloqueado">
+                {nomes.get(pacote.id) ?? indicatorDisplayName(pacote.id)} ainda não tem a regra
+                aprovada para publicar valor
+                {pacote.blockedGates.length > 0 ? ` (${pacote.blockedGates.join('; ')})` : ''}. A
+                execução lê o PEC e publica o resultado como bloqueado, com esses motivos.
+              </Callout>
+            </Box>
+          )}
         {aviso && (
           <Typography role="status" sx={{ mt: 1.5 }}>
             {aviso}

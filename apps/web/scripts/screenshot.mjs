@@ -13,7 +13,16 @@ const shots = [
   { slug: '01-painel', path: '/painel?mock-login=1', viewport: desktop },
   { slug: '02-login', path: '/login', viewport: desktop, logout: true },
   { slug: '03-indicadores', path: '/indicadores?mock-login=1', viewport: desktop },
-  { slug: '04-indicador-detalhe', path: '/indicadores/PB-01?mock-login=1', viewport: desktop },
+  {
+    slug: '04-indicador-detalhe',
+    path: '/indicadores/c4-cuidado-diabetes?mock-login=1',
+    viewport: desktop,
+  },
+  {
+    slug: '04-componente-iii',
+    path: '/indicadores/componente-iii?mock-login=1',
+    viewport: desktop,
+  },
   { slug: '05-execucao', path: '/execucao?mock-login=1', viewport: desktop },
   { slug: '06-fonte-de-dados', path: '/configuracoes?mock-login=1', viewport: desktop },
   { slug: '07-relatorios', path: '/relatorios?mock-login=1', viewport: desktop },
@@ -34,7 +43,7 @@ const shots = [
   },
   {
     slug: '09-phone-detalhe',
-    path: '/indicadores/PB-01?mock-login=1',
+    path: '/indicadores/c4-cuidado-diabetes?mock-login=1',
     viewport: { width: 390, height: 844 },
   },
 ]

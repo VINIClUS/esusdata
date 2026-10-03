@@ -7,6 +7,7 @@ import { AccessHelpPage } from '@/features/acesso/AccessHelpPage'
 import { PainelPage } from '@/features/painel/PainelPage'
 import { IndicadoresListPage } from '@/features/indicadores/IndicadoresListPage'
 import { IndicadorDetailPage } from '@/features/indicadores/IndicadorDetailPage'
+import { Componente3Page } from '@/features/componente3/Componente3Page'
 import { ExecucaoPage } from '@/features/execucoes/ExecucaoPage'
 import { FonteDeDadosPage } from '@/features/fontes/FonteDeDadosPage'
 import { IsolamentoPage } from '@/features/isolamento/IsolamentoPage'
@@ -28,6 +29,8 @@ export const router = createBrowserRouter([
       { path: '/alertas', element: <AlertasPage /> },
       { path: '/qualidade', element: <QualidadePage /> },
       { path: '/indicadores', element: <IndicadoresListPage /> },
+      // Before the detail: the Nota Final is computed on read and has its own page (ADR 0030).
+      { path: '/indicadores/componente-iii', element: <Componente3Page /> },
       { path: '/indicadores/:codigo', element: <IndicadorDetailPage /> },
       { path: '/execucao', element: <ExecucaoPage /> },
       { path: '/base-de-dados', element: <Navigate to="/configuracoes" replace /> },
