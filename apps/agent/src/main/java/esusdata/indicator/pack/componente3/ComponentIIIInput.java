@@ -29,6 +29,8 @@ public record ComponentIIIInput(String municipalityIbge, Quadrimestre quadrimest
      * @param value the exact value on the pack's own scale, or {@code null} unless {@code COMPUTED}
      * @param consolidationEligible whether the month enters the mean (C2/C3: only months with a
      *     cohort event)
+     * @param ruleVersion the rule version that computed the month, or {@code null} when unknown
+     *     (accepted with a limitation); a month of another version blocks the indicator
      */
     public record Monthly(
             String indicatorPack,
@@ -36,11 +38,24 @@ public record ComponentIIIInput(String municipalityIbge, Quadrimestre quadrimest
             String resultId,
             IndicatorStatus status,
             ExactRatio value,
-            boolean consolidationEligible) {
+            boolean consolidationEligible,
+            String ruleVersion) {
         public Monthly {
             Objects.requireNonNull(indicatorPack, "indicatorPack");
             Objects.requireNonNull(month, "month");
+            Objects.requireNonNull(resultId, "resultId");
             Objects.requireNonNull(status, "status");
+        }
+
+        /** A month whose rule version is unknown. */
+        public Monthly(
+                String indicatorPack,
+                YearMonth month,
+                String resultId,
+                IndicatorStatus status,
+                ExactRatio value,
+                boolean consolidationEligible) {
+            this(indicatorPack, month, resultId, status, value, consolidationEligible, null);
         }
     }
 }

@@ -1,9 +1,11 @@
 package esusdata.indicator.pack.componente3;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.Quadrimestre;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -55,12 +57,23 @@ class FinancialTransitionTest {
                 Classification.OTIMO);
     }
 
-    // ---- FIN-Q1-2026: art. 3º, II — "bom" whatever the methodological band (also before 2026) ----
+    // ---- FIN-Q1-2026: art. 3º, II — "bom" whatever the methodological band ----
     @Test
-    void finQ1_2026_alwaysBomAndEarlierQuadrimestresToo() {
+    void finQ1_2026_alwaysBom() {
         assertAlwaysBom("2026-Q1");
-        assertAlwaysBom("2025-Q3");
-        assertAlwaysBom("2025-Q1");
+        assertThat(FinancialTransition.covers(Quadrimestre.parse("2026-Q1"))).isTrue();
+    }
+
+    // ---- § 2º: the transition counts from the first parcel of the new methodology — no answer before 2026 ----
+    @Test
+    void portaria10994Par2_noFinancialClassificationBefore2026() {
+        for (String q : List.of("2025-Q3", "2025-Q1", "2019-Q1")) {
+            Quadrimestre quadrimestre = Quadrimestre.parse(q);
+            assertThat(FinancialTransition.covers(quadrimestre)).as(q).isFalse();
+            assertThatThrownBy(() -> FinancialTransition.classify(quadrimestre, Classification.OTIMO))
+                    .as(q)
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
     }
 
     // ---- FIN-Q2-2026: § 3º — Ótimo keeps Ótimo; Bom, Suficiente, Regular receive Bom ----

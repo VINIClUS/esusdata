@@ -18,18 +18,34 @@ import esusdata.indicator.model.Quadrimestre;
  *       § 6º; the Portaria does not name it for the Componente III (AMB-CIII-10);
  *   <li>from Q1/2027 — § 6º: the methodological classification.
  * </ul>
+ *
+ * <p>No answer before Q1/2026: § 2º counts the transition "a contar da primeira parcela de custeio
+ * desta nova metodologia", a date this pack does not transcribe, and quadrimestres before 2026 were
+ * consolidated under NT nº 6/2025 (revoked by NT 8/2026, p. 4), not under the rule written here.
  */
 public final class FinancialTransition {
 
-    private static final Quadrimestre FIXED_BOM_UNTIL = new Quadrimestre(2026, 1);
+    private static final Quadrimestre FIRST_COVERED = new Quadrimestre(2026, 1);
     private static final Quadrimestre DERIVED = new Quadrimestre(2026, 3);
     private static final Quadrimestre METHODOLOGICAL_FROM = new Quadrimestre(2027, 1);
 
     private FinancialTransition() {}
 
-    /** The classification the transfer of {@code quadrimestre} uses for a methodological one. */
+    /** True from Q1/2026 on: the quadrimestres this transition answers for. */
+    public static boolean covers(Quadrimestre quadrimestre) {
+        return quadrimestre.compareTo(FIRST_COVERED) >= 0;
+    }
+
+    /**
+     * The classification the transfer of {@code quadrimestre} uses for a methodological one.
+     *
+     * @throws IllegalArgumentException before Q1/2026 ({@link #covers})
+     */
     public static Classification classify(Quadrimestre quadrimestre, Classification methodological) {
-        if (quadrimestre.compareTo(FIXED_BOM_UNTIL) <= 0) {
+        if (!covers(quadrimestre)) {
+            throw new IllegalArgumentException("transição financeira não transcrita antes de " + FIRST_COVERED);
+        }
+        if (quadrimestre.equals(FIRST_COVERED)) {
             return Classification.BOM;
         }
         if (quadrimestre.compareTo(METHODOLOGICAL_FROM) >= 0) {

@@ -73,3 +73,23 @@ atendido.
 - **S-03:** atendido — `ExactRatio.reduced()`; o helper privado foi removido.
 - **S-04:** recusado — `Bands` não muda; fica a comparação cruzada local em `Nt08Tables`.
 - **S-05:** aceito — exigir as quatro competências; as faltantes só no texto da limitação.
+
+## Revisão da integração @ 4365532 — o que mudou no pacote
+
+- **Unidade municipal sem classificação financeira.** A NT define nota e classificação "para uma
+  equipe" (Quadros 1 e 2, p. 2) e a Portaria paga "eSF, eAP, eSB 40h e eMulti" (§ 3º): a unidade
+  com `ine == null` tem Nota Final e classificação metodológica, `financialTransferClassification`
+  nulo e a limitação "Nota municipal é agregado do produto; o repasse é por equipe".
+- **Ids lidos preservados.** `IndicatorQuadrimestral.resultIds` lista todo resultado mensal lido
+  (usado ou não), na ordem de `monthsRead` (campo novo, no fim do registro); `monthsUsed` continua
+  sendo só os meses da média. Os motivos nomeiam a competência.
+- **S-06 — `Monthly.ruleVersion` (ligar no serviço).** Campo novo no fim de `Monthly`, com o
+  construtor de seis argumentos mantido (versão nula = desconhecida, aceita com a limitação
+  "versão da regra não informada em …"). Mês de outra versão que a registrada ⇒ indicador
+  `BLOCKED`; regra cujo `descriptor().id()` difere do pacote ⇒ `BLOCKED`. Pedido: o
+  `QualityComponentService` passar `IndicatorResult.ruleVersion()` de cada mês.
+- **Sem classificação financeira antes de 2026-Q1.** A Portaria, § 2º, conta a transição "a contar
+  da primeira parcela de custeio desta nova metodologia", data não transcrita; quadrimestres
+  anteriores foram consolidados pela NT nº 6/2025 (revogada pela NT 8/2026, p. 4).
+  `FinancialTransition.covers` responde só de 2026-Q1 em diante; antes, a financeira é nula e o
+  resultado diz por quê.

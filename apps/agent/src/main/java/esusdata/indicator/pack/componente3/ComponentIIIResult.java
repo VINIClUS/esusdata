@@ -48,6 +48,11 @@ public record ComponentIIIResult(Quadrimestre quadrimestre, List<UnitResult> uni
     /**
      * One indicator of a unit: the months that entered the mean, the exact mean, its band and the
      * factor of the band (0,25 · 0,50 · 0,75 · 1,00).
+     *
+     * @param monthsUsed the competências that entered the mean, in order
+     * @param resultIds every monthly result read for the indicator, used or not (ADR 0030: "a
+     *     resposta lista os ids lidos"), in the order of {@code monthsRead}
+     * @param monthsRead the competência of each id in {@code resultIds}
      */
     public record IndicatorQuadrimestral(
             String indicatorPack,
@@ -57,10 +62,12 @@ public record ComponentIIIResult(Quadrimestre quadrimestre, List<UnitResult> uni
             IndicatorStatus status,
             ExactRatio mean,
             Classification classification,
-            ExactRatio factor) {
+            ExactRatio factor,
+            List<YearMonth> monthsRead) {
         public IndicatorQuadrimestral {
             monthsUsed = List.copyOf(monthsUsed);
             resultIds = List.copyOf(resultIds);
+            monthsRead = List.copyOf(monthsRead);
         }
     }
 }

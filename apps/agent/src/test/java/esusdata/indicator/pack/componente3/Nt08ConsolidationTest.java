@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.componente3;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import esusdata.indicator.IndicatorRuleRegistry;
 import esusdata.indicator.model.Classification;
@@ -224,7 +225,7 @@ class Nt08ConsolidationTest {
     private static void assertComputed(IndicatorQuadrimestral indicator, ExactRatio mean, Classification band) {
         String pack = indicator.indicatorPack();
         assertThat(indicator.status()).as(pack + " " + mean).isEqualTo(IndicatorStatus.COMPUTED);
-        assertThat(indicator.mean()).as(pack + " mean").isEqualByComparingTo(mean);
+        assertThat(indicator.mean()).as(pack + " mean").isEqualTo(mean.reduced());
         assertThat(indicator.classification()).as(pack + " band of " + mean).isEqualTo(band);
         assertThat(indicator.factor()).as(pack + " factor").isEqualByComparingTo(Nt08Tables.factor(band));
     }
@@ -236,7 +237,7 @@ class Nt08ConsolidationTest {
     private void assertFinal(UnitBuilder builder, ExactRatio score, Classification band) {
         UnitResult unit = single(builder);
         assertThat(unit.status()).isEqualTo(IndicatorStatus.COMPUTED);
-        assertThat(unit.score()).as("score").isEqualByComparingTo(score);
+        assertThat(unit.score()).as("score").isEqualTo(score.reduced());
         assertThat(unit.methodologicalClassification()).as("band of " + score).isEqualTo(band);
     }
 
@@ -304,6 +305,7 @@ class Nt08ConsolidationTest {
     void met33_c1MeanOf40_50_60_70Is55AndOtimo() {
         UnitResult unit = single(unit().values(C1, pct(40), pct(50), pct(60), pct(70)));
         assertComputed(indicator(unit, C1), pct(55), Classification.OTIMO);
+        assertThat(indicator(unit, C1).mean()).isEqualTo(ExactRatio.of(55, 1)); // reduced, not 220/4
         assertThat(indicator(unit, C1).monthsUsed()).containsExactlyElementsOf(Q1_2027.months());
     }
 
@@ -329,7 +331,11 @@ class Nt08ConsolidationTest {
 
         assertComputed(c2, ExactRatio.of(165, 2), Classification.OTIMO);
         assertThat(c2.monthsUsed()).containsExactly(builder.month(0), builder.month(2));
-        assertThat(c2.resultIds()).containsExactly(C2 + "@" + builder.month(0), C2 + "@" + builder.month(2));
+        // every result read stays listed (ADR 0030), the ineligible months included
+        assertThat(c2.monthsRead()).containsExactlyElementsOf(Q1_2027.months());
+        assertThat(c2.resultIds())
+                .containsExactlyElementsOf(
+                        Q1_2027.months().stream().map(m -> C2 + "@" + m).toList());
     }
 
     // ---- MET-35: Quadro 2 example — Bom, Ótimo, Ótimo, Suficiente, Regular, Ótimo, Ótimo -> 8,5 Ótimo ----
@@ -414,6 +420,100 @@ class Nt08ConsolidationTest {
         assertThat(result.limitations()).anyMatch(l -> l.contains("AMB-CIII-10"));
     }
 
+    // ---- MET-39 (Componente III analog): Q3/2026 partial regime vs. Q1/2027 integral ----
+    @Test
+    void met39_q3_2026IsPartialAndQ1_2027UsesTheMethodologicalBand() {
+        Quadrimestre q3 = Quadrimestre.parse("2026-Q3");
+        Classification r = Classification.REGULAR;
+        Classification o = Classification.OTIMO;
+        UnitResult regular = single(concepts(q3, r, r, r, r, r, r, r));
+        assertThat(regular.methodologicalClassification()).isEqualTo(r);
+        assertThat(regular.financialTransferClassification()).isEqualTo(Classification.BOM);
+
+        UnitResult otimo = single(new UnitBuilder(q3));
+        assertThat(otimo.methodologicalClassification()).isEqualTo(o);
+        assertThat(otimo.financialTransferClassification()).isEqualTo(o);
+
+        UnitResult regular2027 = single(all(r));
+        assertThat(regular2027.methodologicalClassification()).isEqualTo(r);
+        assertThat(regular2027.financialTransferClassification()).isEqualTo(r);
+    }
+
+    // ---- C1 above 70 is Regular (non-monotonic) inside a Nota Final: 9 + 0,25 = 37/4 Ótimo ----
+    @Test
+    void met18_c1Above70IsRegularInsideTheNotaFinal() {
+        UnitResult unit = single(unit().constant(C1, pct(80)));
+        assertComputed(indicator(unit, C1), pct(80), Classification.REGULAR);
+        assertThat(unit.score()).isEqualTo(ExactRatio.of(37, 4));
+        assertThat(unit.methodologicalClassification()).isEqualTo(Classification.OTIMO);
+    }
+
+    // ---- Quadro 1 in full, with C3 partial (75 is Bom by the ficha, AMB-CIII-03) -> 8,0 Ótimo ----
+    @Test
+    void quadro1_fullExampleWithC3PartialIs8AndOtimo() {
+        UnitBuilder builder = unit().values(
+                        C1,
+                        ExactRatio.of(4262, 100),
+                        ExactRatio.of(4087, 100),
+                        ExactRatio.of(419, 10),
+                        ExactRatio.of(5198, 100))
+                .values(C2, pct(80), pct(0), pct(85), pct(0))
+                .set(C2, 1, IndicatorStatus.NO_DENOMINATOR, null, false)
+                .set(C2, 3, IndicatorStatus.NO_DENOMINATOR, null, false)
+                .values(C3, pct(75), pct(0), pct(0), pct(0))
+                .set(C3, 1, IndicatorStatus.NO_DENOMINATOR, null, false)
+                .set(C3, 2, IndicatorStatus.NO_DENOMINATOR, null, false)
+                .set(C3, 3, IndicatorStatus.NO_DENOMINATOR, null, false)
+                .values(
+                        C4,
+                        ExactRatio.of(452, 10),
+                        ExactRatio.of(439, 10),
+                        ExactRatio.of(498, 10),
+                        ExactRatio.of(499, 10))
+                .values(C5, pct(10), pct(11), pct(10), pct(50))
+                .values(C6, pct(90), pct(84), pct(81), pct(79))
+                .values(C7, pct(70), pct(79), pct(81), pct(82));
+        UnitResult unit = single(builder);
+
+        assertComputed(indicator(unit, C1), ExactRatio.of(443_425, 10_000), Classification.BOM);
+        assertComputed(indicator(unit, C2), ExactRatio.of(165, 2), Classification.OTIMO);
+        assertComputed(indicator(unit, C3), pct(75), Classification.BOM);
+        assertComputed(indicator(unit, C4), ExactRatio.of(472, 10), Classification.SUFICIENTE);
+        assertComputed(indicator(unit, C5), ExactRatio.of(81, 4), Classification.REGULAR);
+        assertComputed(indicator(unit, C6), ExactRatio.of(167, 2), Classification.OTIMO);
+        assertComputed(indicator(unit, C7), pct(78), Classification.OTIMO);
+        assertThat(unit.score()).isEqualTo(ExactRatio.of(8, 1));
+        assertThat(unit.methodologicalClassification()).isEqualTo(Classification.OTIMO);
+    }
+
+    // ---- the municipality is an aggregate of the product: Nota Final yes, financial classification no ----
+    @Test
+    void municipalUnitHasNoFinancialClassification() {
+        UnitBuilder builder = new UnitBuilder(Quadrimestre.parse("2026-Q2"));
+        ComponentIIIResult result = consolidation.consolidate(
+                input(builder.quadrimestre, builder.build(INE, CNES), builder.build(null, null)), RULES);
+        UnitResult team = result.units().get(0);
+        UnitResult municipality = result.units().get(1);
+
+        assertThat(team.financialTransferClassification()).isEqualTo(Classification.OTIMO);
+        assertThat(municipality.score()).isEqualTo(pct(10));
+        assertThat(municipality.methodologicalClassification()).isEqualTo(Classification.OTIMO);
+        assertThat(municipality.financialTransferClassification()).isNull();
+        assertThat(municipality.limitations()).anyMatch(l -> l.contains("repasse é por equipe"));
+    }
+
+    // ---- before 2026 there is no financial classification (Portaria § 2º), the methodological stays ----
+    @Test
+    void noFinancialClassificationBefore2026() {
+        Quadrimestre q = Quadrimestre.parse("2025-Q3");
+        UnitBuilder builder = new UnitBuilder(q);
+        ComponentIIIResult result = consolidation.consolidate(input(q, builder.build(INE, CNES)), RULES);
+        UnitResult unit = result.units().get(0);
+        assertThat(unit.methodologicalClassification()).isEqualTo(Classification.OTIMO);
+        assertThat(unit.financialTransferClassification()).isNull();
+        assertThat(result.limitations()).anyMatch(l -> l.contains("antes de 2026-Q1"));
+    }
+
     // ---- FIN-Q1-2027: financial equals methodological ----
     @Test
     void finQ1_2027_financialEqualsMethodologicalThroughTheConsolidation() {
@@ -435,6 +535,10 @@ class Nt08ConsolidationTest {
         UnitResult unit = single(unit().status(C5, 1, IndicatorStatus.BLOCKED));
         assertUnavailable(indicator(unit, C5), IndicatorStatus.BLOCKED);
         assertNoScore(unit, IndicatorStatus.BLOCKED, "C5", C5);
+        // the ids read stay listed and the limitation names the competência
+        assertThat(indicator(unit, C5).resultIds()).hasSize(4).contains(C5 + "@2027-02");
+        assertThat(indicator(unit, C5).monthsUsed()).isEmpty();
+        assertThat(unit.limitations()).anyMatch(l -> l.contains("2027-02") && l.contains("BLOCKED"));
     }
 
     // ---- months: BLOCKED > UNSUPPORTED_SOURCE > RULE_AMBIGUITY, even on an ineligible C2 month ----
@@ -529,6 +633,17 @@ class Nt08ConsolidationTest {
         assertNoScore(duplicated, IndicatorStatus.BLOCKED, "C5", C5);
     }
 
+    // ---- a value-less month blocks before a NO_DENOMINATOR one is read as an ambiguity, even ineligible ----
+    @Test
+    void computedMonthWithoutValueBlocksBeforeNoDenominatorAndEvenWhenIneligible() {
+        UnitResult mixed = single(
+                unit().status(C4, 0, IndicatorStatus.NO_DENOMINATOR).set(C4, 1, IndicatorStatus.COMPUTED, null, true));
+        assertUnavailable(indicator(mixed, C4), IndicatorStatus.BLOCKED);
+
+        UnitResult ineligible = single(unit().set(C2, 1, IndicatorStatus.COMPUTED, null, false));
+        assertUnavailable(indicator(ineligible, C2), IndicatorStatus.BLOCKED);
+    }
+
     // ---- a missing indicator never becomes zero nor redistributes its weight (MET-17) ----
     @Test
     void missingIndicatorLeavesTheUnitWithoutScore() {
@@ -546,6 +661,65 @@ class Nt08ConsolidationTest {
         UnitResult unit = single(unit(), rules);
         assertUnavailable(indicator(unit, C6), IndicatorStatus.BLOCKED);
         assertNoScore(unit, IndicatorStatus.BLOCKED, "C6", C6);
+    }
+
+    // ---- a rule registered under another pack id cannot band this one ----
+    @Test
+    void ruleOfAnotherPackBlocksTheIndicator() {
+        Map<String, IndicatorRule> rules = new HashMap<>(RULES);
+        rules.put(C4, RULES.get(C5));
+        assertNoScore(single(unit(), rules), IndicatorStatus.BLOCKED, "C4", C4);
+    }
+
+    // ---- months of another rule version are never averaged with the current one ----
+    @Test
+    void monthOfAnotherRuleVersionBlocksTheIndicator() {
+        String current = RULES.get(C6).descriptor().ruleVersion();
+        UnitBuilder builder = unit();
+        List<Monthly> versioned = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            String version = i == 2 ? C6 + "@0.0.1" : current;
+            versioned.add(new Monthly(
+                    C6,
+                    builder.month(i),
+                    C6 + "@" + builder.month(i),
+                    IndicatorStatus.COMPUTED,
+                    pct(90),
+                    true,
+                    version));
+        }
+        UnitResult other = single(builder.results(C6, versioned.toArray(Monthly[]::new)));
+        assertUnavailable(indicator(other, C6), IndicatorStatus.BLOCKED);
+        assertThat(other.limitations()).anyMatch(l -> l.contains(C6 + "@0.0.1") && l.contains("2027-03"));
+
+        versioned.set(
+                2, new Monthly(C6, builder.month(2), "c6-current", IndicatorStatus.COMPUTED, pct(90), true, current));
+        UnitResult same = single(builder.results(C6, versioned.toArray(Monthly[]::new)));
+        assertThat(indicator(same, C6).status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(same.limitations()).noneMatch(l -> l.startsWith("C6") && l.contains("versão"));
+    }
+
+    // ---- a month without rule version is accepted, with a limitation naming it ----
+    @Test
+    void monthWithoutRuleVersionIsAcceptedWithALimitation() {
+        UnitResult unit = single(unit());
+        assertThat(unit.status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(unit.limitations())
+                .anyMatch(l -> l.contains("versão da regra não informada") && l.contains("2027-01"));
+    }
+
+    // ---- the input refuses a monthly result without id, pack, month or status ----
+    @Test
+    void monthlyRequiresIdPackMonthAndStatus() {
+        YearMonth month = Q1_2027.firstMonth();
+        assertThatThrownBy(() -> new Monthly(C1, month, null, IndicatorStatus.COMPUTED, pct(1), true))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new Monthly(null, month, "id", IndicatorStatus.COMPUTED, pct(1), true))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new Monthly(C1, null, "id", IndicatorStatus.COMPUTED, pct(1), true))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new Monthly(C1, month, "id", null, pct(1), true))
+                .isInstanceOf(NullPointerException.class);
     }
 
     // ---- months outside the quadrimestre and unknown packs are ignored ----
