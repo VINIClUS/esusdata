@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import esusdata.run.job.SourceAcquisitionBlockedException;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.SourceBudgetExceededException;
+import esusdata.source.pec.UnsupportedSourceException;
 import java.sql.SQLException;
 import java.sql.SQLTransientConnectionException;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /** ENG-22: only classes that genuinely need a retry loop are marked transient. */
@@ -25,6 +27,16 @@ class FailureClassifierTest {
         var classification = FailureClassifier.classify(
                 new AllowedDestinations.DestinationNotAllowedException("host not on allowlist"));
         assertThat(classification.category()).isEqualTo(FailureClassifier.Category.DEFINITIVE);
+    }
+
+    /** ADR 0030: a capability without a VALIDATED entry cannot become validated by retrying. */
+    @Test
+    void anUnsupportedSourceIsDefinitiveWithItsOwnCode() {
+        var classification = FailureClassifier.classify(
+                new UnsupportedSourceException("c2-desenvolvimento-infantil", "src-1", List.of("citizen")));
+        assertThat(classification.category()).isEqualTo(FailureClassifier.Category.DEFINITIVE);
+        assertThat(classification.code()).isEqualTo("UNSUPPORTED_SOURCE");
+        assertThat(classification.detail()).contains("citizen");
     }
 
     @Test

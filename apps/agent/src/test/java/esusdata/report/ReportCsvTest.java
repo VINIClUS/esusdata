@@ -23,7 +23,7 @@ class ReportCsvTest {
                                                 .map(h -> "\"" + h + "\"")
                                                 .toList()),
                         "\"3541307\";\"c1-mais-acesso\";\"c1-mais-acesso@0.1.0\";\"2026-03\";\"COMPUTED\";\"3\";\"5\";"
-                                + "\"60,0000\";\"BOM\";\"2026-03-31\";\"2026-04-01T10:00:00Z\";\"run-1\"",
+                                + "\"60,0000\";\"PERCENTAGE\";\"BOM\";\"2026-03-31\";\"2026-04-01T10:00:00Z\";\"run-1\"",
                         "");
     }
 
@@ -45,7 +45,26 @@ class ReportCsvTest {
     void aMissingValueAndClassificationAreEmptyCells() {
         String csv = new String(ReportCsv.render(List.of(result(null, null))), StandardCharsets.UTF_8);
 
-        assertThat(csv).contains("\"5\";\"\";\"\";\"2026-03-31\"");
+        assertThat(csv).contains("\"5\";\"\";\"PERCENTAGE\";\"\";\"2026-03-31\"");
+    }
+
+    /** ADR 0030 amends ADR 0024: valor + unidade instead of valor_percentual. */
+    @Test
+    void theValueColumnIsFollowedByItsUnitInsteadOfAPercentageColumn() {
+        assertThat(ReportCsv.HEADER).contains("valor", "unidade").doesNotContain("valor_percentual");
+        assertThat(ReportCsv.HEADER.indexOf("unidade")).isEqualTo(ReportCsv.HEADER.indexOf("valor") + 1);
+    }
+
+    @Test
+    void aScoreTravelsWithItsUnitAndAValueIsShownOnlyWhenComputed() {
+        PublishedResult computed = withStatus(result("62.5000", "BOM"), "COMPUTED", "SCORE");
+        PublishedResult blocked = withStatus(result("62.5000", null), "BLOCKED", "SCORE");
+
+        String[] lines =
+                new String(ReportCsv.render(List.of(computed, blocked)), StandardCharsets.UTF_8).split("\r\n", -1);
+
+        assertThat(lines[1]).contains("\"COMPUTED\";\"3\";\"5\";\"62,5000\";\"SCORE\";\"BOM\"");
+        assertThat(lines[2]).contains("\"BLOCKED\";\"3\";\"5\";\"\";\"SCORE\";\"\"");
     }
 
     @Test
@@ -103,6 +122,51 @@ class ReportCsvTest {
                 "canonical@1",
                 "ENCOUNTER",
                 "dev",
-                "2026-04-01T10:00:00Z");
+                "2026-04-01T10:00:00Z",
+                "PERCENTAGE",
+                null,
+                null,
+                "[]",
+                "[]",
+                true);
+    }
+
+    private static PublishedResult withStatus(PublishedResult r, String status, String valueKind) {
+        return new PublishedResult(
+                r.resultId(),
+                r.jobId(),
+                r.runId(),
+                r.sourceId(),
+                r.indicatorPack(),
+                r.ruleVersion(),
+                r.municipalityIbge(),
+                r.referencePeriod(),
+                status,
+                r.valueText(),
+                r.numeratorText(),
+                r.denominatorText(),
+                r.denominatorKind(),
+                r.classification(),
+                r.dataCutoff(),
+                r.extractionId(),
+                r.adapterVersion(),
+                r.calculationPolicyVersion(),
+                r.limitationsJson(),
+                r.inputFingerprint(),
+                r.resultNature(),
+                r.validationStatus(),
+                r.completenessStatus(),
+                r.consistencyLevel(),
+                r.reproducibilityLevel(),
+                r.canonicalSchemaVersion(),
+                r.evidenceGrain(),
+                r.appBuild(),
+                r.publishedAt(),
+                valueKind,
+                null,
+                null,
+                "[]",
+                "[]",
+                true);
     }
 }

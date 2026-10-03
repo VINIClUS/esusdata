@@ -2,9 +2,15 @@ package esusdata.run.worker;
 
 import esusdata.auth.GrantRevalidator;
 import esusdata.auth.model.Permission;
-import esusdata.indicator.model.CanonicalEncounter;
+import esusdata.indicator.IndicatorRuleRegistry;
+import esusdata.indicator.model.CanonicalDataset;
+import esusdata.indicator.model.EvaluationContext;
+import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.IndicatorResult;
-import esusdata.indicator.pack.c1.C1Rule;
+import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.PackDescriptor;
+import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.model.RuleOutcomes;
 import esusdata.result.PublicationService;
 import esusdata.result.model.EvidenceEntry;
 import esusdata.result.model.InputFingerprint;
@@ -19,18 +25,21 @@ import esusdata.run.acquisition.AcquisitionListener;
 import esusdata.run.acquisition.CancellationSignal;
 import esusdata.run.extract.ExtractStore;
 import esusdata.run.extract.ExtractionManifest;
+import esusdata.run.extract.ManifestPart;
 import esusdata.run.job.JobRepository;
 import esusdata.source.SourceRepository;
 import esusdata.source.model.SourceRecord;
+import esusdata.source.pec.CapabilityCatalog;
+import esusdata.source.pec.CapabilityEligibility;
+import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecConnectionProperties;
 import esusdata.source.pec.PecSourceIdentity;
-import esusdata.source.pec.ReadBudget;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -38,16 +47,22 @@ import java.util.UUID;
 
 /**
  * Orchestrates one job run: read (from an already-finalized extract, or from a fresh PEC
- * acquisition via {@link Acquisition}) → compute (C1) → stage → publish. Today this class is
- * C1-specific (the only indicator pack wired into the pilot, §4.5.1) — a second pack would need
- * either a small strategy seam here or its own executor; premature to build before there is a
- * second rule to generalize from.
+ * acquisition via {@link Acquisition}) → compute → stage → publish, for whichever compiled rule the
+ * job names (ADR 0030): {@link RuleLookup} — {@link IndicatorRuleRegistry#require} in production —
+ * turns an unknown pack or rule version into {@code INVALID_REQUEST} before any I/O.
  *
- * <p>C1's release gates are not complete (§4.4 Portões A/B/D/E {@code BLOCKED} — Q01 not
- * retrieved), so every result computed here is {@code status=BLOCKED} with exact counts, never a
- * fabricated value. {@link C1Rule#computeEvidenceOnly} is deliberately not used on this path — it
- * exists only to prove reproducibility in tests (ENG-19), not to publish a methodologically
- * unreleased indicator as if it had passed the gates.
+ * <p>C1 is unchanged: the same v1 command and read budget, the same encounters, the same
+ * per-encounter evidence and the same input fingerprint; its result now also carries the per-team
+ * breakdown {@code C1Pack} computes. Its release gates are not complete (§4.4 Portões A/B/D/E), so
+ * every C1 result is {@code status=BLOCKED} with exact counts, never a fabricated value.
+ *
+ * <p>A canonical v2 pack (C2–C7) is checked for eligibility first: every capability it reads needs
+ * a {@code VALIDATED} compatibility entry for the source's PEC version, read model and installation
+ * role, or the run fails with {@code UNSUPPORTED_SOURCE} before the acquisition guard and before
+ * any child process — definitive, with no cooldown. The acquisition then reads every part the rule
+ * requires in one transaction ({@link ReadPlan}); the result is gated again by the pack's release
+ * gates ({@link RuleOutcomes#gate}, idempotent), staged with its practices, teams and generic
+ * evidence, and published. Its input fingerprint also names every part read.
  *
  * <p>§1.9.4 L365 is checked at the start of BOTH {@link #runFromExtract} and {@link #runLive} —
  * against the principal's CURRENT grants, not whatever authorized the original HTTP request.
@@ -55,18 +70,23 @@ import java.util.UUID;
  * only an actual grant/account change does.
  *
  * <p>Reading (from disk or from a live PEC acquisition) is behind ports ({@link ExtractStore},
- * {@link Acquisition}) — this class no longer imports JDBC, the PEC driver, or any other
- * module's {@code infrastructure} package (ADR 0009).
+ * {@link Acquisition}) — this class never imports JDBC, the PEC driver, or any other module's
+ * {@code infrastructure} package (ADR 0009).
  */
 public final class RunExecutor {
 
-    private static final String EVIDENCE_GRAIN = "SOURCE_EVENT";
+    /** C1's evidence grain since V2: one row per source event. */
+    private static final String EVENT_EVIDENCE_GRAIN = "SOURCE_EVENT";
+
+    /** C2–C7 (ADR 0030): one row per subject (person or episode) and practice, plus supporting events. */
+    private static final String SUBJECT_EVIDENCE_GRAIN = "SUBJECT_PRACTICE";
+
     // §1.2/§1.10.1: LOCAL_ESTIMATE | OFFICIAL_IMPORTED | SIMULATION — a calculation from a local
     // immutable PEC extract is never OFFICIAL_IMPORTED (that label is reserved for results
     // imported from an official source with its own provenance, never earned by numeric
     // resemblance) and never SIMULATION.
     private static final String RESULT_NATURE = "LOCAL_ESTIMATE";
-    // C1's release gates (Portões A/B/D/E, §4.4) are not complete — see class javadoc.
+    // No pack has its release gates complete (Portões A–E, §4.4) — see class javadoc.
     private static final String VALIDATION_STATUS = "NOT_VALIDATED";
     private static final String SOURCE_ZONE_ID = "America/Sao_Paulo";
 
@@ -81,7 +101,21 @@ public final class RunExecutor {
     private final Acquisition acquisitionPort;
     private final AcquisitionGuard acquisitionGuard;
     private final Duration liveAcquisitionCooldownMargin;
+    private final CapabilityEligibility eligibility;
+    private final RuleLookup rules;
+    private final CapabilityCatalog catalog = CapabilityCatalog.packaged();
 
+    /** How a job's pack and rule version resolve to a compiled rule (ADR 0030). */
+    @FunctionalInterface
+    public interface RuleLookup {
+
+        /**
+         * The rule to run, or {@link IllegalArgumentException} for an unknown pack or version.
+         */
+        IndicatorRule require(String indicatorPack, String ruleVersion);
+    }
+
+    /** The production wiring: the release's rules and the packaged compatibility matrix. */
     public RunExecutor(
             ExtractStore extractStore,
             JobRepository jobRepository,
@@ -94,6 +128,36 @@ public final class RunExecutor {
             Acquisition acquisitionPort,
             AcquisitionGuard acquisitionGuard,
             Duration liveAcquisitionCooldownMargin) {
+        this(
+                extractStore,
+                jobRepository,
+                stagingArea,
+                publicationService,
+                appBuild,
+                clock,
+                grantRevalidator,
+                sourceRepository,
+                acquisitionPort,
+                acquisitionGuard,
+                liveAcquisitionCooldownMargin,
+                new CapabilityEligibility(PecCompatibilityMatrix.fromClasspathResource()),
+                IndicatorRuleRegistry::require);
+    }
+
+    public RunExecutor(
+            ExtractStore extractStore,
+            JobRepository jobRepository,
+            ResultStagingArea stagingArea,
+            PublicationService publicationService,
+            String appBuild,
+            Clock clock,
+            GrantRevalidator grantRevalidator,
+            SourceRepository sourceRepository,
+            Acquisition acquisitionPort,
+            AcquisitionGuard acquisitionGuard,
+            Duration liveAcquisitionCooldownMargin,
+            CapabilityEligibility eligibility,
+            RuleLookup rules) {
         this.extractStore = extractStore;
         this.jobRepository = jobRepository;
         this.stagingArea = stagingArea;
@@ -105,6 +169,8 @@ public final class RunExecutor {
         this.acquisitionPort = acquisitionPort;
         this.acquisitionGuard = acquisitionGuard;
         this.liveAcquisitionCooldownMargin = liveAcquisitionCooldownMargin;
+        this.eligibility = eligibility;
+        this.rules = rules;
     }
 
     public record RunContext(
@@ -123,38 +189,17 @@ public final class RunExecutor {
     public record RunOutcome(String stagingId, String resultId, IndicatorResult result) {}
 
     public RunOutcome runFromExtract(RunContext context, CancellationSignal cancellation) throws IOException {
-        requireC1(context);
+        IndicatorRule rule = rules.require(context.indicatorPack(), context.ruleVersion());
+        ReadPlan plan = ReadPlan.of(rule, YearMonth.parse(context.referencePeriod()), catalog);
         grantRevalidator.requireCurrentlyAuthorized(
                 context.idempotencyPrincipal(), context.municipalityIbge(), Permission.RUN_INDICATOR);
 
         ExtractionManifest manifest = extractStore.readManifest(context.extractionId());
-        YearMonth requestedPeriod = YearMonth.parse(context.referencePeriod());
-        String expectedPeriodStart = requestedPeriod.atDay(1).toString();
-        String expectedPeriodEndExclusive =
-                requestedPeriod.plusMonths(1).atDay(1).toString();
-        if (!manifest.sourceId().equals(context.sourceId())
-                || !manifest.municipalityIbge().equals(context.municipalityIbge())
-                || !manifest.periodStart().equals(expectedPeriodStart)
-                || !manifest.periodEndExclusive().equals(expectedPeriodEndExclusive)) {
-            // The extract file matches the requested extractionId but its actual scope (source,
-            // municipality, or period) does not match what the job asked for — all FKs stay
-            // individually valid, so nothing else would catch this. This matters even for an
-            // extract with zero matching records: C1Rule's per-record checks never run on an
-            // empty extract, so a scope mismatch would otherwise publish a plausible-looking
-            // zero-count result under the wrong municipality/period with wrong provenance,
-            // silently — exactly what §1.10.1 forbids.
-            throw new IllegalStateException(
-                    "extract " + context.extractionId() + " covers source " + manifest.sourceId()
-                            + "/municipality " + manifest.municipalityIbge() + "/period ["
-                            + manifest.periodStart() + ", " + manifest.periodEndExclusive()
-                            + ") but job " + context.jobId() + " requested source " + context.sourceId()
-                            + "/municipality " + context.municipalityIbge() + "/period "
-                            + context.referencePeriod());
-        }
-        List<CanonicalEncounter> encounters = extractStore.readEncounters(manifest);
+        plan.requireCovers(manifest, context);
+        CanonicalDataset data = plan.read(extractStore, manifest);
         cancellation.checkCancelled();
 
-        return computeStageAndPublish(context, manifest, encounters, cancellation);
+        return computeStageAndPublish(context, rule, plan, manifest, data, cancellation);
     }
 
     /**
@@ -164,7 +209,8 @@ public final class RunExecutor {
      * evidence" code path (the same invariant ENG-19 proves for replay).
      */
     public RunOutcome runLive(RunContext context, CancellationSignal cancellation) throws IOException {
-        requireC1(context);
+        IndicatorRule rule = rules.require(context.indicatorPack(), context.ruleVersion());
+        ReadPlan plan = ReadPlan.of(rule, YearMonth.parse(context.referencePeriod()), catalog);
         grantRevalidator.requireCurrentlyAuthorized(
                 context.idempotencyPrincipal(), context.municipalityIbge(), Permission.RUN_INDICATOR);
 
@@ -175,6 +221,16 @@ public final class RunExecutor {
             throw new IllegalStateException("source " + source.id() + " is authorized for municipality "
                     + source.municipalityIbge() + " but job " + context.jobId()
                     + " requested municipality " + context.municipalityIbge());
+        }
+        if (plan.isCanonicalV2()) {
+            // ADR 0030: decided here, in Java, before the guard and before any child — a probe
+            // that diverged inside the execution plane would block the whole source by cooldown.
+            eligibility.require(
+                    rule.descriptor().id(),
+                    plan.capabilities(),
+                    CapabilityEligibility.identityOf(
+                                    source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole())
+                            .orElse(null));
         }
         acquisitionGuard.requireUnblocked(context.sourceId());
 
@@ -188,15 +244,8 @@ public final class RunExecutor {
                 source.municipalityIbge());
         PecSourceIdentity sourceIdentity = new PecSourceIdentity(
                 source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole());
-        ReadBudget budget = ReadBudget.initialEngineeringProposal();
-
-        YearMonth requestedPeriod = YearMonth.parse(context.referencePeriod());
-        LocalDate periodStart = requestedPeriod.atDay(1);
-        LocalDate periodEndExclusive = requestedPeriod.plusMonths(1).atDay(1);
         String extractionId = "live-" + context.jobId() + "-g" + context.executionGeneration();
-
-        AcquisitionCommand command = new AcquisitionCommand(
-                properties, sourceIdentity, budget, extractionId, periodStart, periodEndExclusive, SOURCE_ZONE_ID);
+        AcquisitionCommand command = plan.command(properties, sourceIdentity, extractionId, SOURCE_ZONE_ID);
 
         ExtractionManifest manifest = acquisitionPort.acquire(command, cancellation, new AcquisitionListener() {
             @Override
@@ -215,34 +264,33 @@ public final class RunExecutor {
         });
         cancellation.checkCancelled();
 
-        List<CanonicalEncounter> encounters = extractStore.readEncounters(manifest);
-        return computeStageAndPublish(context, manifest, encounters, cancellation);
-    }
-
-    private static void requireC1(RunContext context) {
-        // This executor only ever computes C1 — reject anything else before doing any I/O rather
-        // than silently publishing a C1 result under a different pack/version's name.
-        if (!C1Rule.INDICATOR_PACK.equals(context.indicatorPack())
-                || !C1Rule.RULE_VERSION.equals(context.ruleVersion())) {
-            throw new IllegalArgumentException("job requests " + context.indicatorPack() + "@" + context.ruleVersion()
-                    + " but this executor only computes "
-                    + C1Rule.INDICATOR_PACK + "@" + C1Rule.RULE_VERSION);
+        if (plan.isCanonicalV2()) {
+            plan.requireCovers(manifest, context);
         }
+        CanonicalDataset data = plan.read(extractStore, manifest);
+        return computeStageAndPublish(context, rule, plan, manifest, data, cancellation);
     }
 
     private RunOutcome computeStageAndPublish(
             RunContext context,
+            IndicatorRule rule,
+            ReadPlan plan,
             ExtractionManifest manifest,
-            List<CanonicalEncounter> encounters,
+            CanonicalDataset data,
             CancellationSignal cancellation) {
-        YearMonth requestedPeriod = YearMonth.parse(context.referencePeriod());
-        String dataCutoff = requestedPeriod.atEndOfMonth().toString();
-        IndicatorResult result =
-                C1Rule.compute(encounters, context.municipalityIbge(), context.referencePeriod(), dataCutoff);
+        PackDescriptor descriptor = rule.descriptor();
+        EvaluationContext evaluation =
+                EvaluationContext.endOfMonth(context.municipalityIbge(), YearMonth.parse(context.referencePeriod()));
+        RuleOutcome outcome = rule.evaluate(data, evaluation);
+        if (plan.isCanonicalV2()) {
+            outcome = RuleOutcomes.gate(descriptor, outcome);
+        }
+        IndicatorResult result = outcome.result();
+        requireJobScope(descriptor, result, context);
         cancellation.checkCancelled();
 
         String stagingId = "stg-" + UUID.randomUUID();
-        String inputFingerprint = computeInputFingerprint(manifest, result);
+        String inputFingerprint = computeInputFingerprint(manifest, descriptor.id(), result, plan);
 
         stagingArea.open(new StagingRequest(
                 stagingId,
@@ -250,13 +298,14 @@ public final class RunExecutor {
                 context.executionGeneration(),
                 context.processInstanceId(),
                 clock.instant(),
-                C1Rule.INDICATOR_PACK,
+                descriptor.id(),
                 result,
                 manifest.extractionId(),
                 manifest.adapterVersion(),
-                EVIDENCE_GRAIN,
-                inputFingerprint));
-        stagingArea.writeEvidence(stagingId, toEvidence(encounters, result));
+                plan.isCanonicalV2() ? SUBJECT_EVIDENCE_GRAIN : EVENT_EVIDENCE_GRAIN,
+                inputFingerprint,
+                outcome.teams()));
+        stagingArea.writeEvidence(stagingId, toEvidence(outcome.evidence(), result.ruleVersion()));
         cancellation.checkCancelled();
         stagingArea.seal(stagingId);
 
@@ -268,7 +317,7 @@ public final class RunExecutor {
                     "job " + context.jobId() + " ownership changed before staging could be recorded");
         }
 
-        PublicationOutcome outcome = publicationService.publish(new PublicationRequest(
+        PublicationOutcome published = publicationService.publish(new PublicationRequest(
                 context.jobId(),
                 context.runId(),
                 stagingId,
@@ -283,10 +332,27 @@ public final class RunExecutor {
                 context.idempotencyPrincipal(),
                 context.municipalityIbge()));
 
-        return new RunOutcome(stagingId, outcome.resultId(), result);
+        return new RunOutcome(stagingId, published.resultId(), result);
     }
 
-    private static String computeInputFingerprint(ExtractionManifest manifest, IndicatorResult result) {
+    /**
+     * The staged row takes its municipality, competência and rule version from the result itself, so
+     * a rule answering for anything but the job is refused rather than published under it.
+     */
+    private static void requireJobScope(PackDescriptor descriptor, IndicatorResult result, RunContext context) {
+        if (!context.municipalityIbge().equals(result.municipalityIbge())
+                || !context.referencePeriod().equals(result.referencePeriod())
+                || !descriptor.ruleVersion().equals(result.ruleVersion())
+                || descriptor.valueKind() != result.valueKind()) {
+            throw new IllegalStateException(descriptor.ruleVersion() + " answered for " + result.ruleVersion() + " "
+                    + result.municipalityIbge() + " " + result.referencePeriod() + " (" + result.valueKind()
+                    + ") but job " + context.jobId() + " asked for " + context.municipalityIbge() + " "
+                    + context.referencePeriod());
+        }
+    }
+
+    private static String computeInputFingerprint(
+            ExtractionManifest manifest, String indicatorPack, IndicatorResult result, ReadPlan plan) {
         SortedMap<String, String> fields = new TreeMap<>();
         fields.put("source_id", manifest.sourceId());
         fields.put("municipality_ibge", manifest.municipalityIbge());
@@ -295,33 +361,55 @@ public final class RunExecutor {
         fields.put(
                 "acquisition_plan",
                 manifest.extractionId().startsWith("live-") ? "LIVE_READ_ONLY" : "IMMUTABLE_EXTRACT");
-        fields.put("indicator_pack", C1Rule.INDICATOR_PACK);
+        fields.put("indicator_pack", indicatorPack);
         fields.put("rule_version", result.ruleVersion());
         fields.put("reference_period", result.referencePeriod());
         fields.put("data_cutoff", result.dataCutoff());
         fields.put("calculation_policy_version", result.calculationPolicyVersion());
         fields.put("adapter_version", manifest.adapterVersion());
+        if (plan.isCanonicalV2()) {
+            // C1's fingerprint stays byte-identical: only v2 runs name their schema and parts.
+            fields.put("canonical_schema_version", manifest.canonicalSchemaVersion());
+            fields.put("parts", partsFingerprint(manifest.parts()));
+        }
         return InputFingerprint.compute(fields);
     }
 
-    private static List<EvidenceEntry> toEvidence(List<CanonicalEncounter> encounters, IndicatorResult result) {
-        List<EvidenceEntry> entries = new ArrayList<>(encounters.size());
-        for (CanonicalEncounter e : encounters) {
-            String decision = switch (e.modality()) {
-                case PROGRAMADO -> "IN_NUMERATOR";
-                case ESPONTANEO -> "DENOMINATOR_ONLY";
-                case UNMAPPED -> "EXCLUDED_UNMAPPED";
-            };
+    /** One line per part, in part order: what was read, how, over which window, and how much. */
+    private static String partsFingerprint(List<ManifestPart> parts) {
+        List<ManifestPart> ordered = new ArrayList<>(parts);
+        ordered.sort(Comparator.comparingInt(ManifestPart::index));
+        List<String> lines = new ArrayList<>(ordered.size());
+        for (ManifestPart part : ordered) {
+            lines.add(part.index() + ":" + part.capability() + "@" + part.adapterVersion() + ":" + part.recordKind()
+                    + ":" + part.queryChecksum() + ":[" + part.periodStart() + "," + part.periodEndExclusive() + "):"
+                    + part.paramsChecksum() + ":" + part.rowCount());
+        }
+        return String.join(";", lines);
+    }
+
+    /**
+     * Evidence rows as the rule emitted them, in order (the {@code seq} of each row). C1's {@code
+     * EVENT} rows map to exactly the columns V2 has always stored.
+     */
+    private static List<EvidenceEntry> toEvidence(List<EvidenceItem> items, String criterionVersion) {
+        List<EvidenceEntry> entries = new ArrayList<>(items.size());
+        for (EvidenceItem item : items) {
             entries.add(new EvidenceEntry(
-                    e.sourceRef().entityType(),
-                    e.sourceRef().recordId(),
-                    e.careDate(),
-                    e.modality().name(),
-                    e.cnes(),
-                    e.ine(),
-                    e.cbo(),
-                    decision,
-                    result.ruleVersion()));
+                    item.subjectKind().name(),
+                    item.subjectKey(),
+                    item.sourceRef() == null ? null : item.sourceRef().entityType(),
+                    item.sourceRef() == null ? null : item.sourceRef().recordId(),
+                    item.eventDate(),
+                    item.modality(),
+                    item.cnes(),
+                    item.ine(),
+                    item.cbo(),
+                    item.component(),
+                    item.decision().name(),
+                    item.reasonCode(),
+                    item.points() == null ? null : item.points().toString(),
+                    criterionVersion));
         }
         return entries;
     }

@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
@@ -43,6 +44,8 @@ class CoverageSchedulerTest {
     private static final String BROKEN = "src-0";
     private static final CoverageScheduler.Settings SETTINGS =
             new CoverageScheduler.Settings(true, Duration.ofHours(6), Duration.ofMinutes(2), 5);
+    /** ADR 0030: "published" is per pack; C1 has 2026-03. */
+    private static final Map<String, Set<String>> PUBLISHED_C1 = Map.of("c1-mais-acesso", Set.of("2026-03"));
 
     @TempDir
     Path dataDir;
@@ -59,7 +62,7 @@ class CoverageSchedulerTest {
         fixture = new JobRunnerTestFixture(dataDir, clock);
         fixture.registerSource(SOURCE, MUNICIPALITY);
         schedules = new JdbcScheduleRepository(fixture.jdbc);
-        when(results.findPublishedPeriods(MUNICIPALITY)).thenReturn(List.of("2026-03"));
+        when(results.findPublishedPeriodsByPack(MUNICIPALITY)).thenReturn(PUBLISHED_C1);
     }
 
     @AfterEach
@@ -146,7 +149,7 @@ class CoverageSchedulerTest {
                 "update jobs set state = 'FAILED', finished_at = ? where job_id = ?",
                 clock.instant().minusSeconds(60).toString(),
                 failed);
-        when(results.findPublishedPeriods(MUNICIPALITY)).thenReturn(List.of("2026-03"));
+        when(results.findPublishedPeriodsByPack(MUNICIPALITY)).thenReturn(PUBLISHED_C1);
 
         ScheduleState next = tick(scheduler);
 

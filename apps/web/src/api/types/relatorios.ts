@@ -16,6 +16,8 @@ export interface ExportResponse {
 export interface Exportacao {
   id: string
   arquivo: string
+  /** The exported pack's id; null when every pack is exported. */
+  pacote: string | null
   indicador: string
   periodo: string
   linhas: number

@@ -6,10 +6,14 @@ import esusdata.auth.model.AuthAuditWriter;
 import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.Permission;
 import esusdata.indicator.IndicatorPackCatalog;
+import esusdata.indicator.model.ExactRatio;
 import esusdata.result.dto.EvidenceCursor;
 import esusdata.result.dto.EvidenceEntryResponse;
 import esusdata.result.dto.EvidenceResponse;
+import esusdata.result.dto.ExactValue;
+import esusdata.result.dto.ResultComponentResponse;
 import esusdata.result.dto.ResultResponse;
+import esusdata.result.dto.TeamResultResponse;
 import esusdata.result.model.EvidencePage;
 import esusdata.result.model.EvidenceRecord;
 import esusdata.result.model.EvidenceRepository;
@@ -32,6 +36,9 @@ import tools.jackson.databind.ObjectMapper;
 public class ResultController {
 
     private static final String EVIDENCE_ORDERING = "seq_asc";
+
+    /** Decimal places of a component's 0–1 value shown beside its exact fraction. */
+    private static final int DISPLAY_SCALE = 4;
 
     private final ResultRepository resultRepository;
     private final EvidenceRepository evidenceRepository;
@@ -134,6 +141,15 @@ public class ResultController {
                 result.denominatorText(),
                 result.denominatorKind(),
                 result.classification(),
+                result.valueKind(),
+                ExactValue.of(result.valueExact()),
+                ResultJson.readComponents(result.componentsJson()).stream()
+                        .map(ResultController::component)
+                        .toList(),
+                ResultJson.readTeams(result.teamResultsJson()).stream()
+                        .map(ResultController::team)
+                        .toList(),
+                result.consolidationEligible(),
                 result.dataCutoff(),
                 parseLimitations(result.limitationsJson()),
                 List.of(result.sourceId()),
@@ -157,6 +173,8 @@ public class ResultController {
 
     private static EvidenceEntryResponse toResponse(EvidenceRecord record) {
         return new EvidenceEntryResponse(
+                record.subjectKind(),
+                record.subjectKey(),
                 record.sourceEntityType(),
                 record.sourceRecordId(),
                 record.careDate(),
@@ -164,7 +182,39 @@ public class ResultController {
                 record.cnes(),
                 record.ine(),
                 record.cbo(),
+                record.component(),
                 record.decision(),
+                record.reasonCode(),
+                record.points(),
                 record.criterionVersion());
+    }
+
+    /** A practice or subgroup; its 0–1 value as a display decimal beside the exact fraction. */
+    static ResultComponentResponse component(ResultJson.StoredComponent component) {
+        ExactRatio value = component.value();
+        return new ResultComponentResponse(
+                component.code(),
+                component.kind(),
+                component.weight(),
+                component.numerator(),
+                component.denominator(),
+                value == null ? null : value.toScaledBigDecimal(DISPLAY_SCALE).toPlainString(),
+                ExactValue.of(value),
+                component.status());
+    }
+
+    static TeamResultResponse team(ResultJson.StoredTeam team) {
+        return new TeamResultResponse(
+                team.ine(),
+                team.cnes(),
+                team.status(),
+                team.valueText(),
+                ExactValue.of(team.value()),
+                team.numerator(),
+                team.denominator(),
+                team.classification(),
+                team.consolidationEligible(),
+                team.components().stream().map(ResultController::component).toList(),
+                team.limitations());
     }
 }

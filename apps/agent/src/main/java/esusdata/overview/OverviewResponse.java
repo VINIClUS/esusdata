@@ -28,12 +28,24 @@ public record OverviewResponse(
         List<PendingPeriod> pendingPeriods,
         List<RecentRun> recentRuns) {
 
-    /** One catalog pack and, when published, its result in {@code referencePeriod}. */
+    /**
+     * One catalog pack and, when published, its result in {@code referencePeriod}. ADR 0030: its
+     * code, title and value kind, whether anything enqueues it ({@code runnable} is false for the
+     * Nota Final, computed on read), and whether some PEC source of the municipality can compute it
+     * — {@code AVAILABLE}, {@code UNSUPPORTED_SOURCE} with the capabilities missing, or {@code
+     * NO_SOURCE}. An unsupported source is never shown as a zero.
+     */
     public record Indicator(
             String indicatorPack,
             String ruleVersion,
             String family,
             String unit,
+            String code,
+            String title,
+            String valueKind,
+            boolean runnable,
+            String availability,
+            List<String> missingCapabilities,
             boolean executionEnabled,
             List<String> blockedGates,
             String resultId,
@@ -65,7 +77,8 @@ public record OverviewResponse(
             String detail,
             String at) {}
 
-    public record PendingPeriod(String sourceId, String referencePeriod, long count) {}
+    /** A competência still to compute and the packs the source can compute that are unpublished in it. */
+    public record PendingPeriod(String sourceId, String referencePeriod, long count, List<String> indicatorPacks) {}
 
     public record RecentRun(
             String jobId,
