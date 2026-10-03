@@ -51,7 +51,10 @@ final class VaccinePractice {
 
     private VaccinePractice() {}
 
-    /** {@code date} is the application; {@code registered} the day it was recorded (a transcription's is later). */
+    /**
+     * {@code date} is the application; {@code registered} the day a transcription was recorded (the
+     * application date for any other dose, whose registration date does not change what it proves).
+     */
     private record Dose(LocalDate date, LocalDate registered, String code, String cbo, Support support) {
         LocalDate limitDate(Set<Reading> readings) {
             return readings.contains(Reading.DOSE_BY_REGISTRATION_DATE) ? registered : date;
@@ -147,24 +150,18 @@ final class VaccinePractice {
         return dates;
     }
 
-    /** The code as the ficha writes it: {@code 9} from a source without the leading zero is {@code 09}. */
-    private static String code(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        String trimmed = raw.trim();
-        return trimmed.length() == 1 ? "0" + trimmed : trimmed;
-    }
-
     private static List<Dose> doses(ChildRecords child) {
         List<Dose> doses = new ArrayList<>();
         for (CanonicalImmunization i : child.doses()) {
             LocalDate date = LocalDate.parse(i.applicationDate());
-            LocalDate registered = i.registrationDate() == null ? date : LocalDate.parse(i.registrationDate());
-            String code = code(i.immunobiologicalCode());
+            boolean transcription = Boolean.TRUE.equals(i.transcription());
+            LocalDate registered =
+                    transcription && i.registrationDate() != null ? LocalDate.parse(i.registrationDate()) : date;
+            String code = i.immunobiologicalCode();
+            // A transcription recorded after the cutoff was not known on the cutoff.
             boolean known = child.inScope(date) && !registered.isAfter(child.cutoff());
             if (C2Codes.IMMUNOBIOLOGICAL_CODES.contains(code) && known) {
-                String model = Boolean.TRUE.equals(i.transcription()) ? "MIV_TRANSCRICAO" : "MIV";
+                String model = transcription ? "MIV_TRANSCRICAO" : "MIV";
                 doses.add(new Dose(
                         date,
                         registered,

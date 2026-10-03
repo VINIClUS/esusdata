@@ -6,6 +6,7 @@ import esusdata.indicator.model.CanonicalImmunization;
 import esusdata.indicator.model.CanonicalMeasurement;
 import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.DateWindow;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -35,7 +36,15 @@ record ChildRecords(
         return DateWindow.inclusive(clock.birth(), cutoff).contains(date);
     }
 
+    /** A measured value: a number above zero. "0", blanks and text never prove a measurement. */
     static boolean present(String value) {
-        return value != null && !value.isBlank();
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        try {
+            return new BigDecimal(value.trim()).signum() > 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }

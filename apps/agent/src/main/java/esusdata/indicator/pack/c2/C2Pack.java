@@ -42,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Function;
@@ -76,15 +77,20 @@ public final class C2Pack implements IndicatorRule {
                     + " verificada.",
             "Puericultura (Quadro 02) não é identificável no DW (lacuna L7, AMB-C2-05): as consultas de A e B"
                     + " são contadas sem esse filtro e podem superestimar o resultado local.",
-            "Denominador mensal (AMB-C2-03): leitura literal da ficha — todas as crianças vinculadas com até 2"
-                    + " anos no mês, inclusive as que completam 2 anos na competência — até a reconciliação com a"
-                    + " lista nominal do Siaps.",
+            "Denominador mensal (AMB-C2-03): entram as crianças vinculadas com até 2 anos no mês; mês com"
+                    + " criança completando 2 anos na competência fica RULE_AMBIGUITY (CT-C2-65) até a reconciliação"
+                    + " com a lista nominal do Siaps.",
             "Datas (AMB-C2-01, AMB-C2-02): o dia do nascimento é o dia 0 (N+29 cumpre o 30º dia, N+30 é"
-                    + " ambíguo); a coorte usa o aniversário da Lei 810/1949 (29/02 completa anos em 01/03); datas"
-                    + " exatas de aniversário e aniversários inexistentes no mês tornam a prática ambígua.",
-            "Prática E (AMB-C2-09 iv, AMB-C2-10 ii/iii): doses são aplicações em datas distintas, não o campo"
-                    + " dose; SCR sem intervalo mínimo; só o Esquema Primário do 24 g. Transcrição registrada depois"
-                    + " do corte ainda não é conhecida no corte.",
+                    + " ambíguo); datas exatas de aniversário e aniversários inexistentes no mês tornam a prática, ou"
+                    + " a inclusão na coorte, ambígua.",
+            "Prática E (AMB-C2-09 iv, AMB-C2-10 ii/iii): doses são aplicações em datas distintas; a leitura pelo"
+                    + " campo dose não é avaliada (domínio LEDI de dose não congelado); SCR sem intervalo mínimo; só"
+                    + " o Esquema Primário do 24 g; transcrição registrada depois do corte não é conhecida no corte;"
+                    + " o código do imunobiológico é comparado como a ficha escreve (09), formato a confirmar no"
+                    + " Portão C.",
+            "Prática C: só valores numéricos maiores que zero comprovam peso ou altura; o campo"
+                    + " \"Antropometria\" do MIAC (Quadro 03) não é lido até o código LEDI ser confirmado no Portão C;"
+                    + " linha de participante do MIAC sem CBO é aceita.",
             "Cadastros não unificados (AMB-C2-14) contam como pessoas distintas; o corte local não reproduz o"
                     + " 20º dia útil do Siaps (AMB-C2-16).",
             "Leituras declaradas: CBO de quatro dígitos é família (AMB-C2-13); visitas com motivo diferente de"
@@ -92,7 +98,14 @@ public final class C2Pack implements IndicatorRule {
                     + " 'anos completos ≤ 2' (AMB-C2-02); sem o filtro de Puericultura, A e B divergem do tratamento"
                     + " proposto na transcrição (AMB-C2-05); equipe de tipo conhecido fora de 70/76 sai da coorte"
                     + " (24 b); atendimento domiciliar só no MIAI com local 4 é ambíguo (AMB-C2-04), registro de outro"
-                    + " modelo não conta.");
+                    + " modelo não conta; recusa de cadastro (versão vigente) tira a criança da coorte; atendimentos"
+                    + " com mesma data, CBO, CNES e INE são tratados como o mesmo registrado duas vezes (MET-32), não"
+                    + " como dois atendimentos (AMB-C2-15).");
+
+    /** Civil months read: the first that can hold a cohort birth through the competência (ADR 0030 §1.9.2). */
+    private static final int MONTHS_READ = 26;
+
+    private static final long SIX_MONTHS = 6;
 
     public static final String ID = "c2-desenvolvimento-infantil";
     public static final String RULE_VERSION = ID + "@0.1.0";
@@ -163,7 +176,7 @@ public final class C2Pack implements IndicatorRule {
      */
     @Override
     public DataRequirements requirements(YearMonth competencia) {
-        DateWindow period = DateWindow.lastCivilMonths(competencia, 26);
+        DateWindow period = DateWindow.lastCivilMonths(competencia, MONTHS_READ);
         DateWindow births = new DateWindow(
                 competencia.atDay(1).minusYears(2).minusDays(1),
                 competencia.plusMonths(1).atDay(1));
@@ -183,10 +196,10 @@ public final class C2Pack implements IndicatorRule {
      * The exact outcome before the release gates (§4.4): what {@link #evaluate} publishes once the
      * gates allow it. Rejects any record outside the authorized municipality.
      */
-    public static RuleOutcome compute(CanonicalDataset data, EvaluationContext context) {
+    static RuleOutcome compute(CanonicalDataset data, EvaluationContext context) {
         String ibge = context.municipalityIbge();
         rejectForeignRecords(data, ibge);
-        Optional<String> missing = missingCapability(data);
+        Optional<String> missing = missingCapability(data, context.competencia());
         if (missing.isPresent()) {
             return unsupported(context, missing.get());
         }
@@ -255,15 +268,30 @@ public final class C2Pack implements IndicatorRule {
     private static ScoredChild score(C2Cohort.Member member, ChildRecords records, String teamType) {
         PracticeOutcome visits =
                 C2Codes.TEAM_TYPE_EAP.equals(teamType) ? PracticeOutcome.exempt("D") : VisitPractice.evaluate(records);
+        ChildClock clock = member.clock();
+        LocalDate cutoff = records.cutoff();
+        boolean firstMonthOpen = clock.day(cutoff) < ChildClock.LAST_DAY_BOTH_READINGS + 1;
+        boolean sixMonthsOpen = clock.anniversary(SIX_MONTHS, Set.of()).isAfter(cutoff);
+        boolean twoYearsOpen =
+                clock.anniversary(ChildClock.TWO_YEARS_IN_MONTHS, Set.of()).isAfter(cutoff);
         return new ScoredChild(
                 member,
                 List.of(
-                        ConsultPractices.firstPresentialConsult(records),
-                        ConsultPractices.nineConsults(records),
-                        AnthropometryPractice.evaluate(records),
-                        visits,
-                        VaccinePractice.evaluate(records)),
+                        open(ConsultPractices.firstPresentialConsult(records), firstMonthOpen),
+                        open(ConsultPractices.nineConsults(records), twoYearsOpen),
+                        open(AnthropometryPractice.evaluate(records), twoYearsOpen),
+                        open(visits, sixMonthsOpen),
+                        open(VaccinePractice.evaluate(records), twoYearsOpen)),
                 teamType == null);
+    }
+
+    /**
+     * A practice not met while its window is still open on the cutoff keeps 0 points but says so
+     * (Tech Spec §2.4 C2: "práticas ainda não vencidas" are not a delay). E has no window in the ficha
+     * (AMB-C2-10); its schedule closes, for this purpose, on the second birthday.
+     */
+    private static PracticeOutcome open(PracticeOutcome outcome, boolean windowOpen) {
+        return windowOpen ? outcome.windowOpen() : outcome;
     }
 
     /** One row for the child, one per practice with its points, and one per supporting event (ENG-36). */
@@ -357,25 +385,35 @@ public final class C2Pack implements IndicatorRule {
         return List.copyOf(unique.values());
     }
 
-    /** Records of kinds C2 does not read still prove the extract is the authorized municipality's. */
+    /** Every record, of every kind, must be the authorized municipality's — checked before anything else. */
     private static void rejectForeignRecords(CanonicalDataset data, String ibge) {
-        data.encounters().forEach(r -> requireMunicipality(ibge, r.municipalityIbge()));
-        data.conditions().forEach(r -> requireMunicipality(ibge, r.municipalityIbge()));
-        data.pregnancyOutcomes().forEach(r -> requireMunicipality(ibge, r.municipalityIbge()));
+        List<String> municipalities = new ArrayList<>();
+        data.persons().forEach(r -> municipalities.add(r.municipalityIbge()));
+        data.registrations().forEach(r -> municipalities.add(r.municipalityIbge()));
+        data.teams().forEach(r -> municipalities.add(r.municipalityIbge()));
+        data.careEvents().forEach(r -> municipalities.add(r.municipalityIbge()));
+        data.procedureEvents().forEach(r -> municipalities.add(r.municipalityIbge()));
+        data.homeVisits().forEach(r -> municipalities.add(r.municipalityIbge()));
+        data.measurements().forEach(r -> municipalities.add(r.municipalityIbge()));
+        data.immunizations().forEach(r -> municipalities.add(r.municipalityIbge()));
+        data.encounters().forEach(r -> municipalities.add(r.municipalityIbge()));
+        data.conditions().forEach(r -> municipalities.add(r.municipalityIbge()));
+        data.pregnancyOutcomes().forEach(r -> municipalities.add(r.municipalityIbge()));
+        municipalities.forEach(m -> requireMunicipality(ibge, m));
     }
 
     /**
-     * A v2 extract names the window of every capability it read; one of ours missing means its
-     * records are unknown, never zero (ADR 0030). A dataset without windows (built in memory) is
-     * taken as complete.
+     * The extract names the window of every capability it read; one of ours missing, or narrower
+     * than {@link #requirements} asks, means its records are unknown — never zero (ADR 0030).
      */
-    private static Optional<String> missingCapability(CanonicalDataset data) {
-        if (data.windows().isEmpty()) {
-            return Optional.empty();
-        }
-        for (String capability : DESCRIPTOR.requiredCapabilities()) {
-            if (data.windowOf(capability).isEmpty()) {
-                return Optional.of(capability);
+    private static Optional<String> missingCapability(CanonicalDataset data, YearMonth competencia) {
+        for (PartRequirement part : new C2Pack().requirements(competencia).parts()) {
+            Optional<DateWindow> window = data.windowOf(part.capability());
+            boolean covers = window.isPresent()
+                    && !window.get().start().isAfter(part.periodStart())
+                    && !window.get().endExclusive().isBefore(part.periodEndExclusive());
+            if (!covers) {
+                return Optional.of(part.capability());
             }
         }
         return Optional.empty();
@@ -383,7 +421,8 @@ public final class C2Pack implements IndicatorRule {
 
     private static RuleOutcome unsupported(EvaluationContext context, String capability) {
         List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
-        limitations.add("Capacidade " + capability + " ausente do extrato: o C2 não é calculado sem ela.");
+        limitations.add("Capacidade " + capability
+                + " ausente do extrato ou com janela menor que a pedida: o C2 não é calculado sem ela.");
         IndicatorResult result = new IndicatorResult(
                 IndicatorStatus.UNSUPPORTED_SOURCE,
                 null,
@@ -425,10 +464,10 @@ public final class C2Pack implements IndicatorRule {
         return types;
     }
 
-    /** The day a team was observed (a date or a timestamp); unknown counts as before any cutoff. */
+    /** The day a team was observed (a date or a timestamp); without one it proves nothing on any cutoff. */
     private static LocalDate observedOn(CanonicalTeam team) {
         String at = team.observedAt();
-        return at == null || at.length() < 10 ? LocalDate.MIN : LocalDate.parse(at.substring(0, 10));
+        return at == null || at.length() < 10 ? LocalDate.MAX : LocalDate.parse(at.substring(0, 10));
     }
 
     private static <T> Map<String, List<T>> byPerson(

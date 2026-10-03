@@ -21,12 +21,6 @@ final class ConsultPractices {
     private static final String MIAI = C2Codes.MIAI;
     private static final String MIP = C2Codes.MIP;
 
-    /**
-     * Only the individual-encounter model (Quadro 02: MIAI); a home-care record of another model
-     * ({@code form} HOME) is not it. A MIAI encounter at home (local de atendimento 4) is AMB-C2-04.
-     */
-    private static final String INDIVIDUAL = "INDIVIDUAL";
-
     private static final List<Reading> FIRST_CONSULT_READINGS = List.of(
             Reading.DAY_30_INSIDE,
             Reading.HOME_CARE_COUNTS,
@@ -151,7 +145,7 @@ final class ConsultPractices {
         List<Consult> consults = new ArrayList<>();
         for (CanonicalCareEvent e : child.encounters()) {
             LocalDate date = LocalDate.parse(e.careDate());
-            if (INDIVIDUAL.equals(e.form()) && C2Codes.CONSULT.matches(e.cbo()) && child.inScope(date)) {
+            if (C2Codes.INDIVIDUAL_FORM.equals(e.form()) && C2Codes.CONSULT.matches(e.cbo()) && child.inScope(date)) {
                 boolean home = C2Codes.HOME_CARE_LOCATION.equals(e.careLocationCode());
                 String key = date + "|" + normalizedCbo(e.cbo()) + "|" + e.cnes() + "|" + e.ine();
                 String model = home ? MIAI + "_DOMICILIAR" : MIAI;
@@ -181,7 +175,8 @@ final class ConsultPractices {
             LocalDate date = LocalDate.parse(p.eventDate());
             boolean code = C2Codes.TELECONSULT_SIGTAP.equals(p.sigtapCode())
                     || C2Codes.CHILD_DEVELOPMENT_SIGTAP.equals(p.sigtapCode());
-            if (code && MIP.equals(p.origin()) && child.inScope(date)) {
+            boolean recorded = MIP.equals(p.origin()) && C2Codes.PERFORMED.equals(p.stage());
+            if (code && recorded && C2Codes.CONSULT.matches(p.cbo()) && child.inScope(date)) {
                 list.add(new ProcedureConsult(
                         date,
                         p.sigtapCode(),

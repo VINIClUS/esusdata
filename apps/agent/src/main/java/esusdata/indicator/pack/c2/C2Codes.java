@@ -14,9 +14,6 @@ import java.util.List;
 @SuppressWarnings("PMD.DataClass") // tabela de códigos congelados da ficha
 public final class C2Codes {
 
-    /** Versão destas tabelas: muda quando a ficha mudar. */
-    public static final String VERSION = "c2-codes@2026-06";
-
     /** 24 c (p.2) e Quadro 02 (p.5): consultas de A e B — médicos e enfermeiros. */
     public static final List<String> CONSULT_CBO = List.of("2251", "2252", "2253", "2231", "2235");
 
@@ -114,6 +111,8 @@ public final class C2Codes {
 
     static final String AMB_C2_02 = "AMB-C2-02";
 
+    static final String AMB_C2_03 = "AMB-C2-03";
+
     static final String AMB_C2_04 = "AMB-C2-04";
 
     static final String AMB_C2_06 = "AMB-C2-06";
@@ -131,6 +130,15 @@ public final class C2Codes {
     static final String AMB_C2_15 = "AMB-C2-15";
 
     static final String LACUNA_L3 = "LACUNA-L3";
+
+    /** Prefix of a source gap (not a ficha ambiguity) among the reasons a practice is undecided. */
+    static final String SOURCE_GAP_PREFIX = "LACUNA-";
+
+    /** The individual-encounter model (MIAI), also when it happens at home ({@code careLocationCode} 4). */
+    static final String INDIVIDUAL_FORM = "INDIVIDUAL";
+
+    /** Procedure events that count: performed, never only requested or evaluated. */
+    static final String PERFORMED = "PERFORMED";
 
     /** Information models as the canonical records name them. */
     static final String MIAI = "MIAI";

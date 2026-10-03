@@ -15,6 +15,10 @@ record PracticeOutcome(
     static final String NOT_MET = "NAO_CUMPRIDA";
     static final String EXEMPT_EAP = "ISENTA_EAP_76";
     static final String AMBIGUITY_PREFIX = "AMBIGUIDADE:";
+    /** Undecided only because the source lacks a datum (a DW gap), not because the ficha is ambiguous. */
+    static final String UNAVAILABLE_PREFIX = "DADO_INDISPONIVEL:";
+    /** Not met while the practice's window is still open on the cutoff (Tech Spec §2.4 C2). */
+    static final String NOT_MET_WINDOW_OPEN = "NAO_CUMPRIDA_PRAZO_ABERTO";
 
     enum Status {
         MET,
@@ -35,13 +39,29 @@ record PracticeOutcome(
             return new PracticeOutcome(
                     component,
                     Status.AMBIGUOUS,
-                    AMBIGUITY_PREFIX + String.join(",", verdict.ambiguities()),
+                    prefix(verdict.ambiguities()) + String.join(",", verdict.ambiguities()),
                     verdict.ambiguities(),
                     support);
         }
         return verdict.met()
                 ? new PracticeOutcome(component, Status.MET, MET, new TreeSet<>(), support)
                 : new PracticeOutcome(component, Status.NOT_MET, NOT_MET, new TreeSet<>(), List.of());
+    }
+
+    private static String prefix(SortedSet<String> reasons) {
+        for (String reason : reasons) {
+            if (!reason.startsWith(C2Codes.SOURCE_GAP_PREFIX)) {
+                return AMBIGUITY_PREFIX;
+            }
+        }
+        return UNAVAILABLE_PREFIX;
+    }
+
+    /** The same outcome, saying the practice's window has not closed yet when it was not met. */
+    PracticeOutcome windowOpen() {
+        return status == Status.NOT_MET
+                ? new PracticeOutcome(component, status, NOT_MET_WINDOW_OPEN, ambiguities, support)
+                : this;
     }
 
     static PracticeOutcome exempt(String component) {

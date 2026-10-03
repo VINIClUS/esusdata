@@ -41,9 +41,10 @@ final class C2Tally {
     void add(ScoredChild child) {
         subjects++;
         points = points.add(child.certainPoints(descriptor.components()));
-        if (child.ambiguous()) {
+        if (child.ambiguous() || !child.member().cohortAmbiguities().isEmpty()) {
             ambiguousSubjects++;
         }
+        ambiguities.addAll(child.member().cohortAmbiguities());
         if (child.teamTypeUnknown()) {
             teamTypeUnknown++;
         }
@@ -124,7 +125,8 @@ final class C2Tally {
     private List<String> limitations() {
         List<String> limitations = new ArrayList<>(descriptor.standingLimitations());
         if (ambiguousSubjects > 0) {
-            limitations.add(ambiguousSubjects + " criança(s) com prática indeterminada por ambiguidade da ficha ("
+            limitations.add(ambiguousSubjects
+                    + " criança(s) com prática ou inclusão indeterminada (ambiguidade da ficha ou dado indisponível: "
                     + String.join(", ", ambiguities)
                     + "): valor indisponível (RULE_AMBIGUITY); o numerador soma só as práticas certas"
                     + " (limite inferior).");

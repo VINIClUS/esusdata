@@ -109,7 +109,7 @@ final class AnthropometryPractice {
     /** MIAI: "registros de Peso e Altura do campo específico do PEC". */
     private static void addEncounters(ChildRecords child, List<Measure> measures) {
         for (CanonicalCareEvent e : child.encounters()) {
-            if ("INDIVIDUAL".equals(e.form()) && C2Codes.ANTHROPOMETRY.matches(e.cbo())) {
+            if (C2Codes.INDIVIDUAL_FORM.equals(e.form()) && C2Codes.ANTHROPOMETRY.matches(e.cbo())) {
                 Support support =
                         new Support(e.sourceRef(), LocalDate.parse(e.careDate()), e.cbo(), e.cnes(), e.ine(), MIAI);
                 addValues(child, measures, support, e.weightKg(), e.heightCm());
@@ -128,11 +128,15 @@ final class AnthropometryPractice {
         }
     }
 
-    /** MIP and MIAC values written outside an encounter; a collective activity row may carry no CBO. */
+    /**
+     * MIP and MIAC values written outside an encounter. The Quadro 03 CBO list holds for every model;
+     * only a collective-activity participant row may lack the professional's CBO (declared).
+     */
     private static void addMeasurements(ChildRecords child, List<Measure> measures) {
         for (CanonicalMeasurement m : child.measurements()) {
             boolean model = MIP.equals(m.origin()) || MIAC.equals(m.origin());
-            if (model && (m.cbo() == null || C2Codes.ANTHROPOMETRY.matches(m.cbo()))) {
+            boolean cbo = C2Codes.ANTHROPOMETRY.matches(m.cbo()) || (m.cbo() == null && MIAC.equals(m.origin()));
+            if (model && cbo) {
                 Support support =
                         new Support(m.sourceRef(), LocalDate.parse(m.measuredDate()), m.cbo(), null, null, m.origin());
                 addValues(child, measures, support, m.weightKg(), m.heightCm());
@@ -156,22 +160,18 @@ final class AnthropometryPractice {
      * encounter's weight and height also as a procedure, dictionary finding 7) is one pair, not two.
      */
     private static String decimal(String value) {
-        try {
-            return new BigDecimal(value.trim()).stripTrailingZeros().toPlainString();
-        } catch (NumberFormatException e) {
-            return value.trim();
-        }
+        return new BigDecimal(value.trim()).stripTrailingZeros().toPlainString();
     }
 
     /**
-     * MIP (Quadro 03: "com exceção do registro de procedimento consolidado"): weight and height codes
-     * by the Quadro 03 CBO; {@code 01.01.04.002-4} by the same CBO and {@code 03.01.01.026-9} by any
-     * CBO (outside the 24 d groups, AMB-C2-06) only as a lone code.
+     * MIP (Quadro 03: "com exceção do registro de procedimento consolidado"), performed by a Quadro
+     * 03 CBO: weight and height codes, and {@code 01.01.04.002-4} or {@code 03.01.01.026-9} only as a
+     * lone code (AMB-C2-07 i).
      */
     private static void addProcedure(ChildRecords child, List<Measure> measures, CanonicalProcedureEvent p) {
         LocalDate date = LocalDate.parse(p.eventDate());
         boolean model = MIP.equals(p.origin()) || MIAI.equals(p.origin());
-        if (!model || !child.inScope(date)) {
+        if (!model || !C2Codes.PERFORMED.equals(p.stage()) || !child.inScope(date)) {
             return;
         }
         boolean byCbo = C2Codes.ANTHROPOMETRY.matches(p.cbo());
@@ -179,7 +179,7 @@ final class AnthropometryPractice {
         boolean weight = byCbo && C2Codes.WEIGHT_MEASUREMENT.equals(code);
         boolean height = byCbo && C2Codes.HEIGHT_MEASUREMENT.equals(code);
         boolean lone =
-                (byCbo && C2Codes.ANTHROPOMETRIC_EVALUATION.equals(code)) || C2Codes.GROWTH_EVALUATION.equals(code);
+                byCbo && (C2Codes.ANTHROPOMETRIC_EVALUATION.equals(code) || C2Codes.GROWTH_EVALUATION.equals(code));
         if (weight || height || lone) {
             Support support = new Support(p.sourceRef(), date, p.cbo(), p.cnes(), p.ine(), p.origin());
             measures.add(new Measure(date, weight, height, null, lone, support));

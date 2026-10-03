@@ -72,3 +72,12 @@ declarada como limitação permanente em `C2Pack` e mantém o pacote `BLOCKED`.
   como leitura (limites de 12 meses e 2 anos pela data de aplicação × pela de registro) e ignora
   transcrição registrada depois do corte.
 - Prática ambígua passa a sair como `EvidenceDecision.PRACTICE_AMBIGUOUS` (sem pontos).
+
+## S-C2-07 — Formato do código do imunobiológico e domínio do campo dose (`immunization_history`)
+
+- **O quê:** confirmar no Portão C que `immunobiological_code` (`nu_identificador`) vem como a ficha
+  escreve (`09`, não `9`), já que o bind casa por igualdade; e congelar o domínio LEDI de `dose_code`
+  (D1, D2, D3, reforço…).
+- **Por quê:** o pacote deixou de normalizar `9`→`09` (a SQL filtraria `9` antes). A AMB-C2-09 (iv)
+  (campo dose × contagem de aplicações) só vira leitura avaliável com o domínio de dose congelado;
+  até lá o pacote conta aplicações em datas distintas e declara a limitação.

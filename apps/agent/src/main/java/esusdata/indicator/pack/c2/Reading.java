@@ -39,7 +39,7 @@ enum Reading {
     SHORT_INTERVAL_INVALIDATES(C2Codes.AMB_C2_09),
     /**
      * The 12-month and two-year limits of a dose use the day it was recorded, not the day it was
-     * applied — differs only for a transcription (AMB-C2-09 v).
+     * applied — read only for a transcription, the one dose whose two dates differ (AMB-C2-09 v).
      */
     DOSE_BY_REGISTRATION_DATE(C2Codes.AMB_C2_09),
     /** Doses on or after the second birthday count (AMB-C2-10 i). */
