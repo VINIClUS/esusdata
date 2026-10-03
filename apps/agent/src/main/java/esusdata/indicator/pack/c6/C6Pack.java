@@ -3,7 +3,6 @@ package esusdata.indicator.pack.c6;
 import esusdata.indicator.model.Bands;
 import esusdata.indicator.model.BudgetHint;
 import esusdata.indicator.model.CanonicalDataset;
-import esusdata.indicator.model.CanonicalTeam;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ComponentSpec;
@@ -27,16 +26,14 @@ import esusdata.indicator.model.ValueKind;
 import esusdata.indicator.pack.c6.C6Cohort.Subject;
 import esusdata.indicator.pack.c6.C6Practices.Practice;
 import esusdata.indicator.pack.c6.C6Practices.Support;
+import esusdata.indicator.pack.c6.C6Teams.TeamType;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,6 +41,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * C6 — Cuidado da pessoa idosa (Tech Spec §2.4; ficha transcrita em {@code docs/metodologia/c6-cuidado-pessoa-idosa.md}).
@@ -63,13 +61,19 @@ public final class C6Pack implements IndicatorRule {
     public static final String ID = "c6-cuidado-pessoa-idosa";
     public static final String RULE_VERSION = ID + "@0.1.0";
 
-    /** The reason code of the visits practice of an eAP tipo 76 person while P07 is open. */
-    static final String EAP_AMBIGUOUS = "C_AMBIGUA_EAP76_AMB_C6_01";
+    /** Reason code of practice C for a person of an eAP tipo 76 team while P07 is open. */
+    static final String C_REASON_EAP = "C_AMBIGUA_EAP76_AMB_C6_01";
 
-    static final String EAP_AMBIGUITY = "AMB-C6-01: a boa prática (C) «não será condicionante de pontuação para eAP, "
+    /** Reason code of practice C for a person whose team has two types at the same latest instant. */
+    static final String C_REASON_CONFLICTING_TYPE = "C_AMBIGUA_TIPO_EQUIPE_CONFLITANTE";
+
+    static final String EAP_LIMITATION = "AMB-C6-01: a boa prática (C) «não será condicionante de pontuação para eAP, "
             + "tipo 76» (item 24 b, p. 2) admite três leituras (crédito integral, renormalização sobre 75 ou só não "
             + "exigir); resultado sem valor até a P07 (MET-23). A, B e D seguem nos componentes; o componente C "
             + "fica RULE_AMBIGUITY com as contagens exatas e a prática C da pessoa, PRACTICE_AMBIGUOUS.";
+
+    static final String CONFLICTING_TYPE_LIMITATION = "Tipo de equipe divergente na observação mais recente até o "
+            + "corte (§1.7.3: sem escolher um): a prática C dessas equipes fica sem decisão e o resultado sem valor.";
 
     private static final List<String> STANDING_LIMITATIONS = List.of(
             "Dados fora do PEC local: doses só na RNDS/RIA (lacuna L4) não aparecem e a falta de integração não é "
@@ -79,10 +83,18 @@ public final class C6Pack implements IndicatorRule {
                     + "do cadastro individual local vigente no corte, lida nos 24 meses civis até a competência (quem "
                     + "não teve versão nesse período fica sem vínculo); estimativa local que não equivale ao vínculo "
                     + "do Siaps (lacuna L8). Saída 136 (mudança de território) e 135 "
-                    + "(óbito) são códigos LEDI do dicionário do DW, não da ficha.",
+                    + "(óbito) são códigos LEDI do dicionário do DW, não da ficha; outro código de saída exclui "
+                    + "(EXCLUIDO_SAIDA_CADASTRO_NAO_MAPEADA). Pessoa sem INE no cadastro vigente não está «vinculada "
+                    + "à equipe» (item 23) e sai como EXCLUIDO_SEM_VINCULO.",
+            "Exclusões que a ficha não define (item 15 só interrompe por território, equipe e óbito), adotadas "
+                    + "localmente em vez do desempate da Portaria SAPS/MS nº 161/2024: data de nascimento divergente "
+                    + "entre registros da mesma pessoa, versões do cadastro da mesma data divergentes, recusa de "
+                    + "cadastro e ficha inativa. Se o DW marcar versões substituídas como inativas, a exclusão por "
+                    + "ficha inativa precisa ser validada no Portão C.",
             "Tipo de equipe ausente no DW (lacuna L1): a exceção eAP tipo 76 da prática C (AMB-C6-01) só é "
                     + "reconhecida quando o extrato traz o tipo; sem ele, C é exigida de todas as equipes e a "
-                    + "validação de equipes (Portaria GM/MS nº 3.493/2024, SCNES) não é feita.",
+                    + "validação de equipes (Portaria GM/MS nº 3.493/2024, SCNES) não é feita. Com tipo conhecido "
+                    + "fora de 70/76 a pessoa sai (EXCLUIDO_EQUIPE_FORA_DO_ESCOPO).",
             "Não verificados no PEC local: CNS profissional identificado, estabelecimento de APS, habilitação de "
                     + "CBO na tabela SIGTAP (item 24 f), identificação conforme CadSUS (item 24 a) e o corte do "
                     + "20º dia útil (item 11).",
@@ -93,7 +105,8 @@ public final class C6Pack implements IndicatorRule {
                     + "SIGTAP de consulta e sem exigir o problema/condição avaliada do item 24 e.",
             "AMB-C6-07/AMB-C6-11: peso e altura (B) na mesma data civil, em qualquer combinação de MIAI, MIP, "
                     + "MIAC, MIVDT e SIGTAP 0101040083/0101040075, ou 0101040024 sozinho (SIGTAP só de MIP ou MIAI), "
-                    + "por CBO do Quadro 03; a exclusão do procedimento consolidado fica com a consulta da capacidade.",
+                    + "medidas só de MIP ou MIAC e, no MIVDT, só de ACS/TACS com motivo preenchido (item 24 e), por CBO "
+                    + "do Quadro 03; procedimento consolidado não chega da capacidade.",
             "AMB-C6-03: visitas (C) de ACS/TACS com motivo preenchido e a primeira e a última distantes "
                     + "≥ 30 dias corridos; desfecho não filtrado.",
             "AMB-C6-08/09/10: influenza (D) 33 ou 77 com data de aplicação na janela, transcrição incluída, "
@@ -148,10 +161,6 @@ public final class C6Pack implements IndicatorRule {
                     "docs/metodologia/c6-cuidado-pessoa-idosa.md"),
             List.of());
 
-    /** ISO observation instants order as text; ties fall back to the source record id. */
-    private static final Comparator<CanonicalTeam> LATEST_OBSERVATION = Comparator.comparing(CanonicalTeam::observedAt)
-            .thenComparing(t -> t.sourceRef().recordId(), Comparator.nullsFirst(Comparator.naturalOrder()));
-
     private static final Map<Practice, ComponentSpec> SPECS = specs();
 
     @Override
@@ -203,35 +212,63 @@ public final class C6Pack implements IndicatorRule {
     /** The rule before the release gates: exact value, teams and evidence. */
     static RuleOutcome compute(CanonicalDataset data, EvaluationContext context) {
         C6Scope.requireMunicipality(data, context.municipalityIbge());
+        List<String> uncovered = C6Scope.uncoveredCapabilities(data, new C6Pack().requirements(context.competencia()));
+        if (!uncovered.isEmpty()) {
+            List<String> limitations = new ArrayList<>();
+            limitations.add("Capacidade não lida ou lida com janela menor que a pedida: " + String.join(", ", uncovered)
+                    + " — sem valor e sem contagens, nunca zero.");
+            limitations.addAll(STANDING_LIMITATIONS);
+            return new RuleOutcome(
+                    build(IndicatorStatus.UNSUPPORTED_SOURCE, null, null, null, List.of(), limitations, context),
+                    List.of(),
+                    List.of());
+        }
         LocalDate lastDay = context.competencia().atEndOfMonth();
-        DateWindow window = practiceWindow(context);
-        List<Subject> subjects = C6Cohort.resolve(data, lastDay, context.dataCutoff());
-        C6Practices practices = C6Practices.index(data, window);
-        Set<String> eapTeams = eapTeams(data.teams(), context.dataCutoff());
+        C6Teams teamTypes = C6Teams.resolve(data.teams(), context.dataCutoff());
+        List<Subject> subjects = C6Cohort.resolve(data, lastDay, context.dataCutoff(), teamTypes);
+        C6Practices practices = C6Practices.index(data, practiceWindow(context));
         List<Assessment> assessed = new ArrayList<>();
         for (Subject s : subjects) {
             if (s.eligible()) {
-                assessed.add(Assessment.of(s, practices.assess(s.personKey()), eapTeams.contains(s.ine())));
+                assessed.add(Assessment.of(s, practices.assess(s.personKey()), visitsReason(s.teamType())));
             }
         }
-        IndicatorResult municipal = result(assessed, context);
-        return new RuleOutcome(municipal, teams(assessed, context), C6Evidence.of(subjects, assessed, lastDay));
+        List<String> extra = new ArrayList<>();
+        if (teamTypes.undated() > 0) {
+            extra.add(teamTypes.undated() + " observação(ões) de tipo de equipe sem data ignorada(s) (§1.7.3).");
+        }
+        IndicatorResult municipal = result(assessed, extra, context);
+        return new RuleOutcome(municipal, teams(assessed, extra, context), C6Evidence.of(subjects, assessed, lastDay));
+    }
+
+    /** Practice C cannot be decided for eAP tipo 76 (AMB-C6-01) or for a team of conflicting type. */
+    private static String visitsReason(TeamType type) {
+        if (type == TeamType.EAP) {
+            return C_REASON_EAP;
+        }
+        return type == TeamType.CONFLICTING ? C_REASON_CONFLICTING_TYPE : null;
     }
 
     /** One eligible person with the events behind each practice and the points they earn. */
-    record Assessment(Subject subject, Map<Practice, List<Support>> practices, boolean eap, BigInteger points) {
+    record Assessment(
+            Subject subject, Map<Practice, List<Support>> practices, String visitsAmbiguity, BigInteger points) {
         Assessment {
             practices = Collections.unmodifiableMap(new EnumMap<>(practices));
         }
 
-        static Assessment of(Subject subject, Map<Practice, List<Support>> practices, boolean eap) {
+        static Assessment of(Subject subject, Map<Practice, List<Support>> practices, String visitsAmbiguity) {
             List<ComponentSpec> satisfied = new ArrayList<>();
             for (Practice p : Practice.values()) {
                 if (!practices.get(p).isEmpty()) {
                     satisfied.add(spec(p));
                 }
             }
-            return new Assessment(subject, practices, eap, Scores.points(satisfied));
+            return new Assessment(subject, practices, visitsAmbiguity, Scores.points(satisfied));
+        }
+
+        /** Practice C is undecided for this person: no points for C, none for the person. */
+        boolean ambiguous() {
+            return visitsAmbiguity != null;
         }
 
         boolean met(Practice practice) {
@@ -261,16 +298,17 @@ public final class C6Pack implements IndicatorRule {
         return months;
     }
 
-    private static IndicatorResult result(List<Assessment> group, EvaluationContext context) {
+    private static IndicatorResult result(List<Assessment> group, List<String> extra, EvaluationContext context) {
         BigInteger subjects = BigInteger.valueOf(group.size());
         BigInteger total = BigInteger.ZERO;
-        boolean ambiguous = false;
-        long withoutTeam = 0;
+        Set<String> ambiguities = new TreeSet<>();
         for (Assessment a : group) {
             total = total.add(a.points());
-            ambiguous |= a.eap();
-            withoutTeam += a.subject().ine() == null ? 1 : 0;
+            if (a.ambiguous()) {
+                ambiguities.add(a.visitsAmbiguity());
+            }
         }
+        boolean ambiguous = !ambiguities.isEmpty();
         List<ResultComponent> components = new ArrayList<>();
         for (Practice p : Practice.values()) {
             BigInteger met =
@@ -281,12 +319,12 @@ public final class C6Pack implements IndicatorRule {
                             : ResultComponent.of(spec(p), met, subjects));
         }
         List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
-        if (withoutTeam > 0) {
-            limitations.add(withoutTeam + " pessoa(s) elegível(is) sem INE no cadastro vigente, contadas no município "
-                    + "e na equipe sem INE.");
-        }
+        limitations.addAll(extra);
         if (ambiguous) {
-            limitations.add(EAP_AMBIGUITY);
+            limitations.add(ambiguities.contains(C_REASON_EAP) ? EAP_LIMITATION : CONFLICTING_TYPE_LIMITATION);
+            if (ambiguities.size() > 1) {
+                limitations.add(CONFLICTING_TYPE_LIMITATION);
+            }
             return build(IndicatorStatus.RULE_AMBIGUITY, null, null, subjects, components, limitations, context);
         }
         Optional<ExactRatio> value = Scores.meanPoints(total, subjects);
@@ -327,54 +365,23 @@ public final class C6Pack implements IndicatorRule {
                 true);
     }
 
-    /** One result per INE of the link in force, in INE order; people without INE last. */
-    private static List<TeamResult> teams(List<Assessment> assessed, EvaluationContext context) {
+    /** One result per INE of the link in force, in INE order. */
+    private static List<TeamResult> teams(List<Assessment> assessed, List<String> extra, EvaluationContext context) {
         Map<String, List<Assessment>> byTeam = new TreeMap<>(Comparator.nullsLast(Comparator.naturalOrder()));
         for (Assessment a : assessed) {
             byTeam.computeIfAbsent(a.subject().ine(), k -> new ArrayList<>()).add(a);
         }
         List<TeamResult> teams = new ArrayList<>(byTeam.size());
-        byTeam.forEach((ine, members) -> teams.add(new TeamResult(ine, cnes(members), result(members, context))));
+        byTeam.forEach(
+                (ine, members) -> teams.add(new TeamResult(ine, cnes(members), result(members, extra, context))));
         return teams;
     }
 
+    /** The team's CNES when its members agree on one, else {@code null}. */
     private static String cnes(List<Assessment> members) {
-        return members.stream()
-                .map(a -> a.subject().cnes())
-                .filter(Objects::nonNull)
-                .sorted()
-                .findFirst()
-                .orElse(null);
-    }
-
-    /**
-     * INEs whose latest team-type observation on or before the cutoff is eAP tipo 76 (item 24 b).
-     * The DW has no team type (lacuna L1), so today this is empty unless an extract brings one.
-     */
-    private static Set<String> eapTeams(List<CanonicalTeam> teams, LocalDate cutoff) {
-        Map<String, CanonicalTeam> latest = new HashMap<>();
-        for (CanonicalTeam t : teams) {
-            if (t.ine() != null && t.observedAt() != null && !observedDate(t).isAfter(cutoff)) {
-                latest.merge(t.ine(), t, (a, b) -> LATEST_OBSERVATION.compare(b, a) > 0 ? b : a);
-            }
-        }
-        Set<String> eap = new HashSet<>();
-        latest.forEach((ine, t) -> {
-            if (C6Codes.TEAM_TYPE_EAP.equals(t.teamTypeCode())) {
-                eap.add(ine);
-            }
-        });
-        return eap;
-    }
-
-    /** The ISO date (or date-time) a team type was observed; anything else is refused, never guessed. */
-    private static LocalDate observedDate(CanonicalTeam team) {
-        String observed = team.observedAt();
-        try {
-            return LocalDate.parse(observed.length() > 10 ? observed.substring(0, 10) : observed);
-        } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("team observedAt is not an ISO date: " + observed, e);
-        }
+        Set<String> cnes = new TreeSet<>();
+        members.forEach(a -> cnes.add(Objects.requireNonNullElse(a.subject().cnes(), "")));
+        return cnes.size() == 1 && !cnes.contains("") ? cnes.iterator().next() : null;
     }
 
     /** The code lists each capability binds (C6Codes, transcribed from the ficha). */

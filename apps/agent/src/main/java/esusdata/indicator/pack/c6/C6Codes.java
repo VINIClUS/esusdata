@@ -35,13 +35,13 @@ final class C6Codes {
     /** Prática C, Quadro 04 (p. 5): {@code 3222-55} TACS e {@code 5151-05} ACS. */
     static final CboGroups HOME_VISIT_CBO = CboGroups.of("3222-55", "5151-05");
 
-    /** Quadro 03 (p. 4) e item 24 f (p. 3): «01.01.04.002-4 - Avaliação antropométrica». */
+    /** Quadro 03 (p. 5) e item 24 f (p. 3): «01.01.04.002-4 - Avaliação antropométrica». */
     static final String SIGTAP_ANTHROPOMETRIC_ASSESSMENT = "0101040024";
 
-    /** Quadro 03 (p. 4) e item 24 f (p. 3): «01.01.04.008-3 - Medição de peso». */
+    /** Quadro 03 (p. 5) e item 24 f (p. 3): «01.01.04.008-3 - Medição de peso». */
     static final String SIGTAP_WEIGHT = "0101040083";
 
-    /** Quadro 03 (p. 4) e item 24 f (p. 3): «01.01.04.007-5 - Medição de altura». */
+    /** Quadro 03 (p. 5) e item 24 f (p. 3): «01.01.04.007-5 - Medição de altura». */
     static final String SIGTAP_HEIGHT = "0101040075";
 
     /** The SIGTAP codes the pack binds to {@code procedure_performed} (prática B only; AMB-C6-06). */
@@ -52,6 +52,9 @@ final class C6Codes {
      * Vacina influenza tetravalente».
      */
     static final List<String> INFLUENZA_CODES = List.of("33", "77");
+
+    /** Item 24 b (p. 2): «equipes de Saúde da Família (eSF), […] tipo 70». */
+    static final String TEAM_TYPE_ESF = "70";
 
     /** Item 24 b (p. 2): «equipes de Atenção Primária (eAP), tipo […] 76». */
     static final String TEAM_TYPE_EAP = "76";

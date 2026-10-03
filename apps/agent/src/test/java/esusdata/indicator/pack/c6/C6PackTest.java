@@ -115,8 +115,12 @@ class C6PackTest {
         assertThat(exclusionReason(outcome, X)).isEqualTo("INTERROMPIDO_MUDANCA_TERRITORIO");
     }
 
+    /**
+     * T-C6-23: the model has no CNS; the citizen capability unifies a citizen's records under one
+     * opaque key, so the rule's part is to count two registration versions of that key once.
+     */
     @Test
-    void tC6_23_twoRegistrationsOfTheSamePersonAreOnePersonInTheDenominator() {
+    void tC6_23_twoRegistrationVersionsOfTheSameKeyAreOnePersonInTheDenominator() {
         RuleOutcome outcome = scenario()
                 .elder(X)
                 .add(registration(X, LocalDate.of(2025, 8, 1), INE_A))
@@ -350,7 +354,7 @@ class C6PackTest {
                 scenario().elder(X).fluDose(X, LocalDate.of(2025, 3, 15)).compute();
 
         assertThat(met(outcome, X, "D")).isFalse();
-        assertThat(practiceRow(outcome, X, "D").reasonCode()).isEqualTo("D_SEM_DOSE_INFLUENZA");
+        assertThat(practiceRow(outcome, X, "D").reasonCode()).isEqualTo("D_SEM_DOSE_INFLUENZA_NO_PEC_LOCAL");
     }
 
     @Test
@@ -367,10 +371,22 @@ class C6PackTest {
     void tC6_14_transcriptionOfADoseAppliedBeforeTheWindowDoesNotCount() {
         RuleOutcome outcome = scenario()
                 .elder(X)
-                .add(immunization(X, LocalDate.of(2024, 12, 1), FLU_TRIVALENTE, true, null))
+                .add(CanonicalFixtures.transcribedDose(
+                        X, LocalDate.of(2024, 12, 1), LocalDate.of(2026, 2, 1), FLU_TRIVALENTE, "1"))
                 .compute();
 
         assertThat(met(outcome, X, "D")).isFalse();
+    }
+
+    @Test
+    void tC6_14_transcriptionTypedAfterTheWindowOfADoseAppliedInsideItCounts() {
+        RuleOutcome outcome = scenario()
+                .elder(X)
+                .add(CanonicalFixtures.transcribedDose(
+                        X, LocalDate.of(2025, 6, 1), LocalDate.of(2026, 5, 20), FLU_TRIVALENTE, "1"))
+                .compute();
+
+        assertThat(met(outcome, X, "D")).isTrue();
     }
 
     @Test
@@ -378,7 +394,7 @@ class C6PackTest {
         RuleOutcome outcome = scenario().elder(X).compute();
 
         assertThat(met(outcome, X, "D")).isFalse();
-        assertThat(practiceRow(outcome, X, "D").reasonCode()).isEqualTo("D_SEM_DOSE_INFLUENZA");
+        assertThat(practiceRow(outcome, X, "D").reasonCode()).isEqualTo("D_SEM_DOSE_INFLUENZA_NO_PEC_LOCAL");
         assertThat(new C6Pack().descriptor().standingLimitations()).anyMatch(l -> l.contains("RNDS"));
     }
 
@@ -612,7 +628,7 @@ class C6PackTest {
     }
 
     @Test
-    void teams_personWithoutIneEntersInANullTeamListedLast() {
+    void teams_personWithoutIneIsNotLinkedToATeam() {
         RuleOutcome outcome = scenario()
                 .person("sem-ine", C6Scenario.BORN_70)
                 .add(registration("sem-ine", C6Scenario.LINKED_ON, null))
@@ -620,9 +636,9 @@ class C6PackTest {
                 .elder("com-ine", INE_B)
                 .compute();
 
-        assertComputed(outcome.result(), 25, 2, "12.5000", Classification.REGULAR);
-        assertThat(outcome.teams()).extracting(TeamResult::ine).containsExactly(INE_B, null);
-        assertComputed(teamOf(outcome, null).result(), 25, 1, "25.0000", Classification.REGULAR);
+        assertThat(exclusionReason(outcome, "sem-ine")).isEqualTo("EXCLUIDO_SEM_VINCULO");
+        assertComputed(outcome.result(), 0, 1, "0.0000", Classification.REGULAR);
+        assertThat(outcome.teams()).extracting(TeamResult::ine).containsExactly(INE_B);
     }
 
     // ---- helpers ---------------------------------------------------------------------------------------

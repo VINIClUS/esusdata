@@ -4,6 +4,7 @@ import esusdata.indicator.model.AgeAt;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalRegistration;
+import esusdata.indicator.pack.c6.C6Teams.TeamType;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -39,6 +40,8 @@ final class C6Cohort {
     static final String REFUSED = "EXCLUIDO_RECUSA_CADASTRO";
     static final String INACTIVE = "EXCLUIDO_CADASTRO_INATIVO";
     static final String CHANGE_OF_TERRITORY = "INTERROMPIDO_MUDANCA_TERRITORIO";
+    static final String UNMAPPED_EXIT = "EXCLUIDO_SAIDA_CADASTRO_NAO_MAPEADA";
+    static final String TEAM_OUT_OF_SCOPE = "EXCLUIDO_EQUIPE_FORA_DO_ESCOPO";
 
     private static final Comparator<CanonicalRegistration> BY_VERSION = Comparator.comparing(
                     (CanonicalRegistration r) -> LocalDate.parse(r.registrationDate()))
@@ -51,8 +54,9 @@ final class C6Cohort {
      *
      * @param link the registration version in force at the cutoff, or {@code null}
      * @param reasonCode {@link #ELIGIBLE} or the first exclusion that applies
+     * @param teamType the type of the linked team, or {@code null} when the extract does not say
      */
-    record Subject(String personKey, CanonicalRegistration link, String reasonCode) {
+    record Subject(String personKey, CanonicalRegistration link, String reasonCode, TeamType teamType) {
         boolean eligible() {
             return ELIGIBLE.equals(reasonCode);
         }
@@ -67,7 +71,7 @@ final class C6Cohort {
     }
 
     /** Every person key of the person and registration parts, in key order. */
-    static List<Subject> resolve(CanonicalDataset data, LocalDate ageReference, LocalDate cutoff) {
+    static List<Subject> resolve(CanonicalDataset data, LocalDate ageReference, LocalDate cutoff, C6Teams teams) {
         Map<String, List<CanonicalPerson>> persons = new TreeMap<>();
         data.persons()
                 .forEach(p -> persons.computeIfAbsent(p.personKey(), k -> new ArrayList<>())
@@ -83,12 +87,16 @@ final class C6Cohort {
         for (String key : keys) {
             List<CanonicalPerson> rows = persons.getOrDefault(key, List.of());
             Link link = link(registrations.getOrDefault(key, List.of()), cutoff);
+            CanonicalRegistration version = link.conflicting() ? null : link.version();
+            TeamType type = version == null ? null : teams.typeOf(version.ine()).orElse(null);
             String reason = personExclusion(rows, ageReference, cutoff);
             if (reason == null) {
                 reason = linkExclusion(link);
             }
-            subjects.add(
-                    new Subject(key, link.conflicting() ? null : link.version(), reason == null ? ELIGIBLE : reason));
+            if (reason == null && type == TeamType.OUT_OF_SCOPE) {
+                reason = TEAM_OUT_OF_SCOPE;
+            }
+            subjects.add(new Subject(key, version, reason == null ? ELIGIBLE : reason, type));
         }
         return subjects;
     }
@@ -117,6 +125,11 @@ final class C6Cohort {
         return dead ? DEATH : null;
     }
 
+    /**
+     * The ficha's own interruptions (item 15, p. 1) come first; then the local conventions declared
+     * as limitations (refusal, inactive version); a person without a team is not «vinculada à
+     * equipe» (item 23, p. 2).
+     */
     private static String linkExclusion(Link link) {
         CanonicalRegistration version = link.version();
         if (version == null) {
@@ -125,16 +138,28 @@ final class C6Cohort {
         if (link.conflicting()) {
             return CONFLICTING_LINK;
         }
+        String exit = blankToNull(version.exitReason());
+        if (exit != null) {
+            return exitExclusion(exit);
+        }
         if (Boolean.TRUE.equals(version.refused())) {
             return REFUSED;
         }
         if (Boolean.TRUE.equals(version.inactive())) {
             return INACTIVE;
         }
-        if (C6Codes.EXIT_CHANGE_OF_TERRITORY.equals(version.exitReason())) {
+        return version.ine() == null ? NO_LINK : null;
+    }
+
+    private static String exitExclusion(String exit) {
+        if (C6Codes.EXIT_CHANGE_OF_TERRITORY.equals(exit)) {
             return CHANGE_OF_TERRITORY;
         }
-        return C6Codes.EXIT_DEATH.equals(version.exitReason()) ? DEATH : null;
+        return C6Codes.EXIT_DEATH.equals(exit) ? DEATH : UNMAPPED_EXIT;
+    }
+
+    private static String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text.trim();
     }
 
     /**
@@ -165,9 +190,12 @@ final class C6Cohort {
     /** What a version says about the link; two same-day versions that differ here conflict. */
     private record LinkState(String ine, String cnes, String exitReason, boolean inactive, boolean refused) {
         static LinkState of(CanonicalRegistration r) {
-            String exit = r.exitReason() == null || r.exitReason().isBlank() ? null : r.exitReason();
             return new LinkState(
-                    r.ine(), r.cnes(), exit, Boolean.TRUE.equals(r.inactive()), Boolean.TRUE.equals(r.refused()));
+                    r.ine(),
+                    r.cnes(),
+                    blankToNull(r.exitReason()),
+                    Boolean.TRUE.equals(r.inactive()),
+                    Boolean.TRUE.equals(r.refused()));
         }
     }
 }

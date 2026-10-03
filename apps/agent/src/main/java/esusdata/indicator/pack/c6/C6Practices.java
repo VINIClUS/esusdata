@@ -31,6 +31,7 @@ final class C6Practices {
 
     static final String MIAI = "MIAI";
     static final String MIP = "MIP";
+    static final String MIAC = "MIAC";
     static final String MIVDT = "MIVDT";
     static final String MIV = "MIV";
     private static final String INDIVIDUAL_FORM = "INDIVIDUAL";
@@ -127,38 +128,42 @@ final class C6Practices {
 
     private List<Measure> measures(String personKey) {
         List<Measure> all = new ArrayList<>();
-        for (CanonicalCareEvent e : of(careEvents, personKey)) {
-            if (!INDIVIDUAL_FORM.equals(e.form())) {
-                continue;
-            }
-            all.add(new Measure(
-                    support(e.sourceRef(), e.careDate(), e.cbo(), e.cnes(), e.ine(), MIAI),
-                    positive(e.weightKg()),
-                    positive(e.heightCm())));
-        }
-        for (CanonicalHomeVisit v : of(visits, personKey)) {
-            all.add(new Measure(
-                    support(v.sourceRef(), v.visitDate(), v.cbo(), v.cnes(), v.ine(), MIVDT),
-                    positive(v.weightKg()),
-                    positive(v.heightCm())));
-        }
-        for (CanonicalMeasurement m : of(measurements, personKey)) {
-            all.add(new Measure(
-                    support(m.sourceRef(), m.measuredDate(), m.cbo(), null, null, m.origin()),
-                    positive(m.weightKg()),
-                    positive(m.heightCm())));
-        }
-        for (CanonicalProcedureEvent p : of(procedures, personKey)) {
-            if ("PERFORMED".equals(p.stage()) && (MIP.equals(p.origin()) || MIAI.equals(p.origin()))) {
-                String code = p.sigtapCode();
-                boolean assessment = C6Codes.SIGTAP_ANTHROPOMETRIC_ASSESSMENT.equals(code);
-                all.add(new Measure(
-                        support(p.sourceRef(), p.eventDate(), p.cbo(), p.cnes(), p.ine(), p.origin()),
-                        assessment || C6Codes.SIGTAP_WEIGHT.equals(code),
-                        assessment || C6Codes.SIGTAP_HEIGHT.equals(code)));
-            }
-        }
+        of(careEvents, personKey).stream()
+                .filter(e -> INDIVIDUAL_FORM.equals(e.form()))
+                .map(e -> new Measure(
+                        support(e.sourceRef(), e.careDate(), e.cbo(), e.cnes(), e.ine(), MIAI),
+                        positive(e.weightKg()),
+                        positive(e.heightCm())))
+                .forEach(all::add);
+        of(visits, personKey).stream()
+                .filter(C6Practices::byCommunityAgent)
+                .map(v -> new Measure(
+                        support(v.sourceRef(), v.visitDate(), v.cbo(), v.cnes(), v.ine(), MIVDT),
+                        positive(v.weightKg()),
+                        positive(v.heightCm())))
+                .forEach(all::add);
+        of(measurements, personKey).stream()
+                .filter(m -> MIP.equals(m.origin()) || MIAC.equals(m.origin()))
+                .map(m -> new Measure(
+                        support(m.sourceRef(), m.measuredDate(), m.cbo(), null, null, m.origin()),
+                        positive(m.weightKg()),
+                        positive(m.heightCm())))
+                .forEach(all::add);
+        of(procedures, personKey).stream()
+                .filter(p -> "PERFORMED".equals(p.stage()) && (MIP.equals(p.origin()) || MIAI.equals(p.origin())))
+                .map(C6Practices::procedureMeasure)
+                .forEach(all::add);
         return all;
+    }
+
+    /** SIGTAP: 0101040083 is a weight, 0101040075 a height, 0101040024 both (Quadro 03). */
+    private static Measure procedureMeasure(CanonicalProcedureEvent p) {
+        String code = p.sigtapCode();
+        boolean assessment = C6Codes.SIGTAP_ANTHROPOMETRIC_ASSESSMENT.equals(code);
+        return new Measure(
+                support(p.sourceRef(), p.eventDate(), p.cbo(), p.cnes(), p.ine(), p.origin()),
+                assessment || C6Codes.SIGTAP_WEIGHT.equals(code),
+                assessment || C6Codes.SIGTAP_HEIGHT.equals(code));
     }
 
     /**
@@ -167,8 +172,7 @@ final class C6Practices {
      */
     private List<Support> homeVisits(String personKey) {
         List<Support> valid = of(visits, personKey).stream()
-                .filter(v -> C6Codes.HOME_VISIT_CBO.matches(v.cbo())
-                        && v.reasonCodes().stream().anyMatch(r -> r != null && !r.isBlank()))
+                .filter(C6Practices::byCommunityAgent)
                 .map(v -> support(v.sourceRef(), v.visitDate(), v.cbo(), v.cnes(), v.ine(), MIVDT))
                 .filter(s -> window.contains(s.date()))
                 .sorted(CHRONOLOGICAL)
@@ -205,7 +209,7 @@ final class C6Practices {
         A("A_CONSULTA_MEDICA_ENFERMAGEM", "A_SEM_CONSULTA"),
         B("B_PESO_ALTURA_MESMO_DIA", "B_SEM_PESO_ALTURA_MESMO_DIA"),
         C("C_DUAS_VISITAS_30_DIAS", "C_SEM_DUAS_VISITAS_30_DIAS"),
-        D("D_DOSE_INFLUENZA", "D_SEM_DOSE_INFLUENZA");
+        D("D_DOSE_INFLUENZA", "D_SEM_DOSE_INFLUENZA_NO_PEC_LOCAL");
 
         private final String metReason;
         private final String notMetReason;
@@ -231,7 +235,20 @@ final class C6Practices {
         return new Support(ref, LocalDate.parse(date), cbo, cnes, ine, model);
     }
 
-    /** A measurement counts only when the source wrote a positive decimal (§1.7.1). */
+    /**
+     * MIVDT (item 24 e, p. 2): a visit «com preenchimento do ‘‘motivo da visita’’, desde que
+     * registrado por ACS/TACS» — for C and for the measurements it carries in B.
+     */
+    private static boolean byCommunityAgent(CanonicalHomeVisit v) {
+        return C6Codes.HOME_VISIT_CBO.matches(v.cbo())
+                && v.reasonCodes().stream().anyMatch(r -> r != null && !r.isBlank());
+    }
+
+    /**
+     * A measurement counts only when the source wrote a positive decimal (§1.7.1). The capability
+     * delivers canonical decimals, so anything else is a broken extract and is refused, never read
+     * as "no measure".
+     */
     static boolean positive(String decimal) {
         if (decimal == null || decimal.isBlank()) {
             return false;
@@ -239,7 +256,7 @@ final class C6Practices {
         try {
             return new BigDecimal(decimal.trim()).signum() > 0;
         } catch (NumberFormatException e) {
-            return false;
+            throw new IllegalArgumentException("measurement is not a canonical decimal: " + decimal, e);
         }
     }
 

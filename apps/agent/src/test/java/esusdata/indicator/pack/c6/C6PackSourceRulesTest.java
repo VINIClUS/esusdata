@@ -135,9 +135,9 @@ class C6PackSourceRulesTest {
         assertThat(C6Practices.positive(" 1 ")).isTrue();
         assertThat(C6Practices.positive("0")).isFalse();
         assertThat(C6Practices.positive("-3")).isFalse();
-        assertThat(C6Practices.positive("abc")).isFalse();
         assertThat(C6Practices.positive(" ")).isFalse();
         assertThat(C6Practices.positive(null)).isFalse();
+        assertThatThrownBy(() -> C6Practices.positive("70,5")).isInstanceOf(IllegalArgumentException.class);
     }
 
     private static CanonicalCareEvent careEvent(String key, String form, String cbo) {

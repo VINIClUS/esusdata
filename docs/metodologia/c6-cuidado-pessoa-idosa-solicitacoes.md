@@ -16,7 +16,7 @@ isso, que está declarada como limitação permanente em `C6Pack`.
   pontos por pessoa.
 - **Alternativa local**: a regra já lê `CanonicalDataset.teams()`; quando uma equipe aparece como
   `76` (observação mais recente até o corte) o resultado dessa equipe e o municipal ficam
-  `RULE_AMBIGUITY`, com C informativa na evidência (`C_INFORMATIVA_EAP76_AMB_C6_01`). Sem
+  `RULE_AMBIGUITY`, com C sem decisão (`PRACTICE_AMBIGUOUS`) na evidência (`C_AMBIGUA_EAP76_AMB_C6_01`). Sem
   registros `team`, nada é presumido.
 
 ## S-C6-02 — Procedimento consolidado fora de `procedure_performed`
