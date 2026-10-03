@@ -9,6 +9,7 @@ import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.pack.c2.C2Pack;
+import esusdata.indicator.pack.componente3.ComponentIII;
 import esusdata.result.model.PublishedResult;
 import esusdata.result.model.ResultRepository;
 import esusdata.web.ApiFixtureSupport;
@@ -77,13 +78,13 @@ class QualityComponentApiTest extends ApiFixtureSupport {
         assertThat(response.body())
                 .contains("\"municipalityIbge\":\"" + ibge + "\",\"quadrimestre\":\"2026-Q1\","
                         + "\"months\":[\"2026-01\",\"2026-02\",\"2026-03\",\"2026-04\"],"
-                        + "\"ruleVersion\":\"componente-iii-nota-final@0.1.0\","
+                        + "\"ruleVersion\":\"" + ComponentIII.RULE_VERSION + "\","
                         + "\"inputFingerprint\":\"" + sha256(String.join("\n", read)) + "\"")
                 .contains("\"units\":[{\"ine\":null,\"cnes\":null,\"status\":\"BLOCKED\",\"score\":null,"
                         + "\"scoreExact\":null")
                 .contains("{\"ine\":\"0000000001\",\"cnes\":\"2750325\",\"status\":\"BLOCKED\"")
                 .contains("{\"ine\":\"0000000002\",\"cnes\":\"2750333\",\"status\":\"BLOCKED\"")
-                .contains("Consolidação em implementação");
+                .contains("\"limitations\":[\""); // the consolidation says why, whatever its version
         assertThat(response.body().indexOf("\"ine\":\"0000000001\""))
                 .isLessThan(response.body().indexOf("\"ine\":\"0000000002\""));
         // C2's bucket of records without a team never becomes a second municipal unit.
