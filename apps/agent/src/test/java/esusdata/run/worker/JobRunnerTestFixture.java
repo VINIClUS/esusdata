@@ -12,32 +12,52 @@ import esusdata.auth.model.UserAccount;
 import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
 import esusdata.config.SqliteConfig;
+import esusdata.indicator.IndicatorRuleRegistry;
+import esusdata.indicator.model.IndicatorRule;
+import esusdata.result.JdbcEvidenceRepository;
 import esusdata.result.JdbcExtractionManifestRepository;
 import esusdata.result.JdbcResultRepository;
 import esusdata.result.JdbcResultStagingArea;
 import esusdata.result.PublicationService;
 import esusdata.result.ReproducibilityCheck;
+import esusdata.result.model.EvidencePage;
+import esusdata.result.model.EvidenceRecord;
+import esusdata.result.model.EvidenceRepository;
 import esusdata.result.model.ExtractionManifestRepository;
+import esusdata.result.model.PublishedResult;
 import esusdata.result.model.ResultRepository;
 import esusdata.result.model.ResultStagingArea;
 import esusdata.run.acquisition.Acquisition;
+import esusdata.run.acquisition.AcquisitionCommand;
+import esusdata.run.acquisition.AcquisitionListener;
+import esusdata.run.acquisition.CancellationSignal;
 import esusdata.run.acquisition.InProcessAcquisition;
+import esusdata.run.extract.ExtractionManifest;
 import esusdata.run.extract.FileExtractStore;
+import esusdata.run.job.CancellationToken;
+import esusdata.run.job.EnqueueRequest;
 import esusdata.run.job.JdbcAcquisitionGuardStore;
 import esusdata.run.job.JdbcJobRepository;
+import esusdata.run.job.Job;
 import esusdata.run.job.JobRepository;
 import esusdata.run.job.RetryPolicy;
 import esusdata.source.JdbcSourceRepository;
 import esusdata.source.SourceRepository;
 import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
+import esusdata.source.pec.CapabilityEligibility;
 import esusdata.source.pec.CompatibilityCatalog;
 import esusdata.source.pec.EnvFileSecretResolver;
+import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecDataSourceFactory;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -158,6 +178,113 @@ public final class JobRunnerTestFixture implements AutoCloseable {
                 acquisitionPort,
                 acquisitionGuard(),
                 liveAcquisitionCooldownMargin);
+    }
+
+    /**
+     * An executor over this fixture's database and extracts that resolves {@code rules} — any
+     * {@link IndicatorRule} instance, registered in the release or not — before the registry (ADR
+     * 0030), against the given compatibility matrix.
+     */
+    public RunExecutor executor(PecCompatibilityMatrix matrix, Acquisition acquisition, IndicatorRule... rules) {
+        return new RunExecutor(
+                new FileExtractStore(extractsDir),
+                jobRepository,
+                stagingArea,
+                publicationService,
+                "test-build",
+                clock,
+                grantRevalidator,
+                sourceRepository,
+                acquisition,
+                acquisitionGuard(),
+                liveAcquisitionCooldownMargin,
+                new CapabilityEligibility(matrix),
+                (pack, ruleVersion) -> {
+                    for (IndicatorRule rule : rules) {
+                        if (rule.descriptor().id().equals(pack)
+                                && rule.descriptor().ruleVersion().equals(ruleVersion)) {
+                            return rule;
+                        }
+                    }
+                    return IndicatorRuleRegistry.require(pack, ruleVersion);
+                });
+    }
+
+    /**
+     * ENG-19 for a pack (ADR 0030): enqueues an IMMUTABLE_EXTRACT job of {@code rule} over {@code
+     * extract} for {@code competencia}, takes it, and runs it to publication — no PEC involved.
+     * {@code principal} must hold RUN_INDICATOR in the extract's municipality ({@link
+     * #registerPrincipal}).
+     */
+    public RunExecutor.RunOutcome replay(
+            ExtractionManifest extract, IndicatorRule rule, YearMonth competencia, String principal)
+            throws IOException {
+        String jobId = "job-replay-" + UUID.randomUUID();
+        jobRepository.enqueue(new EnqueueRequest(
+                jobId,
+                "run-" + jobId,
+                extract.municipalityIbge(),
+                rule.descriptor().id(),
+                rule.descriptor().ruleVersion(),
+                competencia.toString(),
+                1,
+                extract.sourceId(),
+                extract.extractionId(),
+                principal,
+                null,
+                null,
+                null,
+                null,
+                clock.instant()));
+        Job job = jobRepository.acquireNext("proc-replay", clock.instant()).orElseThrow();
+        if (!job.jobId().equals(jobId)) {
+            throw new IllegalStateException("another queued job was taken first: " + job.jobId());
+        }
+        return executor(PecCompatibilityMatrix.fromClasspathResource(), new UnusedAcquisition(), rule)
+                .runFromExtract(context(job), new CancellationToken());
+    }
+
+    /** The {@code RunContext} the worker builds for {@code job}. */
+    public static RunExecutor.RunContext context(Job job) {
+        return new RunExecutor.RunContext(
+                job.jobId(),
+                job.runId(),
+                job.sourceId(),
+                job.executionGeneration(),
+                job.processInstanceId(),
+                job.extractionId(),
+                job.municipalityIbge(),
+                job.referencePeriod(),
+                job.indicatorPack(),
+                job.ruleVersion(),
+                job.idempotencyPrincipal());
+    }
+
+    /** The published result, read as the API reads it. */
+    public PublishedResult published(String resultId, String municipalityIbge) {
+        return resultRepository.findByIdInScope(resultId, municipalityIbge).orElseThrow();
+    }
+
+    /** Every evidence row of a published result, in {@code seq} order. */
+    public List<EvidenceRecord> evidence(String resultId, String municipalityIbge) {
+        JdbcEvidenceRepository evidence = new JdbcEvidenceRepository(jdbc);
+        List<EvidenceRecord> rows = new ArrayList<>();
+        Long cursor = null;
+        do {
+            EvidencePage page = evidence.page(resultId, municipalityIbge, cursor, EvidenceRepository.MAX_PAGE_SIZE);
+            rows.addAll(page.items());
+            cursor = page.nextCursor();
+        } while (cursor != null);
+        return List.copyOf(rows);
+    }
+
+    /** Replays never acquire: an acquisition here is a test bug. */
+    private static final class UnusedAcquisition implements Acquisition {
+        @Override
+        public ExtractionManifest acquire(
+                AcquisitionCommand command, CancellationSignal cancellation, AcquisitionListener listener) {
+            throw new IllegalStateException("a replay never acquires from the PEC");
+        }
     }
 
     public JobRecovery jobRecovery() {

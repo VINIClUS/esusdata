@@ -43,9 +43,9 @@ class OverviewAlertsTest {
                 List.of(),
                 List.of(),
                 List.of(
-                        new PendingPeriod("pec-a", "2026-01", 10),
-                        new PendingPeriod("pec-a", "2026-02", 20),
-                        new PendingPeriod("pec-b", "2026-02", 5)),
+                        new PendingPeriod("pec-a", "2026-01", 10, List.of("c1-mais-acesso")),
+                        new PendingPeriod("pec-a", "2026-02", 20, List.of("c1-mais-acesso")),
+                        new PendingPeriod("pec-b", "2026-02", 5, List.of("c1-mais-acesso"))),
                 null);
 
         assertThat(alerts)
@@ -62,7 +62,24 @@ class OverviewAlertsTest {
     }
 
     private static Indicator indicator(String pack, String status) {
-        return new Indicator(pack, "0.1.0", "C1", "PERCENT", true, List.of(), "r", status, null, List.of(), null);
+        return new Indicator(
+                pack,
+                "0.1.0",
+                "C1",
+                "PERCENT",
+                "C1",
+                "Mais acesso",
+                "PERCENTAGE",
+                true,
+                "AVAILABLE",
+                List.of(),
+                true,
+                List.of(),
+                "r",
+                status,
+                null,
+                List.of(),
+                null);
     }
 
     private static RecentRun run(String state, String finishedAt) {

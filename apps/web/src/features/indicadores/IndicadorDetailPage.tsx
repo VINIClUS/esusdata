@@ -10,11 +10,8 @@ import {
   ArrowLeft,
   Building,
   Calendar,
-  ChartColumn,
   Database,
-  ExternalLink,
   FileText,
-  Info,
   RefreshCw,
   Sigma,
   Target,
@@ -22,25 +19,27 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router'
-import { useIndicadorDetalhe } from '@/api/hooks'
-import type { EvidenciaMotivo, IndicadorDetalhe, InfoAdicional, MetodologiaItem } from '@/api/types'
-import { DonutChart } from '@/components/charts/DonutChartCard'
+import { Link, Navigate, useNavigate, useParams } from 'react-router'
+import { useIndicadorDetalhe, useIndicadorNaVisaoGeral } from '@/api/hooks'
+import { COMPONENTE_III_ID, COMPONENTE_III_PATH, competenciaLabel } from '@/api/normalizers'
+import type { HistoricoPonto, IndicadorDetalhe, InfoAdicional, MetodologiaItem } from '@/api/types'
 import { LineChartCard } from '@/components/charts/LineChartCard'
 import { DataTable, type Column } from '@/components/data/DataTable'
 import { KpiCard } from '@/components/data/KpiCard'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { FilterSelect } from '@/components/ui/FilterSelect'
+import { Callout } from '@/components/ui/Callout'
 import { IconRow } from '@/components/ui/IconRow'
 import { LinkButton } from '@/components/ui/LinkButton'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { UnderlineTabs } from '@/components/ui/Tabs'
-import { detailTabContent, type DetailTabContent } from './detail-tabs'
-import { EvidenciasResultado } from './EvidenciasResultado'
-import { formatInt, formatPercent } from '@/lib/format'
 import { colors } from '@/theme/tokens'
+import { ComponentesTabela } from './ComponentesTabela'
+import { detailTabContent, type DetailTabContent } from './detail-tabs'
+import { EquipesTabela } from './EquipesTabela'
+import { EvidenciasResultado } from './EvidenciasResultado'
+import { naturezaDoValor, rotulosDoPar } from './rotulos'
 
 const metodologiaIcons: Record<MetodologiaItem['icone'], LucideIcon> = {
   target: Target,
@@ -57,7 +56,6 @@ const infoIcons: Record<InfoAdicional['icone'], LucideIcon> = {
   user: User,
   file: FileText,
 }
-const tom = { success: colors.success, warning: colors.warning, error: colors.error }
 
 const desktopTabs = [
   { key: 'resultados', label: 'Resultados' },
@@ -70,55 +68,6 @@ const phoneTabs = [
   { key: 'resultados', label: 'Resumo' },
   { key: 'metodologia', label: 'Metodologia' },
   { key: 'estratificacoes', label: 'Estratificações' },
-]
-
-const evidenciaColumns: Column<EvidenciaMotivo>[] = [
-  {
-    key: 'motivo',
-    header: 'Motivo',
-    render: (r) => <Typography sx={{ fontSize: 13, color: colors.navy }}>{r.motivo}</Typography>,
-  },
-  {
-    key: 'qtd',
-    header: 'Quantidade',
-    align: 'center',
-    render: (r) => (
-      <Typography sx={{ fontSize: 13, fontWeight: 700, color: colors.error }}>
-        {r.quantidade}
-      </Typography>
-    ),
-  },
-  {
-    key: 'pct',
-    header: 'Percentual',
-    align: 'center',
-    render: (r) => (
-      <Typography sx={{ fontSize: 13, color: colors.navy }}>
-        {formatPercent(r.percentual)}
-      </Typography>
-    ),
-  },
-  {
-    key: 'acao',
-    header: 'Ação sugerida',
-    render: (r) => (
-      <Box
-        component="span"
-        sx={{
-          display: 'inline-block',
-          px: 1.5,
-          py: 0.5,
-          borderRadius: '8px',
-          bgcolor: colors.primarySoft,
-          color: colors.primary,
-          fontSize: 12,
-          fontWeight: 500,
-        }}
-      >
-        {r.acao}
-      </Box>
-    ),
-  },
 ]
 
 function MetaChip({
@@ -145,92 +94,320 @@ function MetaChip({
   )
 }
 
-function IndicatorDetailTabContent({
+function Lista({ itens }: { itens: string[] }) {
+  return (
+    <Box component="ul" sx={{ m: 0, pl: 2.5, display: 'grid', gap: 0.5 }}>
+      {itens.map((item, indice) => (
+        <Typography
+          component="li"
+          key={`${indice}-${item}`}
+          sx={{ fontSize: 13.5, color: colors.navy }}
+        >
+          {item}
+        </Typography>
+      ))}
+    </Box>
+  )
+}
+
+/** A methodology source: a link when it is a URL, the repository path otherwise. */
+function Fonte({ fonte }: { fonte: string }) {
+  if (!/^https?:\/\//.test(fonte)) {
+    return <Typography sx={{ fontSize: 13.5, color: colors.navy }}>{fonte}</Typography>
+  }
+  return (
+    <Typography sx={{ fontSize: 13.5, overflowWrap: 'anywhere' }}>
+      <Box
+        component="a"
+        href={fonte}
+        target="_blank"
+        rel="noreferrer"
+        sx={{ color: colors.primary }}
+      >
+        {fonte}
+      </Box>
+    </Typography>
+  )
+}
+
+/** Why the value is missing, and what holds the result back. */
+function Retencao({ data }: { data: IndicadorDetalhe }) {
+  if (!data.resultado.motivo) return null
+  const limitacoes = data.resultId
+    ? data.limitacoes
+    : [...data.limitacoesPermanentes, ...data.portoes]
+  return (
+    <Callout
+      variant={data.status === 'pendente' || data.status === 'na_leitura' ? 'info' : 'warning'}
+      title={data.resultId ? `Sem valor: ${data.statusRotulo.toLowerCase()}` : data.statusRotulo}
+    >
+      <Typography sx={{ fontSize: 13.5, color: colors.navy, mb: limitacoes.length ? 1 : 0 }}>
+        {data.resultado.motivo}
+      </Typography>
+      {limitacoes.length > 0 && <Lista itens={limitacoes} />}
+    </Callout>
+  )
+}
+
+function Resultados({
   data,
-  content,
+  phone,
+  onVerEquipes,
 }: {
   data: IndicadorDetalhe
-  content: Exclude<DetailTabContent, 'resultados'>
+  phone: boolean
+  onVerEquipes: () => void
 }) {
-  if (content === 'metodologia') {
-    return (
-      <SectionCard title="Metodologia" subtitle="Como o indicador é calculado e interpretado.">
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {data.metodologia.map((item) => {
-            const Icon = metodologiaIcons[item.icone]
-            return (
-              <IconRow
-                key={item.titulo}
-                icon={<Icon size={18} strokeWidth={2.4} />}
-                title={item.titulo}
-                text={item.texto}
-              />
-            )
-          })}
+  const par = rotulosDoPar(data.valueKind)
+  const semPar = data.tipoComponentes === 'SUBGROUP'
+  return (
+    <Grid container spacing={1.75}>
+      <Grid size={{ xs: 12, md: 4 }}>
+        <KpiCard
+          label="Resultado"
+          value={data.resultado.valor ?? 'Indisponível'}
+          valueColor={data.resultado.valor ? colors.success : colors.textSecondary}
+          chip={
+            data.resultado.classificacao
+              ? { label: 'Classificação', value: data.resultado.classificacao }
+              : undefined
+          }
+          caption={naturezaDoValor(data.valueKind)}
+          compact={phone}
+        />
+      </Grid>
+      <Grid size={{ xs: 6, md: 4 }}>
+        <KpiCard
+          label={par.numerador}
+          value={data.numerador ?? '—'}
+          caption={semPar ? 'Cada subgrupo tem o seu par.' : undefined}
+          compact={phone}
+        />
+      </Grid>
+      <Grid size={{ xs: 6, md: 4 }}>
+        <KpiCard
+          label={par.denominador}
+          value={data.denominador ?? '—'}
+          caption={
+            semPar ? (
+              'Veja os subgrupos abaixo.'
+            ) : data.denominadorTipo ? (
+              // A code without spaces: it breaks anywhere rather than widen the card.
+              <Box component="span" sx={{ overflowWrap: 'anywhere' }}>
+                {data.denominadorTipo}
+              </Box>
+            ) : undefined
+          }
+          compact={phone}
+        />
+      </Grid>
+      {data.resultado.motivo && (
+        <Grid size={12}>
+          <Retencao data={data} />
+        </Grid>
+      )}
+      {data.componentes.length > 0 && (
+        <Grid size={12}>
+          <ComponentesTabela componentes={data.componentes} />
+        </Grid>
+      )}
+      {data.equipes.length > 0 && (
+        <Grid size={12}>
+          <LinkButton onClick={onVerEquipes}>
+            Ver o resultado por equipe ({data.equipes.length})
+          </LinkButton>
+        </Grid>
+      )}
+      {data.resultado.valor !== null && data.limitacoes.length > 0 && (
+        <Grid size={12}>
+          <SectionCard title="Limitações do resultado">
+            <Lista itens={data.limitacoes} />
+          </SectionCard>
+        </Grid>
+      )}
+    </Grid>
+  )
+}
+
+function Metodologia({ data }: { data: IndicadorDetalhe }) {
+  return (
+    <Grid container spacing={1.75}>
+      <Grid size={{ xs: 12, lg: 7 }}>
+        <SectionCard title="Metodologia" subtitle="Como o indicador é calculado e interpretado.">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {data.metodologia.map((item) => {
+              const Icon = metodologiaIcons[item.icone]
+              return (
+                <IconRow
+                  key={item.titulo}
+                  icon={<Icon size={18} strokeWidth={2.4} />}
+                  title={item.titulo}
+                  text={item.texto}
+                />
+              )
+            })}
+          </Box>
+        </SectionCard>
+      </Grid>
+      <Grid size={{ xs: 12, lg: 5 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+          <SectionCard
+            title="Portões de liberação pendentes"
+            subtitle="Enquanto algum falta, o resultado sai bloqueado, com as contagens."
+          >
+            {data.portoes.length > 0 ? (
+              <Lista itens={data.portoes} />
+            ) : (
+              <Typography sx={{ fontSize: 13.5, color: colors.textSecondary }}>
+                Todos os portões foram cumpridos.
+              </Typography>
+            )}
+          </SectionCard>
+          <SectionCard title="Limitações permanentes">
+            {data.limitacoesPermanentes.length > 0 ? (
+              <Lista itens={data.limitacoesPermanentes} />
+            ) : (
+              <Typography sx={{ fontSize: 13.5, color: colors.textSecondary }}>
+                Nenhuma declarada no catálogo.
+              </Typography>
+            )}
+          </SectionCard>
+          <SectionCard title="Fontes metodológicas">
+            {data.fontes.length > 0 ? (
+              <Box sx={{ display: 'grid', gap: 0.75 }}>
+                {data.fontes.map((fonte) => (
+                  <Fonte key={fonte} fonte={fonte} />
+                ))}
+              </Box>
+            ) : (
+              <Typography sx={{ fontSize: 13.5, color: colors.textSecondary }}>
+                Não informadas pelo catálogo.
+              </Typography>
+            )}
+          </SectionCard>
+        </Box>
+      </Grid>
+      {data.componentes.length > 0 && (
+        <Grid size={12}>
+          <ComponentesTabela
+            componentes={data.componentes}
+            contagens={false}
+            titulo={
+              data.tipoComponentes === 'SUBGROUP' ? 'Subgrupos da ficha' : 'Boas práticas da ficha'
+            }
+          />
+        </Grid>
+      )}
+    </Grid>
+  )
+}
+
+function Populacao({ data }: { data: IndicadorDetalhe }) {
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+      <SectionCard
+        title="População e filtros"
+        subtitle="Escopo e informações do resultado, como a API os publicou."
+      >
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+          {data.infoAdicionais.map((item) => (
+            <MetaChip
+              key={item.label}
+              icon={infoIcons[item.icone]}
+              label={item.label}
+              value={item.valor}
+            />
+          ))}
         </Box>
       </SectionCard>
-    )
-  }
+      <EquipesTabela equipes={data.equipes} valueKind={data.valueKind} />
+    </Box>
+  )
+}
 
-  if (content === 'evidencias') {
-    if (data.resultId) {
-      return <EvidenciasResultado resultId={data.resultId} competencia={data.competencia} />
-    }
-    return (
-      <SectionCard
-        title="Evidências"
-        subtitle="Principais motivos e ações sugeridas para este resultado."
-      >
-        <DataTable
-          columns={evidenciaColumns}
-          rows={data.evidencias}
-          getRowKey={(row) => row.motivo}
-          dense
-        />
-      </SectionCard>
-    )
-  }
+const historicoColumns: Column<HistoricoPonto>[] = [
+  { key: 'competencia', header: 'Competência', render: (h) => h.mes },
+  {
+    key: 'situacao',
+    header: 'Situação',
+    render: (h) => (
+      <StatusChip status={h.status} label={h.statusRotulo} size="sm" withIcon={false} />
+    ),
+  },
+  { key: 'valor', header: 'Valor', align: 'right', render: (h) => h.valorTexto ?? '—' },
+]
 
-  if (content === 'historico') {
-    return (
-      <SectionCard title="Histórico" subtitle="Evolução temporal do indicador.">
-        {data.evolucao.length > 0 ? (
-          <LineChartCard
-            data={data.evolucao}
-            series={[{ key: 'valor', label: 'Resultado do indicador', cor: colors.primary }]}
-            xKey="mes"
-            referenceLine={{ value: data.meta, label: `Meta (${data.meta}%)` }}
-          />
-        ) : (
-          <Typography sx={{ py: 7, textAlign: 'center', color: colors.textSecondary }}>
-            Histórico indisponível para este período.
-          </Typography>
-        )}
-      </SectionCard>
-    )
-  }
-
+function Historico({ codigo }: { codigo: string }) {
+  const { data, isPending, isError } = useIndicadorNaVisaoGeral(codigo)
+  const pontos = data?.historico ?? []
+  // A competência without a value has no `valor` key: the line breaks there, it never drops to 0.
+  const serie = pontos.map((p) => {
+    const ponto: Record<string, string | number> = { mes: p.mes }
+    if (p.valor !== null) ponto.valor = p.valor
+    return ponto
+  })
+  const comValor = pontos.some((p) => p.valor !== null)
   return (
     <SectionCard
-      title="População e filtros"
-      subtitle="Escopo e informações adicionais aplicados ao resultado."
+      title="Histórico"
+      subtitle="As 12 competências até a escolhida. Uma competência bloqueada ou sem denominador é uma lacuna, nunca zero."
     >
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-        {data.infoAdicionais.map((item) => {
-          const Icon = infoIcons[item.icone]
-          return <MetaChip key={item.label} icon={Icon} label={item.label} value={item.valor} />
-        })}
-      </Box>
-      <Typography sx={{ mt: 2, color: colors.textSecondary, fontSize: 13.5 }}>
-        Os filtros apresentados correspondem ao escopo fornecido pela API para este indicador.
-      </Typography>
+      {isPending ? (
+        <Typography sx={{ py: 4, textAlign: 'center', color: colors.textSecondary }}>
+          Carregando histórico…
+        </Typography>
+      ) : isError || pontos.length === 0 ? (
+        <Typography sx={{ py: 7, textAlign: 'center', color: colors.textSecondary }}>
+          Histórico indisponível para este indicador.
+        </Typography>
+      ) : (
+        <>
+          {comValor && (
+            <LineChartCard
+              data={serie}
+              series={[{ key: 'valor', label: 'Resultado do indicador', cor: colors.primary }]}
+              xKey="mes"
+            />
+          )}
+          <DataTable
+            columns={historicoColumns}
+            rows={[...pontos].reverse()}
+            getRowKey={(h) => h.competencia}
+            dense
+            sx={{ mt: 1.5 }}
+          />
+        </>
+      )}
     </SectionCard>
   )
 }
 
-export function IndicadorDetailPage() {
-  const { codigo = 'PB-01' } = useParams()
-  const { data, isError, isPending } = useIndicadorDetalhe(codigo)
+function Conteudo({ data, content }: { data: IndicadorDetalhe; content: DetailTabContent }) {
+  switch (content) {
+    case 'metodologia':
+      return <Metodologia data={data} />
+    case 'populacao':
+      return <Populacao data={data} />
+    case 'evidencias':
+      return data.resultId ? (
+        <EvidenciasResultado resultId={data.resultId} competencia={data.competencia} />
+      ) : (
+        <SectionCard title="Evidências">
+          <Typography sx={{ py: 4, textAlign: 'center', color: colors.textSecondary }}>
+            Sem resultado publicado nesta competência, não há evidência a mostrar.
+          </Typography>
+        </SectionCard>
+      )
+    case 'historico':
+      return <Historico codigo={data.codigo} />
+    case 'resultados':
+      return null
+  }
+}
+
+function Detalhe({ codigo }: { codigo: string }) {
+  const { data, error, isError, isPending } = useIndicadorDetalhe(codigo)
+  const visaoGeral = useIndicadorNaVisaoGeral(codigo)
   const theme = useTheme()
   const phone = useMediaQuery(theme.breakpoints.down('md'))
   const navigate = useNavigate()
@@ -247,7 +424,7 @@ export function IndicadorDetailPage() {
         />
         <SectionCard title="Detalhes indisponíveis">
           <Typography sx={{ color: colors.textSecondary }}>
-            Volte à lista de indicadores para escolher outro item.
+            {error.message} Volte à lista de indicadores para escolher outro item.
           </Typography>
           <Button
             variant="outlined"
@@ -262,9 +439,8 @@ export function IndicadorDetailPage() {
     )
   }
 
-  const infoIcon = <Info size={18} color={colors.primary} />
-  const resultadoIndisponivel = data.resultado.valor === null
   const content = detailTabContent(tab)
+  const disponibilidade = visaoGeral.data?.disponibilidade ?? null
 
   return (
     <>
@@ -287,11 +463,12 @@ export function IndicadorDetailPage() {
             <ArrowLeft size={18} /> Voltar aos indicadores
           </Box>
         }
-        title={`${data.codigo} – ${data.nome}`}
+        title={data.nome}
         chip={<StatusChip status={data.status} withIcon={false} />}
         subtitle={data.descricao}
         actions={
-          !phone && (
+          !phone &&
+          data.executavel && (
             <Button
               variant="contained"
               size="large"
@@ -311,9 +488,31 @@ export function IndicadorDetailPage() {
 
       {!phone && (
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-          <MetaChip icon={Target} label="Componente" value={data.componente} />
-          <MetaChip icon={ChartColumn} label="Tipo" value={data.tipo} />
-          <MetaChip icon={Calendar} label="Última execução" value={data.ultimaExecucao} />
+          <MetaChip icon={Target} label="Valor" value={naturezaDoValor(data.valueKind)} />
+          <MetaChip
+            icon={Calendar}
+            label="Competência"
+            value={data.competencia ? competenciaLabel(data.competencia) : 'Nenhuma publicada'}
+          />
+          <MetaChip
+            icon={RefreshCw}
+            label="Publicação"
+            value={data.publicadoEm ?? 'Não publicado'}
+          />
+        </Box>
+      )}
+
+      {disponibilidade && disponibilidade.situacao !== 'disponivel' && (
+        <Box sx={{ mb: 2 }}>
+          <Callout
+            variant="warning"
+            dense
+            title={`Disponibilidade no município: ${disponibilidade.rotulo}`}
+          >
+            {disponibilidade.capacidadesFaltantes.length > 0
+              ? `Nenhuma fonte do PEC do município tem validadas as capacidades ${disponibilidade.capacidadesFaltantes.join(', ')}; a execução deste pacote falha antes de ler a fonte.`
+              : 'O município não tem fonte do PEC cadastrada para executar este pacote.'}
+          </Callout>
         </Box>
       )}
 
@@ -325,261 +524,21 @@ export function IndicadorDetailPage() {
       />
 
       {content === 'resultados' ? (
-        <Grid container spacing={1.75}>
-          <Grid size={{ xs: 6, md: 3 }}>
-            <KpiCard
-              label="Resultado"
-              infoIcon
-              value={formatPercent(data.resultado.valor)}
-              valueColor={resultadoIndisponivel ? colors.textSecondary : colors.success}
-              chip={{ label: 'Meta', value: data.resultado.meta }}
-              trend={{ text: data.resultado.tendencia, tone: 'up' }}
-              compact={phone}
-            />
-          </Grid>
-          <Grid size={{ xs: 6, md: 3 }}>
-            <KpiCard
-              label="Numerador"
-              infoIcon
-              value={formatInt(data.numerador.valor)}
-              valueColor={colors.success}
-              caption={data.numerador.label}
-              compact={phone}
-            />
-          </Grid>
-          <Grid size={{ xs: 6, md: 3 }}>
-            <KpiCard
-              label="Denominador"
-              infoIcon
-              value={formatInt(data.denominador.valor)}
-              valueColor={colors.success}
-              caption={data.denominador.label}
-              compact={phone}
-            />
-          </Grid>
-          <Grid size={{ xs: 6, md: 3 }}>
-            <KpiCard
-              label="Pendências"
-              infoIcon
-              value={formatInt(data.pendencias.valor)}
-              valueColor={colors.error}
-              caption={
-                <Box component="span" sx={{ color: colors.error, fontSize: 16, fontWeight: 500 }}>
-                  ({formatPercent(data.pendencias.percentual)})
-                </Box>
-              }
-              compact={phone}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, lg: 8.4 }}>
-            <Grid container spacing={1.75}>
-              <Grid size={{ xs: 12, md: 7.2 }}>
-                <SectionCard
-                  title="Evolução temporal"
-                  action={
-                    <FilterSelect
-                      ariaLabel="Período do gráfico"
-                      value={phone ? 'Últimos 8 meses' : 'Últimos 12 meses'}
-                      options={['Últimos 12 meses', 'Últimos 8 meses']}
-                      size="sm"
-                    />
-                  }
-                  sx={{ height: '100%' }}
-                >
-                  {data.evolucao.length > 0 ? (
-                    <LineChartCard
-                      data={phone ? data.evolucao.slice(-8) : data.evolucao}
-                      series={[
-                        { key: 'valor', label: 'Resultado do indicador', cor: colors.primary },
-                      ]}
-                      xKey="mes"
-                      height={phone ? 150 : 180}
-                      referenceLine={{ value: data.meta, label: `Meta (${data.meta}%)` }}
-                      legend={!phone}
-                    />
-                  ) : (
-                    <Typography sx={{ py: 7, textAlign: 'center', color: colors.textSecondary }}>
-                      Resultado indisponível para este período.
-                    </Typography>
-                  )}
-                </SectionCard>
-              </Grid>
-
-              {!phone && (
-                <>
-                  <Grid size={{ xs: 12, md: 4.8 }}>
-                    <SectionCard title="Distribuição por status" sx={{ height: '100%' }}>
-                      {data.distribuicao.length > 0 ? (
-                        <>
-                          <DonutChart
-                            size={150}
-                            thickness={22}
-                            data={data.distribuicao.map((d) => ({
-                              name: d.label,
-                              value: d.valor,
-                              color: tom[d.tom],
-                            }))}
-                            centerValue={formatInt(data.denominador.valor)}
-                            centerLabel={
-                              <>
-                                Total de
-                                <br />
-                                gestantes
-                              </>
-                            }
-                          />
-                          <Box
-                            sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 0.75 }}
-                          >
-                            {data.distribuicao.map((d) => (
-                              <Box
-                                key={d.label}
-                                sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}
-                              >
-                                <Box
-                                  sx={{
-                                    width: 18,
-                                    height: 18,
-                                    borderRadius: '50%',
-                                    bgcolor: tom[d.tom],
-                                    color: '#fff',
-                                    display: 'grid',
-                                    placeItems: 'center',
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  ✓
-                                </Box>
-                                <Typography sx={{ flex: 1, fontSize: 12.5, color: colors.navy }}>
-                                  {d.label} ({formatPercent(d.percentual)})
-                                </Typography>
-                                <Typography
-                                  sx={{ fontSize: 12.5, fontWeight: 700, color: colors.navy }}
-                                >
-                                  {d.valor}
-                                </Typography>
-                              </Box>
-                            ))}
-                          </Box>
-                        </>
-                      ) : (
-                        <Typography
-                          sx={{ py: 8, textAlign: 'center', color: colors.textSecondary }}
-                        >
-                          Distribuição indisponível para este período.
-                        </Typography>
-                      )}
-                    </SectionCard>
-                  </Grid>
-
-                  <Grid size={12}>
-                    <SectionCard
-                      title={
-                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                          Principais evidências / motivos de pendência {infoIcon}
-                        </Box>
-                      }
-                      action={
-                        <LinkButton onClick={() => setTab('evidencias')}>Ver todas</LinkButton>
-                      }
-                    >
-                      <DataTable
-                        columns={evidenciaColumns}
-                        rows={data.evidencias}
-                        getRowKey={(r) => r.motivo}
-                        dense
-                        sx={{ '& td': { py: 0.6 }, '& th': { py: 0.9 } }}
-                      />
-                    </SectionCard>
-                  </Grid>
-                </>
-              )}
-            </Grid>
-          </Grid>
-
-          {!phone && (
-            <Grid size={{ xs: 12, lg: 3.6 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
-                <SectionCard title="Metodologia (resumo)" action={infoIcon}>
-                  <Box
-                    sx={{
-                      bgcolor: colors.primarySoft,
-                      borderRadius: '12px',
-                      p: 1.5,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 1.1,
-                    }}
-                  >
-                    {data.metodologia.map((m) => {
-                      const Icon = metodologiaIcons[m.icone]
-                      return (
-                        <IconRow
-                          key={m.titulo}
-                          icon={<Icon size={15} strokeWidth={2.4} />}
-                          title={m.titulo}
-                          text={m.texto}
-                          size="sm"
-                        />
-                      )
-                    })}
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      startIcon={<ExternalLink size={16} />}
-                      onClick={() => setTab('metodologia')}
-                      sx={{ mt: 0.25, fontSize: 13, minHeight: 36 }}
-                    >
-                      Ver metodologia completa
-                    </Button>
-                  </Box>
-                </SectionCard>
-
-                <SectionCard icon={<Database size={20} />} title="Informações adicionais">
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25 }}>
-                    {data.infoAdicionais.map((i) => {
-                      const Icon = infoIcons[i.icone]
-                      return (
-                        <Box
-                          key={i.label}
-                          sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}
-                        >
-                          <Icon
-                            size={16}
-                            color={colors.primary}
-                            style={{ flexShrink: 0, marginTop: 2 }}
-                          />
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography
-                              sx={{ fontSize: 11.5, color: colors.textSecondary, lineHeight: 1.3 }}
-                            >
-                              {i.label}
-                            </Typography>
-                            <Typography
-                              sx={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: colors.navy,
-                                lineHeight: 1.3,
-                              }}
-                            >
-                              {i.valor}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      )
-                    })}
-                  </Box>
-                </SectionCard>
-              </Box>
-            </Grid>
-          )}
-        </Grid>
+        <Resultados
+          data={data}
+          phone={phone}
+          onVerEquipes={() => setTab(phone ? 'estratificacoes' : 'populacao')}
+        />
       ) : (
-        <IndicatorDetailTabContent data={data} content={content} />
+        <Conteudo data={data} content={content} />
       )}
     </>
   )
+}
+
+/** The detail of a pack; the Nota Final has its own page, computed on read. */
+export function IndicadorDetailPage() {
+  const { codigo = '' } = useParams()
+  if (codigo === COMPONENTE_III_ID) return <Navigate to={COMPONENTE_III_PATH} replace />
+  return <Detalhe key={codigo} codigo={codigo} />
 }

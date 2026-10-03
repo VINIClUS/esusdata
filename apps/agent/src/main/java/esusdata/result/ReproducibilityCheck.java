@@ -10,6 +10,7 @@ import java.nio.file.Path;
  * nunca silenciosamente reproduzível." A missing or corrupted extract never blocks publication of
  * the already-computed result — it only downgrades {@code reproducibility_level}, since the result
  * itself was computed from evidence already captured in {@code result_staging}/{@code evidence}.
+ * Both canonical schemas are re-read end to end (ADR 0030).
  */
 public final class ReproducibilityCheck {
 
@@ -24,8 +25,7 @@ public final class ReproducibilityCheck {
 
     public Outcome verify(String extractionId) {
         try {
-            var manifest = reader.readManifest(extractsBaseDir, extractionId);
-            reader.readEncounters(extractsBaseDir, manifest); // re-verifies checksum & row count
+            reader.verify(extractsBaseDir, extractionId); // re-verifies checksum, counts and records
             return new Outcome(true, null);
         } catch (IOException
                 | RuntimeException e) { // NOPMD - any failure re-reading the extract is a failed check, reported

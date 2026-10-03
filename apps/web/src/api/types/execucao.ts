@@ -89,7 +89,18 @@ export interface RunSchedule {
 export interface RunSourcePeriod {
   referencePeriod: string
   count: number
+  /** Every pack this source can compute is published (ADR 0030). */
   published: boolean
+  /** The packs published in this competência; absent from an API before ADR 0030. */
+  publishedPacks?: string[]
+}
+
+/** A runnable pack and whether this source can compute it (ADR 0030). */
+export interface RunSourcePack {
+  indicatorPack: string
+  ruleVersion: string
+  availability: 'AVAILABLE' | 'UNSUPPORTED_SOURCE'
+  missingCapabilities: string[]
 }
 
 /** `GET /run-sources`: a PEC source a run can read, its competências and its scheduler. */
@@ -100,6 +111,8 @@ export interface RunSourceResponse {
   coverageCheckedAt: string | null
   /** Newest first; empty unless the last coverage was `CHECKED`. */
   periods: RunSourcePeriod[]
+  /** Absent from an API before ADR 0030. */
+  packs?: RunSourcePack[]
   schedule: RunSchedule
 }
 

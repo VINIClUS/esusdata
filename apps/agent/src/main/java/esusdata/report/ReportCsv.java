@@ -7,7 +7,12 @@ import java.util.List;
 /**
  * Renders the aggregate export (ADR 0024) for a pt-BR spreadsheet: UTF-8 with a BOM, {@code ;}
  * between cells, CRLF between lines, every cell quoted. The values are the stored canonical
- * strings — nothing is recomputed; only the decimal point of the percentage becomes a comma.
+ * strings — nothing is recomputed; only the decimal point of the value becomes a comma.
+ *
+ * <p>ADR 0030 amends ADR 0024: {@code valor_percentual} became {@code valor} + {@code unidade}, since
+ * a C2–C7 value is a score, not a percentage. {@code unidade} is the result's value kind ({@code
+ * PERCENTAGE}, {@code SCORE} or {@code COMPOSITE_SCORE}); {@code valor} is empty unless the result
+ * is {@code COMPUTED} — a blocked result never reads as a number.
  */
 public final class ReportCsv {
 
@@ -19,11 +24,14 @@ public final class ReportCsv {
             "status",
             "numerador",
             "denominador",
-            "valor_percentual",
+            "valor",
+            "unidade",
             "classificacao",
             "data_corte",
             "publicado_em",
             "execucao");
+
+    private static final String COMPUTED = "COMPUTED";
 
     private static final String BOM = "﻿";
     private static final String SEPARATOR = ";";
@@ -45,7 +53,8 @@ public final class ReportCsv {
                             nullToEmpty(result.status()),
                             nullToEmpty(result.numeratorText()),
                             nullToEmpty(result.denominatorText()),
-                            decimalComma(result.valueText()),
+                            COMPUTED.equals(result.status()) ? decimalComma(result.valueText()) : "",
+                            nullToEmpty(result.valueKind()),
                             nullToEmpty(result.classification()),
                             nullToEmpty(result.dataCutoff()),
                             nullToEmpty(result.publishedAt()),
