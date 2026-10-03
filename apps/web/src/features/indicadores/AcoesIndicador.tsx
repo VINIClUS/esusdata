@@ -5,20 +5,22 @@ import MenuItem from '@mui/material/MenuItem'
 import { EllipsisVertical } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { baixarExportacao, gerarExportacao } from '@/api/hooks'
-import { normalizeExport } from '@/api/normalizers'
+import { indicadorPath, normalizeExport } from '@/api/normalizers'
+import type { IndicadorResumo } from '@/api/types'
 import { useScope } from '@/app/scope-context'
 import { colors } from '@/theme/tokens'
 
 /**
  * A row's actions: open the detail, run the indicator again for the competência, or download the
- * competência's aggregate CSV (ADR 0024) for this indicator alone.
+ * competência's aggregate CSV (ADR 0024) for this indicator alone. The Nota Final is computed on
+ * read: it is never run nor exported, so it only opens its page.
  */
 export function AcoesIndicador({
-  codigo,
+  item,
   competencia,
   onErro,
 }: {
-  codigo: string
+  item: Pick<IndicadorResumo, 'codigo' | 'nome' | 'valueKind' | 'executavel'>
   competencia: string | undefined
   onErro: (mensagem: string) => void
 }) {
@@ -26,6 +28,7 @@ export function AcoesIndicador({
   const { municipalityIbge } = useScope()
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const fechar = () => setAnchor(null)
+  const { codigo, nome, executavel } = item
 
   async function exportar() {
     fechar()
@@ -34,7 +37,7 @@ export function AcoesIndicador({
       const gerada = await gerarExportacao(municipalityIbge, competencia, competencia, codigo)
       await baixarExportacao(normalizeExport(gerada), municipalityIbge)
     } catch {
-      onErro(`Não foi possível exportar ${codigo}. Tente novamente em Relatórios.`)
+      onErro(`Não foi possível exportar ${nome}. Tente novamente em Relatórios.`)
     }
   }
 
@@ -45,7 +48,7 @@ export function AcoesIndicador({
     <>
       <IconButton
         size="small"
-        aria-label={`Ações de ${codigo}`}
+        aria-label={`Ações de ${nome}`}
         aria-haspopup="menu"
         onClick={(e) => {
           e.stopPropagation()
@@ -61,13 +64,17 @@ export function AcoesIndicador({
         onClose={fechar}
         onClick={(e) => e.stopPropagation()}
       >
-        <MenuItem onClick={() => void navigate(`/indicadores/${codigo}`)}>Ver detalhe</MenuItem>
-        <MenuItem onClick={() => void navigate(`/execucao?${executar.toString()}`)}>
-          Executar novamente
-        </MenuItem>
-        <MenuItem disabled={!competencia || !municipalityIbge} onClick={() => void exportar()}>
-          Exportar CSV da competência
-        </MenuItem>
+        <MenuItem onClick={() => void navigate(indicadorPath(item))}>Ver detalhe</MenuItem>
+        {executavel && (
+          <MenuItem onClick={() => void navigate(`/execucao?${executar.toString()}`)}>
+            Executar novamente
+          </MenuItem>
+        )}
+        {executavel && (
+          <MenuItem disabled={!competencia || !municipalityIbge} onClick={() => void exportar()}>
+            Exportar CSV da competência
+          </MenuItem>
+        )}
       </Menu>
     </>
   )

@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test'
 import { expectNoA11yViolations } from '../support/a11y.ts'
 import { expectNoHorizontalOverflow } from '../support/layout.ts'
 import { IBGE, expect, test, type ApiStub } from './api.ts'
-import { PERIOD, pack, run, runSource, source } from './data.ts'
+import { PERIOD, c1Pack, c4Pack, notaFinalPack, pack, run, runSource, source } from './data.ts'
 
 const RUNS = `/runs?municipalityIbge=${IBGE}&limit=1`
 const RUN_SOURCES = `/run-sources?municipalityIbge=${IBGE}`
@@ -200,6 +200,73 @@ test.describe('execução única', () => {
     await expect(
       page.getByText('Nenhuma fonte do e-SUS PEC cadastrada para este município.'),
     ).toBeVisible()
+  })
+
+  test('a fonte diz o que calcula: sem suporte não executa, e a Nota Final não se executa', async ({
+    page,
+    api,
+  }) => {
+    manager(api)
+    api.get('/indicator-packs', { json: [c1Pack(), c4Pack(), notaFinalPack()] })
+    api.get(RUN_SOURCES, {
+      json: [
+        runSource({
+          periods: [
+            {
+              referencePeriod: PERIOD,
+              count: 10029,
+              published: true,
+              publishedPacks: ['c1-mais-acesso'],
+            },
+            { referencePeriod: '2026-02', count: 9500, published: false, publishedPacks: [] },
+          ],
+          packs: [
+            {
+              indicatorPack: 'c1-mais-acesso',
+              ruleVersion: 'c1-mais-acesso@1.0.0',
+              availability: 'AVAILABLE',
+              missingCapabilities: [],
+            },
+            {
+              indicatorPack: 'c4-cuidado-diabetes',
+              ruleVersion: 'c4-cuidado-diabetes@1.0.0',
+              availability: 'UNSUPPORTED_SOURCE',
+              missingCapabilities: ['condition_list'],
+            },
+          ],
+        }),
+      ],
+    })
+    await page.goto('/execucao?indicador=c4-cuidado-diabetes')
+    await expect(page.getByText('Esta fonte não calcula este indicador')).toBeVisible()
+    await expect(
+      page.getByText(/não tem validadas para o PEC 5\.5\.28: condition_list/),
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Executar' })).toBeDisabled()
+    await expectSettled(page)
+
+    await page.getByRole('button', { name: 'Editar' }).click()
+    await page.getByRole('combobox', { name: 'Indicador' }).click()
+    await expect(page.getByRole('option')).toHaveText([
+      'C1 – Mais acesso',
+      'C4 – Cuidado da pessoa com diabetes · fonte sem suporte',
+    ])
+    await page.getByRole('option', { name: 'C1 – Mais acesso' }).click()
+    // 03/2026 already has C1 published: the next run defaults to 02/2026.
+    await expect(page.getByRole('combobox', { name: 'Competência' })).toHaveText(
+      /02\/2026 · 9\.500 atendimentos/,
+    )
+    await expect(page.getByRole('button', { name: 'Executar' })).toBeEnabled()
+
+    await page.getByRole('tab', { name: 'Agendamento' }).click()
+    const c4 = page.getByRole('row', { name: /C4 – Cuidado da pessoa com diabetes/ })
+    await expect(c4).toContainText('Fonte sem suporte')
+    await expect(c4).toContainText('Faltam: condition_list')
+    const marco = page.getByRole('row', { name: /^03\/2026/ })
+    await expect(marco).toContainText('C1')
+    const fevereiro = page.getByRole('row', { name: /^02\/2026/ })
+    await expect(fevereiro.getByRole('cell').nth(3)).toHaveText('C1')
+    await expectSettled(page)
   })
 
   test('erro da API', async ({ page, api }) => {
