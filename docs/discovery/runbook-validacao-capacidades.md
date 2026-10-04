@@ -139,14 +139,52 @@ muda antes. O checksum da consulta, os `objects_used` e as assinaturas da fixtur
 este runbook roda de novo. Mudança de consulta, de versão do adaptador ou do descritor passa pelo
 coordenador, porque são contratos congelados.
 
-**Ainda falta nesta branch:**
+Nenhuma entrada é promovida sem as duas evidências abaixo. As duas rodam com
+`-Dsurefire.reuseForks=false`, com o filho Rust compilado:
+`cargo build --release --locked --manifest-path apps/execplane/Cargo.toml`.
 
-- um caso ao vivo da aquisição v2 pelo filho Rust: o `ExecPlaneCanonicalV2LiveTest` só faz o
-  handshake contra um contêiner;
-- o teste diferencial Rust × JDBC por capacidade sobre a fixture v2 (`CapabilityQueryReader` é o lado
-  JDBC).
+- **Diferencial Rust × JDBC por capacidade (CI, fixture v2).** `ExecPlaneCapabilityDifferentialLiveTest`
+  sobe um PostgreSQL 9.6.13 em contêiner, carrega `pec_dw_v2_fixture.sql` e faz uma aquisição v2 com as
+  dez capacidades pelo binário real. Compara, capacidade a capacidade e linha a linha (sem ordem), o que o
+  filho escreveu com o que `CapabilityQueryReader` lê com o mesmo SQL e os mesmos binds, em três janelas:
+  município A, município B e janela larga. A matriz do teste é o próprio JSON empacotado com as dez
+  entradas `VALIDATED` e as assinaturas medidas no contêiner, injetada pelo ponto de entrada de teste do
+  `ExecPlaneAcquisition`; o portão de produção (`findExact` recusa `NOT_TESTED`) não é tocado. O CI já
+  passa o binário ao `mvn verify`, então este teste roda lá.
 
-Sem os dois, nenhuma entrada é promovida.
+  ```bash
+  mvn -B -f apps/agent/pom.xml test -Dsurefire.reuseForks=false \
+    -Dtest=ExecPlaneCapabilityDifferentialLiveTest \
+    -Dobservatorio.execution-plane.binary=$PWD/apps/execplane/target/release/observatorio-execplane
+  ```
+
+- **Caso ao vivo da aquisição v2 pelo filho Rust (opt-in, depois do passo 1 abaixo).**
+  `ExecPlaneCapabilityLivePecTest` adquire uma competência do município configurado, em uma aquisição v2,
+  com a matriz empacotada pelo construtor de produção. Exige: aquisição bem-sucedida, fingerprints iguais
+  (falha fechada), município do manifesto igual ao configurado, nenhuma linha fora do município, da janela
+  ou das colunas obrigatórias, e, por capacidade, as mesmas linhas do Rust e do JDBC (contagens e um
+  digest sem ordem de cada linha), este lido numa transação somente leitura `REPEATABLE READ`. Sem
+  nenhuma capacidade `VALIDATED` na matriz empacotada, o teste é ignorado. Escritas na fonte entre a
+  transação do filho e a do JDBC podem dar diferença de contagem: repita antes de concluir.
+
+  ```bash
+  mvn -B -f apps/agent/pom.xml test -Dsurefire.reuseForks=false \
+    -Dtest=ExecPlaneCapabilityLivePecTest \
+    -Dobservatorio.execution-plane.binary=$PWD/apps/execplane/target/release/observatorio-execplane \
+    -Dobservatorio.execution-plane.live-pec=true \
+    -Dobservatorio.execution-plane.live-pec.env-file=$HOME/.config/observatorio-aps/pec.env
+  ```
+
+  O arquivo de ambiente traz `PEC_DB_HOST/PORT/NAME/USER/PASSWORD`, `PEC_SOURCE_ID`, `PEC_VERSION` e
+  `PEC_MUNICIPALITY_IBGE`. Opcionais:
+  - `-Dobservatorio.capabilities.live.competencia=AAAA-MM`, o mês anterior (America/Sao_Paulo) por padrão;
+  - `-Dobservatorio.capabilities.live.only=care_encounter,citizen`, as `VALIDATED` por padrão (citar uma
+    que não está `VALIDATED` falha);
+  - `-Dobservatorio.capabilities.live.<bind>=a,b` para cada lista de códigos.
+
+  O log e o relatório JSON em `apps/agent/target/capability-validation/capacidades-v2-rust-*.json`
+  (ignorado pelo controle de versão) trazem só contagens, tempos e hashes, nunca linha, `person_key`,
+  CNES ou INE. O teste não roda senha errada nem cancelamento.
 
 1. **Prepare a entrada só na sua cópia de trabalho.**
    - Troque cada `signature_fingerprint` pela real do JSON (`objects_used[].signature_fingerprint`).
@@ -157,7 +195,8 @@ Sem os dois, nenhuma entrada é promovida.
 2. **Recompile o execplane**, que embute a matriz e as consultas por `include_str!`:
    `cargo build --release --locked --manifest-path apps/execplane/Cargo.toml`.
 3. **Rode só os casos ao vivo que cobrem o que é novo.**
-   - A aquisição v2 de uma competência com esta capacidade.
+   - A aquisição v2 de uma competência com esta capacidade: `ExecPlaneCapabilityLivePecTest`, acima, com
+     `-Dobservatorio.capabilities.live.only=<capacidade>`.
    - O caso de fingerprints.
    - Nunca os de senha errada nem o de cancelamento sobre o histórico: eles carregam o servidor de
      produção ou deixam logins falhos no log dele.

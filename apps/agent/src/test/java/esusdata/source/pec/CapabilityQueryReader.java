@@ -30,7 +30,7 @@ import java.util.TreeMap;
  * tests of the foundation capabilities ({@code CapabilityQueriesFixtureTest},
  * {@code CapabilityFingerprintCaptureLiveTest}).
  */
-final class CapabilityQueryReader {
+public final class CapabilityQueryReader {
 
     private static final String TEXT = "text";
 
@@ -40,14 +40,14 @@ final class CapabilityQueryReader {
      * The values one part binds (ADR 0030): the municipality, the window and the named date and code
      * list parameters. A capability binds only the ones its descriptor declares.
      */
-    record Binds(
+    public record Binds(
             String municipalityIbge,
             LocalDate periodStart,
             LocalDate periodEndExclusive,
             SortedMap<String, LocalDate> dateParams,
             SortedMap<String, List<String>> arrayParams) {
 
-        Binds {
+        public Binds {
             dateParams = Collections.unmodifiableSortedMap(new TreeMap<>(dateParams));
             SortedMap<String, List<String>> arrays = new TreeMap<>();
             arrayParams.forEach((name, values) -> arrays.put(name, List.copyOf(values)));
@@ -55,7 +55,7 @@ final class CapabilityQueryReader {
         }
 
         /** The binds of a rule's part, as the run pipeline hands them to the execution plane. */
-        static Binds of(String municipalityIbge, PartRequirement part) {
+        public static Binds of(String municipalityIbge, PartRequirement part) {
             return new Binds(
                     municipalityIbge,
                     part.periodStart(),
@@ -66,16 +66,16 @@ final class CapabilityQueryReader {
     }
 
     /** What a query returned: column labels and PostgreSQL type names, in order, and the rows. */
-    record Result(List<String> columnLabels, List<String> columnTypes, List<Map<String, Object>> rows) {
+    public record Result(List<String> columnLabels, List<String> columnTypes, List<Map<String, Object>> rows) {
 
-        Result {
+        public Result {
             columnLabels = List.copyOf(columnLabels);
             columnTypes = List.copyOf(columnTypes);
             rows = Collections.unmodifiableList(new ArrayList<>(rows));
         }
     }
 
-    static Result read(Connection connection, CapabilityContract contract, Binds binds) throws SQLException {
+    public static Result read(Connection connection, CapabilityContract contract, Binds binds) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(contract.queryText())) {
             int index = 1;
             for (CapabilityContract.Bind bind : contract.binds()) {

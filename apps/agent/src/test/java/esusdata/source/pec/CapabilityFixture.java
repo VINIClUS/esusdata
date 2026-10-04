@@ -23,22 +23,22 @@ import java.util.TreeMap;
  * (ENG-37, ENG-38). Its {@link #checksum()} is the {@code fixture_checksum} of the foundation's
  * {@code NOT_TESTED} entries in {@code contracts/compatibility/pec-adapters.json}.
  */
-final class CapabilityFixture {
+public final class CapabilityFixture {
 
-    static final Path FILE = Path.of("src/test/resources/fixtures/pec_dw_v2_fixture.sql");
+    public static final Path FILE = Path.of("src/test/resources/fixtures/pec_dw_v2_fixture.sql");
 
-    static final String MUNICIPALITY_A = "1100015";
-    static final String MUNICIPALITY_B = "3550308";
+    public static final String MUNICIPALITY_A = "1100015";
+    public static final String MUNICIPALITY_B = "3550308";
 
     /** The golden window: competência 2026-03. */
-    static final LocalDate PERIOD_START = LocalDate.of(2026, 3, 1);
+    public static final LocalDate PERIOD_START = LocalDate.of(2026, 3, 1);
 
-    static final LocalDate PERIOD_END_EXCLUSIVE = LocalDate.of(2026, 4, 1);
+    public static final LocalDate PERIOD_END_EXCLUSIVE = LocalDate.of(2026, 4, 1);
 
     /** The golden birth range, inclusive at both ends. */
-    static final LocalDate BORN_FROM = LocalDate.of(1990, 1, 1);
+    public static final LocalDate BORN_FROM = LocalDate.of(1990, 1, 1);
 
-    static final LocalDate BORN_TO = LocalDate.of(2025, 12, 31);
+    public static final LocalDate BORN_TO = LocalDate.of(2025, 12, 31);
 
     private CapabilityFixture() {}
 
@@ -46,7 +46,7 @@ final class CapabilityFixture {
      * Runs the whole fixture in one statement: pgJDBC's simple query protocol splits statements and
      * comments itself (a naive split on {@code ;} breaks on comment text).
      */
-    static void load(Connection connection) throws IOException, SQLException {
+    public static void load(Connection connection) throws IOException, SQLException {
         try (Statement statement = connection.createStatement()) {
             statement.execute(Files.readString(FILE));
         }
@@ -64,11 +64,11 @@ final class CapabilityFixture {
     }
 
     /** The golden parameters of {@code capability} for {@code municipality}. */
-    static CapabilityQueryReader.Binds binds(String capability, String municipality) {
+    public static CapabilityQueryReader.Binds binds(String capability, String municipality) {
         return binds(municipality, PERIOD_START, PERIOD_END_EXCLUSIVE, BORN_FROM, BORN_TO, codes(capability));
     }
 
-    static CapabilityQueryReader.Binds binds(
+    public static CapabilityQueryReader.Binds binds(
             String municipality,
             LocalDate periodStart,
             LocalDate periodEndExclusive,
@@ -82,7 +82,7 @@ final class CapabilityFixture {
     }
 
     /** The golden code lists of {@code capability}: some codes of the fixture, never all of them. */
-    static SortedMap<String, List<String>> codes(String capability) {
+    public static SortedMap<String, List<String>> codes(String capability) {
         SortedMap<String, List<String>> codes = new TreeMap<>();
         switch (capability) {
             case Capabilities.IMMUNIZATION_HISTORY ->
