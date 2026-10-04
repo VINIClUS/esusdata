@@ -1282,6 +1282,16 @@ class C2PackCasesTest {
                 .satisfies(equipe -> assertThat(equipe.cnes()).isNull());
     }
 
+    @Test
+    void equipes_cnesDesconhecidoDeUmaCriancaNaoConcordaComOConhecido() {
+        add(CanonicalFixtures.person("c1", N, "M"), CanonicalFixtures.registration("c1", N, CNES, INE));
+        add(CanonicalFixtures.person("c2", N, "M"), CanonicalFixtures.registration("c2", N, null, INE));
+
+        assertThat(calcular().teams())
+                .singleElement()
+                .satisfies(equipe -> assertThat(equipe.cnes()).isNull());
+    }
+
     // ================================================================ Consolidação (MET-34, CT-71)
 
     @Test

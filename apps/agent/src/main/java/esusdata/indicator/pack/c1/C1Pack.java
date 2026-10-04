@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -145,9 +146,9 @@ public final class C1Pack implements IndicatorRule {
      */
     private static String agreedCnes(List<CanonicalEncounter> members) {
         Set<String> cnes = members.stream()
-                .filter(e -> e.cnes() != null && C1Rule.isFichaCbo(e.cbo()))
-                .map(CanonicalEncounter::cnes)
+                .filter(e -> C1Rule.isFichaCbo(e.cbo()))
+                .map(e -> Objects.requireNonNullElse(e.cnes(), "")) // unknown never agrees
                 .collect(Collectors.toSet());
-        return cnes.size() == 1 ? cnes.iterator().next() : null;
+        return cnes.size() == 1 && !cnes.contains("") ? cnes.iterator().next() : null;
     }
 }

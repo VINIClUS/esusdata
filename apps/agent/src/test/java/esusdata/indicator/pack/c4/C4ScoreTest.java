@@ -459,6 +459,30 @@ class C4ScoreTest {
     }
 
     @Test
+    void item21_aTeamWithALinkOfUnknownCnesHasNone() {
+        CanonicalRegistration sameIne = registration("a2", LINKED_ON.plusDays(1), INE_ESF);
+        RuleOutcome o = ungated(data().diabetic("a1")
+                .diabetic("a2")
+                .add(new CanonicalRegistration(
+                        sameIne.sourceRef(),
+                        sameIne.municipalityIbge(),
+                        sameIne.personKey(),
+                        sameIne.registrationDate(),
+                        null,
+                        sameIne.ine(),
+                        sameIne.simplified(),
+                        sameIne.inactive(),
+                        sameIne.refused(),
+                        sameIne.exitReason(),
+                        sameIne.selfReportedHypertension(),
+                        sameIne.selfReportedDiabetes(),
+                        sameIne.pregnant()))
+                .build());
+
+        assertThat(teamOf(o, INE_ESF).cnes()).isNull();
+    }
+
+    @Test
     void item21_teamResultsAreComputedPerIneOrderedByIneWithTheirCnes() {
         RuleOutcome o = ungated(data().diabetic("b", INE_ESF_2)
                 .addAll(fullCare("b"))

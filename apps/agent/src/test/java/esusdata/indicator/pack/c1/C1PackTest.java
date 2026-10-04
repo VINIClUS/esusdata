@@ -108,6 +108,22 @@ class C1PackTest {
     }
 
     @Test
+    void aCountedEncounterOfUnknownCnesLeavesTheTeamWithoutOne() {
+        CanonicalEncounter known = encounter(1, CanonicalModality.PROGRAMADO, "0000000001");
+        CanonicalEncounter unknown = new CanonicalEncounter(
+                known.sourceRef(), "3541307", "2026-03-11", CanonicalModality.ESPONTANEO, null, "0000000001", "225142");
+
+        RuleOutcome outcome = new C1Pack()
+                .evaluate(
+                        CanonicalDataset.ofEncounters(C1Pack.CAPABILITY, MARCH_WINDOW, List.of(known, unknown)),
+                        EvaluationContext.endOfMonth("3541307", MARCH));
+
+        assertThat(outcome.teams())
+                .singleElement()
+                .satisfies(team -> assertThat(team.cnes()).isNull());
+    }
+
+    @Test
     void eachTeamIsComputedOnItsOwnEncountersAndTeamlessOnesStayApart() {
         RuleOutcome outcome = new C1Pack()
                 .evaluate(

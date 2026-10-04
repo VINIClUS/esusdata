@@ -29,6 +29,7 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.SortedMap;
 import java.util.SortedSet;
@@ -223,10 +224,8 @@ public final class C4Pack implements IndicatorRule {
             if (subject.countsForTeam()) {
                 // a linked team keeps its row even when nobody of it is eligible (NO_DENOMINATOR, T-C4-36)
                 byTeam.computeIfAbsent(subject.link().ine(), k -> new ArrayList<>());
-                if (subject.link().cnes() != null) {
-                    teamCnes.computeIfAbsent(subject.link().ine(), k -> new TreeSet<>())
-                            .add(subject.link().cnes());
-                }
+                teamCnes.computeIfAbsent(subject.link().ine(), k -> new TreeSet<>())
+                        .add(Objects.requireNonNullElse(subject.link().cnes(), "")); // unknown never agrees
             }
             if (!subject.eligible()) {
                 evidence.add(C4Scoring.excluded(subject));
@@ -271,6 +270,6 @@ public final class C4Pack implements IndicatorRule {
 
     /** The team's CNES when its links agree on one, else {@code null} — never the first by order. */
     private static String agreed(SortedSet<String> cnes) {
-        return cnes != null && cnes.size() == 1 ? cnes.first() : null;
+        return cnes != null && cnes.size() == 1 && !cnes.contains("") ? cnes.first() : null;
     }
 }

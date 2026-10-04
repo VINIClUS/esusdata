@@ -12,6 +12,7 @@ import esusdata.indicator.model.Scores;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -49,9 +50,7 @@ final class C2Tally {
             teamTypeUnknown++;
         }
         completesTwo |= child.member().completesTwoInMonth();
-        if (child.member().cnes() != null) {
-            cnes.add(child.member().cnes());
-        }
+        cnes.add(Objects.requireNonNullElse(child.member().cnes(), "")); // unknown never agrees
         for (int i = 0; i < practices; i++) {
             PracticeOutcome outcome = child.outcomes().get(i);
             if (outcome.scores()) {
@@ -65,7 +64,7 @@ final class C2Tally {
 
     /** The CNES of the unit's children when they agree on one, else {@code null} — never the first by order. */
     String cnes() {
-        return cnes.size() == 1 ? cnes.first() : null;
+        return cnes.size() == 1 && !cnes.contains("") ? cnes.first() : null;
     }
 
     /** The unit's result before the release gates: exact, with every practice counted apart. */
