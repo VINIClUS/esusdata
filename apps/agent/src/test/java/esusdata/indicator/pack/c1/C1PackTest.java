@@ -74,6 +74,40 @@ class C1PackTest {
     }
 
     @Test
+    void aTeamHasACnesOnlyWhenItsCountedEncountersAgreeOnOne() {
+        CanonicalEncounter counted = encounter(1, CanonicalModality.PROGRAMADO, "0000000001");
+        CanonicalEncounter otherUnit = new CanonicalEncounter(
+                counted.sourceRef(),
+                "3541307",
+                "2026-03-11",
+                CanonicalModality.ESPONTANEO,
+                "7654321",
+                "0000000001",
+                "225142");
+        CanonicalEncounter outsideFicha = new CanonicalEncounter(
+                counted.sourceRef(),
+                "3541307",
+                "2026-03-12",
+                CanonicalModality.ESPONTANEO,
+                "7654321",
+                "0000000002",
+                "322205");
+        CanonicalEncounter inFicha = encounter(4, CanonicalModality.PROGRAMADO, "0000000002");
+
+        RuleOutcome outcome = new C1Pack()
+                .evaluate(
+                        CanonicalDataset.ofEncounters(
+                                C1Pack.CAPABILITY, MARCH_WINDOW, List.of(counted, otherUnit, outsideFicha, inFicha)),
+                        EvaluationContext.endOfMonth("3541307", MARCH));
+
+        assertThat(outcome.teams())
+                .extracting(TeamResult::ine, TeamResult::cnes)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("0000000001", null),
+                        org.assertj.core.groups.Tuple.tuple("0000000002", "1234567"));
+    }
+
+    @Test
     void eachTeamIsComputedOnItsOwnEncountersAndTeamlessOnesStayApart() {
         RuleOutcome outcome = new C1Pack()
                 .evaluate(

@@ -26,6 +26,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * C1 behind the rule SPI (ADR 0030) — an adapter over {@link C1Rule}, which keeps computing
@@ -93,7 +95,7 @@ public final class C1Pack implements IndicatorRule {
             List<CanonicalEncounter> members = team.getValue();
             String ine = team.getKey().isEmpty() ? null : team.getKey();
             teams.add(new TeamResult(
-                    ine, firstCnes(members), C1Rule.compute(members, context.municipalityIbge(), period, cutoff)));
+                    ine, agreedCnes(members), C1Rule.compute(members, context.municipalityIbge(), period, cutoff)));
         }
         return new RuleOutcome(municipal, teams, evidence(encounters));
     }
@@ -137,12 +139,15 @@ public final class C1Pack implements IndicatorRule {
         };
     }
 
-    private static String firstCnes(List<CanonicalEncounter> members) {
-        for (CanonicalEncounter e : members) {
-            if (e.cnes() != null) {
-                return e.cnes();
-            }
-        }
-        return null;
+    /**
+     * The team's CNES when its counted encounters — those with a ficha CBO — agree on one, else
+     * {@code null}: never the first by order, nor one of an encounter the CBO filter excluded.
+     */
+    private static String agreedCnes(List<CanonicalEncounter> members) {
+        Set<String> cnes = members.stream()
+                .filter(e -> e.cnes() != null && C1Rule.isFichaCbo(e.cbo()))
+                .map(CanonicalEncounter::cnes)
+                .collect(Collectors.toSet());
+        return cnes.size() == 1 ? cnes.iterator().next() : null;
     }
 }

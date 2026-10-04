@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * The Nota Final do Componente III, computed on read (ADR 0030, NT 8/2026): the newest published
@@ -90,7 +91,7 @@ public final class QualityComponentService {
     static List<ComponentIIIInput.Unit> units(List<PublishedResult> results) {
         List<ComponentIIIInput.Monthly> municipal = new ArrayList<>();
         Map<String, List<ComponentIIIInput.Monthly>> byTeam = new TreeMap<>();
-        Map<String, String> cnesByTeam = new TreeMap<>();
+        Map<String, Set<String>> cnesByTeam = new TreeMap<>();
         for (PublishedResult result : results) {
             YearMonth month = YearMonth.parse(result.referencePeriod());
             IndicatorStatus status = IndicatorStatus.valueOf(result.status());
@@ -118,14 +119,22 @@ public final class QualityComponentService {
                                 team.consolidationEligible(),
                                 result.ruleVersion()));
                 if (team.cnes() != null) {
-                    cnesByTeam.putIfAbsent(team.ine(), team.cnes());
+                    cnesByTeam
+                            .computeIfAbsent(team.ine(), ine -> new TreeSet<>())
+                            .add(team.cnes());
                 }
             }
         }
         List<ComponentIIIInput.Unit> units = new ArrayList<>();
         units.add(new ComponentIIIInput.Unit(null, null, municipal));
-        byTeam.forEach((ine, monthly) -> units.add(new ComponentIIIInput.Unit(ine, cnesByTeam.get(ine), monthly)));
+        byTeam.forEach(
+                (ine, monthly) -> units.add(new ComponentIIIInput.Unit(ine, agreed(cnesByTeam.get(ine)), monthly)));
         return List.copyOf(units);
+    }
+
+    /** A team whose results disagree on its CNES (it moved, or the sources differ) gets none, never the first. */
+    private static String agreed(Set<String> cnes) {
+        return cnes != null && cnes.size() == 1 ? cnes.iterator().next() : null;
     }
 
     /** {@code sha256:} + SHA-256 of the ids read, sorted and joined by {@code \n}. */
