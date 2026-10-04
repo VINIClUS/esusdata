@@ -111,9 +111,7 @@ final class CapabilityDifferential {
             throws IOException {
         List<List<String>> keys = new ArrayList<>();
         long[][] counts = new long[parts.size()][3];
-        for (int index = 0; index < parts.size(); index++) {
-            keys.add(new ArrayList<>());
-        }
+        parts.forEach(part -> keys.add(new ArrayList<>()));
         try (BufferedReader lines = new BufferedReader(
                 new InputStreamReader(new GZIPInputStream(Files.newInputStream(extract)), StandardCharsets.UTF_8))) {
             String line = lines.readLine();
@@ -127,7 +125,7 @@ final class CapabilityDifferential {
                     throw new IllegalStateException("part " + index + " has a line of another record kind");
                 }
                 Map<String, Object> record = plain(entry.get("record"));
-                check(contracts.get(index), parts.get(index), municipality, record, counts[index]);
+                check(contracts.get(index), parts.get(index), counts[index], municipality, record);
                 String rendered = render(record);
                 keys.get(index).add(digest ? digest(rendered) : rendered);
                 line = lines.readLine();
@@ -182,9 +180,9 @@ final class CapabilityDifferential {
     private static void check(
             CapabilityContract contract,
             AcquisitionPart part,
+            long[] counts,
             String municipality,
-            Map<String, Object> record,
-            long[] counts) {
+            Map<String, Object> record) {
         if (!municipality.equals(record.get(contract.municipalityColumn()))) {
             counts[0]++;
         }
