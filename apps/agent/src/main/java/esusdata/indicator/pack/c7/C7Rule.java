@@ -7,7 +7,6 @@ import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CanonicalRegistration;
 import esusdata.indicator.model.ComponentSpec;
-import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
@@ -21,6 +20,7 @@ import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.Scores;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
+import esusdata.indicator.pack.PackSupport;
 import esusdata.indicator.pack.c7.C7Cohort.Member;
 import esusdata.indicator.pack.c7.C7Practices.Decision;
 import esusdata.indicator.pack.c7.C7Practices.Fact;
@@ -56,7 +56,9 @@ public final class C7Rule {
     /** The ungated outcome: municipal result, one per team (INE) and the evidence. */
     public static RuleOutcome compute(CanonicalDataset data, EvaluationContext context) {
         validateScope(data, context.municipalityIbge());
-        List<String> missing = uncoveredCapabilities(data, context);
+        List<String> missing = PackSupport.uncoveredParts(data, C7Pack.parts(context.competencia())).stream()
+                .map(PartRequirement::capability)
+                .toList();
         if (!missing.isEmpty()) {
             return new RuleOutcome(unsupported(missing, context), List.of(), List.of());
         }
@@ -247,28 +249,6 @@ public final class C7Rule {
                 m.ine(),
                 null,
                 null);
-    }
-
-    /**
-     * Capabilities the competência needs that the dataset says it did not read, or read for a
-     * shorter period: a capability never read must not look like a practice nobody did (null ≠ 0).
-     * A dataset that declares no window at all is trusted as validated by the run (ADR 0030).
-     */
-    private static List<String> uncoveredCapabilities(CanonicalDataset data, EvaluationContext context) {
-        if (data.windows().isEmpty()) {
-            return List.of();
-        }
-        List<String> missing = new ArrayList<>();
-        for (PartRequirement part : C7Pack.parts(context.competencia())) {
-            Optional<DateWindow> read = data.windowOf(part.capability());
-            boolean covered = read.isPresent()
-                    && !read.get().start().isAfter(part.periodStart())
-                    && !read.get().endExclusive().isBefore(part.periodEndExclusive());
-            if (!covered) {
-                missing.add(part.capability());
-            }
-        }
-        return missing;
     }
 
     private static IndicatorResult unsupported(List<String> missing, EvaluationContext context) {

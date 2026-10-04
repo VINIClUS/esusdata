@@ -1,5 +1,7 @@
 package esusdata.indicator.pack.c5;
 
+import static esusdata.indicator.pack.PackSupport.positive;
+
 import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalHomeVisit;
@@ -8,7 +10,6 @@ import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CboGroups;
 import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -239,18 +240,6 @@ final class C5Practices {
 
     private static boolean hasPressure(String systolic, String diastolic) {
         return positive(systolic) && positive(diastolic);
-    }
-
-    /** A measure counts only as a decimal greater than zero; invalid text does not count. */
-    private static boolean positive(String value) {
-        if (value == null || value.isBlank()) {
-            return false;
-        }
-        try {
-            return new BigDecimal(value.strip()).signum() > 0;
-        } catch (NumberFormatException e) {
-            return false;
-        }
     }
 
     private static boolean hasAny(List<String> codes) {

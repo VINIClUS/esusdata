@@ -10,6 +10,7 @@ import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.Scores;
+import esusdata.indicator.pack.PackSupport;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,27 +111,9 @@ final class C5Results {
      * counts and no components — never a zero from records that were not read (§1.6).
      */
     static IndicatorResult unsupported(Scope scope, List<String> unread) {
-        PackDescriptor descriptor = scope.descriptor();
-        EvaluationContext context = scope.context();
         List<String> limitations = new ArrayList<>(unread);
-        limitations.addAll(descriptor.standingLimitations());
-        return new IndicatorResult(
-                IndicatorStatus.UNSUPPORTED_SOURCE,
-                null,
-                null,
-                null,
-                descriptor.denominatorKind(),
-                null,
-                context.referencePeriod(),
-                descriptor.ruleVersion(),
-                context.dataCutoff().toString(),
-                context.municipalityIbge(),
-                limitations,
-                descriptor.calculationPolicyVersion(),
-                descriptor.valueKind(),
-                null,
-                List.of(),
-                false);
+        limitations.addAll(scope.descriptor().standingLimitations());
+        return PackSupport.unsupportedSource(scope.descriptor(), scope.context(), limitations);
     }
 
     private static List<ResultComponent> components(List<ComponentSpec> specs, List<Scored> people) {

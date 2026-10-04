@@ -2,7 +2,6 @@ package esusdata.indicator.pack.c3;
 
 import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CboGroups;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -237,18 +236,6 @@ final class C3Codes {
     /** True when the LPC condition is active or latent ("0", "1"); an unknown status is not. */
     static boolean active(CanonicalCondition condition) {
         return CONDITION_ACTIVE.contains(token(condition.status()));
-    }
-
-    /** True when the value parses as a decimal greater than zero (§1.7.1; never a {@code double}). */
-    static boolean positive(String value) {
-        if (value == null || value.isBlank()) {
-            return false;
-        }
-        try {
-            return new BigDecimal(value.strip()).signum() > 0;
-        } catch (NumberFormatException e) {
-            return false;
-        }
     }
 
     /** True when a LEDI code is in the list, "5" and "05" being the same code. */

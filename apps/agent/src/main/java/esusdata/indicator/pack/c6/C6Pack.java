@@ -23,6 +23,7 @@ import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.Scores;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
+import esusdata.indicator.pack.PackSupport;
 import esusdata.indicator.pack.c6.C6Cohort.Subject;
 import esusdata.indicator.pack.c6.C6Practices.Practice;
 import esusdata.indicator.pack.c6.C6Practices.Support;
@@ -211,8 +212,14 @@ public final class C6Pack implements IndicatorRule {
 
     /** The rule before the release gates: exact value, teams and evidence. */
     static RuleOutcome compute(CanonicalDataset data, EvaluationContext context) {
-        C6Scope.requireMunicipality(data, context.municipalityIbge());
-        List<String> uncovered = C6Scope.uncoveredCapabilities(data, new C6Pack().requirements(context.competencia()));
+        PackSupport.requireMunicipality(data, context.municipalityIbge());
+        List<String> uncovered =
+                PackSupport.uncoveredParts(
+                                data,
+                                new C6Pack().requirements(context.competencia()).parts())
+                        .stream()
+                        .map(PartRequirement::capability)
+                        .toList();
         if (!uncovered.isEmpty()) {
             List<String> limitations = new ArrayList<>();
             limitations.add("Capacidade não lida ou lida com janela menor que a pedida: " + String.join(", ", uncovered)

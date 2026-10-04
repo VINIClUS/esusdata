@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.c4;
 
 import esusdata.indicator.model.CboGroups;
+import esusdata.indicator.pack.PackSupport;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
@@ -39,13 +40,13 @@ public final class C4Codes {
     public static final String BLOOD_PRESSURE = "0301100039";
 
     /** {@code 01.01.04.002-4} «Avaliação antropométrica.» (Quadro 04, p. 5). */
-    public static final String ANTHROPOMETRY = "0101040024";
+    public static final String ANTHROPOMETRY = PackSupport.SIGTAP_ANTHROPOMETRY;
 
     /** {@code 01.01.04.008-3} «Medição de peso.» (Quadro 04, p. 5). */
-    public static final String WEIGHT = "0101040083";
+    public static final String WEIGHT = PackSupport.SIGTAP_WEIGHT;
 
     /** {@code 01.01.04.007-5} «Medição de altura.» (Quadro 04, p. 5). */
-    public static final String HEIGHT = "0101040075";
+    public static final String HEIGHT = PackSupport.SIGTAP_HEIGHT;
 
     /** {@code 02.02.01.050-3} «Dosagem de hemoglobina glicosilada.» (Quadro 06, p. 6). */
     public static final String HBA1C = "0202010503";
@@ -67,7 +68,7 @@ public final class C4Codes {
     public static final List<String> EXAM_CODES = List.of(HBA1C, HBA1C_ABEX);
 
     /** Prática A — Quadro 02 (p. 4) and item 24 c (p. 2): médicos e enfermeiros. */
-    public static final CboGroups CBO_A = CboGroups.of(MEDICO_2251, MEDICO_2252, MEDICO_2253, MEDICO_2231, ENFERMEIRO);
+    public static final CboGroups CBO_A = PackSupport.CONSULTATION_CBO;
 
     /**
      * Who evaluates the condition: «realizada por enfermeira(o) e/ou médica(o) da APS» (item 5, p. 1),

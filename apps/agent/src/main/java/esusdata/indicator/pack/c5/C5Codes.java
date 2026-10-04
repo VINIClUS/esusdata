@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.c5;
 
 import esusdata.indicator.model.CboGroups;
+import esusdata.indicator.pack.PackSupport;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -36,20 +37,20 @@ public final class C5Codes {
     public static final String SIGTAP_AFERICAO_PA = "0301100039";
 
     /** Quadro 04 (p. 5): «01.01.04.002-4» — «Avaliação antropométrica» (weight and height at once). */
-    public static final String SIGTAP_AVALIACAO_ANTROPOMETRICA = "0101040024";
+    public static final String SIGTAP_AVALIACAO_ANTROPOMETRICA = PackSupport.SIGTAP_ANTHROPOMETRY;
 
     /** Quadro 04 (p. 5): «01.01.04.008-3» — «Medição de peso». */
-    public static final String SIGTAP_MEDICAO_PESO = "0101040083";
+    public static final String SIGTAP_MEDICAO_PESO = PackSupport.SIGTAP_WEIGHT;
 
     /** Quadro 04 (p. 5): «01.01.04.007-5» — «Medição de altura». */
-    public static final String SIGTAP_MEDICAO_ALTURA = "0101040075";
+    public static final String SIGTAP_MEDICAO_ALTURA = PackSupport.SIGTAP_HEIGHT;
 
     /** Every SIGTAP code of Quadros 03 and 04 (p. 5), bound as {@code procedure_codes}. */
     public static final List<String> PROCEDURE_CODES =
             List.of(SIGTAP_AFERICAO_PA, SIGTAP_AVALIACAO_ANTROPOMETRICA, SIGTAP_MEDICAO_PESO, SIGTAP_MEDICAO_ALTURA);
 
     /** Quadro 02 (p. 4), practice A: «2251, 2252, 2253, 2231» médicos and «2235» enfermeiros. */
-    public static final CboGroups CBO_CONSULTA = CboGroups.of("2251", "2252", "2253", "2231", "2235");
+    public static final CboGroups CBO_CONSULTA = PackSupport.CONSULTATION_CBO;
 
     /**
      * Quadro 03 (p. 4–5), practice B. Without «5151-05», which nota de rodapé 4 (p. 6) withdrew; the
