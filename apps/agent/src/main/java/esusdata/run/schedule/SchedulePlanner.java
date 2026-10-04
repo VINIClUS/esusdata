@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,9 +16,9 @@ import java.util.Set;
  * <ul>
  *   <li>the PEC holds data of the source's municipality for it: for a pack that reads only
  *       atendimentos individuais (C1), a competência of the last coverage; for a pack that also
- *       reads cadastros, visitas, vacinas or procedimentos (C2–C7), any competência from the oldest
- *       one covered on — the coverage counts only atendimentos individuais, so a month without one
- *       still has data for those packs;
+ *       reads cadastros, visitas, vacinas or procedimentos (C2–C7), any competência of the coverage
+ *       window — the coverage counts only atendimentos individuais, so a month without one, or a
+ *       source without any, still has data for those packs;
  *   <li>it is closed and settled — at least {@code settleDays} into the following month, so the
  *       DW has had time to load the month's last fichas;
  *   <li>it has no published result of that pack yet — a published competência is never recomputed
@@ -72,12 +71,13 @@ public final class SchedulePlanner {
      */
     public static List<Candidate> pending(
             Collection<YearMonth> covered,
+            YearMonth windowFrom,
             List<String> packs,
             Set<String> attendanceScoped,
             Map<String, Set<YearMonth>> publishedByPack,
             LocalDate today,
             int settleDays) {
-        List<YearMonth> continuous = sinceOldest(covered, today, settleDays);
+        List<YearMonth> continuous = settledFrom(windowFrom, today, settleDays);
         List<Candidate> pending = new ArrayList<>();
         for (String pack : packs) {
             Collection<YearMonth> periods = attendanceScoped.contains(pack) ? covered : continuous;
@@ -91,6 +91,7 @@ public final class SchedulePlanner {
     /** At most {@code maxJobs} of {@link #pending}, in order, skipping what failed recently. */
     public static List<Candidate> next(
             Collection<YearMonth> covered,
+            YearMonth windowFrom,
             List<String> packs,
             Set<String> attendanceScoped,
             Map<String, Set<YearMonth>> publishedByPack,
@@ -98,20 +99,20 @@ public final class SchedulePlanner {
             LocalDate today,
             int settleDays,
             int maxJobs) {
-        return pending(covered, packs, attendanceScoped, publishedByPack, today, settleDays).stream()
+        return pending(covered, windowFrom, packs, attendanceScoped, publishedByPack, today, settleDays).stream()
                 .filter(candidate -> !recentlyFailed.contains(candidate))
                 .limit(Math.max(0, maxJobs))
                 .toList();
     }
 
-    /** Every settled competência from the oldest covered one on, gaps included; none without coverage. */
-    static List<YearMonth> sinceOldest(Collection<YearMonth> covered, LocalDate today, int settleDays) {
+    /** Every settled competência from {@code from} on, oldest first; none without a window. */
+    static List<YearMonth> settledFrom(YearMonth from, LocalDate today, int settleDays) {
         List<YearMonth> months = new ArrayList<>();
-        covered.stream().min(Comparator.naturalOrder()).ifPresent(oldest -> {
-            for (YearMonth month = oldest; isSettled(month, today, settleDays); month = month.plusMonths(1)) {
-                months.add(month);
-            }
-        });
+        for (YearMonth month = from;
+                month != null && isSettled(month, today, settleDays);
+                month = month.plusMonths(1)) {
+            months.add(month);
+        }
         return months;
     }
 

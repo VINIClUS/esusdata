@@ -22,7 +22,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -209,6 +208,7 @@ public final class CoverageScheduler implements SmartLifecycle {
                 coverage.periods().stream()
                         .map(period -> YearMonth.parse(period.referencePeriod()))
                         .toList(),
+                windowFrom(coverage),
                 List.copyOf(eligible.keySet()),
                 SourcePacks.attendanceScoped(eligible.values()),
                 publishedByPack(source),
@@ -261,12 +261,18 @@ public final class CoverageScheduler implements SmartLifecycle {
     }
 
     /**
-     * Every settled competência from the oldest of {@code covered} on, gaps included: what a pack
-     * beyond atendimentos individuais (C2–C7) is due in ({@link SchedulePlanner}).
+     * Every settled competência of the coverage window, oldest first: what a pack beyond
+     * atendimentos individuais (C2–C7) is due in ({@link SchedulePlanner}).
      */
-    public List<YearMonth> settledSinceOldest(Collection<YearMonth> covered) {
-        return SchedulePlanner.sinceOldest(
-                covered, LocalDate.now(clock.withZone(SourceCoverageService.ZONE)), settings.settleDays());
+    public List<YearMonth> settledInWindow(LastCoverage coverage) {
+        return SchedulePlanner.settledFrom(
+                windowFrom(coverage), LocalDate.now(clock.withZone(SourceCoverageService.ZONE)), settings.settleDays());
+    }
+
+    /** The first competência the coverage counted ({@code yyyy-MM}, or a date in it), or {@code null}. */
+    public static YearMonth windowFrom(LastCoverage coverage) {
+        String from = coverage.windowFrom();
+        return from == null || from.length() < 7 ? null : YearMonth.parse(from.substring(0, 7));
     }
 
     private Optional<Job> activeJob(SourceRecord source) {

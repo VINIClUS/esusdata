@@ -185,6 +185,7 @@ public class OverviewController {
             Map<YearMonth, List<String>> byMonth = new TreeMap<>();
             SchedulePlanner.pending(
                             counts.keySet(),
+                            CoverageScheduler.windowFrom(coverage),
                             packs,
                             SourcePacks.attendanceScoped(rules),
                             published,

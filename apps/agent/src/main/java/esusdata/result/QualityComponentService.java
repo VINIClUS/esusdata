@@ -22,6 +22,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -118,11 +119,10 @@ public final class QualityComponentService {
                                 value,
                                 team.consolidationEligible(),
                                 result.ruleVersion()));
-                if (team.cnes() != null) {
-                    cnesByTeam
-                            .computeIfAbsent(team.ine(), ine -> new TreeSet<>())
-                            .add(team.cnes());
-                }
+                // an unknown CNES is kept, as "", so it never agrees with a known one
+                cnesByTeam
+                        .computeIfAbsent(team.ine(), ine -> new TreeSet<>())
+                        .add(Objects.requireNonNullElse(team.cnes(), ""));
             }
         }
         List<ComponentIIIInput.Unit> units = new ArrayList<>();
@@ -132,9 +132,14 @@ public final class QualityComponentService {
         return List.copyOf(units);
     }
 
-    /** A team whose results disagree on its CNES (it moved, or the sources differ) gets none, never the first. */
+    /**
+     * A team whose results disagree on its CNES (it moved, the sources differ, or one does not know
+     * it) gets none, never the first.
+     */
     private static String agreed(Set<String> cnes) {
-        return cnes != null && cnes.size() == 1 ? cnes.iterator().next() : null;
+        return cnes != null && cnes.size() == 1 && !cnes.contains("")
+                ? cnes.iterator().next()
+                : null;
     }
 
     /** {@code sha256:} + SHA-256 of the ids read, sorted and joined by {@code \n}. */

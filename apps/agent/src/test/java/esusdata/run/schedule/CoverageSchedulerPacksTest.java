@@ -124,9 +124,10 @@ class CoverageSchedulerPacksTest {
 
         assertThat(state.lastOutcome()).isEqualTo("ENQUEUED");
         assertThat(state.lastPack()).isEqualTo(C2Pack.ID);
-        assertThat(state.lastPeriod()).isEqualTo("2026-04");
+        // C2 reads more than atendimentos: its history fills from the start of the coverage window
+        assertThat(state.lastPeriod()).isEqualTo("2024-11");
         assertThat(enqueued())
-                .containsExactly("c1-mais-acesso 2026-04", C2Pack.ID + " 2026-03", C2Pack.ID + " 2026-04");
+                .containsExactly("c1-mais-acesso 2026-04", C2Pack.ID + " 2024-10", C2Pack.ID + " 2024-11");
         Job c2 = fixture.jobRepository.findById(state.lastJobId()).orElseThrow();
         assertThat(c2.ruleVersion()).isEqualTo(C2Pack.RULE_VERSION);
         assertThat(c2.extractionId()).isNull();
@@ -145,7 +146,7 @@ class CoverageSchedulerPacksTest {
 
         assertThat(next.lastOutcome()).isEqualTo("ENQUEUED");
         assertThat(next.lastPack()).isEqualTo(C2Pack.ID);
-        assertThat(next.lastPeriod()).isEqualTo("2026-03");
+        assertThat(next.lastPeriod()).isEqualTo("2024-10");
     }
 
     @Test

@@ -14,6 +14,7 @@ import esusdata.web.ApiNotFoundException;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -139,8 +140,8 @@ public class ScheduleController {
 
     /**
      * The competências a person can run: the covered ones, and — when the source computes a pack
-     * beyond atendimentos individuais (C2–C7) — every settled month from the oldest covered one on,
-     * with zero atendimentos, as the scheduler sees them.
+     * beyond atendimentos individuais (C2–C7) — every settled month of the coverage window, with zero
+     * atendimentos, as the scheduler sees them.
      */
     private List<LastCoverage.PeriodCount> selectable(LastCoverage coverage, List<SourcePacks.Availability> packs) {
         List<IndicatorRule> available = packs.stream()
@@ -150,15 +151,12 @@ public class ScheduleController {
         if (SourcePacks.attendanceScoped(available).size() == available.size()) {
             return coverage.periods();
         }
-        List<YearMonth> covered = coverage.periods().stream()
-                .map(p -> YearMonth.parse(p.referencePeriod()))
-                .toList();
-        return withGaps(coverage.periods(), scheduler.settledSinceOldest(covered));
+        return withGaps(coverage.periods(), scheduler.settledInWindow(coverage));
     }
 
-    /** {@code covered} plus each month of {@code settled} it lacks, with zero atendimentos, oldest first. */
+    /** {@code covered} plus each month of {@code settled} it lacks, with zero atendimentos, newest first. */
     static List<LastCoverage.PeriodCount> withGaps(List<LastCoverage.PeriodCount> covered, List<YearMonth> settled) {
-        Map<YearMonth, Long> counts = new TreeMap<>();
+        Map<YearMonth, Long> counts = new TreeMap<>(Comparator.reverseOrder());
         covered.forEach(p -> counts.merge(YearMonth.parse(p.referencePeriod()), p.count(), Long::sum));
         settled.forEach(month -> counts.putIfAbsent(month, 0L));
         List<LastCoverage.PeriodCount> periods = new ArrayList<>(counts.size());

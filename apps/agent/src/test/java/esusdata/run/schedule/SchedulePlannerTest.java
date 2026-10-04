@@ -57,6 +57,7 @@ class SchedulePlannerTest {
         LocalDate today = LocalDate.of(2026, 10, 10);
         List<SchedulePlanner.Candidate> pending = SchedulePlanner.pending(
                 List.of(SEPTEMBER, MARCH, APRIL),
+                MARCH,
                 List.of("c1", "c2"),
                 BOTH_ATTENDANCE_SCOPED,
                 Map.of("c1", Set.of(MARCH), "c2", Set.of(APRIL)),
@@ -78,10 +79,11 @@ class SchedulePlannerTest {
         Map<String, Set<YearMonth>> published = Map.of("c1", Set.of(MARCH));
 
         assertThat(SchedulePlanner.next(
-                        covered, List.of("c1", "c2"), BOTH_ATTENDANCE_SCOPED, published, Set.of(), today, 5, 1))
+                        covered, MARCH, List.of("c1", "c2"), BOTH_ATTENDANCE_SCOPED, published, Set.of(), today, 5, 1))
                 .containsExactly(new SchedulePlanner.Candidate("c1", APRIL));
         assertThat(SchedulePlanner.next(
                         covered,
+                        MARCH,
                         List.of("c1", "c2"),
                         BOTH_ATTENDANCE_SCOPED,
                         published,
@@ -91,7 +93,7 @@ class SchedulePlannerTest {
                         2))
                 .containsExactly(
                         new SchedulePlanner.Candidate("c2", MARCH), new SchedulePlanner.Candidate("c2", APRIL));
-        assertThat(SchedulePlanner.next(covered, List.of(), Set.of(), published, Set.of(), today, 5, 3))
+        assertThat(SchedulePlanner.next(covered, MARCH, List.of(), Set.of(), published, Set.of(), today, 5, 3))
                 .isEmpty();
     }
 
@@ -107,20 +109,23 @@ class SchedulePlannerTest {
 
     /**
      * The coverage counts only atendimentos individuais: a pack that reads more (C2–C7) is due in
-     * every settled month from the oldest covered one on, gaps included, and C1 only in covered ones.
+     * every settled month of the coverage window — gaps, and a source without any atendimento,
+     * included — and C1 only in covered ones.
      */
     @Test
-    void aPackBeyondAtendimentosIsDueInEverySettledMonthSinceTheOldestCovered() {
+    void aPackBeyondAtendimentosIsDueInEverySettledMonthOfTheWindow() {
         LocalDate today = LocalDate.of(2026, 7, 3);
         List<SchedulePlanner.Candidate> pending = SchedulePlanner.pending(
-                List.of(MARCH, APRIL), List.of("c1", "c4"), Set.of("c1"), Map.of("c4", Set.of(MARCH)), today, 5);
+                List.of(APRIL), MARCH, List.of("c1", "c4"), Set.of("c1"), Map.of("c4", Set.of(MARCH)), today, 5);
 
         assertThat(pending)
                 .containsExactly(
-                        new SchedulePlanner.Candidate("c1", MARCH),
                         new SchedulePlanner.Candidate("c1", APRIL),
                         new SchedulePlanner.Candidate("c4", APRIL),
                         new SchedulePlanner.Candidate("c4", YearMonth.of(2026, 5)));
-        assertThat(SchedulePlanner.sinceOldest(List.of(), today, 5)).isEmpty();
+        assertThat(SchedulePlanner.pending(List.of(), MARCH, List.of("c4"), Set.of(), Map.of(), today, 5))
+                .extracting(SchedulePlanner.Candidate::period)
+                .containsExactly(MARCH, APRIL, YearMonth.of(2026, 5));
+        assertThat(SchedulePlanner.settledFrom(null, today, 5)).isEmpty();
     }
 }

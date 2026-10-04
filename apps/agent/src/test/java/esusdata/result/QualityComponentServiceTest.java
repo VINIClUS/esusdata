@@ -98,6 +98,27 @@ class QualityComponentServiceTest {
     }
 
     @Test
+    void aTeamWhoseCnesIsUnknownInOneResultHasNone() {
+        List<ComponentIIIInput.Unit> units = QualityComponentService.units(List.of(
+                result(
+                        "res-a",
+                        "c4-cuidado-diabetes",
+                        "2026-01",
+                        "COMPUTED",
+                        "60",
+                        "[" + team("0000000001", "2750325", "COMPUTED", "70") + "]"),
+                result(
+                        "res-b",
+                        "c4-cuidado-diabetes",
+                        "2026-02",
+                        "COMPUTED",
+                        "60",
+                        "[" + team("0000000001", null, "COMPUTED", "80") + "]")));
+
+        assertThat(units.get(1).cnes()).isNull();
+    }
+
+    @Test
     void theMunicipalityComesFirstThenOneUnitPerTeamWithValuesOnlyWhenComputed() {
         List<ComponentIIIInput.Unit> units = QualityComponentService.units(List.of(
                 result(
@@ -134,7 +155,7 @@ class QualityComponentServiceTest {
         assertThat(units.get(1).cnes()).isEqualTo("2750325");
         assertThat(units.get(1).monthly().getFirst().value()).isNull(); // BLOCKED: never a value
         ComponentIIIInput.Unit second = units.get(2);
-        assertThat(second.cnes()).isEqualTo("2750333");
+        assertThat(second.cnes()).isNull(); // unknown in January, 2750333 in February: no agreement
         assertThat(second.monthly())
                 .extracting(ComponentIIIInput.Monthly::value)
                 .containsExactly(ExactRatio.of(70, 1), ExactRatio.of(80, 1));
