@@ -3,6 +3,9 @@
 # acquisition of the Windows package (ADR 0014).
 contracts/** text eol=lf
 
+# SQL fixtures outside contracts/ are checksummed too (fixture_checksum, CapabilityMatrixConsistencyTest).
+*.sql text eol=lf
+
 # Formatting is checked byte-for-byte (Spotless, rustfmt; ADR 0018), including on the Windows
 # package job: sources are LF everywhere.
 *.java text eol=lf

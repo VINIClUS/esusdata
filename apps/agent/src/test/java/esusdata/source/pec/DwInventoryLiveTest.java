@@ -86,7 +86,7 @@ class DwInventoryLiveTest {
 
     private static final Pattern READ_QUERY = Pattern.compile("(?i)(select|with)\\b");
     private static final Pattern SQL_RUNNING_FUNCTION = Pattern.compile("(?i)\\b(\\w+_to_xml|dblink\\w*)\\s*\\(");
-    private static final Pattern META_COMMAND = Pattern.compile("\\\\(\\w+)(.*)");
+    private static final Pattern META_COMMAND = Pattern.compile("\\\\(\\w++)(.*)");
     private static final Pattern DOLLAR_TAG = Pattern.compile("\\$\\w*\\$");
     private static final Set<String> CATALOG_SCHEMAS = Set.of("pg_catalog", "information_schema");
     private static final Set<String> METADATA_TABLES = Set.of("tb_migracao", "tb_relatorio_processamento");

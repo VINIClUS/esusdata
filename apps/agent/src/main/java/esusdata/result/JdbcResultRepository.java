@@ -1,5 +1,6 @@
 package esusdata.result;
 
+import esusdata.indicator.IndicatorRuleRegistry;
 import esusdata.result.model.PublishedResult;
 import esusdata.result.model.ResultRepository;
 import java.util.Collections;
@@ -129,14 +130,23 @@ public final class JdbcResultRepository implements ResultRepository {
         requireScope(municipalityIbge);
         Map<String, Set<String>> byPack = new TreeMap<>();
         jdbc.query(
-                "select distinct indicator_pack, reference_period from results where municipality_ibge = ?",
-                (RowCallbackHandler)
-                        rs -> byPack.computeIfAbsent(rs.getString("indicator_pack"), pack -> new TreeSet<>())
-                                .add(rs.getString("reference_period")),
+                "select distinct indicator_pack, rule_version, reference_period from results where municipality_ibge = ?",
+                (RowCallbackHandler) rs -> {
+                    String pack = rs.getString("indicator_pack");
+                    if (isCurrentRule(pack, rs.getString("rule_version"))) {
+                        byPack.computeIfAbsent(pack, p -> new TreeSet<>()).add(rs.getString("reference_period"));
+                    }
+                },
                 municipalityIbge);
         Map<String, Set<String>> readOnly = new TreeMap<>();
         byPack.forEach((pack, periods) -> readOnly.put(pack, Collections.unmodifiableSet(periods)));
         return Collections.unmodifiableMap(readOnly);
+    }
+
+    private static boolean isCurrentRule(String pack, String ruleVersion) {
+        return IndicatorRuleRegistry.find(pack)
+                .map(rule -> rule.descriptor().ruleVersion().equals(ruleVersion))
+                .orElse(false);
     }
 
     /**

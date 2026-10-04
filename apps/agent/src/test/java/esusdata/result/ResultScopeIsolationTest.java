@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -224,6 +225,20 @@ class ResultScopeIsolationTest {
                 .hasSize(1);
         assertThat(resultRepository.findPublished("3550308", "c1-mais-acesso", "2026-03"))
                 .isEmpty();
+    }
+
+    @Test
+    void aCompetenciaPublishedByAnOlderRuleVersionIsNotPublishedForScheduling() {
+        assertThat(resultRepository.findPublishedPeriodsByPack("3541307"))
+                .containsExactly(Map.entry("c1-mais-acesso", Set.of("2026-03")));
+
+        context.getBean(JdbcTemplate.class)
+                .update(
+                        "UPDATE results SET rule_version = 'c1-mais-acesso@0.1.0' WHERE result_id = ?",
+                        resultIdMunicipalityA);
+
+        assertThat(resultRepository.findPublishedPeriodsByPack("3541307")).isEmpty();
+        assertThat(resultRepository.findPublishedPeriods("3541307")).containsExactly("2026-03");
     }
 
     @Test

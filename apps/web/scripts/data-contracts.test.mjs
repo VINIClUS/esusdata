@@ -1368,7 +1368,7 @@ test('labels the evidence rows: an opaque subject, an ambiguous practice never "
     'PRACTICE_EXEMPT',
     'SUPPORTING_EVENT',
     null,
-  ].map(normalizers.evidenceDecisionLabel)
+  ].map((decision) => normalizers.evidenceDecisionLabel(decision))
   assert.deepEqual(labels, [
     'Elegível',
     'Excluído',
@@ -1556,7 +1556,9 @@ test('names a run and an export by the catalog, else by the pack id', () => {
 test('quadrimestres: Q1 jan–abr, Q2 mai–ago, Q3 set–dez — never a civil quarter', () => {
   const { quadrimestreDe, quadrimestreLabel, quadrimestresDasCompetencias } = normalizers
   assert.deepEqual(
-    ['2026-01', '2026-04', '2026-05', '2026-08', '2026-09', '2026-12'].map(quadrimestreDe),
+    ['2026-01', '2026-04', '2026-05', '2026-08', '2026-09', '2026-12'].map((competencia) =>
+      quadrimestreDe(competencia),
+    ),
     ['2026-Q1', '2026-Q1', '2026-Q2', '2026-Q2', '2026-Q3', '2026-Q3'],
   )
   assert.equal(quadrimestreDe('2026-13'), null)

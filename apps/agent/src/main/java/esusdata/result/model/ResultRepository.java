@@ -25,7 +25,8 @@ public interface ResultRepository {
 
     /**
      * The competências with a published result of each pack in the municipality (ADR 0030:
-     * "publicado" is per pack), by pack id, each set in ascending order.
+     * "publicado" is per pack), by pack id, each set in ascending order. Only results of the rule
+     * version this release computes count: a competência published by an older version is due again.
      */
     Map<String, Set<String>> findPublishedPeriodsByPack(String municipalityIbge);
 
