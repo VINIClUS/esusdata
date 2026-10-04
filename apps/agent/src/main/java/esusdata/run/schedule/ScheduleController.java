@@ -3,6 +3,7 @@ package esusdata.run.schedule;
 import esusdata.auth.ApiAuthorization;
 import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.Permission;
+import esusdata.indicator.model.IndicatorRule;
 import esusdata.result.model.ResultRepository;
 import esusdata.source.SourceIsolationService;
 import esusdata.source.SourceRepository;
@@ -11,6 +12,7 @@ import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.UnsupportedSourceException;
 import esusdata.web.ApiNotFoundException;
 import java.time.Instant;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -128,11 +130,40 @@ public class ScheduleController {
                 current == null ? null : current.checkedAt(),
                 current == null
                         ? List.of()
-                        : current.periods().stream()
+                        : selectable(current, packs).stream()
                                 .map(period -> period(period, computable, publishedPacks))
                                 .toList(),
                 packs.stream().map(ScheduleController::pack).toList(),
                 schedule(scheduleRepository.find(source.id())));
+    }
+
+    /**
+     * The competências a person can run: the covered ones, and — when the source computes a pack
+     * beyond atendimentos individuais (C2–C7) — every settled month from the oldest covered one on,
+     * with zero atendimentos, as the scheduler sees them.
+     */
+    private List<LastCoverage.PeriodCount> selectable(LastCoverage coverage, List<SourcePacks.Availability> packs) {
+        List<IndicatorRule> available = packs.stream()
+                .filter(SourcePacks.Availability::available)
+                .map(SourcePacks.Availability::rule)
+                .toList();
+        if (SourcePacks.attendanceScoped(available).size() == available.size()) {
+            return coverage.periods();
+        }
+        List<YearMonth> covered = coverage.periods().stream()
+                .map(p -> YearMonth.parse(p.referencePeriod()))
+                .toList();
+        return withGaps(coverage.periods(), scheduler.settledSinceOldest(covered));
+    }
+
+    /** {@code covered} plus each month of {@code settled} it lacks, with zero atendimentos, oldest first. */
+    static List<LastCoverage.PeriodCount> withGaps(List<LastCoverage.PeriodCount> covered, List<YearMonth> settled) {
+        Map<YearMonth, Long> counts = new TreeMap<>();
+        covered.forEach(p -> counts.merge(YearMonth.parse(p.referencePeriod()), p.count(), Long::sum));
+        settled.forEach(month -> counts.putIfAbsent(month, 0L));
+        List<LastCoverage.PeriodCount> periods = new ArrayList<>(counts.size());
+        counts.forEach((month, count) -> periods.add(new LastCoverage.PeriodCount(month.toString(), count)));
+        return periods;
     }
 
     /** Published when every pack the source can compute is: never for a source that computes none. */

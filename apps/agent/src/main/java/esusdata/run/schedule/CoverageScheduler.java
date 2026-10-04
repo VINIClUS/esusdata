@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -257,6 +258,15 @@ public final class CoverageScheduler implements SmartLifecycle {
             }
         }
         return record(source, Outcome.ENQUEUED, null, last);
+    }
+
+    /**
+     * Every settled competência from the oldest of {@code covered} on, gaps included: what a pack
+     * beyond atendimentos individuais (C2–C7) is due in ({@link SchedulePlanner}).
+     */
+    public List<YearMonth> settledSinceOldest(Collection<YearMonth> covered) {
+        return SchedulePlanner.sinceOldest(
+                covered, LocalDate.now(clock.withZone(SourceCoverageService.ZONE)), settings.settleDays());
     }
 
     private Optional<Job> activeJob(SourceRecord source) {
