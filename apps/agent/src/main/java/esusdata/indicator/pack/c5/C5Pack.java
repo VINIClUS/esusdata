@@ -3,18 +3,7 @@ package esusdata.indicator.pack.c5;
 import esusdata.indicator.model.AgeAt;
 import esusdata.indicator.model.Bands;
 import esusdata.indicator.model.BudgetHint;
-import esusdata.indicator.model.CanonicalCareEvent;
-import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalDataset;
-import esusdata.indicator.model.CanonicalEncounter;
-import esusdata.indicator.model.CanonicalHomeVisit;
-import esusdata.indicator.model.CanonicalImmunization;
-import esusdata.indicator.model.CanonicalMeasurement;
-import esusdata.indicator.model.CanonicalPerson;
-import esusdata.indicator.model.CanonicalPregnancyOutcome;
-import esusdata.indicator.model.CanonicalProcedureEvent;
-import esusdata.indicator.model.CanonicalRegistration;
-import esusdata.indicator.model.CanonicalTeam;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ComponentSpec;
@@ -32,6 +21,7 @@ import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
+import esusdata.indicator.pack.PackSupport;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -40,8 +30,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.function.Function;
-import java.util.stream.Stream;
 
 /**
  * C5 — Cuidado da pessoa com hipertensão (Tech Spec §2.4; ficha transcrita em {@code
@@ -182,7 +170,7 @@ public final class C5Pack implements IndicatorRule {
 
     /** The computed outcome before the release gates, so tests can see the value the gate hides. */
     RuleOutcome evaluateUngated(CanonicalDataset data, EvaluationContext context) {
-        requireMunicipality(data, context.municipalityIbge());
+        PackSupport.requireMunicipality(data, context.municipalityIbge());
         C5Results.Scope scope = new C5Results.Scope(DESCRIPTOR, context);
         List<String> unread = unreadCapabilities(data, context.competencia());
         if (!unread.isEmpty()) {
@@ -218,18 +206,10 @@ public final class C5Pack implements IndicatorRule {
      */
     private List<String> unreadCapabilities(CanonicalDataset data, YearMonth competencia) {
         List<String> unread = new ArrayList<>();
-        if (data.windows().isEmpty()) {
-            return unread;
-        }
-        for (PartRequirement part : requirements(competencia).parts()) {
-            DateWindow read = data.windowOf(part.capability()).orElse(null);
-            boolean covered = read != null
-                    && !read.start().isAfter(part.periodStart())
-                    && !read.endExclusive().isBefore(part.periodEndExclusive());
-            if (!covered) {
-                unread.add("Capacidade " + part.capability() + " ausente ou lida com janela menor que a exigida ("
-                        + part.periodStart() + " a " + part.periodEndExclusive().minusDays(1) + ").");
-            }
+        for (PartRequirement part :
+                PackSupport.uncoveredParts(data, requirements(competencia).parts())) {
+            unread.add("Capacidade " + part.capability() + " ausente ou lida com janela menor que a exigida ("
+                    + part.periodStart() + " a " + part.periodEndExclusive().minusDays(1) + ").");
         }
         return unread;
     }
@@ -297,33 +277,6 @@ public final class C5Pack implements IndicatorRule {
         List<String> cnes =
                 members.stream().map(m -> m.decision().cnes()).distinct().toList();
         return cnes.size() == 1 ? cnes.get(0) : null;
-    }
-
-    /** Every record must belong to the authorized municipality; otherwise nothing is computed. */
-    private static void requireMunicipality(CanonicalDataset data, String municipalityIbge) {
-        Stream.of(
-                        municipalities(data.encounters(), CanonicalEncounter::municipalityIbge),
-                        municipalities(data.persons(), CanonicalPerson::municipalityIbge),
-                        municipalities(data.registrations(), CanonicalRegistration::municipalityIbge),
-                        municipalities(data.teams(), CanonicalTeam::municipalityIbge),
-                        municipalities(data.careEvents(), CanonicalCareEvent::municipalityIbge),
-                        municipalities(data.procedureEvents(), CanonicalProcedureEvent::municipalityIbge),
-                        municipalities(data.homeVisits(), CanonicalHomeVisit::municipalityIbge),
-                        municipalities(data.immunizations(), CanonicalImmunization::municipalityIbge),
-                        municipalities(data.conditions(), CanonicalCondition::municipalityIbge),
-                        municipalities(data.measurements(), CanonicalMeasurement::municipalityIbge),
-                        municipalities(data.pregnancyOutcomes(), CanonicalPregnancyOutcome::municipalityIbge))
-                .flatMap(Function.identity())
-                .filter(m -> !municipalityIbge.equals(m))
-                .findFirst()
-                .ifPresent(m -> {
-                    throw new IllegalArgumentException(
-                            "C5: registro do município " + m + " fora do município autorizado " + municipalityIbge);
-                });
-    }
-
-    private static <T> Stream<String> municipalities(List<T> records, Function<T, String> municipality) {
-        return records.stream().map(municipality);
     }
 
     private static PartRequirement part(String capability, DateWindow period, DateWindow births) {

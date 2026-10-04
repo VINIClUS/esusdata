@@ -43,6 +43,7 @@ import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.pack.PackSupport;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -366,8 +367,8 @@ class C4IntegrationReviewTest {
         assertThat(met(o, "p1", "B")).isFalse();
         assertThat(met(o, "p1", "C")).isFalse();
         assertThat(met(o, "p1", "D")).isFalse();
-        assertThat(C4Practices.positive("abc")).isFalse();
-        assertThat(C4Practices.positive("72.5")).isTrue();
+        assertThat(PackSupport.positive("abc")).isFalse();
+        assertThat(PackSupport.positive("72.5")).isTrue();
     }
 
     // ---- 9: a condition status outside 0/1/2 is diagnosed ---------------------------------------

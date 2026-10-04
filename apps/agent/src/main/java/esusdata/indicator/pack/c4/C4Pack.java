@@ -12,7 +12,6 @@ import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
-import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
@@ -22,6 +21,7 @@ import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
+import esusdata.indicator.pack.PackSupport;
 import esusdata.indicator.pack.c4.C4Cohort.Subject;
 import esusdata.indicator.pack.c4.C4Scoring.Scored;
 import java.time.LocalDate;
@@ -185,20 +185,11 @@ public final class C4Pack implements IndicatorRule {
      * dataset that declares no window at all is not checked.
      */
     static List<String> unreadParts(CanonicalDataset data, YearMonth competencia) {
-        List<String> missing = new ArrayList<>();
-        if (data.windows().isEmpty()) {
-            return missing;
-        }
-        for (PartRequirement part : new C4Pack().requirements(competencia).parts()) {
-            Optional<DateWindow> read = data.windowOf(part.capability());
-            boolean covered = read.isPresent()
-                    && !read.get().start().isAfter(part.periodStart())
-                    && !read.get().endExclusive().isBefore(part.periodEndExclusive());
-            if (!covered) {
-                missing.add(part.capability());
-            }
-        }
-        return missing;
+        return PackSupport.uncoveredParts(
+                        data, new C4Pack().requirements(competencia).parts())
+                .stream()
+                .map(PartRequirement::capability)
+                .toList();
     }
 
     /** {@code UNSUPPORTED_SOURCE}: no value and no counts — a part not read is never a zero. */
@@ -207,29 +198,13 @@ public final class C4Pack implements IndicatorRule {
         limitations.add("Fonte sem as partes exigidas pela regra (lidas com janela ausente ou menor): "
                 + String.join(", ", missing) + ".");
         limitations.addAll(DESCRIPTOR.standingLimitations());
-        IndicatorResult result = new IndicatorResult(
-                IndicatorStatus.UNSUPPORTED_SOURCE,
-                null,
-                null,
-                null,
-                DESCRIPTOR.denominatorKind(),
-                null,
-                context.referencePeriod(),
-                DESCRIPTOR.ruleVersion(),
-                context.dataCutoff().toString(),
-                context.municipalityIbge(),
-                limitations,
-                DESCRIPTOR.calculationPolicyVersion(),
-                DESCRIPTOR.valueKind(),
-                null,
-                List.of(),
-                false);
+        IndicatorResult result = PackSupport.unsupportedSource(DESCRIPTOR, context, limitations);
         return new RuleOutcome(result, List.of(), List.of());
     }
 
     /** The computation before the release gates: what the gates hide, exactly as computed. */
     static RuleOutcome evaluateUngated(CanonicalDataset data, EvaluationContext context) {
-        C4Scope.requireMunicipality(data, context.municipalityIbge());
+        PackSupport.requireCoreMunicipality(data, context.municipalityIbge());
         List<String> missing = unreadParts(data, context.competencia());
         if (!missing.isEmpty()) {
             return unsupported(context, missing);

@@ -4,6 +4,7 @@ import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalHomeVisit;
 import esusdata.indicator.model.CanonicalMeasurement;
 import esusdata.indicator.model.CanonicalProcedureEvent;
+import esusdata.indicator.pack.PackSupport;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -107,7 +108,7 @@ final class RecordingPractices {
 
     /** A measured value counts only as a decimal greater than zero. */
     static boolean present(String value) {
-        return C3Codes.positive(value);
+        return PackSupport.positive(value);
     }
 
     /** The weights, heights and undecided pairs of the pregnancy, by day (Quadro 04). */

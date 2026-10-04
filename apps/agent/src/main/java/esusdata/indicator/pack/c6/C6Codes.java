@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.c6;
 
 import esusdata.indicator.model.CboGroups;
+import esusdata.indicator.pack.PackSupport;
 import java.util.List;
 
 /**
@@ -21,7 +22,7 @@ final class C6Codes {
     static final int MINIMUM_VISIT_INTERVAL_DAYS = 30;
 
     /** Prática A, Quadro 02 (p. 4): médicos {@code 2251, 2252, 2253, 2231} e enfermeiros {@code 2235}. */
-    static final CboGroups CONSULTATION_CBO = CboGroups.of("2251", "2252", "2253", "2231", "2235");
+    static final CboGroups CONSULTATION_CBO = PackSupport.CONSULTATION_CBO;
 
     /**
      * Prática B, Quadro 03 (p. 4–5): médicos, enfermeiros, {@code 3222}, {@code 5151-05}, {@code
@@ -36,13 +37,13 @@ final class C6Codes {
     static final CboGroups HOME_VISIT_CBO = CboGroups.of("3222-55", "5151-05");
 
     /** Quadro 03 (p. 5) e item 24 f (p. 3): «01.01.04.002-4 - Avaliação antropométrica». */
-    static final String SIGTAP_ANTHROPOMETRIC_ASSESSMENT = "0101040024";
+    static final String SIGTAP_ANTHROPOMETRIC_ASSESSMENT = PackSupport.SIGTAP_ANTHROPOMETRY;
 
     /** Quadro 03 (p. 5) e item 24 f (p. 3): «01.01.04.008-3 - Medição de peso». */
-    static final String SIGTAP_WEIGHT = "0101040083";
+    static final String SIGTAP_WEIGHT = PackSupport.SIGTAP_WEIGHT;
 
     /** Quadro 03 (p. 5) e item 24 f (p. 3): «01.01.04.007-5 - Medição de altura». */
-    static final String SIGTAP_HEIGHT = "0101040075";
+    static final String SIGTAP_HEIGHT = PackSupport.SIGTAP_HEIGHT;
 
     /** The SIGTAP codes the pack binds to {@code procedure_performed} (prática B only; AMB-C6-06). */
     static final List<String> PROCEDURE_CODES = List.of(SIGTAP_ANTHROPOMETRIC_ASSESSMENT, SIGTAP_WEIGHT, SIGTAP_HEIGHT);

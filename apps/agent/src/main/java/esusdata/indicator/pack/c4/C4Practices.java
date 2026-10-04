@@ -1,5 +1,7 @@
 package esusdata.indicator.pack.c4;
 
+import static esusdata.indicator.pack.PackSupport.positive;
+
 import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalHomeVisit;
@@ -8,7 +10,6 @@ import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CboGroups;
 import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.SourceRef;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
@@ -269,18 +270,6 @@ final class C4Practices {
 
     private static boolean accepted(DateWindow window, CboGroups cbo, String date, String occupation) {
         return cbo.matches(occupation) && window.contains(LocalDate.parse(date));
-    }
-
-    /** A measured value is present when it is a positive number; blank, zero or garbage is absent. */
-    static boolean positive(String value) {
-        if (value == null || value.isBlank()) {
-            return false;
-        }
-        try {
-            return new BigDecimal(value.trim()).signum() > 0;
-        } catch (NumberFormatException e) {
-            return false;
-        }
     }
 
     private static Outcome atLeastOne(List<Support> supports) {
