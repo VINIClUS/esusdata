@@ -9,6 +9,7 @@ import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
+import esusdata.indicator.pack.c1.C1Rule;
 import esusdata.indicator.pack.componente3.ComponentIII;
 import esusdata.web.ApiFixtureSupport;
 import java.math.BigInteger;
@@ -175,7 +176,7 @@ class QualityComponentConsolidationTest extends ApiFixtureSupport {
                 c1 ? "PROGRAMADOS_MAIS_ESPONTANEOS" : null,
                 null,
                 period,
-                pack + "@0.1.0",
+                c1 ? C1Rule.RULE_VERSION : pack + "@0.1.0",
                 YearMonth.parse(period).atEndOfMonth().toString(),
                 IBGE,
                 List.of(),

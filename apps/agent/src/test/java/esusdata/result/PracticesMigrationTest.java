@@ -80,7 +80,7 @@ class PracticesMigrationTest {
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version, reference_period,
                     state, attempt, max_attempts, process_instance_id, execution_generation, created_at, source_id,
                     staging_id)
-                VALUES ('job-1', 'run-1', ?, 'c1-mais-acesso', 'c1-mais-acesso@0.1.0', '2026-03', 'SUCCEEDED', 1, 3,
+                VALUES ('job-1', 'run-1', ?, 'c1-mais-acesso', 'c1-mais-acesso@0.2.0', '2026-03', 'SUCCEEDED', 1, 3,
                     'proc-1', 1, '2026-04-01T00:00:00Z', 'src-1', 'stg-1')
                 """, IBGE);
         jdbc.update("""
@@ -98,7 +98,7 @@ class PracticesMigrationTest {
                     numerator_text, denominator_text, denominator_kind, classification, data_cutoff, extraction_id,
                     adapter_version, calculation_policy_version, limitations_json, input_fingerprint, evidence_grain)
                 VALUES ('stg-1', 'job-1', 1, 'proc-1', '2026-04-01T00:00:00Z', 'PUBLISHED', 'c1-mais-acesso',
-                    'c1-mais-acesso@0.1.0', ?, '2026-03', 'BLOCKED', NULL, '1', '2', 'PROGRAMADOS_MAIS_ESPONTANEOS',
+                    'c1-mais-acesso@0.2.0', ?, '2026-03', 'BLOCKED', NULL, '1', '2', 'PROGRAMADOS_MAIS_ESPONTANEOS',
                     NULL, '2026-03-31', 'ext-1', '0.1.0', 'c1-exact-ratio@1', '["Portão A"]', 'sha256:cc',
                     'SOURCE_EVENT')
                 """, IBGE);
@@ -108,7 +108,7 @@ class PracticesMigrationTest {
                     INSERT INTO evidence (staging_id, seq, source_entity_type, source_record_id, care_date, modality,
                         cnes, ine, cbo, decision, criterion_version)
                     VALUES ('stg-1', ?, 'tb_fat_atendimento_individual', ?, '2026-03-02', ?, '2750325', '0000346268',
-                        '225142', ?, 'c1-mais-acesso@0.1.0')
+                        '225142', ?, 'c1-mais-acesso@0.2.0')
                     """,
                     seq,
                     "rec-" + seq,
@@ -122,7 +122,7 @@ class PracticesMigrationTest {
                     calculation_policy_version, limitations_json, input_fingerprint, result_nature, validation_status,
                     completeness_status, consistency_level, reproducibility_level, canonical_schema_version,
                     evidence_grain, app_build, published_at)
-                VALUES ('res-1', 'job-1', 'run-1', 'stg-1', 'src-1', 'c1-mais-acesso', 'c1-mais-acesso@0.1.0', ?,
+                VALUES ('res-1', 'job-1', 'run-1', 'stg-1', 'src-1', 'c1-mais-acesso', 'c1-mais-acesso@0.2.0', ?,
                     '2026-03', 'BLOCKED', NULL, '1', '2', 'PROGRAMADOS_MAIS_ESPONTANEOS', NULL, '2026-03-31', 'ext-1',
                     '0.1.0', 'c1-exact-ratio@1', '["Portão A"]', 'sha256:cc', 'LOCAL_ESTIMATE', 'NOT_VALIDATED',
                     'COMPLETE', 'SNAPSHOT', 'REPRODUCIBLE', '1', 'SOURCE_EVENT', '0.1.7', '2026-04-01T00:00:02Z')

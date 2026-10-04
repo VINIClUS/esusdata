@@ -22,7 +22,7 @@ class ReportCsvTest {
                                         ReportCsv.HEADER.stream()
                                                 .map(h -> "\"" + h + "\"")
                                                 .toList()),
-                        "\"3541307\";\"c1-mais-acesso\";\"c1-mais-acesso@0.1.0\";\"2026-03\";\"COMPUTED\";\"3\";\"5\";"
+                        "\"3541307\";\"c1-mais-acesso\";\"c1-mais-acesso@0.2.0\";\"2026-03\";\"COMPUTED\";\"3\";\"5\";"
                                 + "\"60,0000\";\"PERCENTAGE\";\"BOM\";\"2026-03-31\";\"2026-04-01T10:00:00Z\";\"run-1\"",
                         "");
     }
@@ -99,7 +99,7 @@ class ReportCsvTest {
                 "run-1",
                 "src-1",
                 "c1-mais-acesso",
-                "c1-mais-acesso@0.1.0",
+                "c1-mais-acesso@0.2.0",
                 "3541307",
                 "2026-03",
                 "COMPUTED",

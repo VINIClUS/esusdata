@@ -355,7 +355,7 @@ function evento(
     decision: decision[modality],
     reasonCode: null,
     points: null,
-    criterionVersion: 'c1-mais-acesso@0.1.0',
+    criterionVersion: 'c1-mais-acesso@0.2.0',
   }
 }
 

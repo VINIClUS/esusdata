@@ -107,6 +107,26 @@ class C1PackTest {
     }
 
     @Test
+    void anEncounterOutsideTheFichaCboListIsExcludedWithItsReasonCode() {
+        CanonicalEncounter outside = new CanonicalEncounter(
+                new SourceRef("pec-1", "tb_fat_atendimento_individual", "9"),
+                "3541307",
+                "2026-03-10",
+                CanonicalModality.PROGRAMADO,
+                "1234567",
+                "0000000001",
+                "515105");
+        List<EvidenceItem> evidence = C1Pack.evidence(List.of(outside));
+        assertThat(evidence).singleElement().satisfies(e -> {
+            assertThat(e.decision()).isEqualTo(EvidenceDecision.EXCLUDED);
+            assertThat(e.reasonCode()).isEqualTo(C1Rule.REASON_CBO_OUTSIDE_FICHA);
+            assertThat(e.cbo()).isEqualTo("515105");
+        });
+        assertThat(C1Pack.evidence(sample()))
+                .allSatisfy(e -> assertThat(e.reasonCode()).isNull());
+    }
+
+    @Test
     void classifiesWithC1sOwnNonMonotonicBands() {
         assertThat(new C1Pack().classify(esusdata.indicator.model.ExactRatio.of(80, 1)))
                 .contains(esusdata.indicator.model.Classification.REGULAR);

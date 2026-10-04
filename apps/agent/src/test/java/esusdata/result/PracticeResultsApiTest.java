@@ -268,7 +268,7 @@ class PracticeResultsApiTest extends ApiFixtureSupport {
                         "PROGRAMADOS_MAIS_ESPONTANEOS",
                         null,
                         "2026-05",
-                        "c1-mais-acesso@0.1.0",
+                        "c1-mais-acesso@0.2.0",
                         "2026-05-31",
                         ibge,
                         List.of(),

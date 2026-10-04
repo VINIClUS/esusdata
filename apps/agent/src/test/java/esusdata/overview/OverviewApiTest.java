@@ -116,7 +116,7 @@ class OverviewApiTest extends ApiFixtureSupport {
         String manager = manager(ibge);
 
         assertThat(overview(manager, ibge, null).body())
-                .contains("{\"indicatorPack\":\"c1-mais-acesso\",\"ruleVersion\":\"c1-mais-acesso@0.1.0\","
+                .contains("{\"indicatorPack\":\"c1-mais-acesso\",\"ruleVersion\":\"c1-mais-acesso@0.2.0\","
                         + "\"family\":\"QUALIDADE_ESF_EAP\",\"unit\":\"percentual\",\"code\":\"C1\","
                         + "\"title\":\"Mais acesso\",\"valueKind\":\"PERCENTAGE\",\"runnable\":true,"
                         + "\"availability\":\"NO_SOURCE\",\"missingCapabilities\":[]");
@@ -182,7 +182,7 @@ class OverviewApiTest extends ApiFixtureSupport {
                 "PROGRAMADOS_MAIS_ESPONTANEOS",
                 Classification.BOM,
                 period,
-                "c1-mais-acesso@0.1.0",
+                "c1-mais-acesso@0.2.0",
                 YearMonth.parse(period).atEndOfMonth().toString(),
                 ibge,
                 List.of(),

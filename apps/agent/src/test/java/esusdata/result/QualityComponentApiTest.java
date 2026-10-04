@@ -119,7 +119,7 @@ class QualityComponentApiTest extends ApiFixtureSupport {
                 "PROGRAMADOS_MAIS_ESPONTANEOS",
                 null,
                 period,
-                "c1-mais-acesso@0.1.0",
+                "c1-mais-acesso@0.2.0",
                 YearMonth.parse(period).atEndOfMonth().toString(),
                 ibge,
                 List.of(),

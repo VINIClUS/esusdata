@@ -150,7 +150,7 @@ class ReportExportApiTest extends ApiFixtureSupport {
                         "PROGRAMADOS_MAIS_ESPONTANEOS",
                         Classification.BOM,
                         referencePeriod,
-                        "c1-mais-acesso@0.1.0",
+                        "c1-mais-acesso@0.2.0",
                         referencePeriod + "-28",
                         MUNICIPALITY,
                         List.of(),
