@@ -75,7 +75,7 @@ const DOZE_MESES = '12 meses'
 export const catalogoFixture: IndicatorPack[] = [
   {
     id: 'c1-mais-acesso',
-    ruleVersion: 'c1-mais-acesso@0.1.0',
+    ruleVersion: 'c1-mais-acesso@0.2.0',
     family: FAMILIA,
     unit: 'percentual',
     dependsOn: [],

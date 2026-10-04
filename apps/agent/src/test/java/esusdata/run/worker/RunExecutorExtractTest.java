@@ -150,7 +150,7 @@ class RunExecutorExtractTest {
                 "run-1",
                 "3541307",
                 "c1-mais-acesso",
-                "c1-mais-acesso@0.1.0",
+                "c1-mais-acesso@0.2.0",
                 "2026-03",
                 3,
                 "src-1",

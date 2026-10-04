@@ -3,6 +3,7 @@ package esusdata.indicator.pack.c1;
 import esusdata.indicator.model.BudgetHint;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalEncounter;
+import esusdata.indicator.model.CanonicalModality;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.DataRequirements;
 import esusdata.indicator.model.EvaluationContext;
@@ -102,15 +103,15 @@ public final class C1Pack implements IndicatorRule {
         return Optional.of(C1Rule.classify(value));
     }
 
-    /** One row per encounter, exactly as the run pipeline has written C1 evidence since V2. */
+    /**
+     * One row per encounter, as the run pipeline has written C1 evidence since V2; an encounter
+     * outside the ficha's CBO list is {@code EXCLUDED} with {@link C1Rule#REASON_CBO_OUTSIDE_FICHA}.
+     */
     static List<EvidenceItem> evidence(List<CanonicalEncounter> encounters) {
         List<EvidenceItem> items = new ArrayList<>(encounters.size());
         for (CanonicalEncounter e : encounters) {
-            EvidenceDecision decision = switch (e.modality()) {
-                case PROGRAMADO -> EvidenceDecision.IN_NUMERATOR;
-                case ESPONTANEO -> EvidenceDecision.DENOMINATOR_ONLY;
-                case UNMAPPED -> EvidenceDecision.EXCLUDED_UNMAPPED;
-            };
+            boolean inFicha = C1Rule.isFichaCbo(e.cbo());
+            EvidenceDecision decision = inFicha ? byModality(e.modality()) : EvidenceDecision.EXCLUDED;
             items.add(new EvidenceItem(
                     EvidenceSubjectKind.EVENT,
                     null,
@@ -118,7 +119,7 @@ public final class C1Pack implements IndicatorRule {
                     e.careDate(),
                     null,
                     decision,
-                    null,
+                    inFicha ? null : C1Rule.REASON_CBO_OUTSIDE_FICHA,
                     null,
                     e.cnes(),
                     e.ine(),
@@ -126,6 +127,14 @@ public final class C1Pack implements IndicatorRule {
                     e.modality().name()));
         }
         return items;
+    }
+
+    private static EvidenceDecision byModality(CanonicalModality modality) {
+        return switch (modality) {
+            case PROGRAMADO -> EvidenceDecision.IN_NUMERATOR;
+            case ESPONTANEO -> EvidenceDecision.DENOMINATOR_ONLY;
+            case UNMAPPED -> EvidenceDecision.EXCLUDED_UNMAPPED;
+        };
     }
 
     private static String firstCnes(List<CanonicalEncounter> members) {

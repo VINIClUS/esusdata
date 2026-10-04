@@ -204,7 +204,7 @@ class GrantRevocationDuringRunTest {
                 "PROGRAMADOS_MAIS_ESPONTANEOS",
                 Classification.OTIMO,
                 manifest.periodStart().substring(0, 7),
-                "c1-mais-acesso@0.1.0",
+                "c1-mais-acesso@0.2.0",
                 "2026-03-31",
                 "3541307",
                 List.of(),

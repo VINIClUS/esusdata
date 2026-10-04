@@ -106,7 +106,7 @@ class RuntimeScopeApiTest extends ApiFixtureSupport {
                         "PROGRAMADOS_MAIS_ESPONTANEOS",
                         Classification.BOM,
                         referencePeriod,
-                        "c1-mais-acesso@0.1.0",
+                        "c1-mais-acesso@0.2.0",
                         referencePeriod + "-28",
                         MUNICIPALITY,
                         List.of(),
@@ -125,7 +125,7 @@ class RuntimeScopeApiTest extends ApiFixtureSupport {
                 "run-" + jobId,
                 municipalityIbge,
                 "c1-mais-acesso",
-                "c1-mais-acesso@0.1.0",
+                "c1-mais-acesso@0.2.0",
                 "2026-08",
                 createdAt.toString());
     }
