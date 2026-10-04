@@ -31,10 +31,11 @@ ou endereço; o resumo de cada dimensão diz quais colunas omitiu. Tudo roda num
 
 - **Túnel SSH até o PostgreSQL do PEC** ([ADR 0003](../adr/0003-tunel-ssh-para-pec.md)). O
   PostgreSQL do PEC só escuta no loopback do host. Abra o túnel da sua estação e feche-o ao
-  terminar. No PEC 5.5.28 de produção, por exemplo:
+  terminar. No PEC 5.5.28 de produção, a conexão é `ssh esus`, um alias do `~/.ssh/config` da
+  estação que aponta para o host do PEC com a chave do administrador:
 
   ```bash
-  ssh -f -N -L 15434:127.0.0.1:5433 <admin>@<host-do-pec>
+  ssh -f -N -M -S ~/.ssh/pec-tunel.sock -L 15434:127.0.0.1:5433 esus
   ```
 
 - **Credencial `esus_leitura`** ([ADR 0002](../adr/0002-credencial-esus-leitura-existente.md)),
@@ -209,7 +210,8 @@ validação segue a receita do [ADR 0023](../adr/0023-checagem-de-isolamento-mun
    com `approved_at`, `approved_by`, `test_result: PASS` e `test_evidence_ref` apontando para
    essa descoberta.
 
-Feche o túnel no fim: `pkill -f 'ssh -f -N -L 15434'`, ou encerre a sessão SSH.
+Feche o túnel no fim pelo socket de controle: `ssh -S ~/.ssh/pec-tunel.sock -O exit esus`. Evite
+`pkill -f`: o padrão aparece na linha de comando do próprio shell, que morre junto.
 
 ## Problemas comuns
 
