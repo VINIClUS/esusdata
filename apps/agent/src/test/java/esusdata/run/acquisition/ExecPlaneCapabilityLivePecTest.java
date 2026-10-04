@@ -278,10 +278,12 @@ class ExecPlaneCapabilityLivePecTest {
             acquisition.put("query_checksum", manifest.queryChecksum());
             return manifest;
         } catch (RuntimeException failure) { // NOPMD - recorded in the report, sanitized, and rethrown
+            String reason = failure.getClass().getSimpleName() + ": " + sanitized(failure);
             acquisition.put("succeeded", false);
             acquisition.put("elapsed_ms", (System.nanoTime() - started) / 1_000_000);
-            acquisition.put("error", failure.getClass().getSimpleName() + ": " + sanitized(failure));
-            throw failure;
+            acquisition.put("error", reason);
+            // Only the sanitized reason leaves: the raw message and cause can carry source text.
+            throw new IllegalStateException(reason); // NOPMD - the cause is dropped on purpose
         }
     }
 
