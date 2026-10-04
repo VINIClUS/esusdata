@@ -29,7 +29,7 @@ final class C2Tally {
     private long ambiguousSubjects;
     private long teamTypeUnknown;
     private boolean completesTwo;
-    private String cnes;
+    private final SortedSet<String> cnes = new TreeSet<>();
 
     C2Tally(PackDescriptor descriptor) {
         this.descriptor = descriptor;
@@ -49,8 +49,8 @@ final class C2Tally {
             teamTypeUnknown++;
         }
         completesTwo |= child.member().completesTwoInMonth();
-        if (cnes == null) {
-            cnes = child.member().cnes();
+        if (child.member().cnes() != null) {
+            cnes.add(child.member().cnes());
         }
         for (int i = 0; i < practices; i++) {
             PracticeOutcome outcome = child.outcomes().get(i);
@@ -63,8 +63,9 @@ final class C2Tally {
         }
     }
 
+    /** The CNES of the unit's children when they agree on one, else {@code null} — never the first by order. */
     String cnes() {
-        return cnes;
+        return cnes.size() == 1 ? cnes.first() : null;
     }
 
     /** The unit's result before the release gates: exact, with every practice counted apart. */

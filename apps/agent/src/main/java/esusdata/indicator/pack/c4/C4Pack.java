@@ -31,7 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * C4 — Cuidado da pessoa com diabetes (Tech Spec §2.4; ficha transcrita em {@code docs/metodologia/c4-cuidado-diabetes.md}).
@@ -216,13 +218,14 @@ public final class C4Pack implements IndicatorRule {
         List<EvidenceItem> evidence = new ArrayList<>();
         List<Scored> people = new ArrayList<>();
         SortedMap<String, List<Scored>> byTeam = new TreeMap<>();
-        SortedMap<String, String> teamCnes = new TreeMap<>();
+        SortedMap<String, SortedSet<String>> teamCnes = new TreeMap<>();
         for (Subject subject : C4Cohort.resolve(data, cutoff)) {
             if (subject.countsForTeam()) {
                 // a linked team keeps its row even when nobody of it is eligible (NO_DENOMINATOR, T-C4-36)
                 byTeam.computeIfAbsent(subject.link().ine(), k -> new ArrayList<>());
                 if (subject.link().cnes() != null) {
-                    teamCnes.putIfAbsent(subject.link().ine(), subject.link().cnes());
+                    teamCnes.computeIfAbsent(subject.link().ine(), k -> new TreeSet<>())
+                            .add(subject.link().cnes());
                 }
             }
             if (!subject.eligible()) {
@@ -238,7 +241,7 @@ public final class C4Pack implements IndicatorRule {
         for (Map.Entry<String, List<Scored>> team : byTeam.entrySet()) {
             teams.add(new TeamResult(
                     team.getKey(),
-                    teamCnes.get(team.getKey()),
+                    agreed(teamCnes.get(team.getKey())),
                     C4Scoring.result(DESCRIPTOR, context, team.getValue())));
         }
         return new RuleOutcome(C4Scoring.result(DESCRIPTOR, context, people), teams, evidence);
@@ -264,5 +267,10 @@ public final class C4Pack implements IndicatorRule {
             }
         }
         return lists;
+    }
+
+    /** The team's CNES when its links agree on one, else {@code null} — never the first by order. */
+    private static String agreed(SortedSet<String> cnes) {
+        return cnes != null && cnes.size() == 1 ? cnes.first() : null;
     }
 }

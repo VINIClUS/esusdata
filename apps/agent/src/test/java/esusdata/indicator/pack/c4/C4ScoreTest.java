@@ -45,6 +45,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import esusdata.indicator.model.Bands;
 import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalDataset;
+import esusdata.indicator.model.CanonicalRegistration;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ComponentKind;
 import esusdata.indicator.model.EvidenceDecision;
@@ -431,6 +432,30 @@ class C4ScoreTest {
 
         // The evidence is the same as the ungated computation.
         assertThat(o.evidence()).isEqualTo(ungated(data).evidence());
+    }
+
+    @Test
+    void item21_aTeamWhoseLinksDisagreeOnTheCnesHasNone() {
+        CanonicalRegistration sameIne = registration("a2", LINKED_ON.plusDays(1), INE_ESF);
+        RuleOutcome o = ungated(data().diabetic("a1")
+                .diabetic("a2")
+                .add(new CanonicalRegistration(
+                        sameIne.sourceRef(),
+                        sameIne.municipalityIbge(),
+                        sameIne.personKey(),
+                        sameIne.registrationDate(),
+                        CNES_2,
+                        sameIne.ine(),
+                        sameIne.simplified(),
+                        sameIne.inactive(),
+                        sameIne.refused(),
+                        sameIne.exitReason(),
+                        sameIne.selfReportedHypertension(),
+                        sameIne.selfReportedDiabetes(),
+                        sameIne.pregnant()))
+                .build());
+
+        assertThat(teamOf(o, INE_ESF).cnes()).isNull();
     }
 
     @Test
