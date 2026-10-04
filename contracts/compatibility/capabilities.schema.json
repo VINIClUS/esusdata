@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/VINIClUS/esusdata/contracts/compatibility/capabilities.schema.json",
+  "title": "Descritor de capacidade canônica v2 (ADR 0030)",
+  "description": "Uma capacidade = uma consulta congelada = um tipo de registro canônico. A SQL é o esquema: os aliases das colunas são os campos do registro. Rust e Java leem o mesmo descritor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capability",
+    "adapter_version",
+    "description",
+    "record_kind",
+    "entity_type_column",
+    "record_id_column",
+    "municipality_column",
+    "scope_date_column",
+    "query",
+    "binds",
+    "columns"
+  ],
+  "properties": {
+    "capability": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "adapter_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_kind": {
+      "enum": [
+        "person",
+        "registration",
+        "team",
+        "care_event",
+        "procedure_event",
+        "home_visit",
+        "immunization",
+        "condition",
+        "measurement",
+        "pregnancy_outcome"
+      ]
+    },
+    "entity_type_column": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "record_id_column": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "municipality_column": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "scope_date_column": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "query": {
+      "type": "string",
+      "pattern": "^queries/[a-z][a-z0-9_]*@\\d+\\.\\d+\\.\\d+\\.sql$"
+    },
+    "binds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "type"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "type": {
+            "enum": [
+              "MUNICIPALITY_IBGE",
+              "PERIOD_START",
+              "PERIOD_END_EXCLUSIVE",
+              "DATE",
+              "TEXT_ARRAY"
+            ]
+          }
+        }
+      }
+    },
+    "columns": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "type",
+          "required"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "type": {
+            "enum": [
+              "text",
+              "date",
+              "integer",
+              "decimal",
+              "bool",
+              "text[]"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

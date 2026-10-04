@@ -1,0 +1,160 @@
+{
+  "capability": "care_encounter",
+  "adapter_version": "0.1.0",
+  "description": "Atendimentos individuais (MIAI) no período: CBO, presencial/remoto, CIAP-2/CID-10 avaliados, exames S/A, procedimentos, peso, altura, PA, DUM e IG; form=INDIVIDUAL.",
+  "record_kind": "care_event",
+  "entity_type_column": "source_entity_type",
+  "record_id_column": "source_record_id",
+  "municipality_column": "municipality_ibge",
+  "scope_date_column": "care_date",
+  "query": "queries/care_encounter@0.1.0.sql",
+  "binds": [
+    {
+      "name": "municipality_ibge",
+      "type": "MUNICIPALITY_IBGE"
+    },
+    {
+      "name": "period_start",
+      "type": "PERIOD_START"
+    },
+    {
+      "name": "period_end_exclusive",
+      "type": "PERIOD_END_EXCLUSIVE"
+    },
+    {
+      "name": "birth_date_from",
+      "type": "DATE"
+    },
+    {
+      "name": "birth_date_to",
+      "type": "DATE"
+    }
+  ],
+  "columns": [
+    {
+      "name": "source_entity_type",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "source_record_id",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "municipality_ibge",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "person_key",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "care_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "form",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "cbo",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "cnes",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "ine",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "care_type_code",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "care_location_code",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "remote",
+      "type": "bool",
+      "required": false
+    },
+    {
+      "name": "ciap_codes",
+      "type": "text[]",
+      "required": false
+    },
+    {
+      "name": "cid_codes",
+      "type": "text[]",
+      "required": false
+    },
+    {
+      "name": "procedures_requested",
+      "type": "text[]",
+      "required": false
+    },
+    {
+      "name": "procedures_evaluated",
+      "type": "text[]",
+      "required": false
+    },
+    {
+      "name": "procedures_performed",
+      "type": "text[]",
+      "required": false
+    },
+    {
+      "name": "weight_kg",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "height_cm",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "systolic_mmhg",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "diastolic_mmhg",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "lmp_date",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "gestational_age_weeks",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "pregnant",
+      "type": "bool",
+      "required": false
+    },
+    {
+      "name": "birth_date",
+      "type": "date",
+      "required": false
+    }
+  ]
+}

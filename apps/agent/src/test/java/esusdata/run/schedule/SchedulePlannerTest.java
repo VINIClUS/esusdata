@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +15,7 @@ class SchedulePlannerTest {
     private static final YearMonth APRIL = YearMonth.of(2026, 4);
     private static final YearMonth AUGUST = YearMonth.of(2026, 8);
     private static final YearMonth SEPTEMBER = YearMonth.of(2026, 9);
+    private static final Set<String> BOTH_ATTENDANCE_SCOPED = Set.of("c1", "c2");
 
     @Test
     void theOldestUnpublishedSettledCompetenciaGoesFirst() {
@@ -49,6 +51,52 @@ class SchedulePlannerTest {
                 .isEmpty();
     }
 
+    /** ADR 0030: packs in the order given (C1 first), oldest competência first within a pack. */
+    @Test
+    void perPackTheGivenPackOrderComesFirstAndEachPackFillsItsOwnHistory() {
+        LocalDate today = LocalDate.of(2026, 10, 10);
+        List<SchedulePlanner.Candidate> pending = SchedulePlanner.pending(
+                List.of(SEPTEMBER, MARCH, APRIL),
+                MARCH,
+                List.of("c1", "c2"),
+                BOTH_ATTENDANCE_SCOPED,
+                Map.of("c1", Set.of(MARCH), "c2", Set.of(APRIL)),
+                today,
+                5);
+
+        assertThat(pending)
+                .containsExactly(
+                        new SchedulePlanner.Candidate("c1", APRIL),
+                        new SchedulePlanner.Candidate("c1", SEPTEMBER),
+                        new SchedulePlanner.Candidate("c2", MARCH),
+                        new SchedulePlanner.Candidate("c2", SEPTEMBER));
+    }
+
+    @Test
+    void perPackNextTakesAtMostMaxJobsAndSkipsWhatThatPackFailedRecently() {
+        LocalDate today = LocalDate.of(2026, 10, 10);
+        List<YearMonth> covered = List.of(MARCH, APRIL);
+        Map<String, Set<YearMonth>> published = Map.of("c1", Set.of(MARCH));
+
+        assertThat(SchedulePlanner.next(
+                        covered, MARCH, List.of("c1", "c2"), BOTH_ATTENDANCE_SCOPED, published, Set.of(), today, 5, 1))
+                .containsExactly(new SchedulePlanner.Candidate("c1", APRIL));
+        assertThat(SchedulePlanner.next(
+                        covered,
+                        MARCH,
+                        List.of("c1", "c2"),
+                        BOTH_ATTENDANCE_SCOPED,
+                        published,
+                        Set.of(new SchedulePlanner.Candidate("c1", APRIL)),
+                        today,
+                        5,
+                        2))
+                .containsExactly(
+                        new SchedulePlanner.Candidate("c2", MARCH), new SchedulePlanner.Candidate("c2", APRIL));
+        assertThat(SchedulePlanner.next(covered, MARCH, List.of(), Set.of(), published, Set.of(), today, 5, 3))
+                .isEmpty();
+    }
+
     @Test
     void pendingListsEverySettledUnpublishedCompetenciaOldestFirstIgnoringRecentFailures() {
         LocalDate today = LocalDate.of(2026, 9, 10);
@@ -57,5 +105,27 @@ class SchedulePlannerTest {
         // A recent failure holds only the scheduler back: the competência is still pending.
         assertThat(SchedulePlanner.next(List.of(AUGUST, MARCH), Set.of(), Set.of(MARCH), today, 5))
                 .contains(AUGUST);
+    }
+
+    /**
+     * The coverage counts only atendimentos individuais: a pack that reads more (C2–C7) is due in
+     * every settled month of the coverage window — gaps, and a source without any atendimento,
+     * included — and C1 only in covered ones.
+     */
+    @Test
+    void aPackBeyondAtendimentosIsDueInEverySettledMonthOfTheWindow() {
+        LocalDate today = LocalDate.of(2026, 7, 3);
+        List<SchedulePlanner.Candidate> pending = SchedulePlanner.pending(
+                List.of(APRIL), MARCH, List.of("c1", "c4"), Set.of("c1"), Map.of("c4", Set.of(MARCH)), today, 5);
+
+        assertThat(pending)
+                .containsExactly(
+                        new SchedulePlanner.Candidate("c1", APRIL),
+                        new SchedulePlanner.Candidate("c4", APRIL),
+                        new SchedulePlanner.Candidate("c4", YearMonth.of(2026, 5)));
+        assertThat(SchedulePlanner.pending(List.of(), MARCH, List.of("c4"), Set.of(), Map.of(), today, 5))
+                .extracting(SchedulePlanner.Candidate::period)
+                .containsExactly(MARCH, APRIL, YearMonth.of(2026, 5));
+        assertThat(SchedulePlanner.settledFrom(null, today, 5)).isEmpty();
     }
 }

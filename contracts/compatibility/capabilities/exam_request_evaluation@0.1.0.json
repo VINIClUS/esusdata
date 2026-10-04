@@ -1,0 +1,94 @@
+{
+  "capability": "exam_request_evaluation",
+  "adapter_version": "0.1.0",
+  "description": "Exames solicitados (S) e avaliados (A) dos códigos SIGTAP pedidos; stage=REQUESTED|EVALUATED.",
+  "record_kind": "procedure_event",
+  "entity_type_column": "source_entity_type",
+  "record_id_column": "source_record_id",
+  "municipality_column": "municipality_ibge",
+  "scope_date_column": "event_date",
+  "query": "queries/exam_request_evaluation@0.1.0.sql",
+  "binds": [
+    {
+      "name": "municipality_ibge",
+      "type": "MUNICIPALITY_IBGE"
+    },
+    {
+      "name": "period_start",
+      "type": "PERIOD_START"
+    },
+    {
+      "name": "period_end_exclusive",
+      "type": "PERIOD_END_EXCLUSIVE"
+    },
+    {
+      "name": "birth_date_from",
+      "type": "DATE"
+    },
+    {
+      "name": "birth_date_to",
+      "type": "DATE"
+    },
+    {
+      "name": "procedure_codes",
+      "type": "TEXT_ARRAY"
+    }
+  ],
+  "columns": [
+    {
+      "name": "source_entity_type",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "source_record_id",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "municipality_ibge",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "person_key",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "event_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "sigtap_code",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "stage",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "cbo",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "cnes",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "ine",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "origin",
+      "type": "text",
+      "required": true
+    }
+  ]
+}

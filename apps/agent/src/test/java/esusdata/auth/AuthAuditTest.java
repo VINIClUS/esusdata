@@ -85,7 +85,7 @@ class AuthAuditTest extends ApiFixtureSupport {
                         "PROGRAMADOS_MAIS_ESPONTANEOS",
                         Classification.BOM,
                         "2026-08",
-                        "c1-mais-acesso@0.1.0",
+                        "c1-mais-acesso@0.2.0",
                         "2026-08-31",
                         MUNICIPALITY,
                         List.of(),

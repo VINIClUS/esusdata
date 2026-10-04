@@ -11,6 +11,7 @@ import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
 import esusdata.auth.security.SessionCookie;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.TeamResult;
 import esusdata.result.PublicationService;
 import esusdata.result.model.EvidenceEntry;
 import esusdata.result.model.ExtractionManifestRepository;
@@ -223,6 +224,23 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
             IndicatorResult result,
             List<EvidenceEntry> evidence)
             throws IOException {
+        return publishResult(
+                publisherUserId, municipalityIbge, referencePeriod, "c1-mais-acesso", result, List.of(), evidence);
+    }
+
+    /**
+     * {@link #publishResult(String, String, String, IndicatorResult, List)} for any pack (ADR 0030),
+     * with the result per team staged beside the municipal one.
+     */
+    public String publishResult(
+            String publisherUserId,
+            String municipalityIbge,
+            String referencePeriod,
+            String indicatorPack,
+            IndicatorResult result,
+            List<TeamResult> teams,
+            List<EvidenceEntry> evidence)
+            throws IOException {
         String sourceId = "src-" + UUID.randomUUID();
         registerSource(sourceId, municipalityIbge);
 
@@ -246,7 +264,7 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 jobId,
                 "run-" + jobId,
                 municipalityIbge,
-                "c1-mais-acesso",
+                indicatorPack,
                 result.ruleVersion(),
                 referencePeriod,
                 "proc-test",
@@ -260,12 +278,13 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 1,
                 "proc-test",
                 clock.instant(),
-                "c1-mais-acesso",
+                indicatorPack,
                 result,
                 manifest.extractionId(),
                 manifest.adapterVersion(),
                 "SOURCE_EVENT",
-                "sha256:" + "0".repeat(64)));
+                "sha256:" + "0".repeat(64),
+                teams));
         resultStagingArea.writeEvidence(stagingId, evidence);
         resultStagingArea.seal(stagingId);
 

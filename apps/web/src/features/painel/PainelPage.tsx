@@ -53,8 +53,19 @@ const pendenciaColumns: Column<IndicadorPendencia>[] = [
   {
     key: 'motivo',
     header: 'Motivo',
+    // A reason can be a long limitation: three lines here, the whole text in the detail.
     render: (r) => (
-      <Typography sx={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.3 }}>
+      <Typography
+        sx={{
+          fontSize: 12,
+          color: colors.textSecondary,
+          lineHeight: 1.3,
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}
+      >
         {r.motivo}
       </Typography>
     ),
@@ -340,13 +351,13 @@ export function PainelPage() {
               fullWidth
               variant="outlined"
               color="primary"
-              onClick={() =>
-                void navigate(
-                  data.competenciaPendente
-                    ? `/execucao?competencia=${data.competenciaPendente}`
-                    : '/execucao',
-                )
-              }
+              onClick={() => {
+                const pendente = new URLSearchParams()
+                if (data.competenciaPendente) pendente.set('competencia', data.competenciaPendente)
+                if (data.indicadorPendente) pendente.set('indicador', data.indicadorPendente)
+                const query = pendente.toString()
+                void navigate(query ? `/execucao?${query}` : '/execucao')
+              }}
               startIcon={
                 <Box
                   sx={{

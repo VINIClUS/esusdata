@@ -1,0 +1,403 @@
+                                                    Ministério da Saúde
+                                          Secretaria de Atenção Primária à Saúde
+                    Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde
+
+
+                                  NOTA METODOLÓGICA C6 - CUIDADO DA PESSOA IDOSA
+
+1.           INDICADOR
+1.1.         Cuidado da pessoa idosa na Atenção Primária à Saúde (APS).
+2.           OBJETIVO
+2.1.          Tem como objetivo avaliar o acesso e monitoramento efetivo do cuidado integral à saúde das pessoas idosas,
+com incentivo à captação precoce e acompanhamento coordenado e contínuo na APS.
+3.           FICHA DE QUALIFICAÇÃO
+                N           Título                                                  Descrição
+                Contextualização do indicador
+               1 Título resumido        Cuidado da pessoa idosa na APS.
+               2 Título completo          Cuidado Integral à Pessoa Idosa na Atenção Primária à Saúde (APS).
+               3 Palavras-chave           Pessoa idosa; Idoso; Longitudinalidade; Cuidado integral.
+                                          Monitoramento da atenção integral e do cuidado longitudinal das pessoas idosas na
+                    Contextualização do
+               4                          aplicação de boas práticas de cuidado na APS, considerando as evidências e diretrizes clínicas
+                    indicador
+                                          pertinentes.
+                    Conceitos
+               5                          Pessoa idosa: indivíduos com idade ≥ 60 anos de vida.
+                    importantes
+                                          Avaliar o acesso e acompanhamento efetivo das pessoas idosas em relação aos episódios de
+               6 Objetivo                 cuidados necessários, com incentivo a captação precoce, acompanhamento coordenado e
+                                          contínuo na APS.
+                                          Permitir que profissionais de saúde e gestores acompanhem a evolução das boas práticas,
+               7 Uso/aplicabilidade       com o intuito de monitorar as ações de promoção da saúde, prevenção de agravos, o manejo,
+                                          a captação, o acesso, o acolhimento e o acompanhamento da pessoa idosa na APS.
+                   Regularidade do Indicador
+                    Periodicidade da
+               8                          Mensal.
+                    atualização
+                    Periodicidade do
+               9                          Mensal.
+                    monitoramento
+                    Periodicidade da
+               10                         Quadrimestral.
+                    avaliação
+                    Dia de extração dos   SIAPS: 20º dia útil de cada mês.
+               11
+                    dados                 SCNES: A última competência válida.
+                Escopo da base de dados de acompanhamento
+                                       · Consulta por profissional médica(o) ou enfermeira(o).
+                                       · Registro de peso e altura para avaliação antropométrica.
+               12 Evento
+                                       · Visita domiciliar de ACS/TACS.
+                                       · Registro de vacinação de influenza.
+                    Período de
+               13                         Mensal.
+                    acompanhamento
+                                          Pessoa idosa vinculada às equipes de Saúde da Família (eSF) ou Atenção Primária (eAP),
+                    Entrada no
+               14                         conforme regras da Portaria SAPS/MS nº 161/2024, com idade igual ou superior a 60 anos no
+                    acompanhamento
+                                          período.
+                                          · Usuárias(os) que a atualização mais recente do cadastro individual possua a opção “Saída do
+                                          cidadão do cadastro” com a opção “Mudança de território” marcada.
+                    Interrupção do
+               15                         · Mudança da equipe, considerando os critérios de desempate previstos na Portaria SAPS/MS
+                    acompanhamento
+                                          nº 161/2024.
+                                          · Óbito no CadSUS.
+               16 Boas práticas de        (A) Ter realizado pelo menos 01 (uma) consulta por profissional médica (o) ou enfermeira (o)
+                  acompanhamento/         presencial ou remota nos últimos 12 meses;
+N              Título                                                 Descrição
+     cuidado              (B) Ter realizado pelo menos 01 (um) registro simultâneo (no mesmo dia) de peso e altura
+                          para avaliação antropométrica nos últimos 12 meses;
+                          (C) Ter pelo menos 02 (duas) visitas domiciliares realizadas por ACS/TACS, com intervalo
+                          mínimo de 30 (trinta) dias entre as visitas, realizadas nos últimos 12 meses;
+                          (D) Ter registro de 1 (uma) dose da vacina contra influenza realizada nos últimos 12 meses.
+17 Datas relevantes       Não se aplica.
+ Procedimentos para o desenvolvimento do indicador
+18 Unidade de medida    Percentual.
+     Descritivo da Unidade
+19                         %
+     de Medida
+20 Status do indicador    Acumulativo: Não.
+21 Granularidade          Identificador Nacional de Equipe (INE).
+22 Polaridade             Maior-melhor.
+                          Numerador:
+                          Somatório das boas práticas pontuadas para cada pessoa idosa (com 60 anos de vida ou mais)
+23 Fórmula de Cálculo     durante o acompanhamento.
+                          Denominador:
+                          Nº total de pessoas idosas com 60 anos ou mais de vida vinculadas à equipe no período.
+24 Método de cálculo      I. Regras gerais:
+                          a) Identificação da pessoa assistida:
+                          · Nome, data de nascimento, Cadastro de Pessoa Física (CPF) ou Cartão Nacional de Saúde
+                          (CNS) válido por pessoa, em conformidade com o Sistema de Cadastramento de Usuários do
+                          Sistema Único de Saúde (CadSUS).
+                          b) Validação das equipes:
+                          · Serão consideradas equipes de Saúde da Família (eSF), e equipes de Atenção Primária (eAP),
+                          tipo 70 e 76, respectivamente, atendendo as condições previstas na Portaria GM/MS nº
+                          3.493/2024.
+                          · A boa prática (C) não será condicionante de pontuação para eAP, tipo 76, atendendo as
+                          condições previstas na PRC GM/MS nº 02/2017.
+                          c) Grupo de CBO utilizados para todas as consultas de atendimento individual, presencial
+                          ou remoto:
+                          · 2235 - Enfermeiros
+                          · 2231 / 2251 / 2252 / 2253 - Médicos
+                          d) Grupo de CBO utilizados para o cálculo do indicador (considera-se a habilitação para
+                          execução de procedimentos e atendimentos conforme a tabela SIGTAP):
+                          2235 - Enfermeiros e afins;
+                          2231 / 2251 / 2252 / 2253 - Médicos;
+                          2232 - Cirurgiões-dentistas;
+                          2234 - Farmacêuticos;
+                          2236 - Fisioterapeutas;
+                          2238 - Fonoaudiólogos;
+                          2237 - Nutricionistas;
+                          2241 - Profissionais da Educação Física;
+                          3222 - Técnicos e auxiliares de enfermagem;
+                          2239 - 05 - Terapeutas ocupacionais;
+                          5151-05 - Agente Comunitário de Saúde;
+                          3222-55 - Técnico em Agente Comunitário de Saúde.
+                          e) Modelos de Informação da Estratégia eSUS APS:
+                          Serão considerados os seguintes modelos de informação:
+                          · Modelo de Informação de Atendimento Individual (MIAI): considera o Atendimento
+                          Individual (presencial, domiciliar e remoto) com identificação do Problema/Condição
+                          Avaliada, desde que registrado por profissionais de saúde dos CBO supracitados, com CNS
+                          profissional identificado.
+                          · Modelo de Informação de Procedimentos (MIP): considera os procedimentos realizados
+                          conforme a tabela do Sistema de Gerenciamento da Tabela de Procedimentos, Medicamentos
+                          e OPM do SUS (SIGTAP), desde que registrado por profissionais de saúde dos CBO
+                          supracitados, com CNS profissional identificado.
+                          · Modelo de informação de Visita Domiciliar e Territorial (MIVDT): considera o registro de
+                          visitas domiciliares, com preenchimento do ‘‘motivo da visita’’, desde que registrado por
+                          ACS/TACS, com CNS profissional identificado.
+                          · Modelo de informação de Vacinação (MIV): considera o registro da aplicação dos
+                          imunizantes, com identificação do imunobiológico e dados da estratégia, dose, lote e
+                          fabricante, desde que registrado por profissionais de saúde dos CBO supracitados, com CNS
+                          profissional identificado.
+      N            Título                                                   Descrição
+                                 · Registro de Imunobiológico Administrado (RIA): considera as informações sobre a aplicação
+                                 de imunobiológicos, como vacinas, e faz parte da Rede Nacional de Dados em Saúde (RNDS)
+                                 que tem como objetivo padronizar o registro e compartilhamento dessas informações, tanto
+                                 em campanhas de vacinação quanto na rotina de imunização.
+                                 f) Código do procedimento (o procedimento só é válido respeitando-se as habilitações de
+                                 CBO previstos na tabela SIGTAP):
+                                 01.01.04.002-4 - Avaliação antropométrica
+                                 · 01.01.04.008-3 - Medição de peso
+                                 · 01.01.04.007-5 - Medição de altura
+                                 · 03.01.01.003-0 - Consulta de profissionais de nível superior na atenção primária (exceto
+                                 médico)
+                                 · 03.01.01.006-4 - Consulta médica em atenção primária
+                                 · 03.01.01.025-0 - Teleconsulta na atenção primária
+                                 g) Esquema de doses:
+                                 Dose única, anualmente (33 – Vacina influenza trivalente e 77 - Vacina influenza tetravalente).
+      25 Categorias de análise   Brasil, regiões, unidade federativa, municípios, CNES e INE.
+                                 Siaps
+      26 Fonte de dados          SCNES
+                                 RNDS
+       Análise do indicador
+                                 Os dados apresentados neste indicador são essenciais para a organização de um cuidado
+                                 integral, especialmente quando há necessidade de oferecê-lo no domicílio, mantendo
+           Interpretação em
+      27                         contatos regulares e programados com a equipe de referência. Isso é particularmente
+           saúde
+                                 importante para pessoas com condições crônicas que causam dependência, pessoas idosas
+                                 frágeis ou aqueles que tiveram alta hospitalar recentemente.
+      28 Ano de referência       2024.
+                                 · Índice de envelhecimento populacional do município;
+                                 · Pessoas idosas com limitação funcional para Atividade básica de vida diária (ABVD) e
+           Indicadores
+      29                         Atividade instrumental da vida diária (AIVD);
+           relacionados
+                                 · Pessoas idosas com pelo menos uma doença crônica;
+                                 · Pessoas idosas com multimorbidades.
+                                 Ótimo: > 75 e ≤ 100
+                                 Bom: > 50 e ≤ 75
+      30 Parâmetro
+                                 Suficiente: > 25 e ≤ 50
+                                 Regular: ≤ 25
+      31 Classificação gerencial Indicador de resultado.
+           Classificação de
+      32                         Indicador de efetividade.
+           desempenho
+       Limitações
+                                 · Considerando que há necessidade de registro qualificado da informação em campo
+                                 específico, é possível que os resultados sejam limitados por dificuldades de registro pelos
+      33 Limitações              profissionais de saúde no prontuário eletrônico, assim como o envio tardio da informação
+                                 pela gestão local.
+                                 · Há possibilidade de lapso temporal na identificação da ocorrência de óbitos no CadSUS.
+       Responsabilidades
+                                 Coordenação-Geral de Inovação e Aceleração Digital na APS (CGIAD)
+                                 e-mail: https://webatendimento.saude.gov.br/faq/saps
+      34 Gerencial
+                                 Setor: Deaps/Saps/MS
+                                 Telefone: (61) 3315- 9018
+                                 Coordenação de Atenção à Saúde da Pessoa Idosa (COPID)
+                                 e-mail: dgci@saude.gov.br
+                                 Setor: DGCI/Saps/MS
+                                 Telefone: (61) 3315-9135
+                                 Telefone: (61) 3315-9138
+      35 Técnica
+                                 Departamento de Gestão do Cuidado Integral (DGCI)
+                                 e-mail: dgci@saude.gov.br
+                                 Setor: Saps/MS
+                                 Telefone: (61) 3315-9135
+                                 Telefone: (61) 3315-8847
+
+4.   CADERNO DE CÁLCULO
+4.1.           Definição de pessoa idosa: são consideradas no denominador todas as pessoas com idade maior ou igual a 60
+anos de vida vinculadas à equipe no período.
+4.2.           Para garantir que todos os municípios possam fazer o monitoramento da sua situação em relação a esses
+indicadores, acompanhar o progresso e fazer um cálculo preliminar dos seus resultados, serão considerados os modelos de
+informação publicados previamente pela Secretaria de Atenção Primária à Saúde, do Ministério da Saúde, no âmbito do e-
+SUS APS, através do sítio eletrônico: https://sisaps.saude.gov.br/sistemas/sisab/docs/modelos/intro/ .
+4.3.          O numerador é constituído pela soma das boas práticas pontuadas durante o acompanhamento. A pontuação
+pode alcançar um valor máximo de 100 pontos, para cada pessoa com idade maior ou igual a 60 anos de vida no período,
+conforme Quadro 01.
+4.4.           Atenção: é importante destacar que para as boas práticas, serão considerados os registros de qualquer
+profissional habilitado em estabelecimento de saúde da APS, no país.
+
+             Quadro 01. Boas práticas de cuidado da Pessoa Idosa
+                                                                 Boas Práticas                                                     Pontos
+                   Ter registro de pelo menos 01 (uma) consulta presencial ou remota por profissional médica(o) ou
+               (A)                                                                                                                     25
+                   enfermeira(o) realizada nos últimos 12 meses.
+                     Ter realizado pelo menos 01 (um) registro simultâneo (no mesmo dia) de peso e altura para avaliação
+               (B)                                                                                                                     25
+                     antropométrica nos últimos 12 meses.
+                     Ter pelo menos 02 (duas) visitas domiciliares realizadas por ACS/TACS, com intervalo mínimo de 30 (trinta)
+               (C)                                                                                                                     25
+                     dias entre as visitas, realizadas nos últimos 12 meses.
+               (D) Ter registro de 01 (uma) dose da vacina contra influenza, nos últimos 12 meses.                                     25
+                                                              Somatório em pontos                                                      100
+
+             Quadro 02. Detalhamento para composição das boas práticas (A) pelo menos 01 (uma) consulta presencial ou
+remota por profissional médica(o) ou enfermeira(o) realizada nos últimos 12 meses.
+                Condicionante         Código/Campo                                    Descrição                            Observação
+                                  2251, 2252, 2253, 2231 Médicos                                                                   -
+                Grupo de CBO
+                                           2235           Enfermeiros                                                              -
+                                                         Modelo de Informação de Atendimento Individual, desde que
+                                         Registro de
+                  Modelo de                              registrado por profissionais de saúde dos CBO supracitados, com
+                                      atendimento da                                                                               -
+                  informação                             CNS profissional identificado, alocado conforme os códigos das
+                                    Estratégia e-SUS APS
+                                                         equipes descritos.
+
+             Quadro 03. Detalhamento para composição da boa prática (B) pelo menos 01 (um) registro simultâneo (no
+mesmo dia) de peso e altura para avaliação antropométrica nos últimos 12 meses.
+                 Condicionante           Código/Campo                                 Descrição                          Observação
+                                     2251, 2252, 2253, 2231    Médicos                                                         -
+                                              2235             Enfermeiros                                                     -
+                 Grupo de CBO                                  Técnico de Enfermagem; ou Auxiliar de Enfermagem; ou
+                                              3222                                                                             -
+                                                               Técnico em Agente Comunitário de Saúde
+
+                                             5151-05           Agente Comunitário de Saúde                                     -
+                                              2232             Cirurgiões-dentistas                                            -
+                                              2234             Farmacêuticos                                                   -
+                                              2236             Fisioterapeutas                                                 -
+                                              2238             Fonoaudiólogos                                                  -
+                                              2237             Nutricionistas                                                  -
+                                              2241             Profissionais de Educação Física                                -
+                                              2239             Terapeutas ocupacionais, ortoptistas e psicomotricistas         -
+                     Modelo de      Modelo de Informação de Serão considerados os registros de Peso e Altura do            Registros
+                     informação      Atendimento Individual campo específico do PEC.                                     realizados no
+                                                                                                                          mesmo dia.
+                                                            Serão considerados os registros com os códigos SIGTAP
+                                    Modelo de Informação de
+                                                            especificados, com exceção do registro de procedimento
+                                        Procedimento
+                                                            consolidado.
+                 Condicionante           Código/Campo                                   Descrição                           Observação
+                                                            Serão considerados os registros no campo
+                                    Modelo de Informação de
+                                                            “Antropometria” ou o registro de Peso e Altura do
+                                      Atividade Coletiva
+                                                            campo específico do PEC.
+                                    Modelo de Informação de Serão considerados os registros de peso e altura no
+                                   Visita Domiciliar e Territorial campo específico.
+
+                                         01.01.04.002-4          Avaliação antropométrica                                       -
+                     SIGTAP              01.01.04.008-3          Medição de peso                                                -
+                                         01.01.04.007-5          Medição de altura                                              -
+
+              Quadro 04. Detalhamento para composição da boa prática (C) pelo menos 02 (duas) visitas domiciliares
+realizadas por ACS/TACS, com intervalo mínimo de 30 (trinta) dias entre as visitas, realizadas nos últimos 12 meses.
+                   Condicionante                     Código/Campo                                   Descrição                Observação
+                                                       3222-55                     Técnico em Agente Comunitário de Saúde           -
+                       CBO
+                                                       5151-05                     Agente Comunitário de Saúde                      -
+
+                    Modelo de        Modelo de Informação de Visita Domiciliar Serão considerados os registros de visita
+                                                                                                                                    -
+                    informação                     e Territorial               domiciliar.
+
+               Quadro 05. Detalhamento para composição da boa prática (D) registro de 01 (uma) dose da vacina contra
+influenza, nos últimos 12 meses.
+                  Condicionante           Código/Campo                                      Descrição                        Observação
+                                   Todos que submeterem o registro ao SIAPS ou à RNDS. Será considerado qualquer
+                      CBO                                                                                                           -
+                                   registro de profissional habilitado em estabelecimento de saúde da APS, no país.
+
+                                                             Registro do código da vacina no campo específico do PEC e
+                                     Modelo de Informação de
+                                                             correta identificação, com data de nascimento e CPF ou                 -
+                   Modelo de               Vacinação
+                                                             CNS.
+                   informação
+                                    Registro de Imunobiológico
+                                                               Registro da vacina ou transcrição.                                   -
+                                        Administrado (RIA)
+                                                33                Vacina Influenza Trivalente                                       -
+                 Códigos Vacinas
+                                                77                Vacina Influenza Tetravalente                                     -
+
+Esta nota revoga a NOTA METODOLÓGICA C6 - CUIDADO DA PESSOA IDOSA (0049702803)
+5.            REFERÊNCIAS
+ASSIS, A. S.; CASTRO-SILVA, C. R. Agente comunitário de saúde e o idoso: visita domiciliar e práticas de cuidado. Physis:
+Revista de Saúde Coletiva, v. 28, p. e280308, 2018.
+AZAMBUJA, H. C. S. et al. O impacto da vacinação contra influenza na morbimortalidade dos idosos nas regiões do Brasil
+entre 2010 e 2019. Cadernos de Saúde Pública, v. 36, p. e00040120, 2020.
+BALDANI, M. H. et al. Determinantes individuais da utilização de serviços odontológicos por adultos e idosos de baixa renda.
+Revista brasileira de epidemiologia, v. 13, p. 150-162, 2010.
+BÓS, A. J. G.; MIRANDOLA, A. R. Cobertura vacinal está relacionada à menor mortalidade por doenças respiratórias. Ciência
+& Saúde Coletiva, v. 18, p. 1459-1462, 2013.
+BRASIL, C. C. P. et al. Percepções de profissionais sobre o agente comunitário de saúde no cuidado ao idoso dependente.
+Ciência & Saúde Coletiva, v. 26, p. 109-118, 2021.
+BRASIL. Ministério da Saúde. Secretaria de Vigilância em Saúde. Programa Nacional de Imunizações 30 anos. Brasília, 2003.
+BRASIL. Ministério da Saúde. Secretaria Executiva. Departamento de Apoio à Descentralização. Diretrizes operacionais dos
+Pactos pela Vida, em Defesa do SUS e de Gestão. Ministério da Saúde, Secretaria Executiva, Departamento de Apoio à
+Descentralização. Coordenação-Geral de Apoio à Gestão Descentralizada. – Brasília. 2006a.
+BRASIL. Portaria nº 2.528, de 19 de outubro de 2006: Institui a Política Nacional de Saúde da Pessoa Idosa. 2006b.
+BRASIL. Ministério da Saúde. Secretaria de Atenção à Saúde. Departamento de Atenção Básica. Envelhecimento e saúde da
+pessoa idosa. Brasília: Ministério da Saúde, 2007.
+BRASIL. Ministério da Saúde. Secretaria de Atenção à Saúde. Departamento de Atenção Básica. Saúde Bucal. Caderno de
+Atenção Básica.nº17. Brasília: Ministério da Saúde, 2008.
+ BRASIL. Ministério da Saúde. Orientações para a coleta e análise de dados antropométricos em serviços de saúde: Norma
+ Técnica do Sistema de Vigilância Alimentar e Nutricional-SISVAN. 2011.
+ BRASIL. Ministério da Saúde. Secretaria de Atenção à Saúde. Secretaria de Vigilância em Saúde. SB Brasil 2010: Pesquisa
+ Nacional de Saúde Bucal: resultados principais. Brasília: Ministério da Saúde, 2012.
+ BRASIL. Ministério da Saúde. Secretaria de Atenção à Saúde. Departamento de Atenção Básica. Estratégias para o cuidado da
+ pessoa com doença crônica: hipertensão arterial sistêmica. Brasília: Ministério da Saúde, 2014.
+ BRASIL. Ministério da Saúde. Portaria nº 2.436, de 21 de setembro de 2017: Aprova a Política Nacional de Atenção Básica.
+ Brasília: Ministério da Saúde, 2017.
+ BRASIL. Ministério da Saúde. Secretaria de Atenção à Saúde Departamento de Ações Programáticas e Estratégicas.
+ Orientações técnicas para a implementação de Linha de Cuidado para Atenção Integral à Saúde da Pessoa Idosa no
+ Sistema Único de Saúde – SUS. Brasília: Ministério da Saúde, 2018a.
+ BRASIL. Ministério da Saúde. Secretaria de Atenção à Saúde. Departamento de Atenção Básica. A saúde bucal no Sistema
+ Único de Saúde [recurso eletrônico]. Brasília: Ministério da Saúde, 2018b.
+ BRASIL. Ministério da Saúde. Diretrizes da política nacional de saúde bucal. Brasília: Ministério da Saúde, 2024.
+ DIP, R. M.; CABRERA, M. A. S. Influenza vaccination in non-institutionalized elderly: a population-based study in a medium-
+ sized city in Southern Brazil. Cadernos de Saúde Pública, v. 26, p. 1035-1044, 2010.
+ DUTRA, C. E. S. V.; SANCHEZ, H. F. Organização da atenção à saúde bucal prestada ao idoso nas equipes de saúde bucal da
+ Estratégia Saúde da Família. Revista Brasileira de Geriatria e Gerontologia, v. 18, n. 1, p. 179-188, 2015.
+ FRANCISCO, P. M. S. B.; DONALISIO, M. R. C.; LATTORRE, M. R. D. O. Impacto da vacinação contra influenza na mortalidade
+ por doenças respiratórias em idosos. Revista de Saúde Pública, v. 39, p. 75-81, 2005.
+ GALVÃO, M. H. R.; MOREIRA, R. S. Quem tem direito de ir ao dentista? Os limites do acesso aos serviços odontológicos por
+ pessoas idosas no Brasil à luz da Política Nacional de Saúde da Pessoa Idosa. Revista Brasileira de Geriatria e Gerontologia, v.
+ 25, n. 3, p. e230080, 2022.
+ HE, Q. et al. A sarcopenia index based on serum creatinine and cystatin C cannot accurately detect either low muscle mass or
+ sarcopenia in urban community-dwelling older people. Scientific Reports, v. 8, n. 1, p. 11534, 2018.
+ LI, Chenglong et al. Association of cystatin C kidney function measures with long-term deficit-accumulation frailty trajectories
+ and physical function decline. JAMA Network Open, v. 5, n. 9, p. e2234208-e2234208, 2022.
+ NICHOL, K. L. et al. The efficacy and cost effectiveness of vaccination against influenza among elderly persons living in the
+ community. New England journal of medicine, v. 331, n. 12, p. 778-784, 1994.
+ SAMPAIO, L. R. Avaliação nutricional e envelhecimento. Revista de Nutrição, v. 17, p. 507-514, 2004.
+ SATO, A. P. S. et al. Cobertura vacinal e fatores associados à vacinação contra influenza em pessoas idosas do Município de
+ São Paulo, Brasil: Estudo SABE 2015. Cadernos de Saúde Pública, v. 36, p. e00237419, 2020.
+ SILVA, A. M. M. et al. Uso de serviços de saúde por idosos brasileiros com e sem limitação funcional. Revista de Saúde
+ Pública, v. 51, p. 5s, 2017.
+ TAAL, M. W. Chronic kidney disease in older people–diagnosis, etiology and consequences. Current opinion in nephrology
+ and hypertension, v. 24, n. 6, p. 475-479, 2015.
+
+
+NOTA DE RODAPÉ:
+1. Na Seção 3, item 24 - d, foi retirado o CBO 3224 - Técnico em Saúde Bucal.
+2. Na Seção 3, item 24 - e, inclusão do Modelo de informação de Vacinação (MIV).
+3. Na Seção 3, item 35, foi atualizado o telefone da COPID para 3315-9138.
+4. Na Seção 4, quadro 3, foram incluídos novos CBO (2232 - Cirurgiões-dentistas, 2234 - Farmacêuticos, 2236 - Fisioterapeutas, 2238 - Fonoaudiólogos, 2237 - Nutricionistas, 2241- Profissionais
+de Educação Física e 2239 - Terapeutas ocupacionais, ortoptistas e psicomotricistas).
+
+                      Documento assinado eletronicamente por Audrey Fischer, Diretor(a) do Departamento de Estratégias, Acreditação e
+                      Componentes da Atenção Primária à Saúde, em 19/06/2026, às 16:35, conforme horário oficial de Brasília, com
+                      fundamento no § 3º, do art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de
+                      Março de 2017.
+
+                      Documento assinado eletronicamente por Camila Maria Mendes Nascimento, Coordenador(a) de Atenção à Saúde da
+                      Pessoa Idosa, em 19/06/2026, às 17:48, conforme horário oficial de Brasília, com fundamento no § 3º, do art. 4º, do
+                      Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de 2017.
+
+                      Documento assinado eletronicamente por Olivia Lucena de Medeiros, Diretor(a) do Departamento de Gestão do Cuidado
+                      Integral, em 19/06/2026, às 18:26, conforme horário oficial de Brasília, com fundamento no § 3º, do art. 4º, do Decreto nº
+                      10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de 2017.
+                 A autenticidade deste documento pode ser conferida no site http://sei.saude.gov.br/sei/controlador_externo.php?
+                 acao=documento_conferir&id_orgao_acesso_externo=0, informando o código verificador 0056053813 e o código CRC
+                 4F491169.
+
+
+
+Referência: Processo nº 25000.137969/2025-22                                                                                         SEI nº 0056053813
+
+                                 Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde - Deaps
+                                Esplanada dos Ministérios, Bloco G - Bairro Zona Cívico-Administrativa, Brasília/DF, CEP 70058-900
+                                                                       Site - saude.gov.br
+

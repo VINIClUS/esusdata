@@ -155,7 +155,7 @@ class ScopeIsolationApiTest extends ApiFixtureSupport {
                 "PROGRAMADOS_MAIS_ESPONTANEOS",
                 Classification.BOM,
                 "2026-03",
-                "c1-mais-acesso@0.1.0",
+                "c1-mais-acesso@0.2.0",
                 "2026-03-31",
                 municipalityIbge,
                 List.of(),

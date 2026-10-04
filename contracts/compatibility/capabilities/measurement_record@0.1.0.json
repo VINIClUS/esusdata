@@ -1,0 +1,100 @@
+{
+  "capability": "measurement_record",
+  "adapter_version": "0.1.0",
+  "description": "Peso, altura e PA registrados fora de um atendimento: ficha de procedimentos (MIP, inclusive a escuta inicial de nível médio) e participantes de atividade coletiva (MIAC, sem PA); origin=MIP|MIAC. MIAC traz o tipo de atividade e as práticas em saúde (códigos LEDI).",
+  "record_kind": "measurement",
+  "entity_type_column": "source_entity_type",
+  "record_id_column": "source_record_id",
+  "municipality_column": "municipality_ibge",
+  "scope_date_column": "measured_date",
+  "query": "queries/measurement_record@0.1.0.sql",
+  "binds": [
+    {
+      "name": "municipality_ibge",
+      "type": "MUNICIPALITY_IBGE"
+    },
+    {
+      "name": "period_start",
+      "type": "PERIOD_START"
+    },
+    {
+      "name": "period_end_exclusive",
+      "type": "PERIOD_END_EXCLUSIVE"
+    },
+    {
+      "name": "birth_date_from",
+      "type": "DATE"
+    },
+    {
+      "name": "birth_date_to",
+      "type": "DATE"
+    }
+  ],
+  "columns": [
+    {
+      "name": "source_entity_type",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "source_record_id",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "municipality_ibge",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "person_key",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "measured_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "weight_kg",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "height_cm",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "systolic_mmhg",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "diastolic_mmhg",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "cbo",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "origin",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "activity_type_code",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "health_practice_codes",
+      "type": "text[]",
+      "required": false
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import esusdata.indicator.model.CanonicalModality;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.SourceRef;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -127,13 +128,84 @@ class C1RuleTest {
 
     @Test
     void allCompleteFlagsCannotOverrideKnownStandingLimitations() {
-        IndicatorResult result = C1Rule.compute(
-                encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31", C1Rule.ReleaseGates.allComplete());
+        IndicatorResult result =
+                C1Rule.compute(encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31", ReleaseGates.allComplete());
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.BLOCKED);
         assertThat(result.valueText()).isNull();
         assertThat(result.classification()).isNull();
-        assertThat(result.limitations()).anyMatch(l -> l.contains("Portão A/B BLOCKED"));
+        assertThat(result.limitations()).anyMatch(l -> l.contains("cbo_policy=FICHA_24C"));
+    }
+
+    @Test
+    void everyOccupationOfTheFichaEntersBothArms() {
+        List<CanonicalEncounter> encounters = new ArrayList<>();
+        for (String cbo : List.of("225142", "225170", "225130", "225125", "225250", "223565", "223505")) {
+            encounters.add(encounterWithCbo("p" + cbo, CanonicalModality.PROGRAMADO, cbo));
+            encounters.add(encounterWithCbo("e" + cbo, CanonicalModality.ESPONTANEO, cbo));
+        }
+        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+
+        assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(7));
+        assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(14));
+        assertThat(result.limitations()).noneMatch(l -> l.contains("fora dos sete CBO"));
+    }
+
+    @Test
+    void cboOutsideTheFichaIsExcludedFromNumeratorAndDenominatorAndCounted() {
+        List<CanonicalEncounter> encounters = new ArrayList<>(encounters(2, 2, 0));
+        // 223405 (family 2234) and 515105 (agente comunitário) are not in item 24-c; 2251 alone is a
+        // family, not one of the six-digit occupations, so 225105 is out as well.
+        encounters.add(encounterWithCbo("x1", CanonicalModality.PROGRAMADO, "223405"));
+        encounters.add(encounterWithCbo("x2", CanonicalModality.ESPONTANEO, "515105"));
+        encounters.add(encounterWithCbo("x3", CanonicalModality.PROGRAMADO, "225105"));
+        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+
+        assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(2));
+        assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(4));
+        assertThat(result.limitations()).anyMatch(l -> l.contains("3 encontro(s) com CBO ausente ou fora"));
+    }
+
+    @Test
+    void missingOrBlankCboIsExcludedAndCounted() {
+        List<CanonicalEncounter> encounters = new ArrayList<>(encounters(1, 1, 0));
+        encounters.add(encounterWithCbo("n1", CanonicalModality.PROGRAMADO, null));
+        encounters.add(encounterWithCbo("n2", CanonicalModality.ESPONTANEO, "  "));
+        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+
+        assertThat(result.numerator()).isEqualTo(BigInteger.ONE);
+        assertThat(result.denominator()).isEqualTo(BigInteger.TWO);
+        assertThat(result.limitations()).anyMatch(l -> l.contains("2 encontro(s) com CBO ausente ou fora"));
+    }
+
+    @Test
+    void hyphenatedCboIsMatchedLikeTheSixDigitCode() {
+        List<CanonicalEncounter> encounters = List.of(
+                encounterWithCbo("h1", CanonicalModality.PROGRAMADO, "2251-42"),
+                encounterWithCbo("h2", CanonicalModality.ESPONTANEO, "2235-05"));
+        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+
+        assertThat(result.numerator()).isEqualTo(BigInteger.ONE);
+        assertThat(result.denominator()).isEqualTo(BigInteger.TWO);
+    }
+
+    @Test
+    void anEncounterOutsideTheCboListIsNotAlsoCountedAsUnmapped() {
+        List<CanonicalEncounter> encounters = List.of(
+                encounterWithCbo("u1", CanonicalModality.UNMAPPED, "515105"),
+                encounterWithCbo("u2", CanonicalModality.UNMAPPED, "225142"));
+        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+
+        assertThat(result.limitations()).anyMatch(l -> l.contains("1 encontro(s) com CBO ausente ou fora"));
+        assertThat(result.limitations()).anyMatch(l -> l.contains("1 encontro(s) com tipo de atendimento"));
+    }
+
+    @Test
+    void ruleVersionAndStandingLimitationDescribeTheFichaCboFilter() {
+        assertThat(C1Rule.RULE_VERSION).isEqualTo("c1-mais-acesso@0.2.0");
+        assertThat(C1Rule.standingLimitations())
+                .anyMatch(l -> l.contains("cbo_policy=FICHA_24C") && l.contains("vigência"))
+                .noneMatch(l -> l.contains("ALL_CBO"));
     }
 
     @Test
@@ -182,6 +254,17 @@ class C1RuleTest {
             list.add(encounter("u" + i, CanonicalModality.UNMAPPED, careDate));
         }
         return list;
+    }
+
+    private static CanonicalEncounter encounterWithCbo(String recordId, CanonicalModality modality, String cbo) {
+        return new CanonicalEncounter(
+                new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", recordId),
+                "3541307",
+                "2026-03-15",
+                modality,
+                "2750325",
+                "0000346268",
+                cbo);
     }
 
     private static CanonicalEncounter encounter(String recordId, CanonicalModality modality, String careDate) {

@@ -15,7 +15,7 @@ import java.math.RoundingMode;
  * either side to a decimal first. Decimal conversion ({@link #toScaledBigDecimal}) is an explicit,
  * final, display-only operation.
  */
-public record ExactRatio(BigInteger numerator, BigInteger denominator) {
+public record ExactRatio(BigInteger numerator, BigInteger denominator) implements Comparable<ExactRatio> {
 
     public ExactRatio {
         if (denominator.signum() <= 0) {
@@ -27,12 +27,55 @@ public record ExactRatio(BigInteger numerator, BigInteger denominator) {
         return new ExactRatio(BigInteger.valueOf(numerator), BigInteger.valueOf(denominator));
     }
 
+    public static ExactRatio of(BigInteger numerator, BigInteger denominator) {
+        return new ExactRatio(numerator, denominator);
+    }
+
     public static ExactRatio zero() {
         return new ExactRatio(BigInteger.ZERO, BigInteger.ONE);
     }
 
     public boolean isZero() {
         return numerator.signum() == 0;
+    }
+
+    /**
+     * The same value in lowest terms ({@code 220/4} → {@code 55/1}), for when the fraction itself is
+     * shown or persisted; comparisons never need it.
+     */
+    public ExactRatio reduced() {
+        BigInteger divisor = numerator.gcd(denominator); // ≥ 1: the denominator is positive
+        if (divisor.equals(BigInteger.ONE)) {
+            return this;
+        }
+        return new ExactRatio(numerator.divide(divisor), denominator.divide(divisor));
+    }
+
+    /** {@code this + other}, exact; the result is not reduced. */
+    public ExactRatio plus(ExactRatio other) {
+        return new ExactRatio(
+                numerator.multiply(other.denominator).add(other.numerator.multiply(denominator)),
+                denominator.multiply(other.denominator));
+    }
+
+    /** {@code this × factor}, exact — weights in points (C2–C7) and in the Nota Final (NT 8/2026). */
+    public ExactRatio times(BigInteger factor) {
+        return new ExactRatio(numerator.multiply(factor), denominator);
+    }
+
+    /** {@code this × other}, exact — a weight that is itself a fraction (the 0,25 … 1,00 factors). */
+    public ExactRatio times(ExactRatio other) {
+        return new ExactRatio(numerator.multiply(other.numerator), denominator.multiply(other.denominator));
+    }
+
+    /**
+     * Orders two ratios by cross-multiplication, never by decimal conversion. Equal values with
+     * different representations ({@code 1/2} and {@code 2/4}) compare as 0; {@link #equals} still
+     * compares the components, as a record does.
+     */
+    @Override
+    public int compareTo(ExactRatio other) {
+        return numerator.multiply(other.denominator).compareTo(other.numerator.multiply(denominator));
     }
 
     /** As a percentage ratio (this × 100), still exact — used before comparing to a 0-100 band. */

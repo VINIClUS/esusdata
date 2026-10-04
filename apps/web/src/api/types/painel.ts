@@ -1,5 +1,6 @@
 import type { Severity, StatusKey } from './common'
 import type { RunState } from './execucao'
+import type { Availability, ValueKind } from './indicadores'
 
 export interface Kpi {
   id: string
@@ -58,6 +59,8 @@ export interface PainelResumo {
   ultimaAtualizacao?: string | null
   /** Oldest competência with data and no result, for "Executar nova importação". */
   competenciaPendente?: string | null
+  /** A pack still unpublished in that competência that the source can compute (ADR 0030). */
+  indicadorPendente?: string | null
   kpis: Kpi[]
   evolucao: { series: SerieDef[]; pontos: SeriePonto[] }
   qualidade: { percentual: number | null; titulo: string; descricao: string }
@@ -69,11 +72,20 @@ export interface PainelResumo {
 
 // GET /overview (ADR 0029)
 
+/** One catalog pack in `GET /overview`. The fields from `code` to `missingCapabilities` are ADR 0030's. */
 export interface OverviewIndicator {
   indicatorPack: string
   ruleVersion: string
   family: string
   unit: string
+  code?: string
+  title?: string
+  valueKind?: ValueKind
+  /** False for the Nota Final, computed on read. */
+  runnable?: boolean
+  /** UNSUPPORTED_SOURCE is never a zero. */
+  availability?: Availability
+  missingCapabilities?: string[]
   executionEnabled: boolean
   blockedGates: string[]
   resultId: string | null
@@ -123,6 +135,8 @@ export interface OverviewPendingPeriod {
   sourceId: string
   referencePeriod: string
   count: number
+  /** The packs still unpublished for this competência that the source can compute (ADR 0030). */
+  indicatorPacks?: string[]
 }
 
 export interface OverviewRecentRun {

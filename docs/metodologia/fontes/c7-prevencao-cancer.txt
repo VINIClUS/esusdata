@@ -1,0 +1,472 @@
+                                                   Ministério da Saúde
+                                         Secretaria de Atenção Primária à Saúde
+                   Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde
+
+
+                    NOTA METODOLÓGICA C7 - CUIDADO DA MULHER NA PREVENÇÃO DO CÂNCER
+
+1.           INDICADOR
+1.1.         Cuidado da mulher na prevenção do câncer na Atenção Primária à Saúde (APS).
+2.           OBJETIVO
+2.1.          Tem como objetivo avaliar o acesso e monitoramento efetivo das mulheres e dos homens transgênero, em
+relação aos episódios de cuidados necessários, com incentivo a captação precoce e acompanhamento coordenado e
+contínuo na APS.
+3.           FICHA DE QUALIFICAÇÃO
+               N           Título                                                 Descrição
+                Contextualização do indicador
+               1 Título resumido       Cuidado da mulher na prevenção do câncer na APS.
+                                        Cuidado da mulher e do homem transgênero na prevenção do câncer na Atenção Primária à
+               2 Título completo
+                                        Saúde (APS).
+                                        Atenção integral à saúde da mulher; Câncer do colo do útero; Câncer de mama; Vacinas contra
+               3    Palavras-chave
+                                        Papilomavírus; Saúde sexual; Saúde reprodutiva.
+                                        Monitoramento da atenção integral e do cuidado longitudinal de mulheres e de homens
+                    Contextualização do transgênero, com atenção às necessidades dos diferentes ciclos de vida, no que se refere à
+               4
+                    indicador           saúde sexual e reprodutiva, prevenção e diagnóstico precoce de câncer de colo do útero e
+                                        mama.
+                                        Saúde sexual e reprodutiva: expressão saudável da sexualidade, evitando situações como
+                                        infecções sexualmente transmissíveis (ISTs), gestações não planejadas, coerções, violência e
+                                        discriminação.
+                                        Detecção Precoce: tem como objetivo identificar a doença mais precocemente na premissa de
+                    Conceitos
+               5                        garantir melhores chances de cura, melhor sobrevida e prognóstico. Engloba dois tipos de
+                    importantes
+                                        intervenções: o rastreamento, cujo foco são pessoas assintomáticas, e quando feito de forma
+                                        organizada tem maior impacto na mortalidade e maior qualidade e segurança no cuidado, e o
+                                        diagnóstico precoce que tem como objetivo identificar pessoas com sinais e sintomas de
+                                        câncer em estágios iniciais.
+                                        Avaliar o acesso e o acompanhamento efetivo das mulheres e dos homens transgênero em
+               6    Objetivo            relação aos episódios de cuidados necessários, com incentivo a captação precoce,
+                                        acompanhamento coordenado e contínuo na APS.
+                                        Permitir que profissionais de saúde e gestores acompanhem a evolução das boas práticas, com
+                                        o intuito de monitorar as ações de promoção da saúde, prevenção de agravos, o manejo, a
+               7    Uso/aplicabilidade  captação, o acesso, o acolhimento e o acompanhamento das mulheres e dos homens
+                                        transgênero ao serviço de saúde, com enfoque na saúde sexual e reprodutiva, bem como da
+                                        prevenção e detecção precoce de câncer de colo do útero e mama.
+                   Regularidade do Indicador
+                    Periodicidade da
+               8                          Mensal.
+                    atualização
+                    Periodicidade do
+               9                          Mensal.
+                    monitoramento
+                    Periodicidade da
+               10                         Quadrimestral.
+                    avaliação
+                    Dia de extração dos   SIAPS: 20º dia útil de cada mês.
+               11
+                    dados                 SCNES: A última competência válida.
+                Escopo da base de dados de acompanhamento
+                                      · Atendimento por profissional médica(o) ou enfermeira(o) para a saúde sexual e reprodutiva.
+               12 Evento              · Vacinação contra HPV.
+                                      · Exame de rastreamento para câncer do colo do útero e mama.
+N          Título                                                  Descrição
+     Período de
+13                       Mensal.
+     acompanhamento
+                         Criança, adolescente, mulher ou homens transgênero vinculado às equipes de Saúde da
+     Entrada no
+14                       Família (eSF) ou Atenção Primária (eAP), conforme regras da Nota Técnica n° 30/2025-
+     acompanhamento
+                         CGESCO/DESCO/SAPS/MS, entre 09 e 69 anos de vida no período.
+                         · Usuárias(os) que a atualização mais recente do cadastro individual possua a opção “Saída do
+                         cidadão do cadastro” com a opção “Mudança de território” marcada.
+     Interrupção do
+15                       · Mudança da equipe, considerando os critérios de desempate previstos na Portaria SAPS/MS
+     acompanhamento
+                         nº 161/2024.
+                         · Óbito no CADSUS.
+                         (A) Ter pelo menos 01 (um) exame de rastreamento para câncer do colo do útero em mulheres
+                         e em homens transgênero de 25 a 64 anos de idade, coletado, solicitado ou avaliado nos
+                         últimos 36 meses, exceto o procedimento SIGTAP 02.02.10.025-1 - Exame molecular de
+                         detecção de HPV, que será considerada a janela temporal de 60 meses;
+                         (B) Ter pelo menos 01 (uma) dose da vacina HPV para crianças e adolescentes do sexo feminino
+   Boas práticas de
+                         de 09 a 14 anos de idade;
+16 acompanhamento/
+                         (C) Ter pelo 01 (um) atendimento presencial ou remoto, para adolescentes, mulheres e
+   cuidado
+                         homens transgênero de 14 a 69 anos de idade, sobre atenção à saúde sexual e reprodutiva,
+                         realizado nos últimos 12 meses;
+                         (D) Ter registro de pelo menos 01 (um) exame de rastreamento para câncer de mama em
+                         mulheres e em homens transgênero de 50 a 69 anos de idade, solicitado ou avaliado nos
+                         últimos 24 meses.
+17 Datas relevantes      Não se aplica.
+ Procedimentos para o desenvolvimento do indicador
+18 Unidade de medida     Percentual.
+     Descritivo da
+19                       %
+     Unidade de Medida
+20 Status do indicador   Acumulativo: Não.
+21 Granularidade         Identificador Nacional de Equipe (INE).
+22 Polaridade            Maior-melhor.
+23 Fórmula de Cálculo    Numerador:
+                         Somatório da boa prática para cada mulher e homem transgênero na faixa etária avaliada na
+                         boa prática.
+                         Denominador:
+                         Nº total de mulheres e homens transgênero na faixa etária avaliada na boa prática e vinculadas
+                         à equipe no período.
+
+                         Fórmula do Indicador: (A+B+C+D).
+
+                         Fórmulas por cada boa prática:
+
+                         Boa prática (A)= (a/b) x 20
+                         Onde:
+                         Numerador:
+                         a = Boa prática pontuada para mulheres e homens transgênero entre 25 e 64 anos com
+                         registro de pelo menos 01 exame de rastreamento para câncer do colo do útero, coletado,
+                         solicitado ou avaliado nos últimos 36 meses. Para o procedimento SIGTAP 02.02.10.025-1 -
+                         Exame molecular de detecção de HPV, será considerada a janela temporal de 60 meses.
+                         Denominador:
+                         b = Mulheres e homens transgênero entre 25 e 64 anos, vinculadas à equipe, conforme
+                         critérios listados na entrada no acompanhamento e item 14 desta nota.
+
+                         Boa prática (B)= (c/d) x 30
+                         Onde:
+                         Numerador:
+                         c = Boa prática realizada para crianças e adolescentes do sexo feminino entre 09 e 14 anos no
+                         período avaliado, com registro de pelo menos uma dose da vacina HPV administrada nessa
+                         faixa etária.
+                         Denominador:
+                         d = Crianças e adolescentes do sexo feminino entre 09 e 14 anos, vinculadas à equipe,
+                         conforme critérios listados na entrada no acompanhamento e item 14 desta nota.
+
+                         Boa prática (C)=(e/f) x 30
+                         Onde:
+N        Título                                                  Descrição
+                       Numerador:
+                       e= Boa prática realizada para adolescentes do sexo feminino, mulheres e homens transgênero
+                       entre 14 e 69 anos, com registro de atendimentos presenciais ou remotos de atenção à saúde
+                       sexual e reprodutiva, realizado nos últimos 12 meses.
+                       Denominador:
+                       f = Adolescentes do sexo feminino, mulheres e homens transgênero entre 14 e 69 anos,
+                       vinculadas à equipe, conforme critérios listados na entrada no acompanhamento e item 14
+                       desta nota.
+
+                       Boa prática (D)= (g/h) x 20
+                       Onde:
+                       Numerador:
+                       g = Boa prática realizada para mulheres e homens transgênero entre 50 e 69 anos, com registro
+                       de pelo menos 01 exame de rastreamento para câncer de mama, solicitado ou avaliado nos
+                       últimos 24 meses.
+                       Denominador:
+                       h = Mulheres e homens transgênero entre 50 e 69 anos, vinculadas à equipe, conforme
+                       critérios listados na entrada no acompanhamento e item 14 desta nota.
+24 Método de cálculo   I. I. Regras gerais:
+                       a) Identificação da pessoa assistida:
+                       · Nome, data de nascimento, Cadastro de Pessoa Física (CPF) ou Cartão Nacional de Saúde
+                       (CNS) válido, em conformidade com o Sistema de Cadastramento de Usuários do Sistema
+                       Único de Saúde (CadSUS).
+                       b) Validação das equipes:
+                       · Serão consideradas equipes de Saúde da Família (eSF), e equipes de Atenção Primária (eAP),
+                       tipo 70 e 76, respectivamente, atendendo as condições previstas na Portaria GM/MS nº
+                       3.493/2024.
+                       c) Grupo de CBO utilizados para todas as consultas de atendimento individual, presencial ou
+                       remoto:
+                       · 2235 - Enfermeiros
+                       · 2231 / 2251 / 2252 / 2253 - Médicos
+                       d) Grupo de CBO utilizados para o cálculo do indicador (considera-se a habilitação para
+                       execução de procedimentos e atendimentos conforme a tabela SIGTAP):
+                       · 2235 – Enfermeiros;
+                       · 2231 / 2251 / 2252 / 2253 - Médicos;
+                       · 2516-05 - Assistente Social
+                       · 2234-45 - Farmacêutico(a) Hospitalar e Clínico
+                       · 2236-05 - Fisioterapeuta
+                       · 2238-10 - Fonoaudiólogo(a)
+                       · 2237-10 - Nutricionista
+                       · 2515-10 - Psicólogo(a)
+                       · 2239-05 - Terapeuta Ocupacional
+                       · 3222 - Técnico de enfermagem e auxiliar de enfermagem.
+                       e) Modelos de Informação da Estratégia eSUS APS:
+                       Serão considerados os seguintes modelos de informação:
+                       · Modelo de Informação de Atendimento Individual (MIAI): considera o Atendimento Individual
+                       (presencial, domiciliar e remoto) com identificação do Problema/Condição Avaliada, desde que
+                       registrado por profissionais de saúde dos CBO supracitados, com CNS profissional identificado.
+                       · Modelo de Informação de Procedimentos (MIP): considera os procedimentos realizados
+                       conforme a tabela do Sistema de Gerenciamento da Tabela de Procedimentos, Medicamentos
+                       e OPM do SUS (SIGTAP), desde que registrado por profissionais de saúde dos CBO
+                       supracitados, com CNS profissional identificado.
+                       · Registro de Imunobiológico Administrado (RIA): considera as informações sobre a aplicação
+                       de imunobiológicos, como vacinas, e faz parte da Rede Nacional de Dados em Saúde (RNDS)
+                       que tem como objetivo padronizar o registro e compartilhamento dessas informações, tanto
+                       em campanhas de vacinação quanto na rotina de imunização.
+                       g) CID-10 e CIAP-2 ativos considerados para critérios de elegibilidade para saúde sexual e
+                       reprodutiva:
+                       · Código CIAP-2: B25; W02; W10; W11; W12; W13; W14; W15; W79; W82; X01; X02; X03; X04;
+                       X05; X06; X07; X08; X09; X10; X11; X12; X13; X23; X24; X82; X89; Y14; e/ou
+                       · Código CID-10: N80; N800; N801; N802; N803; N804; N805; N806; N808; N809; N91; N910;
+                       N911; N912; N913; N914; N915; N92; N920; N921; N922; N923; N924; N925; N926; N93;
+                       N930; N938; N939; N94; N940; N941; N942; N943; N944; N945; N946; N948; N949; N95;
+                       N950; N951; N952; N953; N958; N959; N96; N97; N970; N971; N972; N973; N974; N978;
+                       N979; O03; O04; R102; T742; Y050; Y051; Y052; Y053; Y054; Y055; Y056; Y057; Y058; Y059;
+                       Z123; Z124; Z205; Z206; Z30; Z300; Z301; Z302; Z303; Z304; Z305; Z308; Z309; Z31; Z310; Z311;
+N            Título                                                  Descrição
+                         Z312; Z313; Z314; Z315; Z316; Z318; Z319; Z320; Z600; Z630; Z640; Z70; Z700; Z701; Z702;
+                         Z703; Z708; Z709; Z717; Z725; e/ou
+                         · Código ABP: ABP003; ABP022; ABP023.
+                         h) Código do procedimento (o procedimento só é válido respeitando-se as habilitações de
+                         CBO previstos na tabela SIGTAP):
+                         · 02.04.03.003-0 - Mamografia
+                         · 02.04.03.018-8 - Mamografia bilateral para rastreamento;
+                         · 02.01.02.003-3 - Coleta de citopatológico de colo uterino
+                         · 02.03.01.008-6 - Exame citopatológico cérvico vaginal/microflora-rastreamento;
+                         · 02.03.01.001-9 - Exame citopatológico cérvico-vaginal/microflora;
+                         · 02.01.02.007-6 - Coleta de material do colo do útero para exame molecular de detecção de
+                         HPV;
+                         · 02.01.02.008-4 - Entrega de material obtido por auto coleta para exame molecular para
+                         detecção de HPV, no colo do útero;
+                         · 03.01.01.003-0 - Consulta de profissionais de nível superior na atenção primária (exceto
+                         médico)
+                         · 03.01.01.006-4 - Consulta médica em atenção primária
+                         · 03.01.01.025-0 - Teleconsulta na atenção primária.
+                         . 02.02.10.025-1 - Exame molecular de detecção de HPV
+                         i) Esquema de doses:
+                         · Dose única (67 - Vacina HPV quadrivalente ou 93 - Vacina HPV nonavalente).
+25 Categorias de análise Brasil, regiões, unidade federativa, municípios, CNES e INE.
+                        Siaps
+26 Fonte de dados       SCNES
+                        RNDS
+ Análise do indicador
+                        Uma baixa cobertura das ações essenciais a serem ofertadas pode demonstrar a dificuldade de
+                        acesso aos serviços e às equipes de saúde, indicando a necessidade de estratégias a serem
+     Interpretação em
+27                      realizadas pelos profissionais de saúde no território de abrangência, de acordo com as faixas
+     saúde
+                        etárias prioritárias e oportunas para realização dos procedimentos indicados nos protocolos do
+                        Ministério da Saúde.
+28 Ano de referência    2024.
+     Indicadores
+29                      Não se aplica.
+     relacionados
+                        Ótimo: > 75 e ≤ 100
+                        Bom: > 50 e ≤ 75
+30 Parâmetro
+                        Suficiente: > 25 e ≤ 50
+                        Regular: ≤ 25
+     Classificação
+31                      Indicador de resultado.
+     gerencial
+     Classificação de
+32                      Indicador de efetividade.
+     desempenho
+ Limitações
+                        Considerando que há necessidade de registro qualificado da informação em campo específico,
+                        é possível que os resultados sejam limitados por dificuldades de registro pelos profissionais de
+33 Limitações
+                        saúde no prontuário eletrônico, assim como o envio tardio da informação pela gestão local. Há
+                        possibilidade de lapso temporal na identificação da ocorrência de óbitos no CadSUS.
+ Responsabilidades
+                        Coordenação-Geral de Inovação e Aceleração Digital na APS (CGIAD)
+                        e-mail: https://webatendimento.saude.gov.br/faq/saps
+34 Gerencial
+                        Setor: Deaps/Saps/MS
+                        Telefone: (61) 3315- 9018
+35 Técnica              Coordenação-Geral de Atenção à Saúde das Mulheres (CGESMU)
+                        e-mail: dgci@saude.gov.br
+                        Setor: DGCI/Saps
+                        Telefone: (61) 3315-9135
+                        Telefone: (61) 3315-8847
+
+                        Departamento de Gestão do Cuidado Integral (DGCI)
+                        e-mail: dgci@saude.gov.br
+                        Setor: Saps/MS
+                        Telefone: (61) 3315-9135
+                        Telefone: (61) 3315-8847
+                N          Título                                                Descrição
+                                          Coordenação-Geral de Prevenção às Condições Crônicas na Atenção Primária à Saúde (CGCOC).
+                                          e-mail: cgcoc@saude.gov.br
+                                          Setor: DEPROS/Saps
+                                          Telefone: (61) 3315-6101.
+                                          Departamento de Prevenção e Promoção da Saúde (DEPPROS).
+                                          e-mail: deppros@saude.gov.br
+                                          Setor: Saps/MS
+                                          Telefone: (61) 3315-6101.
+
+
+
+4.           CADERNO DE CÁLCULO
+4.1.           Definição de mulher ou homem transgênero: são consideradas no denominador todas as pessoas com idade
+entre 9 e 69 anos vinculadas à equipe no período com:
+4.1.1.       Registro de sexo feminino; ou
+4.1.2.       Registro de sexo masculino e identidade de gênero “Homem transgênero”.
+4.2.           Pessoas com registro de sexo feminino e identidade de gênero “Mulher transgênero” não serão consideradas
+nas boas práticas.
+4.3.           Para garantir que todos os municípios possam fazer o monitoramento da sua situação em relação a esses
+indicadores, acompanhar o progresso e fazer um cálculo preliminar dos seus resultados, serão considerados os modelos de
+informação publicados previamente pela Secretaria de Atenção Primária à Saúde, do Ministério da Saúde, no âmbito do e-
+SUS APS, através do sítio eletrônico: https://sisaps.saude.gov.br/sistemas/sisab/docs/modelos/intro/.
+4.4.         O numerador é constituído pela soma das boas práticas pontuadas durante o acompanhamento de uma
+mulher ou homem transgênero na faixa etária avaliada para cada boa prática. A pontuação pode alcançar um valor máximo
+de 100 pontos, para cada pessoa no período, conforme Quadro 01.
+4.5.           Atenção: é importante destacar que para as boas práticas, serão considerados os registros de qualquer
+profissional habilitado em estabelecimento de saúde da APS, no país.
+
+             Quadro 01. Boas práticas de cuidado da Mulher na Prevenção do Câncer
+                                                                 Boas Práticas                                                  Pontos
+                   Ter pelo menos 01 (um) exame de rastreamento para câncer do colo do útero em mulheres e em homens
+                   transgênero de 25 a 64 anos de idade, coletado, solicitado ou avaliado nos últimos 36 meses, exceto quando
+               (A)                                                                                                               20
+                   se tratar do procedimento SIGTAP 02.02.10.025-1 - Exame molecular de detecção de HPV, que será
+                   considerada a janela temporal de 60 meses.
+                     Ter pelo menos 01 (uma) dose da vacina HPV para crianças e adolescentes do sexo feminino de 09 a 14 anos
+               (B)                                                                                                               30
+                     de idade.
+                     Ter pelo 01 (um) atendimento presencial ou remoto, para adolescentes e mulheres e homens transgênero de
+               (C)                                                                                                               30
+                     14 a 69 anos de idade, sobre atenção à saúde sexual e reprodutiva, realizado nos últimos 12 meses.
+                     Ter pelo menos 01 (um) exame de rastreamento para câncer de mama em mulheres e em homens
+               (D)                                                                                                               20
+                     transgênero de 50 a 69 anos de idade, solicitado ou avaliado nos últimos 24 meses.
+                                                             Somatório em pontos                                                 100
+
+              Quadro 02. Detalhamento para composição da boa prática (A) pelo menos 01 (um) exame de rastreamento
+para câncer do colo do útero em mulheres e em homens transgênero de 25 a 64 anos de idade, coletado, solicitado ou
+avaliado nos últimos 36 meses, exceto para o procedimento SIGTAP 02.02.10.025-1 - Exame molecular de detecção de HPV,
+que será considerado nos últimos 60 meses.
+                 Condicionante           Código/Campo                              Descrição                       Observação
+                                     2251, 2252, 2253, 2231 Médicos                                                     -
+                 Grupo de CBO
+                                              2235            Enfermeiros                                               -
+                                                            Serão considerados os registros com os códigos
+                                    Modelo de Informação de
+                                                            SIGTAP ou registro rápido solicitados ou avaliados
+                     Modelo de       Atendimento Individual
+                                                            especificados.                                              -
+                     informação
+                                    Modelo de Informação de Serão considerados os registros com os códigos
+                                        Procedimento        SIGTAP especificados.
+
+                      SIGTAP        02.01.02.003-3            Coleta de citopatológico de colo uterino.                 -
+                                                              Exame citopatológico cérvico- vaginal/microflora-
+                                    02.03.01.008-6                                                                      -
+                                                              rastreamento
+                Condicionante            Código/Campo                               Descrição                            Observação
+                                  02.03.01.001-9               Exame citopatológico cérvico-vaginal/microflora                 -
+                                                               Coleta de material do colo do útero para exame
+                                  02.01.02.007-6                                                                               -
+                                                               molecular de detecção de HPV
+                                                               Entrega de material obtido por auto coleta para
+                                  02.01.02.008-4               exame molecular para detecção de HPV, no colo do                -
+                                                               útero
+                                                                                                                     Considerar registros
+                                  02.02.10.025-1               Exame molecular de detecção de HPV
+                                                                                                                    nos últimos 60 meses.
+                    ABEX          ABEX001                      Citopatológico                                                  -
+                     ABP          ABP022                       Rastreamento de câncer do colo do útero                         -
+
+              Quadro 03. Detalhamento para composição da boa prática (B) pelo menos 01 (uma) dose da vacina HPV para
+crianças e adolescentes do sexo feminino de 09 a 14 anos de idade.
+                Condicionante            Código/Campo                                     Descrição                           Observação
+                                   Todos que submeterem o registro ao SIAPS ou à RNDS. Será considerado qualquer
+                     CBO                                                                                                            -
+                                   registro de profissional habilitado em estabelecimento de saúde da APS, no país.
+
+                                                            Registro do código da vacina no campo específico do PEC e
+                                    Modelo de Informação de
+                                                            correta identificação da criança, com data de nascimento e              -
+                  Modelo de               Vacinação
+                                                            CPF ou CNS.
+                  informação
+                                   Registro de Imunobiológico
+                                                              Registro da vacina ou transcrição.                                    -
+                                       Administrado (RIA)
+                                                67              Vacina HPV quadrivalente.                                           -
+                Códigos Vacinas
+                                                93              Vacina HPV nonavalente.                                             -
+
+              Quadro 04. Detalhamento para composição das boas práticas (C) pelo menos 01 (um) atendimento presencial
+ou remoto, para adolescentes e mulheres e homens transgênero de 14 a 69 anos de idade, sobre atenção à saúde sexual e
+reprodutiva, realizado nos últimos 12 meses.
+               Condicionante        Código/Campo                           Descrição                                Observação
+                                   2251, 2252, 2253,
+                                                     Médicos                                                              -
+                    CBO                  2231
+                                         2235          Enfermeiros                                                        -
+                                                       Modelo de Informação de Atendimento Registro de atendimento presencial
+                                       Registro de     Individual, desde que registrado por profissionais
+                 Modelo de                                                                                 ou remoto com a marcação dos
+                                    atendimento da de saúde dos CBO supracitados, com CNS
+                 informação                                                                               códigos listados na alínea “g” do
+                                  Estratégia e-SUS APS profissional identificado, alocado conforme os
+                                                                                                          item 24 da ficha de qualificação.
+                                                       códigos das equipes descritos.
+
+              Quadro 05. Detalhamento para composição da boa prática (D) pelo menos 01 (um) exame de rastreamento
+para câncer de mama em mulheres e em homens transgênero de 50 a 69 anos de idade, solicitado ou avaliado nos últimos
+24 meses.
+                 Condicionante                  Código/Campo                                    Descrição                     Observação
+                                            2251, 2252, 2253, 2231         Médicos                                                  -
+                      CBO
+                                                      2235                 Enfermeiros                                              -
+                                           Modelo de Informação de         Preenchimento do campo: exames solicitados (S)
+                   Modelo de                Atendimento Individual         e avaliados (A)
+                                                                                                                                    -
+                   informação              Modelo de Informação de         Serão considerados os registros com os códigos
+                                               Procedimento                SIGTAP especificados.
+
+                                     02.04.03.003-0                        Mamografia                                               -
+                     SIGTAP
+                                     02.04.03.018-8                        Mamografia bilateral para rastreamento                   -
+                      ABP            ABP023                                Rastreamento de câncer de mama                           -
+
+
+Esta nota revoga a NOTA METODOLÓGICA C7 - CUIDADO DA MULHER NA PREVENÇÃO DO CÂNCER (0049702875)
+5.           REFERÊNCIAS
+ BRASIL. Ministério da Saúde. Caderno de Atenção Primária n° 29 – Rastreamento. Brasília: Ministério da Saúde, 2010.
+ BRASIL. Ministério da Saúde. Secretaria de Atenção à Saúde. Departamento de Atenção Básica. Cadernos de Atenção Básica:
+ Saúde Sexual e Reprodutiva. Cadernos de Atenção Básica n. 26, 2013.
+ BRASIL. Ministério da Saúde. Secretaria de Vigilância em Saúde e Ambiente. Departamento do Programa Nacional de
+ Imunizações. NOTA TÉCNICA Nº 41/2025-CGICI/DPNI/SVSA/MS - Atualização das recomendações de vacinação contra o HPV
+ no Brasil. Brasília: Ministério da Saúde, 2025.
+ INSTITUTO NACIONAL DE CÂNCER JOSÉ ALENCAR GOMES DA SILVA. Diretrizes para a detecção precoce do câncer de mama
+ no Brasil. Rio de Janeiro: INCA, 2015.
+ INSTITUTO NACIONAL DE CÂNCER JOSÉ ALENCAR GOMES DA SILVA. Diretrizes brasileiras para o rastreamento do câncer do
+ colo do útero. Rio de Janeiro: INCA, 2016.
+ ORGANIZAÇÃO PAN-AMERICANA DA SAÚDE. Controle integral do câncer do colo do útero: guia de práticas essenciais.
+ Washington, DC: OPAS, 2016.
+ WILD, C. P.; WEIDERPASS, E.; STEWART, B. W. World cancer report: cancer research for cancer prevention. Lyon, France:
+ International Agency for Research on Cancer, 2020.
+ WORLD HEALTH ORGANIZATION. National cancer control programmes: policies and managerial guidelines. 2nd ed. Geneva:
+ WHO, 2002.
+
+
+NOTA DE RODAPÉ:
+1. Na Seção 3, item 5, foi atualizado o conceito sobre Detecção precoce.
+2. Na Seção 3, item 14, foi atualizada a referência normativa para a Nota Técnica nº 30/2025-CGESCO/DESCO/SAPS/MS.
+3. Na Seção 3, item 24 - h, foi incluído o SIGTAP 02.02.10.025-1 - Exame molecular de detecção de HPV.
+4. Na Seção 4, quadro 2, foi incluído o SIGTAP 02.02.10.025-1 - Exame molecular de detecção de HPV. A contabilização desse SIGTAP passou a ser realizada a partir da competência janeiro de
+2026, considerando-se a janela temporal de 60 meses para fins de composição da boa prática (A).
+
+                      Documento assinado eletronicamente por Audrey Fischer, Diretor(a) do Departamento de Estratégias, Acreditação e
+                      Componentes da Atenção Primária à Saúde, em 19/06/2026, às 16:35, conforme horário oficial de Brasília, com
+                      fundamento no § 3º, do art. 4º, do Decreto nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de
+                      Março de 2017.
+
+                      Documento assinado eletronicamente por Olivia Lucena de Medeiros, Diretor(a) do Departamento de Gestão do Cuidado
+                      Integral, em 19/06/2026, às 18:28, conforme horário oficial de Brasília, com fundamento no § 3º, do art. 4º, do Decreto nº
+                      10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de 2017.
+
+                      Documento assinado eletronicamente por Angela Fernandes Leal da Silva, Diretor(a) do Departamento de Promoção da
+                      Saúde, em 21/06/2026, às 06:40, conforme horário oficial de Brasília, com fundamento no § 3º, do art. 4º, do Decreto nº
+                      10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de 2017.
+
+                      Documento assinado eletronicamente por Mariana Seabra Souza Pereira, Coordenador(a)-Geral de Atenção à Saúde das
+                      Mulheres, em 22/06/2026, às 17:58, conforme horário oficial de Brasília, com fundamento no § 3º, do art. 4º, do Decreto
+                      nº 10.543, de 13 de novembro de 2020; e art. 8º, da Portaria nº 900 de 31 de Março de 2017.
+
+
+                     A autenticidade deste documento pode ser conferida no site http://sei.saude.gov.br/sei/controlador_externo.php?
+                     acao=documento_conferir&id_orgao_acesso_externo=0, informando o código verificador 0054641718 e o código CRC
+                     5098AAC7.
+
+
+
+Referência: Processo nº 25000.137969/2025-22                                                                                                                           SEI nº 0054641718
+
+                                         Departamento de Estratégias, Acreditação e Componentes da Atenção Primária à Saúde - Deaps
+                                        Esplanada dos Ministérios, Bloco G - Bairro Zona Cívico-Administrativa, Brasília/DF, CEP 70058-900
+                                                                               Site - saude.gov.br
+

@@ -6,6 +6,7 @@ import esusdata.run.job.JobCancelledException;
 import esusdata.run.job.SourceAcquisitionBlockedException;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.SourceBudgetExceededException;
+import esusdata.source.pec.UnsupportedSourceException;
 import java.sql.SQLException;
 import java.sql.SQLTransientException;
 import java.util.Locale;
@@ -37,6 +38,11 @@ public final class FailureClassifier {
         }
         if (failure instanceof AllowedDestinations.DestinationNotAllowedException e) {
             return new Classification(Category.DEFINITIVE, "DESTINATION_NOT_ALLOWED", e.getMessage());
+        }
+        if (failure instanceof UnsupportedSourceException e) {
+            // ADR 0030: the source's PEC version has no VALIDATED entry for a capability the pack
+            // reads. Decided before any child process; retrying cannot validate a capability.
+            return new Classification(Category.DEFINITIVE, UnsupportedSourceException.CODE, e.getMessage());
         }
         if (failure instanceof JobCancelledException e) {
             return new Classification(Category.DEFINITIVE, "CANCELLED", e.getMessage());

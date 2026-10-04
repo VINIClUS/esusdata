@@ -879,8 +879,9 @@ paths:
           description: >-
             The file, as an attachment with a server-chosen name and Cache-Control no-store.
             Columns: municipio_ibge, indicador, versao_regra, competencia, status, numerador,
-            denominador, valor_percentual (decimal comma, empty without a denominator),
-            classificacao, data_corte, publicado_em, execucao.
+            denominador, valor (decimal comma, empty unless COMPUTED), unidade (the pack's
+            valueKind: PERCENTAGE, SCORE or COMPOSITE_SCORE — ADR 0030 amends ADR 0024, whose
+            column was valor_percentual), classificacao, data_corte, publicado_em, execucao.
           content:
             text/csv:
               schema: { type: string, format: binary }
@@ -952,12 +953,50 @@ paths:
         "404":
           description: Unknown result, or caller holds no grant at all for the municipality.
 
+  /api/v1/quality-component:
+    get:
+      tags: [results]
+      summary: >-
+        Nota Final do Componente III of one quadrimestre (NT 8/2026, ADR 0030), computed on read
+        from the published monthly results of C1–C7 — never acquired, enqueued or stored. Per team
+        (INE) and for the municipality: the months that entered each mean, the exact mean, its band
+        and factor, the weighted score, the methodological classification and, apart, the financial
+        classification of the 2026–2027 transition. A unit has no score (BLOCKED, NO_DENOMINATOR,
+        RULE_AMBIGUITY or UNSUPPORTED_SOURCE, with the reason in its limitations) while any component
+        is missing, blocked or without a value: no zero is imputed and no weight is redistributed.
+        READ_CLINICAL municipality-wide, like GET /results.
+      parameters:
+        - name: municipalityIbge
+          in: query
+          required: true
+          schema: { type: string }
+        - name: quadrimestre
+          in: query
+          required: true
+          description: yyyy-Q1 (jan–abr), yyyy-Q2 (mai–ago) or yyyy-Q3 (set–dez) — never a civil quarter.
+          schema: { type: string, example: "2026-Q1" }
+      responses:
+        "200":
+          description: OK. Codes, exact values and result ids only.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QualityComponent" }
+        "400":
+          description: quadrimestre is not yyyy-Q1, yyyy-Q2 or yyyy-Q3 (BAD_REQUEST).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "404":
+          description: Caller lacks municipality-wide READ_CLINICAL for the municipality.
+
   /api/v1/indicator-packs:
     get:
       tags: [indicator-packs]
       summary: >-
-        Catalog of indicator packs (§1.10 L385). Any authenticated session may read it; being
-        listed does not enable execution (ENG-34) — C1's gates A/B/D/E remain blocked.
+        Catalog of indicator packs (§1.10 L385, ADR 0030): C1–C7 of qualidade-esf-eap-2026-06 and the
+        Nota Final do Componente III, computed on read (runnable false). Any authenticated session
+        may read it; being listed does not enable execution (ENG-34) — every pack lists the gates
+        it has not passed.
       responses:
         "200":
           description: OK.
@@ -1234,6 +1273,17 @@ components:
               ruleVersion: { type: string }
               family: { type: string }
               unit: { type: string }
+              code: { type: string, description: "e.g. C4 (ADR 0030)" }
+              title: { type: string }
+              valueKind: { $ref: "#/components/schemas/ValueKind" }
+              runnable: { type: boolean, description: false for the Nota Final, computed on read }
+              availability:
+                type: string
+                enum: [AVAILABLE, UNSUPPORTED_SOURCE, NO_SOURCE]
+                description: >-
+                  Whether some PEC source of the municipality has every capability the pack reads
+                  VALIDATED for its PEC version (ADR 0030). UNSUPPORTED_SOURCE is never a zero.
+              missingCapabilities: { type: array, items: { type: string } }
               executionEnabled: { type: boolean }
               blockedGates: { type: array, items: { type: string } }
               resultId: { type: string, nullable: true }
@@ -1285,6 +1335,10 @@ components:
               sourceId: { type: string }
               referencePeriod: { type: string }
               count: { type: integer, format: int64 }
+              indicatorPacks:
+                type: array
+                items: { type: string }
+                description: The packs still unpublished for this competência that the source can compute (ADR 0030).
         recentRuns:
           type: array
           nullable: true
@@ -1317,7 +1371,18 @@ components:
             properties:
               referencePeriod: { type: string, example: "2026-03" }
               count: { type: integer, format: int64 }
-              published: { type: boolean }
+              published: { type: boolean, description: "Every pack this source can compute is published (ADR 0030)." }
+              publishedPacks: { type: array, items: { type: string } }
+        packs:
+          type: array
+          description: Each runnable pack and whether this source can compute it (ADR 0030).
+          items:
+            type: object
+            properties:
+              indicatorPack: { type: string }
+              ruleVersion: { type: string }
+              availability: { type: string, enum: [AVAILABLE, UNSUPPORTED_SOURCE] }
+              missingCapabilities: { type: array, items: { type: string } }
         schedule: { $ref: "#/components/schemas/Schedule" }
 
     Schedule:
@@ -1523,6 +1588,22 @@ components:
         denominator: { type: string, nullable: true }
         denominatorKind: { type: string, nullable: true }
         classification: { type: string, nullable: true }
+        valueKind: { $ref: "#/components/schemas/ValueKind" }
+        valueExact:
+          allOf: [{ $ref: "#/components/schemas/ExactValue" }]
+          nullable: true
+          description: The value as an exact fraction; null unless COMPUTED (§1.7.1 L245).
+        components:
+          type: array
+          description: One per practice (C2–C6) or subpopulation (C7); empty for C1 (ADR 0030).
+          items: { $ref: "#/components/schemas/ResultComponentResponse" }
+        teams:
+          type: array
+          description: The same result per team (INE), the granularity of the fichas; ine null groups records without a team.
+          items: { $ref: "#/components/schemas/TeamResultResponse" }
+        consolidationEligible:
+          type: boolean
+          description: Whether the month enters the quadrimestral mean (NT 8/2026; C2/C3 skip months without a cohort event).
         dataCutoff: { type: string, nullable: true }
         limitations:
           type: array
@@ -1542,16 +1623,27 @@ components:
 
     EvidenceEntryResponse:
       type: object
-      description: One minimal evidence row (§1.12.1) — no name, CPF or CNS. The raw seq is never exposed.
+      description: >-
+        One minimal evidence row (§1.12.1) — no name, CPF or CNS. The raw seq is never exposed.
+        C1 writes one EVENT row per encounter; C2–C7 write PERSON or EPISODE rows per practice
+        plus the SUPPORTING_EVENT rows behind them (ADR 0030).
       properties:
-        sourceEntityType: { type: string }
-        sourceRecordId: { type: string }
-        careDate: { type: string, nullable: true }
+        subjectKind: { type: string, enum: [EVENT, PERSON, EPISODE] }
+        subjectKey: { type: string, nullable: true, description: The source's opaque person or episode key; never a CPF, CNS or name. }
+        sourceEntityType: { type: string, nullable: true }
+        sourceRecordId: { type: string, nullable: true }
+        careDate: { type: string, nullable: true, description: The event's date, or the decision's reference date. }
         modality: { type: string, nullable: true }
         cnes: { type: string, nullable: true }
         ine: { type: string, nullable: true }
         cbo: { type: string, nullable: true }
-        decision: { type: string, nullable: true }
+        component: { type: string, nullable: true, description: The practice or subgroup code. }
+        decision:
+          type: string
+          nullable: true
+          enum: [IN_NUMERATOR, DENOMINATOR_ONLY, EXCLUDED_UNMAPPED, ELIGIBLE, EXCLUDED, PRACTICE_MET, PRACTICE_NOT_MET, PRACTICE_EXEMPT, PRACTICE_AMBIGUOUS, SUPPORTING_EVENT]
+        reasonCode: { type: string, nullable: true }
+        points: { type: string, nullable: true, description: Points earned for the component, as a canonical integer string. }
         criterionVersion: { type: string, nullable: true }
 
     EvidenceResponse:
@@ -1581,3 +1673,119 @@ components:
         blockedGates:
           type: array
           items: { type: string }
+        code: { type: string, example: C4 }
+        title: { type: string, example: Cuidado da pessoa com diabetes }
+        packageId: { type: string, example: qualidade-esf-eap-2026-06 }
+        valueKind: { $ref: "#/components/schemas/ValueKind" }
+        components:
+          type: array
+          items:
+            type: object
+            properties:
+              code: { type: string, example: A }
+              label: { type: string, description: The ficha's own wording. }
+              kind: { type: string, enum: [PRACTICE, SUBGROUP, INDICATOR] }
+              weight: { type: string, description: Canonical integer string (points, or the Nota Final weight). }
+              window: { type: string, nullable: true }
+        requiredCapabilities: { type: array, items: { type: string } }
+        methodologySources: { type: array, items: { type: string } }
+        standingLimitations: { type: array, items: { type: string } }
+        runnable:
+          type: boolean
+          description: False for a composite read from published results (the Nota Final); nothing enqueues it.
+
+    ValueKind:
+      type: string
+      description: >-
+        What a value means (ADR 0030): PERCENTAGE = 100 × n/d (C1); SCORE = mean points per eligible
+        person or episode, already 0–100 (C2–C6, never ×100 again); COMPOSITE_SCORE = Σ weight × n/d
+        over subpopulations, 0–100 (C7); FINAL_SCORE = Nota Final do Componente III, 0–10.
+      enum: [PERCENTAGE, SCORE, COMPOSITE_SCORE, FINAL_SCORE]
+
+    ExactValue:
+      type: object
+      description: An exact fraction as canonical integer strings (§1.7.1); the decimal is derived for display only.
+      properties:
+        numerator: { type: string }
+        denominator: { type: string }
+
+    ResultComponentResponse:
+      type: object
+      properties:
+        code: { type: string, example: A }
+        kind: { type: string, enum: [PRACTICE, SUBGROUP] }
+        weight: { type: string }
+        numerator: { type: string, description: Subjects that satisfied the component. }
+        denominator: { type: string, description: Eligible subjects of the component. }
+        value: { type: string, nullable: true, description: "numerator/denominator as a 0–1 decimal string; null without a denominator" }
+        valueExact:
+          allOf: [{ $ref: "#/components/schemas/ExactValue" }]
+          nullable: true
+        status: { type: string, enum: [COMPUTED, NO_DENOMINATOR, BLOCKED, RULE_AMBIGUITY, UNSUPPORTED_SOURCE] }
+
+    TeamResultResponse:
+      type: object
+      properties:
+        ine: { type: string, nullable: true }
+        cnes: { type: string, nullable: true }
+        status: { type: string }
+        value: { type: string, nullable: true }
+        valueExact:
+          allOf: [{ $ref: "#/components/schemas/ExactValue" }]
+          nullable: true
+        numerator: { type: string, nullable: true }
+        denominator: { type: string, nullable: true }
+        classification: { type: string, nullable: true }
+        consolidationEligible: { type: boolean }
+        components:
+          type: array
+          items: { $ref: "#/components/schemas/ResultComponentResponse" }
+        limitations: { type: array, items: { type: string } }
+
+    QualityComponent:
+      type: object
+      description: Nota Final do Componente III of one quadrimestre (NT 8/2026, ADR 0030).
+      properties:
+        municipalityIbge: { type: string }
+        quadrimestre: { type: string, example: "2026-Q1" }
+        months: { type: array, items: { type: string, example: "2026-01" } }
+        ruleVersion: { type: string }
+        inputFingerprint: { type: string, description: SHA-256 over the sorted ids of every published result read. }
+        limitations: { type: array, items: { type: string } }
+        units:
+          type: array
+          description: One per team (INE) with published results, plus the municipality (ine null).
+          items: { $ref: "#/components/schemas/QualityComponentUnit" }
+
+    QualityComponentUnit:
+      type: object
+      properties:
+        ine: { type: string, nullable: true }
+        cnes: { type: string, nullable: true }
+        status: { type: string, enum: [COMPUTED, NO_DENOMINATOR, BLOCKED, RULE_AMBIGUITY, UNSUPPORTED_SOURCE] }
+        score: { type: string, nullable: true, description: "Σ weight × factor, 0–10, decimal string; null unless COMPUTED" }
+        scoreExact:
+          allOf: [{ $ref: "#/components/schemas/ExactValue" }]
+          nullable: true
+        methodologicalClassification: { type: string, nullable: true }
+        financialTransferClassification:
+          type: string
+          nullable: true
+          description: The classification the transfer uses in the transition of Portaria GM/MS 10.994/2026 — kept apart from the methodological one.
+        limitations: { type: array, items: { type: string } }
+        indicators:
+          type: array
+          items:
+            type: object
+            properties:
+              indicatorPack: { type: string }
+              weight: { type: string }
+              status: { type: string }
+              monthsUsed: { type: array, items: { type: string } }
+              resultIds: { type: array, items: { type: string } }
+              mean: { type: string, nullable: true }
+              meanExact:
+                allOf: [{ $ref: "#/components/schemas/ExactValue" }]
+                nullable: true
+              classification: { type: string, nullable: true }
+              factor: { type: string, nullable: true, description: "0.25, 0.50, 0.75 or 1.00" }

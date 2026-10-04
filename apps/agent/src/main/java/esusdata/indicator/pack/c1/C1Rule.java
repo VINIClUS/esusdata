@@ -2,9 +2,11 @@ package esusdata.indicator.pack.c1;
 
 import esusdata.indicator.model.CanonicalEncounter;
 import esusdata.indicator.model.CanonicalModality;
+import esusdata.indicator.model.CboGroups;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.ReleaseGates;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -18,87 +20,72 @@ import java.util.List;
  *
  * <p>Gate status (§4.4 Portões A–E), recorded honestly rather than collapsed into "works":
  * Portão C (adaptador) is what this class and its adapter query actually prove —
- * {@code VALIDATED_AGAINST_PEC} for PEC 5.4.37/PostgreSQL 9.6.13. Portões A/B (Q01 ficha — the
- * exact CBO list and ficha fields) were not retrieved in this session and remain
- * {@code BLOCKED}; this rule pack therefore ships with an explicit {@code cbo_policy=ALL_CBO}
- * limitation rather than silently filtering by an assumed CBO set. Portão D (reconciliation
- * against Siaps/SISAB) has no reference data available in this environment and is
- * {@code NOT_IMPLEMENTED}. Portão E requires a human review and is out of scope for code.
+ * {@code VALIDATED_AGAINST_PEC} for PEC 5.4.37/PostgreSQL 9.6.13. The ficha (Q01,
+ * {@code docs/metodologia/c1-mais-acesso.md}) is now applied for the CBO filter: item 24-c lists
+ * seven six-digit occupations, valid for numerator and denominator alike; encounters with a
+ * missing CBO or one outside the list are excluded from both and counted
+ * ({@code cbo_policy=FICHA_24C}). The ficha does not say from which competency 225125 and 225250
+ * (a footnote addition) apply, so they are applied to every month and that stays a standing
+ * limitation. Team type, professional CNS and the other ficha fields are still not checked.
+ * Portão D (reconciliation against Siaps/SISAB) has no reference data available in this
+ * environment and is {@code NOT_IMPLEMENTED}. Portão E requires a human review and is out of
+ * scope for code.
  */
 public final class C1Rule {
 
     /** Indicator pack identity — distinct from {@link #RULE_VERSION}, which versions the rule. */
     public static final String INDICATOR_PACK = "c1-mais-acesso";
 
-    public static final String RULE_VERSION = "c1-mais-acesso@0.1.0";
+    public static final String RULE_VERSION = "c1-mais-acesso@0.2.0";
     public static final String CALCULATION_POLICY_VERSION = "c1-exact-ratio@1";
     public static final String DENOMINATOR_KIND = "PROGRAMADOS_MAIS_ESPONTANEOS";
 
+    /** Reason code of the evidence row of an encounter left out by the CBO filter. */
+    public static final String REASON_CBO_OUTSIDE_FICHA = "EXCLUIDO_CBO_FORA_DA_FICHA";
+
+    /**
+     * Item 24-c / Quadro 01 of the ficha: exact six-digit occupations (2251-42, 2251-70, 2251-30,
+     * 2251-25, 2252-50, 2235-65, 2235-05), not the four-digit families C7 uses.
+     */
+    private static final CboGroups FICHA_CBO =
+            CboGroups.of("225142", "225170", "225130", "225125", "225250", "223565", "223505");
+
     private static final List<String> STANDING_LIMITATIONS = List.of(
-            "cbo_policy=ALL_CBO — Q01 (ficha metodológica oficial C1) não foi recuperada nesta sessão; "
-                    + "nenhum filtro de CBO foi aplicado (Portão A/B BLOCKED).",
+            "cbo_policy=FICHA_24C — só entram no numerador e no denominador os atendimentos dos sete CBO do "
+                    + "item 24-c / Quadro 01 da ficha (225142, 225170, 225130, 225125, 225250, 223565, 223505); "
+                    + "CBO ausente ou fora da lista é excluído. 225125 e 225250 foram incluídos por nota de "
+                    + "rodapé da ficha, que não informa a competência de vigência: valem aqui para todos os meses.",
             "Nenhuma reconciliação com Siaps/SISAB foi realizada (Portão D NOT_IMPLEMENTED).");
 
     private C1Rule() {}
 
     /**
-     * Release gates are deliberately supplied by the release workflow rather than inferred from
-     * the presence of this class or its compatibility entry. A result must not look published
-     * while any one of the five gates is incomplete.
+     * Limitations every C1 result carries until Q01 is applied and reconciled. Release gates
+     * are supplied by the release workflow ({@link ReleaseGates}); a result also stays blocked
+     * while any of these stands, even with every gate complete.
      */
-    public record ReleaseGates(
-            boolean sourceAndValidity,
-            boolean calculationModel,
-            boolean adapter,
-            boolean reconciliation,
-            boolean pilotAndOperations) {
-        public static ReleaseGates allComplete() {
-            return new ReleaseGates(true, true, true, true, true);
-        }
-
-        public static ReleaseGates knownIncomplete() {
-            return new ReleaseGates(false, false, true, false, false);
-        }
-
-        public boolean isComplete() {
-            return sourceAndValidity
-                    && calculationModel
-                    && adapter
-                    && reconciliation
-                    && pilotAndOperations
-                    && STANDING_LIMITATIONS.isEmpty();
-        }
-
-        public List<String> incompleteReasons() {
-            List<String> reasons = new ArrayList<>();
-            if (!sourceAndValidity) {
-                reasons.add("Portão A (fonte e vigência) incompleto");
-            }
-            if (!calculationModel) {
-                reasons.add("Portão B (modelo de cálculo) incompleto");
-            }
-            if (!adapter) {
-                reasons.add("Portão C (adaptador) incompleto");
-            }
-            if (!reconciliation) {
-                reasons.add("Portão D (reconciliação) incompleto");
-            }
-            if (!pilotAndOperations) {
-                reasons.add("Portão E (piloto e operação) incompleto");
-            }
-            return List.copyOf(reasons);
-        }
+    public static List<String> standingLimitations() {
+        return STANDING_LIMITATIONS;
     }
 
     /**
-     * Computes C1 for one competency from already-canonical encounters. Encounters whose modality
-     * is {@link CanonicalModality#UNMAPPED} are excluded from both numerator and denominator and
+     * Whether the encounter's CBO is one of the seven occupations of the ficha (item 24-c). A
+     * missing or blank CBO is outside the list.
+     */
+    public static boolean isFichaCbo(String cbo) {
+        return FICHA_CBO.matches(cbo);
+    }
+
+    /**
+     * Computes C1 for one competency from already-canonical encounters. Encounters whose CBO is
+     * missing or outside the ficha list, and those whose modality is
+     * {@link CanonicalModality#UNMAPPED}, are excluded from both numerator and denominator and
      * counted, never silently folded into an arm (§2.4: "Filtros de modalidade devem ser mutuamente
      * exclusivos após a normalização").
      */
     public static IndicatorResult compute(
             List<CanonicalEncounter> encounters, String municipalityIbge, String referencePeriod, String dataCutoff) {
-        return compute(encounters, municipalityIbge, referencePeriod, dataCutoff, ReleaseGates.knownIncomplete());
+        return compute(encounters, municipalityIbge, referencePeriod, dataCutoff, ReleaseGates.adapterOnly());
     }
 
     /**
@@ -114,7 +101,7 @@ public final class C1Rule {
             ReleaseGates releaseGates) {
         validateRequestedScope(encounters, municipalityIbge, referencePeriod);
         Computation computation = count(encounters);
-        if (!releaseGates.isComplete()) {
+        if (!releaseGates.isComplete() || !STANDING_LIMITATIONS.isEmpty()) {
             List<String> limitations = new ArrayList<>(computation.limitations());
             limitations.addAll(releaseGates.incompleteReasons());
             return new IndicatorResult(
@@ -194,8 +181,13 @@ public final class C1Rule {
         BigInteger programados = BigInteger.ZERO;
         BigInteger espontaneos = BigInteger.ZERO;
         BigInteger unmapped = BigInteger.ZERO;
+        BigInteger outsideCbo = BigInteger.ZERO;
 
         for (CanonicalEncounter e : encounters) {
+            if (!isFichaCbo(e.cbo())) {
+                outsideCbo = outsideCbo.add(BigInteger.ONE);
+                continue;
+            }
             switch (e.modality()) {
                 case PROGRAMADO -> programados = programados.add(BigInteger.ONE);
                 case ESPONTANEO -> espontaneos = espontaneos.add(BigInteger.ONE);
@@ -206,6 +198,10 @@ public final class C1Rule {
         BigInteger denominator = programados.add(espontaneos);
 
         List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
+        if (outsideCbo.signum() > 0) {
+            limitations.add(outsideCbo + " encontro(s) com CBO ausente ou fora dos sete CBO do item 24-c da ficha "
+                    + "foram excluídos do cálculo (numerador e denominador).");
+        }
         if (unmapped.signum() > 0) {
             limitations.add(unmapped + " encontro(s) com tipo de atendimento fora do mapeamento "
                     + "congelado (ids 8/9/10/11 de tb_dim_tipo_atendimento) foram excluídos do cálculo.");

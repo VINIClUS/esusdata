@@ -37,7 +37,7 @@ const colunasCsv = [
   'Município (IBGE), indicador e versão da regra',
   'Competência e status do resultado',
   'Numerador e denominador exatos',
-  'Valor percentual publicado',
+  'Valor publicado e unidade (percentual, escore ou escore composto)',
   'Classificação e data de corte',
   'Data de publicação e execução de origem',
 ]
@@ -128,9 +128,12 @@ export function RelatoriosPage() {
       .filter((c) => !!ultima && competenciasBetween(c, ultima) <= MAX_COMPETENCIAS)
       .at(-1)
   const final = publicada(fim) ?? ultima
-  const packs = indicadores.data?.itens ?? []
+  const catalogo = indicadores.data?.itens ?? []
+  // The Nota Final is computed on read: it has no published row to export.
+  const packs = catalogo.filter((p) => p.executavel)
   const nomes = [TODOS, ...packs.map((p) => p.nome)]
   const pack = packs.find((p) => p.nome === indicador)?.codigo ?? null
+  const nomePorPacote = new Map(catalogo.map((p) => [p.codigo, p.nome]))
   const intervaloInvalido =
     !!inicial &&
     !!final &&
@@ -176,7 +179,9 @@ export function RelatoriosPage() {
       key: 'indicador',
       header: 'Indicador',
       render: (r) => (
-        <Typography sx={{ fontSize: 14, color: colors.navy }}>{r.indicador}</Typography>
+        <Typography sx={{ fontSize: 14, color: colors.navy }}>
+          {(r.pacote ? nomePorPacote.get(r.pacote) : undefined) ?? r.indicador}
+        </Typography>
       ),
     },
     {

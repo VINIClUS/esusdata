@@ -58,7 +58,7 @@ class ActiveJobMigrationTest {
                 INSERT INTO jobs (job_id, run_id, municipality_ibge, indicator_pack, rule_version,
                     reference_period, state, attempt, max_attempts, execution_generation, created_at,
                     source_id, extraction_id)
-                VALUES (?, ?, '3541307', 'c1-mais-acesso', 'c1-mais-acesso@0.1.0', '2026-03', ?, 0, 3,
+                VALUES (?, ?, '3541307', 'c1-mais-acesso', 'c1-mais-acesso@0.2.0', '2026-03', ?, 0, 3,
                     0, ?, 'src-1', ?)
                 """, jobId, "run-" + jobId, state, createdAt, extractionId);
     }

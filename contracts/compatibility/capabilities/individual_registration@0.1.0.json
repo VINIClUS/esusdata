@@ -1,0 +1,105 @@
+{
+  "capability": "individual_registration",
+  "adapter_version": "0.1.0",
+  "description": "Versões do cadastro individual no período: equipe de vínculo, saída do território e condições autorreferidas (§1.7 Cadastro/Vínculo).",
+  "record_kind": "registration",
+  "entity_type_column": "source_entity_type",
+  "record_id_column": "source_record_id",
+  "municipality_column": "municipality_ibge",
+  "scope_date_column": "registration_date",
+  "query": "queries/individual_registration@0.1.0.sql",
+  "binds": [
+    {
+      "name": "municipality_ibge",
+      "type": "MUNICIPALITY_IBGE"
+    },
+    {
+      "name": "period_start",
+      "type": "PERIOD_START"
+    },
+    {
+      "name": "period_end_exclusive",
+      "type": "PERIOD_END_EXCLUSIVE"
+    },
+    {
+      "name": "birth_date_from",
+      "type": "DATE"
+    },
+    {
+      "name": "birth_date_to",
+      "type": "DATE"
+    }
+  ],
+  "columns": [
+    {
+      "name": "source_entity_type",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "source_record_id",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "municipality_ibge",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "person_key",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "registration_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "cnes",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "ine",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "simplified",
+      "type": "bool",
+      "required": false
+    },
+    {
+      "name": "inactive",
+      "type": "bool",
+      "required": false
+    },
+    {
+      "name": "refused",
+      "type": "bool",
+      "required": false
+    },
+    {
+      "name": "exit_reason",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "self_reported_hypertension",
+      "type": "bool",
+      "required": false
+    },
+    {
+      "name": "self_reported_diabetes",
+      "type": "bool",
+      "required": false
+    },
+    {
+      "name": "pregnant",
+      "type": "bool",
+      "required": false
+    }
+  ]
+}

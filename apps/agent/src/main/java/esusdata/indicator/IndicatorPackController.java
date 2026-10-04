@@ -11,14 +11,7 @@ public class IndicatorPackController {
     @GetMapping("/api/v1/indicator-packs")
     public List<IndicatorPackResponse> packs() {
         return IndicatorPackCatalog.all().stream()
-                .map(p -> new IndicatorPackResponse(
-                        p.id(),
-                        p.ruleVersion(),
-                        p.family(),
-                        p.unit(),
-                        p.dependsOn(),
-                        p.executionEnabled(),
-                        p.blockedGates()))
+                .map(IndicatorPackResponse::from)
                 .toList();
     }
 }
