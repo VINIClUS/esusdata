@@ -4,6 +4,7 @@ import esusdata.auth.ApiAuthorization;
 import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.Permission;
 import esusdata.indicator.IndicatorPackCatalog;
+import esusdata.indicator.model.IndicatorRule;
 import esusdata.overview.OverviewResponse.Check;
 import esusdata.overview.OverviewResponse.HistoryPoint;
 import esusdata.overview.OverviewResponse.Indicator;
@@ -178,15 +179,21 @@ public class OverviewController {
             Map<YearMonth, Long> counts = coverage.periods().stream()
                     .collect(Collectors.toMap(
                             p -> YearMonth.parse(p.referencePeriod()), LastCoverage.PeriodCount::count, Long::sum));
-            List<String> packs = sourcePacks.eligible(source).stream()
-                    .map(rule -> rule.descriptor().id())
-                    .toList();
+            List<IndicatorRule> rules = sourcePacks.eligible(source);
+            List<String> packs =
+                    rules.stream().map(rule -> rule.descriptor().id()).toList();
             Map<YearMonth, List<String>> byMonth = new TreeMap<>();
-            SchedulePlanner.pending(counts.keySet(), packs, published, today, settings.settleDays())
+            SchedulePlanner.pending(
+                            counts.keySet(),
+                            packs,
+                            SourcePacks.attendanceScoped(rules),
+                            published,
+                            today,
+                            settings.settleDays())
                     .forEach(candidate -> byMonth.computeIfAbsent(candidate.period(), month -> new ArrayList<>())
                             .add(candidate.indicatorPack()));
-            byMonth.forEach((month, monthPacks) -> pending.add(
-                    new PendingPeriod(source.id(), month.toString(), counts.get(month), List.copyOf(monthPacks))));
+            byMonth.forEach((month, monthPacks) -> pending.add(new PendingPeriod(
+                    source.id(), month.toString(), counts.getOrDefault(month, 0L), List.copyOf(monthPacks))));
         }
     }
 

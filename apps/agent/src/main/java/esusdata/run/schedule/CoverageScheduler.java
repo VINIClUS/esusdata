@@ -209,6 +209,7 @@ public final class CoverageScheduler implements SmartLifecycle {
                         .map(period -> YearMonth.parse(period.referencePeriod()))
                         .toList(),
                 List.copyOf(eligible.keySet()),
+                SourcePacks.attendanceScoped(eligible.values()),
                 publishedByPack(source),
                 recentlyFailed(source),
                 LocalDate.now(clock.withZone(SourceCoverageService.ZONE)),
