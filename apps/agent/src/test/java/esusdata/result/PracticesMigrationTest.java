@@ -229,6 +229,25 @@ class PracticesMigrationTest {
                 .containsExactly("PRACTICE_MET", "PRACTICE_AMBIGUOUS", "SUPPORTING_EVENT");
     }
 
+    /** V11: C3–C6's RULE_AMBIGUITY keeps the eligible count without a numerator; the rest holds. */
+    @Test
+    void v11AdmitsADenominatorWithoutANumeratorAndKeepsEveryRow() {
+        migrate("11");
+
+        stage("stg-ambiguous", "SCORE", null, "7", "PESSOAS");
+        assertThatThrownBy(() -> stage("stg-half", "SCORE", "1", null, "X")).isInstanceOf(DataAccessException.class);
+        assertThatThrownBy(() -> stage("stg-pct-null", "PERCENTAGE", null, "2", "X"))
+                .isInstanceOf(DataAccessException.class);
+        PublishedResult result =
+                new JdbcResultRepository(jdbc).findByIdInScope("res-1", IBGE).orElseThrow();
+        assertThat(result.numeratorText()).isEqualTo("1");
+        assertThat(result.denominatorText()).isEqualTo("2");
+        assertThat(jdbc.queryForObject("select count(*) from evidence where staging_id = 'stg-1'", Integer.class))
+                .isEqualTo(2);
+        assertThatThrownBy(() -> jdbc.update("DELETE FROM result_staging WHERE staging_id = 'stg-1'"))
+                .isInstanceOf(DataAccessException.class);
+    }
+
     private void stage(String stagingId, String valueKind, String numerator, String denominator, String kind) {
         jdbc.update("""
                 INSERT INTO result_staging (staging_id, job_id, execution_generation, process_instance_id, created_at,
