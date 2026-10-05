@@ -60,10 +60,9 @@ import tools.jackson.databind.node.ObjectNode;
  * same frozen SQL with the same binds — the evidence the runbook asks for before any capability is
  * promoted to {@code VALIDATED}.
  *
- * <p><b>The matrix.</b> The foundation's entries are {@code NOT_TESTED} in the packaged matrix and
- * {@link PecCompatibilityMatrix#findExact} refuses such an entry, as it must. This test never touches
- * that gate: it builds its own matrix document — the packaged one, with the foundation entries
- * {@code VALIDATED} and every object's fingerprint measured, for real, by {@link
+ * <p><b>The matrix.</b> The packaged foundation entries carry the production PEC's signatures, which
+ * this container does not have. This test leaves the packaged file alone: it builds its own matrix
+ * document — the packaged one, with every object's fingerprint measured, for real, by {@link
  * JdbcCompatibilityCatalog} against this very container — and hands it to the package-visible seam
  * the other v2 tests use. If the Rust probe, fed through the same fingerprint computation, disagrees
  * with what Java just measured, the acquisition fails closed before any row is read.

@@ -59,10 +59,10 @@ SELECT CAST('tb_fat_visita_domiciliar' AS text) AS source_entity_type,
        mun.co_ibge AS municipality_ibge,
        k.person_key AS person_key,
        CAST(t.dt_registro AS date) AS visit_date,
-       CAST(cbo.nu_cbo AS text) AS cbo,
-       CAST(us.nu_cnes AS text) AS cnes,
-       CAST(eq.nu_ine AS text) AS ine,
-       CAST(dv.nu_identificador AS text) AS outcome_code,
+       NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
+       NULLIF(CAST(us.nu_cnes AS text), '-') AS cnes,
+       NULLIF(CAST(eq.nu_ine AS text), '-') AS ine,
+       NULLIF(CAST(dv.nu_identificador AS text), '-') AS outcome_code,
        ARRAY(
            SELECT CAST(r.token AS text)
              FROM (VALUES
@@ -107,8 +107,8 @@ SELECT CAST('tb_fat_visita_domiciliar' AS text) AS source_entity_type,
             WHERE r.marcado IN ('1', 'true')
             ORDER BY r.ordem
        ) AS reason_codes,
-       CAST(v.nu_peso AS text) AS weight_kg,
-       CAST(v.nu_altura AS text) AS height_cm
+       CAST(CAST(v.nu_peso AS numeric) AS text) AS weight_kg,
+       CAST(CAST(v.nu_altura AS numeric) AS text) AS height_cm
   FROM public.tb_fat_visita_domiciliar v
   JOIN mun ON mun.co_seq_dim_municipio = v.co_dim_municipio
   JOIN public.tb_dim_tempo t ON t.co_seq_dim_tempo = v.co_dim_tempo

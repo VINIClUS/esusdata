@@ -152,6 +152,9 @@ class ContractRecordsTest {
                 .isEqualTo(LocalDate.of(2026, 2, 28));
         assertThatThrownBy(() -> new BudgetHint(0, 1, 1, 1)).isInstanceOf(IllegalArgumentException.class);
         assertThat(BudgetHint.engineeringDefault().maxRows()).isEqualTo(200_000);
+        assertThat(BudgetHint.practicesPack())
+                .as("about three times C3 on the production PEC: 784 430 rows, 295 MiB, 51 s, 11 MiB temp")
+                .isEqualTo(new BudgetHint(2_500_000, 300_000, 1L << 30, 512L << 20));
     }
 
     @Test

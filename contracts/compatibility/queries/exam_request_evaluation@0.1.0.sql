@@ -67,9 +67,9 @@ atendimento AS (
            mun.co_ibge,
            k.person_key,
            CAST(t.dt_registro AS date) AS event_date,
-           CAST(cbo.nu_cbo AS text) AS cbo,
-           CAST(us.nu_cnes AS text) AS cnes,
-           CAST(eq.nu_ine AS text) AS ine
+           NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
+           NULLIF(CAST(us.nu_cnes AS text), '-') AS cnes,
+           NULLIF(CAST(eq.nu_ine AS text), '-') AS ine
       FROM public.tb_fat_atendimento_individual f
       JOIN mun ON mun.co_seq_dim_municipio = f.co_dim_municipio
       JOIN public.tb_dim_tempo t ON t.co_seq_dim_tempo = f.co_dim_tempo

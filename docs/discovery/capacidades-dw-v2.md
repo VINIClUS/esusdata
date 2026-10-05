@@ -7,11 +7,12 @@ Este documento descreve as consultas congeladas das dez capacidades da fundaçã
 vem, que transformação sofre e que vocabulário entrega. Registra também as decisões de mapeamento, as
 alternativas descartadas, o que só a validação ao vivo confirma e as lacunas.
 
-**Estado:** as dez entradas da matriz (`contracts/compatibility/pec-adapters.json`) estão `NOT_TESTED`.
-As consultas foram escritas a partir do [dicionário oficial do DW](2026-10-02-dw-dicionario-c2-c7.md) e
-testadas só numa fixture sintética em PostgreSQL 9.6. Nenhuma rodou contra um PEC real. As
-`signature_fingerprint` da matriz são as da fixture. A validação ao vivo segue o
-[runbook](runbook-validacao-capacidades.md).
+**Estado:** as dez entradas da matriz (`contracts/compatibility/pec-adapters.json`) estão `VALIDATED`
+para o PEC 5.5.28 desde 2026-10-05. As consultas foram escritas a partir do
+[dicionário oficial do DW](2026-10-02-dw-dicionario-c2-c7.md), testadas numa fixture sintética em
+PostgreSQL 9.6, corrigidas contra o [inventário do PEC de produção](2026-10-05-pec-5528-inventario-dw.md)
+e validadas ao vivo ([evidência](2026-10-05-pec-5528-capacidades.md)). As `signature_fingerprint` da
+matriz são as do PEC real. Uma versão nova do PEC segue o [runbook](runbook-validacao-capacidades.md).
 
 As convenções de códigos e vocabulários que as regras usam estão no guia
 [`docs/indicadores/como-adicionar.md`](../indicadores/como-adicionar.md), na seção "O que as capacidades
@@ -142,6 +143,18 @@ barato, mas uma ficha do CDS com data errada tiraria um evento de uma pessoa que
 | `decimal` | `CAST(x AS text)`: texto decimal com ponto. O plano de execução recusa `numeric`, `float` e `timestamp` | `text` |
 | `text[]` | `array_agg(DISTINCT CAST(… AS text) COLLATE "C" ORDER BY …) FILTER (WHERE … IS NOT NULL)`: sem repetição, ordem binária, nunca elemento nulo; lista vazia `'{}'` quando a fonte tem a informação mas não há nada, nulo quando a fonte não tem a informação | `_text` |
 
+`nu_peso`, `nu_altura`, `nu_participante_peso` e `nu_participante_altura` são `double precision` no PEC 5.5.28 (`tb_fat_atvdd_coletiva_part`, `tb_fat_atendimento_individual`,
+`tb_fat_atendimento_odonto`, `tb_fat_proced_atend`, `tb_fat_visita_domiciliar`); `nu_pressao_*` são
+`numeric`. `CAST(float8 AS text)` depende de `extra_float_digits` da sessão: o pgJDBC fixa 3 (17 dígitos
+significativos, `65.099999999999994`) e a sessão do plano Rust usa o padrão (o mais curto, `65.1`). A
+captura ao vivo de 2026-08 achou `<10` linhas de `care_encounter` divergentes só em `weight_kg`.
+Por isso as consultas projetam `CAST(CAST(x AS numeric) AS text)`: no PostgreSQL 9.6, `float8` → `numeric`
+usa `DBL_DIG` (15 dígitos) qualquer que seja a sessão, e o texto é o mesmo no JDBC e no Rust. O texto
+sai sem zeros à direita desnecessários (`70.3`, `165`). A fixture usa `double precision` e valores com
+artefato binário (`70.3`, `165.1`, `3.45`) para que o teste diferencial pegue a regressão.
+`Infinity` não converte para `numeric` no 9.6: a consulta falharia, em vez de devolver um valor errado.
+Peso e altura reais não têm `Infinity` nem `NaN`.
+
 Os tipos das colunas do DW não são publicados (lacuna L10), e os do `st_*` podem ser inteiro ou
 booleano. Por isso as conversões aceitam os dois. O teste da fixture confere nome, ordem e tipo de cada
 coluna no `ResultSet` contra o descritor. A fixture também usa tipos diferentes de propósito: há
@@ -165,16 +178,34 @@ coluna no `ResultSet` contra o descritor. A fixture também usa tipos diferentes
 
 ### 1.8 Linhas-sentinela e valores do DW
 
-O C1 viu dimensões com linha-sentinela (id 1, "Não informado"/"SEM EQUIPE") em vez de NULL. As
-consultas devolvem o código da dimensão **como o DW grava**, como faz a consulta do C1:
+O DW grava linhas-sentinela em vez de NULL. O inventário ao vivo de 2026-10-05 (PEC 5.5.28) e a captura
+da competência 2026-08 confirmaram duas famílias:
 
-- uma sentinela cujo código é nulo vira `null`;
-- uma sentinela com código próprio (por exemplo um `nu_ine` de "SEM EQUIPE") sai como está.
+- **Código `-`:** `tb_dim_equipe`, `tb_dim_unidade_saude` e `tb_dim_cbo` têm uma linha-sentinela de id 1
+  com `nu_ine = '-'` ("SEM EQUIPE"), `nu_cnes = '-'` e `nu_cbo = '-'`. Sem tratamento, a captura contou
+  329 violações de formato de INE em `individual_registration` e `<10` em `exam_request_evaluation`.
+  Toda consulta (exceto as três `VALIDATED`, congeladas) projeta `NULLIF(CAST(x.nu_ine AS text), '-')`, e
+  o mesmo para `nu_cnes` e `nu_cbo`, inclusive nas CTEs onde são projetados primeiro.
+- **Data `3000-12-31`:** `tb_dim_tempo` tem a sentinela `co_seq_dim_tempo = 30001231` com
+  `dt_registro = 3000-12-31` (o diagnóstico mostrou os 6468 atendimentos do mês com `co_dim_tempo_dum` nela).
+  Toda data opcional lida de `tb_dim_tempo` (`lmp_date`, `resolved_date` e a data de aplicação da
+  vacina) vira nula fora de `1900-01-01..2100-12-31`. As datas do recorte de período não precisam disso:
+  a sentinela não cai em janela alguma. Decisão: uma dose que não é transcrição e tem a data de aplicação
+  na sentinela passa a usar a data de registro, a mesma regra da dose sem data (a ficha registra no dia
+  da aplicação); antes ela ficava fora de qualquer janela. Na captura de 2026-08 não houve dose assim.
 
-A validação ao vivo conta os valores fora do formato esperado (CNES com 7 dígitos, INE com 10, CBO com 6
-caracteres, SIGTAP com 10 dígitos ou AB). Se aparecer sentinela com código, a normalização entra na
-consulta antes da promoção ([runbook](runbook-validacao-capacidades.md), passo 4). Nada é corrigido em
-silêncio.
+- **Sentinela nas dimensões de código:** toda linha-sentinela traz `nu_identificador = '-'` (e CIAP, CID e
+  `co_proced` também `-`). Por robustez, todo código projetado de `nu_identificador` (`care_type_code`,
+  `care_location_code`, `outcome_code`, `dose_code`, `strategy_code`, `activity_type_code`, `status`,
+  `exit_reason`, `gender_identity`) usa `NULLIF(CAST(x AS text), '-')`. As listas montadas com `array_agg`
+  (`ciap_codes`, `cid_codes`, `procedures_requested`, `procedures_evaluated`, `procedures_performed`)
+  excluem o `-` no `FILTER`; sem códigos, a lista continua vazia (`{}`), como antes. A fixture tem
+  linhas-sentinela para tipo de atendimento, tipo de saída do cadastro, CIAP, CID e procedimento.
+
+Os demais códigos saem **como o DW grava**, como na consulta do C1. A validação ao vivo continua contando
+os valores fora do formato esperado (CNES com 7 dígitos, INE com 10, CBO com 6 caracteres, SIGTAP com 10
+dígitos ou AB); sobra de sentinela nova entra na consulta antes da promoção
+([runbook](runbook-validacao-capacidades.md), passo 4). Nada é corrigido em silêncio.
 
 ### 1.9 Custo e forma das consultas
 
@@ -252,7 +283,7 @@ Decisões:
 Lê `tb_fat_atendimento_individual` (FAI); as filhas `tb_fat_atd_ind_problemas` e
 `tb_fat_atd_ind_procedimentos`, agregadas por atendimento; `tb_fat_cad_individual`;
 `tb_dim_cidadao_pec_grupo`; `tb_dim_municipio`, `tb_dim_tempo`, `tb_dim_cbo`, `tb_dim_unidade_saude`,
-`tb_dim_equipe`, `tb_dim_tipo_atendimento`, `tb_dim_local_atendimento`, `tb_dim_tp_participacao_atend`,
+`tb_dim_equipe`, `tb_dim_tipo_atendimento`, `tb_dim_local_atendimento`, `tb_dim_tipo_participacao_atend`,
 `tb_dim_ciap`, `tb_dim_cid` e `tb_dim_procedimento`. Gera uma linha por atendimento do período.
 
 | Coluna | Origem | Transformação / vocabulário |
@@ -264,24 +295,25 @@ Lê `tb_fat_atendimento_individual` (FAI); as filhas `tb_fat_atd_ind_problemas` 
 | `ine` | `co_dim_equipe_1` → `nu_ine` | |
 | `care_type_code` | `co_dim_tipo_atendimento` → dim | LEDI (3.1) |
 | `care_location_code` | `co_dim_local_atendimento` → dim | LEDI (3.2); `4` domicílio |
-| `remote` | `co_dim_tp_particip_cidadao` → `tb_dim_tp_participacao_atend.nu_identificador` | `2` → `false`; `3`–`7` → `true`; `1`, sentinela ou sem FK → nulo |
+| `remote` | `co_dim_tp_particip_cidadao` → `tb_dim_tipo_participacao_atend.nu_identificador` | `2` → `false`; `3`–`7` → `true`; `1`, sentinela ou sem FK → nulo |
 | `ciap_codes` | `tb_fat_atd_ind_problemas.co_dim_ciap` → `nu_ciap` | só os problemas avaliados (`st_avaliado` verdadeiro, ou nulo antes da 5.3.15); com código AB |
 | `cid_codes` | idem, `co_dim_cid` → `tb_dim_cid.nu_cid` | idem |
 | `procedures_requested` | `tb_fat_atd_ind_procedimentos.co_dim_procedimento_solicitado` → `co_proced` | todos os exames solicitados, sem filtro de lista |
 | `procedures_evaluated` | idem, `co_dim_procedimento_avaliado` | todos os avaliados |
 | `procedures_performed` | — | **nulo**: o FAI não tem lista de procedimentos realizados (regra 1 de `tb_fat_procedimento`) |
-| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | texto decimal |
-| `systolic_mmhg`, `diastolic_mmhg` | `nu_medicao_pressao_sistolica`, `nu_medicao_pressao_diastolica` | texto decimal |
-| `lmp_date` | `co_dim_tempo_dum` → `tb_dim_tempo.dt_registro` | alvo inferido (seção 4) |
+| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | `double precision` no DW; `CAST(CAST(x AS numeric) AS text)` (1.6) |
+| `systolic_mmhg`, `diastolic_mmhg` | `nu_pressao_sistolica`, `nu_pressao_diastolica` | texto decimal |
+| `lmp_date` | `co_dim_tempo_dum` → `tb_dim_tempo.dt_registro` | alvo confirmado em 2026-10-05; sentinela `3000-12-31` → nulo (1.8) |
 | `gestational_age_weeks` | `nu_idade_gestacional_semanas` | `integer` |
 | `pregnant` | — | **nulo**: o MIAI não tem o marcador |
 | `birth_date` | `dt_nascimento` do próprio atendimento | `CAST(… AS date)` |
 
 Decisões:
 
-- `remote`: a participação vem da dimensão de tipo de participação. Seu nome não tem página no
-  dicionário (lacuna L3). O nome usado é `tb_dim_tp_participacao_atend`, o que a página do FAO cita
-  para as duas colunas de participação (seção 4).
+- `remote`: a participação vem da dimensão de tipo de participação. Sem página no
+  dicionário (lacuna L3), a dimensão real é `tb_dim_tipo_participacao_atend` (PK `co_seq_dim_tp_particip_atend`,
+  `nu_identificador` varchar, `no_tipo_participacao_atend`), confirmada no inventário de 2026-10-05; o nome
+  inferido antes, `tb_dim_tp_participacao_atend`, não existe (seção 4).
 - Problemas "avaliados" excluem as atualizações da lista feitas sem avaliação (`st_avaliado` falso). Na
   fixture, o K86 do atendimento 1001 é só uma atualização da lista e não entra em `ciap_codes`; entra em
   `condition_list`, que carrega a situação.
@@ -300,7 +332,7 @@ Lê `tb_fat_atendimento_odonto` (FAO); as filhas `tb_fat_atend_odonto_problemas`
 | `ciap_codes`, `cid_codes` | `tb_fat_atend_odonto_problemas` avaliados | idem |
 | `procedures_requested`, `procedures_evaluated` | — | **nulos**: exames do odontológico não são lidos, e nenhuma ficha os pede |
 | `procedures_performed` | `tb_fat_atend_odonto_proced.co_dim_procedimento` → `co_proced` | sem repetição; `qt_procedimentos` não entra |
-| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | |
+| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | `double precision`; `CAST(CAST(x AS numeric) AS text)` (1.6) |
 | `systolic_mmhg`, `diastolic_mmhg`, `lmp_date`, `gestational_age_weeks` | — | nulos: o MIAO não tem PA, DUM nem idade gestacional |
 | `pregnant` | `st_gestante` | booleano |
 | `birth_date` | `dt_nascimento` do FAO | |
@@ -318,7 +350,7 @@ Lê `tb_fat_visita_domiciliar`, as tabelas de pessoa, `tb_dim_municipio`, `tb_di
 | `cbo`, `cnes`, `ine` | `co_dim_cbo`, `co_dim_unidade_saude`, `co_dim_equipe` | |
 | `outcome_code` | `co_dim_desfecho_visita` → `nu_identificador` | LEDI `1` realizada, `2` recusada, `3` ausente |
 | `reason_codes` | as 37 colunas de motivo `st_*` | um token por motivo marcado (seção 3.4), em ordem fixa |
-| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | |
+| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | `double precision`; `CAST(CAST(x AS numeric) AS text)` (1.6) |
 
 Decisões:
 
@@ -336,10 +368,10 @@ Lê `tb_fat_vacinacao_vacina` (dose) e o cabeçalho `tb_fat_vacinacao`, as tabel
 
 | Coluna | Origem | Transformação |
 |---|---|---|
-| `application_date` | dose `co_dim_tempo_vacina_aplicada` → `dt_registro` | sem essa data: a do cabeçalho, **só** se a dose não é transcrição; transcrição sem data não sai |
+| `application_date` | dose `co_dim_tempo_vacina_aplicada` → `dt_registro` | sentinela `3000-12-31` conta como sem data; sem essa data: a do cabeçalho, **só** se a dose não é transcrição; transcrição sem data não sai |
 | `immunobiological_code` | dose `co_dim_imunobiologico` → `nu_identificador` | LEDI; filtrado por `immunobiological_codes` |
 | `dose_code` | dose `co_dim_dose_imunobiologico` → `nu_identificador` | LEDI (seção 3.5) |
-| `strategy_code` | dose `co_dim_estrategia_vacinacao` → `nu_identificador` | código e-SUS, não o RNDS (`nu_estrategia_vacinacao`), que diverge a partir de 11 |
+| `strategy_code` | dose `co_dim_estrategia_vacinacao` → `tb_dim_estrategia_vacinacao` (PK `co_seq_dim_estrategia_vacnacao`, grafia do PEC) `nu_identificador` | código e-SUS, não o RNDS (`nu_estrategia_vacinacao`), que diverge a partir de 11 |
 | `transcription` | dose `st_registro_anterior` | booleano |
 | `cbo`, `cnes`, `ine` | cabeçalho `co_dim_cbo`, `co_dim_unidade_saude`, `co_dim_equipe` | o profissional do atendimento de vacinação; na transcrição, quem transcreveu |
 | `registration_date` | cabeçalho `co_dim_tempo` → `dt_registro` | o dia do registro no PEC |
@@ -412,8 +444,8 @@ mais as tabelas de pessoa, `tb_dim_municipio`, `tb_dim_tempo`, `tb_dim_ciap`, `t
 | `code_system` | — | `CIAP2` ou `CID10`; uma linha canônica por sistema (1.7) |
 | `code` | `co_dim_ciap` → `nu_ciap` ou `co_dim_cid` → `nu_cid` | como o DW grava; filtrado pelas listas (1.5) |
 | `recorded_date` | cabeçalho `co_dim_tempo` → `dt_registro` | data do atendimento |
-| `status` | `co_dim_situacao` → `tb_dim_situacao_problema.nu_identificador` | LEDI `0` ativo, `1` latente, `2` resolvido; nulo antes da 5.3.15 |
-| `resolved_date` | `co_dim_data_fim_problema` → `dt_registro` | sentinela sem data → nulo |
+| `status` | `co_dim_situacao_problema` → `tb_dim_situacao_problema.nu_identificador` | LEDI `0` ativo, `1` latente, `2` resolvido; nulo antes da 5.3.15 |
+| `resolved_date` | `co_dim_data_fim_problema` → `dt_registro` | sentinela (sem data ou `3000-12-31`) → nulo |
 | `basis` | — | `PROFESSIONAL` em toda linha |
 | `cbo` | cabeçalho `co_dim_cbo_1` → `nu_cbo` | só quando o problema foi avaliado no atendimento; nas atualizações da lista sem avaliação, nulo |
 
@@ -440,8 +472,8 @@ de pessoa, `tb_dim_municipio`, `tb_dim_tempo`, `tb_dim_cbo` e `tb_dim_tipo_ativi
 | Coluna | MIP | MIAC |
 |---|---|---|
 | `measured_date` | cabeçalho `co_dim_tempo` | cabeçalho da atividade `co_dim_tempo` |
-| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | `nu_participante_peso`, `nu_participante_altura` |
-| `systolic_mmhg`, `diastolic_mmhg` | `nu_medicao_pressao_sistolica`, `_diastolica` | nulos: o MIAC não tem PA de participante (lacuna L5) |
+| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` (`double precision`, via `numeric`, 1.6) | `nu_participante_peso`, `nu_participante_altura` (também `double precision`, via `numeric`) |
+| `systolic_mmhg`, `diastolic_mmhg` | `nu_pressao_sistolica`, `_diastolica` | nulos: o MIAC não tem PA de participante (lacuna L5) |
 | `cbo` | cabeçalho `co_dim_cbo` | cabeçalho da atividade `co_dim_cbo`, o profissional responsável |
 | `origin` | `MIP` | `MIAC` |
 | `activity_type_code` | nulo | `co_dim_tipo_atividade` → `nu_identificador` (LEDI 1–7, seção 3.6) |
@@ -577,18 +609,20 @@ DW.
 
 | Ponto | Por que é inferência | Como confirmar | Se não confirmar |
 |---|---|---|---|
-| `tb_dim_tp_participacao_atend` (`co_seq_dim_tp_particip_atend`, `nu_identificador`) | dimensão sem página; o FAI e o FAO citam nomes diferentes (lacuna L3) | inventário 1.9 (FK de `co_dim_tp_particip_cidadao`) e 2 (valores) | a consulta falha fechada ("relation does not exist"); corrigir a consulta ([runbook](runbook-validacao-capacidades.md), passo 4) |
-| `co_dim_tempo_dum` → `tb_dim_tempo` | o FAI cita `tb_dim_tempo_dum`, nome que repete a coluna | inventário 1.9; diagnóstico `lmp_against_encounter_date` | DUM errada **não** falharia: bloquear a promoção do `care_encounter` |
+| **Corrigido e confirmado em 2026-10-05:** a dimensão é `tb_dim_tipo_participacao_atend` (`co_seq_dim_tp_particip_atend`, `nu_identificador`; o nome inferido era `tb_dim_tp_participacao_atend`). As FKs `co_dim_tp_particip_cidadao` apontam para ela | dimensão sem página; o FAI e o FAO citam nomes diferentes (lacuna L3) | inventário 1.9 (FK de `co_dim_tp_particip_cidadao`) e 2 (valores) | a consulta falha fechada ("relation does not exist"); corrigir a consulta ([runbook](runbook-validacao-capacidades.md), passo 4) |
+| **Confirmado em 2026-10-05:** `co_dim_tempo_dum` → `tb_dim_tempo` (mas todo atendimento do mês aponta para a sentinela `3000-12-31`, tratada como nula, 1.8) | o FAI cita `tb_dim_tempo_dum`, nome que repete a coluna | inventário 1.9; diagnóstico `lmp_against_encounter_date` | DUM errada **não** falharia: bloquear a promoção do `care_encounter` |
 | `nu_identificador` = código LEDI em cada dimensão | o índice de dimensões avisa que os ids podem não coincidir | passada 2 do inventário (valores das dimensões) | trocar a coluna na consulta (runbook, passo 4) |
-| PK de `tb_dim_sexo` = `co_seq_dim_sexo` | as páginas de fato dizem `co_seq_dim_faixa_sexo` (divergência 2.13.1) | inventário 1.6/1.9 | falha fechada ("column does not exist") |
-| PK de `tb_dim_situacao_problema` = `co_seq_dim_situacao` | divergência 2.13.3 | inventário 1.6/1.9 | falha fechada |
-| `tb_dim_cid`/`tb_dim_ciap` nos problemas | outras páginas citam `tb_dim_cid10`/`tb_dim_ciap2` | inventário 1.9 | trocar a dimensão na consulta (runbook, passo 4) |
+| **Confirmado em 2026-10-05:** PK de `tb_dim_sexo` = `co_seq_dim_sexo` | as páginas de fato dizem `co_seq_dim_faixa_sexo` (divergência 2.13.1) | inventário 1.6/1.9 | falha fechada ("column does not exist") |
+| **Confirmado em 2026-10-05:** PK de `tb_dim_situacao_problema` = `co_seq_dim_situacao`; a coluna nos problemas é `co_dim_situacao_problema` (inferida como `co_dim_situacao`) | divergência 2.13.3 | inventário 1.6/1.9 | falha fechada |
+| **Confirmado em 2026-10-05:** `tb_dim_cid`/`tb_dim_ciap` nos problemas | outras páginas citam `tb_dim_cid10`/`tb_dim_ciap2` | inventário 1.9 | trocar a dimensão na consulta (runbook, passo 4) |
 | `co_fat_procedimento` → `tb_fat_procedimento` nas filhas da ficha de procedimentos | a doc cita "`tb_fat_procedimentos` e `tb_fat_proced_atend`" (2.13.6) | inventário 1.9; contagem de filhas sem cabeçalho | rever o recorte do MIP |
 | unificação de pessoa | uso de `co_cidadao_master` como chave de coorte é inferido (5.2) | diagnóstico `person_group_masters_per_registration` | se houver muitos conflitantes, discutir antes de promover |
 | município da filha = município do cabeçalho | as filhas têm `co_dim_municipio` próprio | diagnóstico `problems_by_evaluation_and_child_municipality` | qualquer divergência bloqueia a promoção |
 | `st_avaliado` nulo = avaliado | a coluna entrou na 5.3.15 | distribuição no mesmo diagnóstico | rever a regra de "avaliado" |
+| **Corrigido em 2026-10-05:** as medidas de pressão são `nu_pressao_sistolica`/`nu_pressao_diastolica` (numeric, nulas) em `tb_fat_atendimento_individual` e `tb_fat_proced_atend`; a PK de `tb_dim_estrategia_vacinacao` é `co_seq_dim_estrategia_vacnacao` (grafia do PEC) | catálogo do inventário de 2026-10-05 | (resolvido) |
 | tipos das colunas (`st_*`, medidas, `nu_identificador`) | não publicados (L10) | fingerprints reais e `column_types` da saída | as conversões já aceitam inteiro e booleano; tipo inesperado vira nulo ou erro, nunca valor errado |
 | formato dos códigos e sentinelas | sentinela pode ter código próprio | `format_violations` da saída | normalizar na consulta (runbook, passo 4) |
+| **Confirmado em 2026-10-05:** sentinelas `-` (INE, CNES, CBO) e `3000-12-31` | a captura da competência 2026-08 contou 329 INE fora do formato em `individual_registration` e `<10` em `exam_request_evaluation` | `format_violations` da saída | (resolvido: `NULLIF(…, '-')` e faixa 1900..2100 nas consultas, 1.8) |
 | datas de aplicação da vacina | `co_dim_tempo_vacina_aplicada` entrou na 4.2.0 | diagnóstico `doses_by_transcription_and_application_date` | rever a reserva para a dose sem data |
 
 ## 5. Lacunas
@@ -597,7 +631,7 @@ DW.
 |---|---|
 | L1 tipo de equipe | sem capacidade (`team` fica no modelo); as exceções eAP viram limitação do pacote |
 | L2 data de desfecho da gestação | sem capacidade; o C3 pode ler a resolução da condição em `condition_list` (`status`/`resolved_date`) ou usar 294 dias |
-| L3 dimensão de participação | nome inferido (seção 4) |
+| L3 dimensão de participação | sem página; nome real confirmado em 2026-10-05 (seção 4) |
 | L4 doses de RNDS/RIA | ausentes do DW |
 | L5 PA de participante | `measurement_record` MIAC sem PA |
 | L6 PA da visita | não lida; `home_visit` não tem coluna de PA |
@@ -621,8 +655,8 @@ DW.
 - `CapabilityQueriesStaticTest`: binds tipados na ordem do descritor; nenhum `?` em comentário,
   literal ou operador; nenhuma coluna de PII nem o município de nascimento; tabelas com `public.`; nada
   além do 9.6 nem volátil.
-- `CapabilityMatrixConsistencyTest`: uma entrada `NOT_TESTED` por capacidade, presa ao checksum da
-  consulta e ao da fixture; `objects_used` igual às tabelas e colunas que a SQL lê; marcadores; e as três
-  entradas `VALIDATED` intactas.
+- `CapabilityMatrixConsistencyTest`: uma entrada `VALIDATED` por capacidade, presa ao checksum da
+  consulta, ao da fixture e ao digest aprovado; `objects_used` igual às tabelas e colunas que a SQL lê;
+  marcadores; e as três entradas `VALIDATED` anteriores intactas.
 - `CapabilityQueryReader`: leitor JDBC de referência, base dos testes diferenciais Rust × JDBC.
 - `CapabilityFingerprintCaptureLiveTest`: validação ao vivo opt-in ([runbook](runbook-validacao-capacidades.md)).

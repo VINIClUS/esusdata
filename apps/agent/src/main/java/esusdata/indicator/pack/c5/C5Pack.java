@@ -134,7 +134,7 @@ public final class C5Pack implements IndicatorRule {
             ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.ALL_MONTHS,
-            BudgetHint.engineeringDefault(),
+            BudgetHint.practicesPack(),
             List.of(
                     "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c5-cuidado-da-pessoa-com-hipertensao",
                     "docs/metodologia/c5-cuidado-hipertensao.md"),

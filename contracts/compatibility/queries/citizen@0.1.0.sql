@@ -79,7 +79,7 @@ SELECT CAST('tb_fat_cad_individual' AS text) AS source_entity_type,
             WHEN '0' THEN CAST('MASCULINO' AS text)
             WHEN '5' THEN CAST('INDETERMINADO' AS text)
        END AS sex,
-       CAST(ig.nu_identificador AS text) AS gender_identity,
+       NULLIF(CAST(ig.nu_identificador AS text), '-') AS gender_identity,
        o.death_date AS death_date
   FROM escolhida e
  CROSS JOIN p

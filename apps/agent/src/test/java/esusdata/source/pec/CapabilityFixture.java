@@ -21,7 +21,7 @@ import java.util.TreeMap;
  * ADR 0030) and the parameters its tests read it with. Like C1's fixture, its two municipalities
  * share every surrogate key, so a query only isolates them through {@code tb_dim_municipio.co_ibge}
  * (ENG-37, ENG-38). Its {@link #checksum()} is the {@code fixture_checksum} of the foundation's
- * {@code NOT_TESTED} entries in {@code contracts/compatibility/pec-adapters.json}.
+ * entries in {@code contracts/compatibility/pec-adapters.json}.
  */
 public final class CapabilityFixture {
 

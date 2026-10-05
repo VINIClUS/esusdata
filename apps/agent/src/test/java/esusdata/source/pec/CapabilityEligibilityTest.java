@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import esusdata.indicator.model.Capabilities;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -18,12 +19,14 @@ class CapabilityEligibilityTest {
     private static final PecSourceIdentity PEC_5_5_28 = new PecSourceIdentity("src", "5.5.28", "PEC_DW", "PRONTUARIO");
 
     @Test
-    void thePackagedMatrixValidatesOnlyC1AndTheAggregateChecksForTheirVersions() {
+    void thePackagedMatrixValidatesC1TheAggregateChecksAndTheFoundationForTheirVersions() {
         PecCompatibilityMatrix packaged = PecCompatibilityMatrix.fromClasspathResource();
+        List<String> on5528 =
+                new ArrayList<>(List.of("individual_encounter_modality", "municipal_isolation", "period_coverage"));
+        on5528.addAll(Capabilities.ALL);
 
         assertThat(packaged.validatedCapabilities(PEC_5_4_37)).containsExactly("individual_encounter_modality");
-        assertThat(packaged.validatedCapabilities(PEC_5_5_28))
-                .containsExactly("individual_encounter_modality", "municipal_isolation", "period_coverage");
+        assertThat(packaged.validatedCapabilities(PEC_5_5_28)).containsExactlyInAnyOrderElementsOf(on5528);
         assertThat(packaged.validatedCapabilities(new PecSourceIdentity("src", "5.4.37", "PEC_OLTP", "PRONTUARIO")))
                 .isEmpty();
         assertThat(packaged.validatedCapabilities(new PecSourceIdentity("src", "5.4.37", "PEC_DW", "UNKNOWN")))

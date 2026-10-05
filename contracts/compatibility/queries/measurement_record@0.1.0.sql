@@ -66,8 +66,8 @@ atividade AS (
     SELECT ac.co_seq_fat_atividade_coletiva,
            mun.co_ibge,
            CAST(t.dt_registro AS date) AS measured_date,
-           CAST(cbo.nu_cbo AS text) AS cbo,
-           CAST(ta.nu_identificador AS text) AS activity_type_code
+           NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
+           NULLIF(CAST(ta.nu_identificador AS text), '-') AS activity_type_code
       FROM public.tb_fat_atividade_coletiva ac
       JOIN mun ON mun.co_seq_dim_municipio = ac.co_dim_municipio
       JOIN public.tb_dim_tempo t ON t.co_seq_dim_tempo = ac.co_dim_tempo
@@ -107,11 +107,11 @@ SELECT CAST('tb_fat_proced_atend' AS text) AS source_entity_type,
        mun.co_ibge AS municipality_ibge,
        k.person_key AS person_key,
        CAST(t.dt_registro AS date) AS measured_date,
-       CAST(pa.nu_peso AS text) AS weight_kg,
-       CAST(pa.nu_altura AS text) AS height_cm,
-       CAST(pa.nu_medicao_pressao_sistolica AS text) AS systolic_mmhg,
-       CAST(pa.nu_medicao_pressao_diastolica AS text) AS diastolic_mmhg,
-       CAST(cbo.nu_cbo AS text) AS cbo,
+       CAST(CAST(pa.nu_peso AS numeric) AS text) AS weight_kg,
+       CAST(CAST(pa.nu_altura AS numeric) AS text) AS height_cm,
+       CAST(pa.nu_pressao_sistolica AS text) AS systolic_mmhg,
+       CAST(pa.nu_pressao_diastolica AS text) AS diastolic_mmhg,
+       NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
        CAST('MIP' AS text) AS origin,
        CAST(NULL AS text) AS activity_type_code,
        CAST(NULL AS text[]) AS health_practice_codes
@@ -131,16 +131,16 @@ SELECT CAST('tb_fat_proced_atend' AS text) AS source_entity_type,
    AND COALESCE(n.birth_date, CAST(pa.dt_nascimento AS date)) BETWEEN p.birth_date_from AND p.birth_date_to
    AND (pa.nu_peso IS NOT NULL
         OR pa.nu_altura IS NOT NULL
-        OR pa.nu_medicao_pressao_sistolica IS NOT NULL
-        OR pa.nu_medicao_pressao_diastolica IS NOT NULL)
+        OR pa.nu_pressao_sistolica IS NOT NULL
+        OR pa.nu_pressao_diastolica IS NOT NULL)
 UNION ALL
 SELECT CAST('tb_fat_atvdd_coletiva_part' AS text),
        CAST(cp.co_seq_fat_atvdd_cltv_part AS text),
        a.co_ibge,
        k.person_key,
        a.measured_date,
-       CAST(cp.nu_participante_peso AS text),
-       CAST(cp.nu_participante_altura AS text),
+       CAST(CAST(cp.nu_participante_peso AS numeric) AS text),
+       CAST(CAST(cp.nu_participante_altura AS numeric) AS text),
        CAST(NULL AS text),
        CAST(NULL AS text),
        a.cbo,

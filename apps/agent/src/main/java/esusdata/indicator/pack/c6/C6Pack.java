@@ -156,7 +156,7 @@ public final class C6Pack implements IndicatorRule {
             ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.ALL_MONTHS,
-            BudgetHint.engineeringDefault(),
+            BudgetHint.practicesPack(),
             List.of(
                     "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c6-cuidado-da-pessoa-idosa",
                     "docs/metodologia/c6-cuidado-pessoa-idosa.md"),

@@ -89,18 +89,18 @@ class CapabilityQueriesFixtureTest {
                     tb_fat_cad_individual|8021|1100015|M5001|2026-03-20|0000001|0000000001|f|f|f|NULL|f|f|f
                     """),
             Map.entry(Capabilities.CARE_ENCOUNTER, """
-                    tb_fat_atendimento_individual|1001|1100015|M5001|2026-03-01|INDIVIDUAL|225142|0000001|0000000001|2|1|f|{T90}|{E11}|{0202010503}|{0202010503,ABEX008}|NULL|70.500|165.0|120|80|NULL|NULL|NULL|1990-01-01
+                    tb_fat_atendimento_individual|1001|1100015|M5001|2026-03-01|INDIVIDUAL|225142|0000001|0000000001|2|1|f|{T90}|{E11}|{0202010503}|{0202010503,ABEX008}|NULL|70.3|165.1|120|80|NULL|NULL|NULL|1990-01-01
                     tb_fat_atendimento_individual|1002|1100015|M5002|2026-03-31|INDIVIDUAL|223565|0000001|0000000001|5|4|t|{ABP022}|{}|{}|{}|NULL|NULL|NULL|NULL|NULL|NULL|NULL|NULL|NULL
                     tb_fat_atendimento_individual|1004|1100015|F105|2026-03-10|INDIVIDUAL|223565|0000001|0000000001|4|NULL|NULL|{}|{E10,E11.9,E119}|{0203010019,0214010015}|{}|NULL|NULL|NULL|NULL|NULL|NULL|NULL|NULL|2000-05-05
-                    tb_fat_atendimento_individual|1005|1100015|M5007|2026-03-15|INDIVIDUAL|225142|0000002|0000000002|1|1|NULL|{}|{}|{}|{}|NULL|NULL|NULL|NULL|NULL|NULL|NULL|NULL|1995-01-01
-                    tb_fat_atendimento_individual|1009|1100015|M5010|2026-03-15|INDIVIDUAL|223565|0000002|0000000002|2|1|t|{W78}|{Z34}|{}|{}|NULL|80.250|160.5|130|85|2025-06-10|39|NULL|1995-03-03
+                    tb_fat_atendimento_individual|1005|1100015|M5007|2026-03-15|INDIVIDUAL|NULL|0000002|0000000002|NULL|1|NULL|{}|{}|{}|{}|NULL|NULL|NULL|NULL|NULL|NULL|NULL|NULL|1995-01-01
+                    tb_fat_atendimento_individual|1009|1100015|M5010|2026-03-15|INDIVIDUAL|223565|0000002|0000000002|2|1|t|{W78}|{Z34}|{}|{}|NULL|80.25|160.5|130|85|2025-06-10|39|NULL|1995-03-03
                     """),
             Map.entry(Capabilities.DENTAL_ENCOUNTER, """
-                    tb_fat_atendimento_odonto|3001|1100015|M5010|2026-03-20|DENTAL|223293|0000002|0000000002|2|1|f|{W78}|{}|NULL|NULL|{0101020058,0307020070}|81.000|NULL|NULL|NULL|NULL|NULL|t|1995-03-03
+                    tb_fat_atendimento_odonto|3001|1100015|M5010|2026-03-20|DENTAL|223293|0000002|0000000002|2|1|f|{W78}|{}|NULL|NULL|{0101020058,0307020070}|81|NULL|NULL|NULL|NULL|NULL|t|1995-03-03
                     tb_fat_atendimento_odonto|3002|1100015|M5001|2026-03-01|DENTAL|223293|0000001|0000000001|2|1|NULL|{}|{}|NULL|NULL|{}|NULL|NULL|NULL|NULL|NULL|NULL|f|1990-01-01
                     """),
             Map.entry(Capabilities.HOME_VISIT, """
-                    tb_fat_visita_domiciliar|4001|1100015|M5002|2026-03-10|515105|0000001|0000000001|1|{MOT_VIS_VISITA_PERIODICA,ACOMP_RECEM_NASCIDO,ACOMP_CRIANCA}|3.450|50.0
+                    tb_fat_visita_domiciliar|4001|1100015|M5002|2026-03-10|515105|0000001|0000000001|1|{MOT_VIS_VISITA_PERIODICA,ACOMP_RECEM_NASCIDO,ACOMP_CRIANCA}|3.45|50
                     tb_fat_visita_domiciliar|4002|1100015|M5001|2026-03-01|515105|0000001|0000000001|3|{}|NULL|NULL
                     tb_fat_visita_domiciliar|4004|1100015|M5010|2026-03-31|515105|0000002|0000000002|1|{BUSCA_ATIVA_VACINA,ACOMP_GESTANTE,CTRL_AMB_VET_IMOVEL_FOCO}|NULL|NULL
                     """),
@@ -133,10 +133,10 @@ class CapabilityQueriesFixtureTest {
                     tb_fat_atend_odonto_problemas.co_dim_cid|3502|1100015|M5010|CID10|K021|2026-03-20|0|NULL|PROFESSIONAL|NULL
                     """),
             Map.entry(Capabilities.MEASUREMENT_RECORD, """
-                    tb_fat_atvdd_coletiva_part|7201|1100015|M5002|2026-03-20|3.600|51.0|NULL|NULL|223565|MIAC|5|{9,20}
+                    tb_fat_atvdd_coletiva_part|7201|1100015|M5002|2026-03-20|3.6|51.3|NULL|NULL|223565|MIAC|5|{9,20}
                     tb_fat_atvdd_coletiva_part|7202|1100015|M5001|2026-03-20|NULL|NULL|NULL|NULL|223565|MIAC|5|{9,20}
-                    tb_fat_atvdd_coletiva_part|7205|1100015|F105|2026-03-10|62.000|NULL|NULL|NULL|223565|MIAC|4|{}
-                    tb_fat_proced_atend|6101|1100015|M5001|2026-03-15|71.000|165.5|125|82|322205|MIP|NULL|NULL
+                    tb_fat_atvdd_coletiva_part|7205|1100015|F105|2026-03-10|65.1|NULL|NULL|NULL|223565|MIAC|4|{}
+                    tb_fat_proced_atend|6101|1100015|M5001|2026-03-15|71|165.5|125|82|322205|MIP|NULL|NULL
                     """));
 
     @BeforeAll

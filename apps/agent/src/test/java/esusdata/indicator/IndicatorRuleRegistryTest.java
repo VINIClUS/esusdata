@@ -3,6 +3,7 @@ package esusdata.indicator;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import esusdata.indicator.model.BudgetHint;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ComponentSpec;
@@ -43,6 +44,16 @@ class IndicatorRuleRegistryTest {
         assertThat(d.blockedGates()).isNotEmpty();
         assertThat(d.methodologySources()).isNotEmpty();
         assertThat(d.requiredCapabilities()).isNotEmpty();
+    }
+
+    /** C1 reads one month through v1; the packs by practice read up to 36 months (BudgetHint). */
+    @ParameterizedTest
+    @MethodSource("rules")
+    void packsByPracticeAskForTheBudgetMeasuredOnARealPec(IndicatorRule rule) {
+        PackDescriptor d = rule.descriptor();
+        if (d.valueKind() != ValueKind.PERCENTAGE) {
+            assertThat(d.budget()).isEqualTo(BudgetHint.practicesPack());
+        }
     }
 
     @ParameterizedTest

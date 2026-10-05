@@ -5,7 +5,7 @@
 -- tb_fat_atend_odonto_proced, agregadas por atendimento; tb_fat_cad_individual (nascimento da
 -- pessoa); tb_dim_cidadao_pec_grupo (unificação); tb_dim_municipio, tb_dim_tempo, tb_dim_cbo,
 -- tb_dim_unidade_saude, tb_dim_equipe, tb_dim_tipo_atendimento, tb_dim_local_atendimento,
--- tb_dim_tp_participacao_atend, tb_dim_ciap, tb_dim_cid e tb_dim_procedimento.
+-- tb_dim_tipo_participacao_atend, tb_dim_ciap, tb_dim_cid e tb_dim_procedimento.
 --
 -- Decisões: as mesmas de care_encounter (recorte pelo município do atendimento, período em
 -- tb_dim_tempo.dt_registro, pessoa unificada, faixa de nascimento pelo cadastro individual com a
@@ -82,9 +82,9 @@ atendimento AS (
 problema AS (
     SELECT pr.co_fat_atd_odnt,
            array_agg(DISTINCT CAST(ci.nu_ciap AS text) COLLATE "C" ORDER BY CAST(ci.nu_ciap AS text) COLLATE "C")
-               FILTER (WHERE ci.nu_ciap IS NOT NULL) AS ciap_codes,
+               FILTER (WHERE ci.nu_ciap IS NOT NULL AND CAST(ci.nu_ciap AS text) <> '-') AS ciap_codes,
            array_agg(DISTINCT CAST(cd.nu_cid AS text) COLLATE "C" ORDER BY CAST(cd.nu_cid AS text) COLLATE "C")
-               FILTER (WHERE cd.nu_cid IS NOT NULL) AS cid_codes
+               FILTER (WHERE cd.nu_cid IS NOT NULL AND CAST(cd.nu_cid AS text) <> '-') AS cid_codes
       FROM public.tb_fat_atend_odonto_problemas pr
       JOIN atendimento a ON a.co_seq_fat_atd_odnt = pr.co_fat_atd_odnt
       LEFT JOIN public.tb_dim_ciap ci ON ci.co_seq_dim_ciap = pr.co_dim_ciap
@@ -95,7 +95,7 @@ problema AS (
 realizado AS (
     SELECT op.co_fat_atd_odnt,
            array_agg(DISTINCT CAST(pc.co_proced AS text) COLLATE "C" ORDER BY CAST(pc.co_proced AS text) COLLATE "C")
-               FILTER (WHERE pc.co_proced IS NOT NULL) AS procedures_performed
+               FILTER (WHERE pc.co_proced IS NOT NULL AND CAST(pc.co_proced AS text) <> '-') AS procedures_performed
       FROM public.tb_fat_atend_odonto_proced op
       JOIN atendimento a ON a.co_seq_fat_atd_odnt = op.co_fat_atd_odnt
       LEFT JOIN public.tb_dim_procedimento pc ON pc.co_seq_dim_procedimento = op.co_dim_procedimento
@@ -107,11 +107,11 @@ SELECT CAST('tb_fat_atendimento_odonto' AS text) AS source_entity_type,
        a.person_key AS person_key,
        a.care_date AS care_date,
        CAST('DENTAL' AS text) AS form,
-       CAST(cbo.nu_cbo AS text) AS cbo,
-       CAST(us.nu_cnes AS text) AS cnes,
-       CAST(eq.nu_ine AS text) AS ine,
-       CAST(ta.nu_identificador AS text) AS care_type_code,
-       CAST(la.nu_identificador AS text) AS care_location_code,
+       NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
+       NULLIF(CAST(us.nu_cnes AS text), '-') AS cnes,
+       NULLIF(CAST(eq.nu_ine AS text), '-') AS ine,
+       NULLIF(CAST(ta.nu_identificador AS text), '-') AS care_type_code,
+       NULLIF(CAST(la.nu_identificador AS text), '-') AS care_location_code,
        CASE WHEN CAST(tp.nu_identificador AS text) = '2' THEN FALSE
             WHEN CAST(tp.nu_identificador AS text) IN ('3', '4', '5', '6', '7') THEN TRUE
        END AS remote,
@@ -120,8 +120,8 @@ SELECT CAST('tb_fat_atendimento_odonto' AS text) AS source_entity_type,
        CAST(NULL AS text[]) AS procedures_requested,
        CAST(NULL AS text[]) AS procedures_evaluated,
        COALESCE(rz.procedures_performed, CAST('{}' AS text[])) AS procedures_performed,
-       CAST(a.nu_peso AS text) AS weight_kg,
-       CAST(a.nu_altura AS text) AS height_cm,
+       CAST(CAST(a.nu_peso AS numeric) AS text) AS weight_kg,
+       CAST(CAST(a.nu_altura AS numeric) AS text) AS height_cm,
        CAST(NULL AS text) AS systolic_mmhg,
        CAST(NULL AS text) AS diastolic_mmhg,
        CAST(NULL AS date) AS lmp_date,
@@ -138,4 +138,4 @@ SELECT CAST('tb_fat_atendimento_odonto' AS text) AS source_entity_type,
   LEFT JOIN public.tb_dim_equipe eq ON eq.co_seq_dim_equipe = a.co_dim_equipe_1
   LEFT JOIN public.tb_dim_tipo_atendimento ta ON ta.co_seq_dim_tipo_atendimento = a.co_dim_tipo_atendimento
   LEFT JOIN public.tb_dim_local_atendimento la ON la.co_seq_dim_local_atendimento = a.co_dim_local_atendimento
-  LEFT JOIN public.tb_dim_tp_participacao_atend tp ON tp.co_seq_dim_tp_particip_atend = a.co_dim_tp_particip_cidadao
+  LEFT JOIN public.tb_dim_tipo_participacao_atend tp ON tp.co_seq_dim_tp_particip_atend = a.co_dim_tp_particip_cidadao

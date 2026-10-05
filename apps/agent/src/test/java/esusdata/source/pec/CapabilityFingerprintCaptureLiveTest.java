@@ -47,7 +47,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Live validation of the foundation capabilities (ADR 0023, ADR 0030; procedure in
- * {@code docs/discovery/runbook-validacao-capacidades.md}), opt-in. For every {@code NOT_TESTED}
+ * {@code docs/discovery/runbook-validacao-capacidades.md}), opt-in. For every foundation
  * entry of {@code contracts/compatibility/pec-adapters.json} it captures the real signature of each
  * object the entry lists, through the probe's own {@link JdbcCompatibilityCatalog}, and runs the
  * frozen query for one competência with small code lists through {@link CapabilityQueryReader}, the
