@@ -374,15 +374,15 @@ CREATE TABLE tb_fat_atendimento_individual (
     co_dim_cbo_1                   BIGINT,
     co_dim_tempo_dum               BIGINT,
     dt_nascimento                  TIMESTAMP,
-    nu_peso                        NUMERIC(7, 3),
-    nu_altura                      NUMERIC(5, 1),
+    nu_peso                        DOUBLE PRECISION,
+    nu_altura                      DOUBLE PRECISION,
     nu_pressao_sistolica   NUMERIC,
     nu_pressao_diastolica  NUMERIC,
     nu_idade_gestacional_semanas   INTEGER
 );
 INSERT INTO tb_fat_atendimento_individual VALUES
     -- primeiro dia do período, presencial, com medidas
-    (1001, 101, 1, 11, 3, 1, 3, 10, 20, 30, 30001231, '1990-01-01 00:00:00', 70.500, 165.0, 120, 80, NULL),
+    (1001, 101, 1, 11, 3, 1, 3, 10, 20, 30, 30001231, '1990-01-01 00:00:00', 70.3, 165.1, 120, 80, NULL),
     -- último dia do período, remoto (vídeo), no domicílio, sem medidas; pessoa pelo cadastro unificado
     (1002, 103, 1, 15, 6, 2, 4, 10, 20, 31, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
     -- excluído: o cadastro diz 1989-12-31, embora o atendimento diga 1990-06-01
@@ -464,8 +464,8 @@ CREATE TABLE tb_fat_atendimento_odonto (
     co_dim_equipe_1                BIGINT,
     co_dim_cbo_1                   BIGINT,
     dt_nascimento                  DATE,
-    nu_peso                        NUMERIC(7, 3),
-    nu_altura                      NUMERIC(5, 1),
+    nu_peso                        DOUBLE PRECISION,
+    nu_altura                      DOUBLE PRECISION,
     st_gestante                    INTEGER
 );
 INSERT INTO tb_fat_atendimento_odonto VALUES
@@ -513,8 +513,8 @@ CREATE TABLE tb_fat_visita_domiciliar (
     co_dim_equipe                  BIGINT,
     co_dim_desfecho_visita         BIGINT,
     dt_nascimento                  DATE,
-    nu_peso                        NUMERIC(7, 3),
-    nu_altura                      NUMERIC(5, 1),
+    nu_peso                        DOUBLE PRECISION,
+    nu_altura                      DOUBLE PRECISION,
     st_mot_vis_cad_att             INTEGER,
     st_mot_vis_visita_periodica    INTEGER,
     st_mot_vis_egresso_internacao  INTEGER,
@@ -657,8 +657,8 @@ CREATE TABLE tb_fat_proced_atend (
     co_fat_procedimento            BIGINT,
     co_fat_cidadao_pec             BIGINT,
     dt_nascimento                  DATE,
-    nu_peso                        NUMERIC(7, 3),
-    nu_altura                      NUMERIC(5, 1),
+    nu_peso                        DOUBLE PRECISION,
+    nu_altura                      DOUBLE PRECISION,
     nu_pressao_sistolica   NUMERIC,
     nu_pressao_diastolica  NUMERIC
 );

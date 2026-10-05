@@ -140,6 +140,16 @@ barato, mas uma ficha do CDS com data errada tiraria um evento de uma pessoa que
 | `bool` | `CASE WHEN CAST(x AS text) IN ('1','true') THEN TRUE WHEN … IN ('0','false') THEN FALSE END`: aceita inteiro 0/1 e booleano; qualquer outro valor sai nulo | `bool` |
 | `integer` | `CAST(… AS integer)` | `int4` |
 | `decimal` | `CAST(x AS text)`: texto decimal com ponto. O plano de execução recusa `numeric`, `float` e `timestamp` | `text` |
+
+`nu_peso` e `nu_altura` são `double precision` no PEC 5.5.28 (`tb_fat_atendimento_individual`,
+`tb_fat_atendimento_odonto`, `tb_fat_proced_atend`, `tb_fat_visita_domiciliar`); `nu_pressao_*` são
+`numeric`. `CAST(float8 AS text)` depende de `extra_float_digits` da sessão: o pgJDBC fixa 3 (17 dígitos
+significativos, `65.099999999999994`) e a sessão do plano Rust usa o padrão (o mais curto, `65.1`). A
+captura ao vivo de 2026-08 achou 2 de 6466 linhas de `care_encounter` divergentes só em `weight_kg`.
+Por isso as consultas projetam `CAST(CAST(x AS numeric) AS text)`: no PostgreSQL 9.6, `float8` → `numeric`
+usa `DBL_DIG` (15 dígitos) qualquer que seja a sessão, e o texto é o mesmo no JDBC e no Rust. O texto
+sai sem zeros à direita desnecessários (`70.3`, `165`). A fixture usa `double precision` e valores com
+artefato binário (`70.3`, `165.1`, `3.45`) para que o teste diferencial pegue a regressão.
 | `text[]` | `array_agg(DISTINCT CAST(… AS text) COLLATE "C" ORDER BY …) FILTER (WHERE … IS NOT NULL)`: sem repetição, ordem binária, nunca elemento nulo; lista vazia `'{}'` quando a fonte tem a informação mas não há nada, nulo quando a fonte não tem a informação | `_text` |
 
 Os tipos das colunas do DW não são publicados (lacuna L10), e os do `st_*` podem ser inteiro ou
@@ -278,7 +288,7 @@ Lê `tb_fat_atendimento_individual` (FAI); as filhas `tb_fat_atd_ind_problemas` 
 | `procedures_requested` | `tb_fat_atd_ind_procedimentos.co_dim_procedimento_solicitado` → `co_proced` | todos os exames solicitados, sem filtro de lista |
 | `procedures_evaluated` | idem, `co_dim_procedimento_avaliado` | todos os avaliados |
 | `procedures_performed` | — | **nulo**: o FAI não tem lista de procedimentos realizados (regra 1 de `tb_fat_procedimento`) |
-| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | texto decimal |
+| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | `double precision` no DW; `CAST(CAST(x AS numeric) AS text)` (1.6) |
 | `systolic_mmhg`, `diastolic_mmhg` | `nu_pressao_sistolica`, `nu_pressao_diastolica` | texto decimal |
 | `lmp_date` | `co_dim_tempo_dum` → `tb_dim_tempo.dt_registro` | alvo confirmado em 2026-10-05; sentinela `3000-12-31` → nulo (1.8) |
 | `gestational_age_weeks` | `nu_idade_gestacional_semanas` | `integer` |
@@ -309,7 +319,7 @@ Lê `tb_fat_atendimento_odonto` (FAO); as filhas `tb_fat_atend_odonto_problemas`
 | `ciap_codes`, `cid_codes` | `tb_fat_atend_odonto_problemas` avaliados | idem |
 | `procedures_requested`, `procedures_evaluated` | — | **nulos**: exames do odontológico não são lidos, e nenhuma ficha os pede |
 | `procedures_performed` | `tb_fat_atend_odonto_proced.co_dim_procedimento` → `co_proced` | sem repetição; `qt_procedimentos` não entra |
-| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | |
+| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | `double precision`; `CAST(CAST(x AS numeric) AS text)` (1.6) |
 | `systolic_mmhg`, `diastolic_mmhg`, `lmp_date`, `gestational_age_weeks` | — | nulos: o MIAO não tem PA, DUM nem idade gestacional |
 | `pregnant` | `st_gestante` | booleano |
 | `birth_date` | `dt_nascimento` do FAO | |
@@ -327,7 +337,7 @@ Lê `tb_fat_visita_domiciliar`, as tabelas de pessoa, `tb_dim_municipio`, `tb_di
 | `cbo`, `cnes`, `ine` | `co_dim_cbo`, `co_dim_unidade_saude`, `co_dim_equipe` | |
 | `outcome_code` | `co_dim_desfecho_visita` → `nu_identificador` | LEDI `1` realizada, `2` recusada, `3` ausente |
 | `reason_codes` | as 37 colunas de motivo `st_*` | um token por motivo marcado (seção 3.4), em ordem fixa |
-| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | |
+| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | `double precision`; `CAST(CAST(x AS numeric) AS text)` (1.6) |
 
 Decisões:
 
@@ -449,7 +459,7 @@ de pessoa, `tb_dim_municipio`, `tb_dim_tempo`, `tb_dim_cbo` e `tb_dim_tipo_ativi
 | Coluna | MIP | MIAC |
 |---|---|---|
 | `measured_date` | cabeçalho `co_dim_tempo` | cabeçalho da atividade `co_dim_tempo` |
-| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` | `nu_participante_peso`, `nu_participante_altura` |
+| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` (`double precision`, via `numeric`, 1.6) | `nu_participante_peso`, `nu_participante_altura` |
 | `systolic_mmhg`, `diastolic_mmhg` | `nu_pressao_sistolica`, `_diastolica` | nulos: o MIAC não tem PA de participante (lacuna L5) |
 | `cbo` | cabeçalho `co_dim_cbo` | cabeçalho da atividade `co_dim_cbo`, o profissional responsável |
 | `origin` | `MIP` | `MIAC` |
