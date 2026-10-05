@@ -127,7 +127,7 @@ public final class C3Pack implements IndicatorRule {
             ReleaseGates.noneComplete(),
             C3Limitations.STANDING,
             MonthlyEligibility.MONTHS_WITH_COHORT_EVENT,
-            BudgetHint.engineeringDefault(),
+            BudgetHint.practicesPack(),
             List.of(
                     "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c3-cuidado-na-gestacao-e-puerperio",
                     "docs/metodologia/c3-gestacao-puerperio.md"),

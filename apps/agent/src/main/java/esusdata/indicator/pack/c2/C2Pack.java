@@ -156,7 +156,7 @@ public final class C2Pack implements IndicatorRule {
             ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.MONTHS_WITH_COHORT_EVENT,
-            BudgetHint.engineeringDefault(),
+            BudgetHint.practicesPack(),
             List.of(
                     "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c2-cuidado-no-desenvolvimento-infantil",
                     "docs/metodologia/c2-desenvolvimento-infantil.md"),

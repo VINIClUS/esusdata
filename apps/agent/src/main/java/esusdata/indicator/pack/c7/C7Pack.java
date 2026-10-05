@@ -126,7 +126,7 @@ public final class C7Pack implements IndicatorRule {
             ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.ALL_MONTHS,
-            BudgetHint.engineeringDefault(),
+            BudgetHint.practicesPack(),
             List.of(
                     "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c7-cuidado-da-mulher-na-prevencao-do-cancer",
                     "docs/metodologia/c7-prevencao-cancer.md"),

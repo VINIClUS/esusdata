@@ -137,7 +137,7 @@ public final class C4Pack implements IndicatorRule {
             ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.ALL_MONTHS,
-            BudgetHint.engineeringDefault(),
+            BudgetHint.practicesPack(),
             List.of(
                     "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c4-cuidado-da-pessoa-com-diabetes",
                     "docs/metodologia/c4-cuidado-diabetes.md"),
