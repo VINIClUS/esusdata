@@ -72,9 +72,9 @@ SELECT CAST('tb_fat_vacinacao_vacina' AS text) AS source_entity_type,
        CAST(dd.nu_identificador AS text) AS dose_code,
        CAST(ev.nu_identificador AS text) AS strategy_code,
        ds.transcription AS transcription,
-       CAST(cbo.nu_cbo AS text) AS cbo,
-       CAST(us.nu_cnes AS text) AS cnes,
-       CAST(eq.nu_ine AS text) AS ine,
+       NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
+       NULLIF(CAST(us.nu_cnes AS text), '-') AS cnes,
+       NULLIF(CAST(eq.nu_ine AS text), '-') AS ine,
        ds.registration_date AS registration_date
   FROM (
         SELECT d.co_seq_fat_vacinacao_vacina,
@@ -100,7 +100,8 @@ SELECT CAST('tb_fat_vacinacao_vacina' AS text) AS source_entity_type,
                             WHEN CAST(d.st_registro_anterior AS text) IN ('0', 'false') THEN FALSE
                        END AS transcription) tr
          CROSS JOIN LATERAL (
-                SELECT COALESCE(CAST(t_apl.dt_registro AS date),
+                SELECT COALESCE(CASE WHEN t_apl.dt_registro BETWEEN DATE '1900-01-01' AND DATE '2100-12-31'
+                                     THEN CAST(t_apl.dt_registro AS date) END,
                                 CASE WHEN tr.transcription IS NOT TRUE THEN CAST(t_reg.dt_registro AS date) END)
                            AS application_date) ap
          CROSS JOIN p
@@ -114,7 +115,7 @@ SELECT CAST('tb_fat_vacinacao_vacina' AS text) AS source_entity_type,
            AND COALESCE(n.birth_date, CAST(h.dt_nascimento AS date)) BETWEEN p.birth_date_from AND p.birth_date_to
        ) ds
   LEFT JOIN public.tb_dim_dose_imunobiologico dd ON dd.co_seq_dim_dose_imunobiologico = ds.co_dim_dose_imunobiologico
-  LEFT JOIN public.tb_dim_estrategia_vacinacao ev ON ev.co_seq_dim_estrategia_vacinacao = ds.co_dim_estrategia_vacinacao
+  LEFT JOIN public.tb_dim_estrategia_vacinacao ev ON ev.co_seq_dim_estrategia_vacnacao = ds.co_dim_estrategia_vacinacao
   LEFT JOIN public.tb_dim_cbo cbo ON cbo.co_seq_dim_cbo = ds.co_dim_cbo
   LEFT JOIN public.tb_dim_unidade_saude us ON us.co_seq_dim_unidade_saude = ds.co_dim_unidade_saude
   LEFT JOIN public.tb_dim_equipe eq ON eq.co_seq_dim_equipe = ds.co_dim_equipe

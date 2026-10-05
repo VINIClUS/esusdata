@@ -197,7 +197,7 @@
         "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
       },
       "query_checksum": "sha256:6f7fddff33b54e42a58513b3024b6511cf1de40b27737508731da7748de43d50",
-      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "fixture_checksum": "sha256:099e427c55f7d5c47fdc6c1586850c973b12c72fbc84e7fcc8ec0246d1c2433f",
       "test_result": "NOT_RUN",
       "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
       "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
@@ -252,8 +252,8 @@
         "binding_column": "tb_dim_municipio.co_ibge",
         "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
       },
-      "query_checksum": "sha256:f9f511d801a36fd444576fb90f7248ff98bee1d33e6526934d91785a9c0b102c",
-      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "query_checksum": "sha256:67368653b75d278fec3af4441aa11f290f29e03673b12e009c35ba7f0b1eecfc",
+      "fixture_checksum": "sha256:099e427c55f7d5c47fdc6c1586850c973b12c72fbc84e7fcc8ec0246d1c2433f",
       "test_result": "NOT_RUN",
       "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
       "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
@@ -280,8 +280,8 @@
         },
         {
           "object": "tb_fat_atendimento_individual",
-          "columns_used": ["co_seq_fat_atd_ind", "co_dim_cbo_1", "co_dim_equipe_1", "co_dim_local_atendimento", "co_dim_municipio", "co_dim_tempo", "co_dim_tempo_dum", "co_dim_tipo_atendimento", "co_dim_tp_particip_cidadao", "co_dim_unidade_saude_1", "co_fat_cidadao_pec", "dt_nascimento", "nu_altura", "nu_idade_gestacional_semanas", "nu_medicao_pressao_diastolica", "nu_medicao_pressao_sistolica", "nu_peso"],
-          "signature_fingerprint": "sha256:6fee7e811b921c7d1ea444b8c487538f3c648f66de2d0cba653bb36be4fc5017"
+          "columns_used": ["co_seq_fat_atd_ind", "co_dim_cbo_1", "co_dim_equipe_1", "co_dim_local_atendimento", "co_dim_municipio", "co_dim_tempo", "co_dim_tempo_dum", "co_dim_tipo_atendimento", "co_dim_tp_particip_cidadao", "co_dim_unidade_saude_1", "co_fat_cidadao_pec", "dt_nascimento", "nu_altura", "nu_idade_gestacional_semanas", "nu_pressao_diastolica", "nu_pressao_sistolica", "nu_peso"],
+          "signature_fingerprint": "sha256:51e4b0c3721df643f23525a762d5eb1f4fd7a2e1bfad494dacc463874d013d63"
         },
         {
           "object": "tb_fat_cad_individual",
@@ -339,9 +339,9 @@
           "signature_fingerprint": "sha256:e66718388d3dc864d96dd2f15441b5923f6a7efc2cce0011224bc32864850038"
         },
         {
-          "object": "tb_dim_tp_participacao_atend",
+          "object": "tb_dim_tipo_participacao_atend",
           "columns_used": ["co_seq_dim_tp_particip_atend", "nu_identificador", "UNIQUE_KEY=co_seq_dim_tp_particip_atend"],
-          "signature_fingerprint": "sha256:87f6448e8b6010b4e56b394bab0e591add109c3755243f46c9d7c3bcb1f4e098"
+          "signature_fingerprint": "sha256:6659b291ee3eddd3dfca25f0bef032c66657d3e393cb20518f195e90608a6b5e"
         },
         {
           "object": "tb_dim_unidade_saude",
@@ -353,8 +353,8 @@
         "binding_column": "tb_dim_municipio.co_ibge",
         "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
       },
-      "query_checksum": "sha256:9743ea5ee615612f450cfbfbb79f4971e6cb816b51c03aa1501045676c9760ad",
-      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "query_checksum": "sha256:eeaf26c59cc18b2d411e566a800689d082946bcf969f2a512a9756d96fedde95",
+      "fixture_checksum": "sha256:099e427c55f7d5c47fdc6c1586850c973b12c72fbc84e7fcc8ec0246d1c2433f",
       "test_result": "NOT_RUN",
       "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
       "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
@@ -440,9 +440,9 @@
           "signature_fingerprint": "sha256:e66718388d3dc864d96dd2f15441b5923f6a7efc2cce0011224bc32864850038"
         },
         {
-          "object": "tb_dim_tp_participacao_atend",
+          "object": "tb_dim_tipo_participacao_atend",
           "columns_used": ["co_seq_dim_tp_particip_atend", "nu_identificador", "UNIQUE_KEY=co_seq_dim_tp_particip_atend"],
-          "signature_fingerprint": "sha256:87f6448e8b6010b4e56b394bab0e591add109c3755243f46c9d7c3bcb1f4e098"
+          "signature_fingerprint": "sha256:6659b291ee3eddd3dfca25f0bef032c66657d3e393cb20518f195e90608a6b5e"
         },
         {
           "object": "tb_dim_unidade_saude",
@@ -454,8 +454,8 @@
         "binding_column": "tb_dim_municipio.co_ibge",
         "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
       },
-      "query_checksum": "sha256:39b8fe497491052c08c915d991ce2042f0f5e81b928ce2b178209e3703e58da4",
-      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "query_checksum": "sha256:d89b953297c4886bf2480432e49b2f36242fd378db757c514ff74ad4929d7bec",
+      "fixture_checksum": "sha256:099e427c55f7d5c47fdc6c1586850c973b12c72fbc84e7fcc8ec0246d1c2433f",
       "test_result": "NOT_RUN",
       "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
       "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
@@ -520,8 +520,8 @@
         "binding_column": "tb_dim_municipio.co_ibge",
         "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
       },
-      "query_checksum": "sha256:d62b4dd658badb6fc2cb0cfdddac40dbb3c093c4dbd58cc556f15b259410764b",
-      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "query_checksum": "sha256:b2817bf39e2d02385654a339afe1e9feec858cff28e9c91500442bdd9e66d805",
+      "fixture_checksum": "sha256:099e427c55f7d5c47fdc6c1586850c973b12c72fbc84e7fcc8ec0246d1c2433f",
       "test_result": "NOT_RUN",
       "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
       "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
@@ -573,8 +573,8 @@
         },
         {
           "object": "tb_dim_estrategia_vacinacao",
-          "columns_used": ["co_seq_dim_estrategia_vacinacao", "nu_identificador", "UNIQUE_KEY=co_seq_dim_estrategia_vacinacao"],
-          "signature_fingerprint": "sha256:e6187763db2c3f81a83824c1860bded79b87fcc246c9216d23ba26bd1449b542"
+          "columns_used": ["co_seq_dim_estrategia_vacnacao", "nu_identificador", "UNIQUE_KEY=co_seq_dim_estrategia_vacnacao"],
+          "signature_fingerprint": "sha256:c7ded2dae84ad9044002c56be911128a0ef5f0300db72067ffcfd01aad3f35b7"
         },
         {
           "object": "tb_dim_imunobiologico",
@@ -601,8 +601,8 @@
         "binding_column": "tb_dim_municipio.co_ibge",
         "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
       },
-      "query_checksum": "sha256:b3dbb5e710afa0cf0625216a70807e496ea94377333dcd5bc9c09cbffb2d9064",
-      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "query_checksum": "sha256:fd8ddbe56731528ee55984636e7bd21e21da198d298586ae74d703d2276c9085",
+      "fixture_checksum": "sha256:099e427c55f7d5c47fdc6c1586850c973b12c72fbc84e7fcc8ec0246d1c2433f",
       "test_result": "NOT_RUN",
       "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
       "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
@@ -672,8 +672,8 @@
         "binding_column": "tb_dim_municipio.co_ibge",
         "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
       },
-      "query_checksum": "sha256:bfab781a5d5fcf489597e237c6f3ba5eb1f036b035d758518dd71eb97782a13e",
-      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "query_checksum": "sha256:9d5f296a0a5ffeb54c660d538a354b723f816bcbc48a20c985d0366bb633ff9f",
+      "fixture_checksum": "sha256:099e427c55f7d5c47fdc6c1586850c973b12c72fbc84e7fcc8ec0246d1c2433f",
       "test_result": "NOT_RUN",
       "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
       "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
@@ -753,8 +753,8 @@
         "binding_column": "tb_dim_municipio.co_ibge",
         "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
       },
-      "query_checksum": "sha256:f96469372d2a8fe12042844cb9e13d218283bcc14829ee2fd6532ebe45d460dd",
-      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "query_checksum": "sha256:bdec0daca439f37563125f98c4d868be6bc1c59abc27b7c88eacd4191bc5a83a",
+      "fixture_checksum": "sha256:099e427c55f7d5c47fdc6c1586850c973b12c72fbc84e7fcc8ec0246d1c2433f",
       "test_result": "NOT_RUN",
       "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
       "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
@@ -771,13 +771,13 @@
       "objects_used": [
         {
           "object": "tb_fat_atd_ind_problemas",
-          "columns_used": ["co_seq_fat_atend_ind_problemas", "co_dim_ciap", "co_dim_cid", "co_dim_data_fim_problema", "co_dim_situacao", "co_fat_atd_ind", "st_avaliado"],
-          "signature_fingerprint": "sha256:25b65ba2c4808bf572f45047f0f369c9f43650f782cc75d99c05512766e6040b"
+          "columns_used": ["co_seq_fat_atend_ind_problemas", "co_dim_ciap", "co_dim_cid", "co_dim_data_fim_problema", "co_dim_situacao_problema", "co_fat_atd_ind", "st_avaliado"],
+          "signature_fingerprint": "sha256:f1c53e4d26630902df678c0234bf4c9d32cfdcea11501ed6aa4eef8ad785c267"
         },
         {
           "object": "tb_fat_atend_odonto_problemas",
-          "columns_used": ["co_seq_fat_atnd_odonto_probl", "co_dim_ciap", "co_dim_cid", "co_dim_data_fim_problema", "co_dim_situacao", "co_fat_atd_odnt", "st_avaliado"],
-          "signature_fingerprint": "sha256:e25cc8e6979c7250d6dc389fbb59db7ad1ca434c4ddbaaf61a7da604619a7417"
+          "columns_used": ["co_seq_fat_atnd_odonto_probl", "co_dim_ciap", "co_dim_cid", "co_dim_data_fim_problema", "co_dim_situacao_problema", "co_fat_atd_odnt", "st_avaliado"],
+          "signature_fingerprint": "sha256:280c35408d81b32075d0a99683c6dec2c57d5fff4e1bad3bfac377aa37968d14"
         },
         {
           "object": "tb_fat_atendimento_individual",
@@ -834,8 +834,8 @@
         "binding_column": "tb_dim_municipio.co_ibge",
         "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
       },
-      "query_checksum": "sha256:18adbe9c53537b7ad695cd90c78d1913355917596d62754607343257a0e83588",
-      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "query_checksum": "sha256:42a385e7bd60fd69c26e669cf903b8f830a99813545253e979cc7c98b2130af2",
+      "fixture_checksum": "sha256:099e427c55f7d5c47fdc6c1586850c973b12c72fbc84e7fcc8ec0246d1c2433f",
       "test_result": "NOT_RUN",
       "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
       "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."
@@ -872,8 +872,8 @@
         },
         {
           "object": "tb_fat_proced_atend",
-          "columns_used": ["co_seq_fat_proced_atend", "co_fat_cidadao_pec", "co_fat_procedimento", "dt_nascimento", "nu_altura", "nu_medicao_pressao_diastolica", "nu_medicao_pressao_sistolica", "nu_peso"],
-          "signature_fingerprint": "sha256:121fa3beec4c69ad9afb48fc062aaaf71b8c766c13c40174b2cd2076e30c01f5"
+          "columns_used": ["co_seq_fat_proced_atend", "co_fat_cidadao_pec", "co_fat_procedimento", "dt_nascimento", "nu_altura", "nu_pressao_diastolica", "nu_pressao_sistolica", "nu_peso"],
+          "signature_fingerprint": "sha256:2a1dcfc4443944262100094c05d08ec8da1b4bfe596368f2756f48cf38c9feb8"
         },
         {
           "object": "tb_fat_procedimento",
@@ -910,8 +910,8 @@
         "binding_column": "tb_dim_municipio.co_ibge",
         "mechanism": "Filtro tb_dim_municipio.co_ibge = bind de município (texto de 7 dígitos), ligado pelo co_dim_municipio do próprio fato; as tabelas-filhas (problemas, exames, procedimentos, doses, participantes) usam o município do cabeçalho. Nunca a chave substituta co_seq_dim_municipio, nunca o município de nascimento do cadastro. A coluna municipality_ibge devolve o co_ibge filtrado. Isolamento provado só na fixture (dois municípios com as mesmas chaves substitutas, CapabilityQueriesIsolationTest)."
       },
-      "query_checksum": "sha256:7125b64f42f908520ba2fe379e62f233b165338ee52dfa5453a63d2ad79c140f",
-      "fixture_checksum": "sha256:bf083e8f4e19e13f2bf0152637039ed34dfb7840a29c989614136f11c0c20d91",
+      "query_checksum": "sha256:a95fdf99dff89149842f426926f6462906f6b536714dd504685294fddff42c0e",
+      "fixture_checksum": "sha256:099e427c55f7d5c47fdc6c1586850c973b12c72fbc84e7fcc8ec0246d1c2433f",
       "test_result": "NOT_RUN",
       "test_evidence_ref": "docs/discovery/capacidades-dw-v2.md; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesFixtureTest.java; apps/agent/src/test/java/esusdata/source/pec/CapabilityQueriesIsolationTest.java",
       "test_notes": "Só fixture sintética: linhas exatas, tipos, fronteiras de período e de nascimento, listas de códigos, unificação de pessoa e isolamento municipal. Nenhuma execução contra PEC real."

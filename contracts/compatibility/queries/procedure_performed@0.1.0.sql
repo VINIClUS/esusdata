@@ -70,9 +70,9 @@ SELECT pf.source_entity_type AS source_entity_type,
        pf.event_date AS event_date,
        pf.sigtap_code AS sigtap_code,
        CAST('PERFORMED' AS text) AS stage,
-       CAST(cbo.nu_cbo AS text) AS cbo,
-       CAST(us.nu_cnes AS text) AS cnes,
-       CAST(eq.nu_ine AS text) AS ine,
+       NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
+       NULLIF(CAST(us.nu_cnes AS text), '-') AS cnes,
+       NULLIF(CAST(eq.nu_ine AS text), '-') AS ine,
        pf.origin AS origin
   FROM (
         SELECT CAST('tb_fat_proced_atend_proced' AS text) AS source_entity_type,

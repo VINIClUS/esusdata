@@ -60,8 +60,8 @@ SELECT CAST('tb_fat_cad_individual' AS text) AS source_entity_type,
        mun.co_ibge AS municipality_ibge,
        k.person_key AS person_key,
        CAST(t.dt_registro AS date) AS registration_date,
-       CAST(us.nu_cnes AS text) AS cnes,
-       CAST(eq.nu_ine AS text) AS ine,
+       NULLIF(CAST(us.nu_cnes AS text), '-') AS cnes,
+       NULLIF(CAST(eq.nu_ine AS text), '-') AS ine,
        FALSE AS simplified,
        CASE WHEN CAST(c.st_ficha_inativa AS text) IN ('1', 'true') THEN TRUE
             WHEN CAST(c.st_ficha_inativa AS text) IN ('0', 'false') THEN FALSE

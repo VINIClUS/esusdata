@@ -5,7 +5,7 @@
 -- tb_fat_atd_ind_procedimentos, agregadas por atendimento; tb_fat_cad_individual (nascimento da
 -- pessoa); tb_dim_cidadao_pec_grupo (unificação); tb_dim_municipio, tb_dim_tempo, tb_dim_cbo,
 -- tb_dim_unidade_saude, tb_dim_equipe, tb_dim_tipo_atendimento, tb_dim_local_atendimento,
--- tb_dim_tp_participacao_atend, tb_dim_ciap, tb_dim_cid e tb_dim_procedimento.
+-- tb_dim_tipo_participacao_atend, tb_dim_ciap, tb_dim_cid e tb_dim_procedimento.
 --
 -- Decisões:
 -- - Recorte pelo município do atendimento (tb_dim_municipio.co_ibge), nunca pela chave substituta;
@@ -27,8 +27,9 @@
 --
 -- Lacunas: procedures_performed nulo (o procedimento feito no atendimento vai para os fatos de
 -- procedimentos, capacidade procedure_performed); pregnant nulo (o MIAI não tem o marcador).
--- Inferências que a validação ao vivo confirma: o nome tb_dim_tp_participacao_atend, o alvo de
--- co_dim_tempo_dum e o nu_identificador como código LEDI.
+-- Confirmados no inventário ao vivo de 2026-10-05: a dimensão tb_dim_tipo_participacao_atend e o alvo
+-- de co_dim_tempo_dum. Ainda a confirmar: o nu_identificador como código LEDI.
+-- Sentinelas: código '-' vira nulo e datas fora de 1900..2100 (3000-12-31) viram nulas.
 WITH p AS (
     SELECT CAST(? AS text) AS municipality_ibge,
            CAST(? AS date) AS period_start,
@@ -74,8 +75,8 @@ atendimento AS (
            f.co_dim_tp_particip_cidadao,
            f.nu_peso,
            f.nu_altura,
-           f.nu_medicao_pressao_sistolica,
-           f.nu_medicao_pressao_diastolica,
+           f.nu_pressao_sistolica,
+           f.nu_pressao_diastolica,
            f.co_dim_tempo_dum,
            f.nu_idade_gestacional_semanas,
            CAST(f.dt_nascimento AS date) AS birth_date
@@ -123,9 +124,9 @@ SELECT CAST('tb_fat_atendimento_individual' AS text) AS source_entity_type,
        a.person_key AS person_key,
        a.care_date AS care_date,
        CAST('INDIVIDUAL' AS text) AS form,
-       CAST(cbo.nu_cbo AS text) AS cbo,
-       CAST(us.nu_cnes AS text) AS cnes,
-       CAST(eq.nu_ine AS text) AS ine,
+       NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
+       NULLIF(CAST(us.nu_cnes AS text), '-') AS cnes,
+       NULLIF(CAST(eq.nu_ine AS text), '-') AS ine,
        CAST(ta.nu_identificador AS text) AS care_type_code,
        CAST(la.nu_identificador AS text) AS care_location_code,
        CASE WHEN CAST(tp.nu_identificador AS text) = '2' THEN FALSE
@@ -138,9 +139,10 @@ SELECT CAST('tb_fat_atendimento_individual' AS text) AS source_entity_type,
        CAST(NULL AS text[]) AS procedures_performed,
        CAST(a.nu_peso AS text) AS weight_kg,
        CAST(a.nu_altura AS text) AS height_cm,
-       CAST(a.nu_medicao_pressao_sistolica AS text) AS systolic_mmhg,
-       CAST(a.nu_medicao_pressao_diastolica AS text) AS diastolic_mmhg,
-       CAST(dum.dt_registro AS date) AS lmp_date,
+       CAST(a.nu_pressao_sistolica AS text) AS systolic_mmhg,
+       CAST(a.nu_pressao_diastolica AS text) AS diastolic_mmhg,
+       CASE WHEN dum.dt_registro BETWEEN DATE '1900-01-01' AND DATE '2100-12-31'
+            THEN CAST(dum.dt_registro AS date) END AS lmp_date,
        CAST(a.nu_idade_gestacional_semanas AS integer) AS gestational_age_weeks,
        CAST(NULL AS boolean) AS pregnant,
        a.birth_date AS birth_date
@@ -152,5 +154,5 @@ SELECT CAST('tb_fat_atendimento_individual' AS text) AS source_entity_type,
   LEFT JOIN public.tb_dim_equipe eq ON eq.co_seq_dim_equipe = a.co_dim_equipe_1
   LEFT JOIN public.tb_dim_tipo_atendimento ta ON ta.co_seq_dim_tipo_atendimento = a.co_dim_tipo_atendimento
   LEFT JOIN public.tb_dim_local_atendimento la ON la.co_seq_dim_local_atendimento = a.co_dim_local_atendimento
-  LEFT JOIN public.tb_dim_tp_participacao_atend tp ON tp.co_seq_dim_tp_particip_atend = a.co_dim_tp_particip_cidadao
+  LEFT JOIN public.tb_dim_tipo_participacao_atend tp ON tp.co_seq_dim_tp_particip_atend = a.co_dim_tp_particip_cidadao
   LEFT JOIN public.tb_dim_tempo dum ON dum.co_seq_dim_tempo = a.co_dim_tempo_dum

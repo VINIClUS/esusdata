@@ -66,7 +66,7 @@ atividade AS (
     SELECT ac.co_seq_fat_atividade_coletiva,
            mun.co_ibge,
            CAST(t.dt_registro AS date) AS measured_date,
-           CAST(cbo.nu_cbo AS text) AS cbo,
+           NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
            CAST(ta.nu_identificador AS text) AS activity_type_code
       FROM public.tb_fat_atividade_coletiva ac
       JOIN mun ON mun.co_seq_dim_municipio = ac.co_dim_municipio
@@ -109,9 +109,9 @@ SELECT CAST('tb_fat_proced_atend' AS text) AS source_entity_type,
        CAST(t.dt_registro AS date) AS measured_date,
        CAST(pa.nu_peso AS text) AS weight_kg,
        CAST(pa.nu_altura AS text) AS height_cm,
-       CAST(pa.nu_medicao_pressao_sistolica AS text) AS systolic_mmhg,
-       CAST(pa.nu_medicao_pressao_diastolica AS text) AS diastolic_mmhg,
-       CAST(cbo.nu_cbo AS text) AS cbo,
+       CAST(pa.nu_pressao_sistolica AS text) AS systolic_mmhg,
+       CAST(pa.nu_pressao_diastolica AS text) AS diastolic_mmhg,
+       NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
        CAST('MIP' AS text) AS origin,
        CAST(NULL AS text) AS activity_type_code,
        CAST(NULL AS text[]) AS health_practice_codes
@@ -131,8 +131,8 @@ SELECT CAST('tb_fat_proced_atend' AS text) AS source_entity_type,
    AND COALESCE(n.birth_date, CAST(pa.dt_nascimento AS date)) BETWEEN p.birth_date_from AND p.birth_date_to
    AND (pa.nu_peso IS NOT NULL
         OR pa.nu_altura IS NOT NULL
-        OR pa.nu_medicao_pressao_sistolica IS NOT NULL
-        OR pa.nu_medicao_pressao_diastolica IS NOT NULL)
+        OR pa.nu_pressao_sistolica IS NOT NULL
+        OR pa.nu_pressao_diastolica IS NOT NULL)
 UNION ALL
 SELECT CAST('tb_fat_atvdd_coletiva_part' AS text),
        CAST(cp.co_seq_fat_atvdd_cltv_part AS text),

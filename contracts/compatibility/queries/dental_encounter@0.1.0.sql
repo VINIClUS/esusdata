@@ -5,7 +5,7 @@
 -- tb_fat_atend_odonto_proced, agregadas por atendimento; tb_fat_cad_individual (nascimento da
 -- pessoa); tb_dim_cidadao_pec_grupo (unificação); tb_dim_municipio, tb_dim_tempo, tb_dim_cbo,
 -- tb_dim_unidade_saude, tb_dim_equipe, tb_dim_tipo_atendimento, tb_dim_local_atendimento,
--- tb_dim_tp_participacao_atend, tb_dim_ciap, tb_dim_cid e tb_dim_procedimento.
+-- tb_dim_tipo_participacao_atend, tb_dim_ciap, tb_dim_cid e tb_dim_procedimento.
 --
 -- Decisões: as mesmas de care_encounter (recorte pelo município do atendimento, período em
 -- tb_dim_tempo.dt_registro, pessoa unificada, faixa de nascimento pelo cadastro individual com a
@@ -107,9 +107,9 @@ SELECT CAST('tb_fat_atendimento_odonto' AS text) AS source_entity_type,
        a.person_key AS person_key,
        a.care_date AS care_date,
        CAST('DENTAL' AS text) AS form,
-       CAST(cbo.nu_cbo AS text) AS cbo,
-       CAST(us.nu_cnes AS text) AS cnes,
-       CAST(eq.nu_ine AS text) AS ine,
+       NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
+       NULLIF(CAST(us.nu_cnes AS text), '-') AS cnes,
+       NULLIF(CAST(eq.nu_ine AS text), '-') AS ine,
        CAST(ta.nu_identificador AS text) AS care_type_code,
        CAST(la.nu_identificador AS text) AS care_location_code,
        CASE WHEN CAST(tp.nu_identificador AS text) = '2' THEN FALSE
@@ -138,4 +138,4 @@ SELECT CAST('tb_fat_atendimento_odonto' AS text) AS source_entity_type,
   LEFT JOIN public.tb_dim_equipe eq ON eq.co_seq_dim_equipe = a.co_dim_equipe_1
   LEFT JOIN public.tb_dim_tipo_atendimento ta ON ta.co_seq_dim_tipo_atendimento = a.co_dim_tipo_atendimento
   LEFT JOIN public.tb_dim_local_atendimento la ON la.co_seq_dim_local_atendimento = a.co_dim_local_atendimento
-  LEFT JOIN public.tb_dim_tp_participacao_atend tp ON tp.co_seq_dim_tp_particip_atend = a.co_dim_tp_particip_cidadao
+  LEFT JOIN public.tb_dim_tipo_participacao_atend tp ON tp.co_seq_dim_tp_particip_atend = a.co_dim_tp_particip_cidadao

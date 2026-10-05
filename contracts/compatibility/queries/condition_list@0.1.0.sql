@@ -86,7 +86,7 @@ atendimento AS (
            mun.co_ibge,
            k.person_key,
            CAST(t.dt_registro AS date) AS recorded_date,
-           CAST(cbo.nu_cbo AS text) AS cbo
+           NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo
       FROM public.tb_fat_atendimento_individual f
       JOIN mun ON mun.co_seq_dim_municipio = f.co_dim_municipio
       JOIN public.tb_dim_tempo t ON t.co_seq_dim_tempo = f.co_dim_tempo
@@ -106,7 +106,7 @@ atendimento AS (
            mun.co_ibge,
            k.person_key,
            CAST(t.dt_registro AS date),
-           CAST(cbo.nu_cbo AS text)
+           NULLIF(CAST(cbo.nu_cbo AS text), '-')
       FROM public.tb_fat_atendimento_odonto o
       JOIN mun ON mun.co_seq_dim_municipio = o.co_dim_municipio
       JOIN public.tb_dim_tempo t ON t.co_seq_dim_tempo = o.co_dim_tempo
@@ -129,7 +129,8 @@ SELECT pb.tabela || '.' || e.coluna AS source_entity_type,
        cg.code AS code,
        pb.recorded_date AS recorded_date,
        CAST(sp.nu_identificador AS text) AS status,
-       CAST(fim.dt_registro AS date) AS resolved_date,
+       CASE WHEN fim.dt_registro BETWEEN DATE '1900-01-01' AND DATE '2100-12-31'
+            THEN CAST(fim.dt_registro AS date) END AS resolved_date,
        CAST('PROFESSIONAL' AS text) AS basis,
        CASE WHEN COALESCE(CAST(pb.st_avaliado AS text), '1') NOT IN ('0', 'false') THEN pb.cbo END AS cbo
   FROM (
@@ -141,7 +142,7 @@ SELECT pb.tabela || '.' || e.coluna AS source_entity_type,
                a.cbo,
                pr.co_dim_ciap,
                pr.co_dim_cid,
-               pr.co_dim_situacao,
+               pr.co_dim_situacao_problema,
                pr.co_dim_data_fim_problema,
                CAST(pr.st_avaliado AS text) AS st_avaliado
           FROM public.tb_fat_atd_ind_problemas pr
@@ -155,7 +156,7 @@ SELECT pb.tabela || '.' || e.coluna AS source_entity_type,
                a.cbo,
                po.co_dim_ciap,
                po.co_dim_cid,
-               po.co_dim_situacao,
+               po.co_dim_situacao_problema,
                po.co_dim_data_fim_problema,
                CAST(po.st_avaliado AS text)
           FROM public.tb_fat_atend_odonto_problemas po
@@ -166,5 +167,5 @@ SELECT pb.tabela || '.' || e.coluna AS source_entity_type,
                (CAST('co_dim_cid' AS text), CAST('CID10' AS text), pb.co_dim_cid)
        ) AS e(coluna, code_system, co_dim)
   JOIN codigo cg ON cg.code_system = e.code_system AND cg.co_dim = e.co_dim
-  LEFT JOIN public.tb_dim_situacao_problema sp ON sp.co_seq_dim_situacao = pb.co_dim_situacao
+  LEFT JOIN public.tb_dim_situacao_problema sp ON sp.co_seq_dim_situacao = pb.co_dim_situacao_problema
   LEFT JOIN public.tb_dim_tempo fim ON fim.co_seq_dim_tempo = pb.co_dim_data_fim_problema

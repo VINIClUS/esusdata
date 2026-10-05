@@ -59,9 +59,9 @@ SELECT CAST('tb_fat_visita_domiciliar' AS text) AS source_entity_type,
        mun.co_ibge AS municipality_ibge,
        k.person_key AS person_key,
        CAST(t.dt_registro AS date) AS visit_date,
-       CAST(cbo.nu_cbo AS text) AS cbo,
-       CAST(us.nu_cnes AS text) AS cnes,
-       CAST(eq.nu_ine AS text) AS ine,
+       NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
+       NULLIF(CAST(us.nu_cnes AS text), '-') AS cnes,
+       NULLIF(CAST(eq.nu_ine AS text), '-') AS ine,
        CAST(dv.nu_identificador AS text) AS outcome_code,
        ARRAY(
            SELECT CAST(r.token AS text)

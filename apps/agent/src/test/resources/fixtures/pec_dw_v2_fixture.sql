@@ -51,7 +51,9 @@ INSERT INTO tb_dim_tempo VALUES
     (22, '2025-11-05'),
     (23, '2026-01-15'),
     (24, '2024-05-20'),
-    (25, '2026-03-05');
+    (25, '2026-03-05'),
+    -- linha-sentinela real do PEC 5.5.28 (confirmada ao vivo em 2026-10-05): 3000-12-31
+    (30001231, '3000-12-31');
 
 CREATE TABLE tb_dim_cbo (
     co_seq_dim_cbo BIGINT PRIMARY KEY,
@@ -63,7 +65,9 @@ INSERT INTO tb_dim_cbo VALUES
     (31, '223565', 'ENFERMEIRO SINTETICO'),
     (32, '515105', 'ACS SINTETICO'),
     (33, '223293', 'DENTISTA SINTETICO'),
-    (34, '322205', 'TECNICO SINTETICO');
+    (34, '322205', 'TECNICO SINTETICO'),
+    -- sentinela real do PEC: id 1 com código '-'
+    (1, '-', 'SEM CBO');
 
 CREATE TABLE tb_dim_unidade_saude (
     co_seq_dim_unidade_saude BIGINT PRIMARY KEY,
@@ -72,7 +76,8 @@ CREATE TABLE tb_dim_unidade_saude (
 );
 INSERT INTO tb_dim_unidade_saude VALUES
     (10, '0000001', 'UBS SINTETICA COMPARTILHADA'),
-    (11, '0000002', 'UBS SINTETICA DOIS');
+    (11, '0000002', 'UBS SINTETICA DOIS'),
+    (1, '-', 'SEM UNIDADE');
 
 CREATE TABLE tb_dim_equipe (
     co_seq_dim_equipe BIGINT PRIMARY KEY,
@@ -81,7 +86,8 @@ CREATE TABLE tb_dim_equipe (
 );
 INSERT INTO tb_dim_equipe VALUES
     (20, '0000000001', 'EQUIPE SINTETICA COMPARTILHADA'),
-    (21, '0000000002', 'EQUIPE SINTETICA DOIS');
+    (21, '0000000002', 'EQUIPE SINTETICA DOIS'),
+    (1, '-', 'SEM EQUIPE');
 
 -- nu_identificador INTEGER: suposição (código LEDI numérico). Ids diferentes do código, como no C1.
 CREATE TABLE tb_dim_tipo_atendimento (
@@ -105,13 +111,13 @@ INSERT INTO tb_dim_local_atendimento VALUES
     (2, 4, 'Domicílio');
 
 -- Nome, chave e coluna de código inferidos (lacuna L3): a página do FAO cita
--- tb_dim_tp_participacao_atend/co_seq_dim_tp_particip_atend para as duas colunas de participação.
-CREATE TABLE tb_dim_tp_participacao_atend (
+-- tb_dim_tipo_participacao_atend/co_seq_dim_tp_particip_atend para as duas colunas de participação.
+CREATE TABLE tb_dim_tipo_participacao_atend (
     co_seq_dim_tp_particip_atend BIGINT PRIMARY KEY,
-    nu_identificador             INTEGER,
-    ds_tp_participacao_atend     VARCHAR(200)
+    nu_identificador             VARCHAR(20),
+    no_tipo_participacao_atend   VARCHAR(200)
 );
-INSERT INTO tb_dim_tp_participacao_atend VALUES
+INSERT INTO tb_dim_tipo_participacao_atend VALUES
     (1, NULL, 'Não informado'),
     (2, 1, 'Não participou'),
     (3, 2, 'Presencial'),
@@ -237,7 +243,7 @@ INSERT INTO tb_dim_dose_imunobiologico VALUES
 
 -- nu_estrategia_vacinacao é o código RNDS, que diverge a partir de 11: a consulta usa nu_identificador.
 CREATE TABLE tb_dim_estrategia_vacinacao (
-    co_seq_dim_estrategia_vacinacao BIGINT PRIMARY KEY,
+    co_seq_dim_estrategia_vacnacao BIGINT PRIMARY KEY,
     nu_identificador                INTEGER,
     nu_estrategia_vacinacao         INTEGER,
     no_estrategia_vacinacao         VARCHAR(200)
@@ -335,7 +341,7 @@ INSERT INTO tb_fat_cad_individual VALUES
     (8009, 110, 1, 1, 24, 10, 20, 2, 1, 1, '1991-07-07', NULL, 0, 0, 1, 0, NULL),
     (8010, 110, 1, 1, 13, 10, 20, 2, 1, 2, '1991-07-07', '2026-03-14', 1, 0, 1, 0, NULL),
     -- 111 (F111): recusa de cadastro, sem unidade nem equipe, no primeiro dia do período.
-    (8011, 111, 1, 1, 11, NULL, NULL, 5, 3, 1, '2001-01-01', NULL, 0, 1, 0, 0, NULL),
+    (8011, 111, 1, 1, 11, 1, 1, 5, 3, 1, '2001-01-01', NULL, 0, 1, 0, 0, NULL),
     -- 112 (M5012): versões fora do período (no dia seguinte ao fim e antes do início); sexo ignorado.
     (8012, 112, 1, 1, 16, 10, 20, 4, 1, 1, '1999-06-06', NULL, 0, 0, 1, 1, NULL),
     (8013, 112, 1, 1, 10, 10, 20, 4, 1, 1, '1999-06-06', NULL, 0, 0, 0, 0, NULL),
@@ -370,13 +376,13 @@ CREATE TABLE tb_fat_atendimento_individual (
     dt_nascimento                  TIMESTAMP,
     nu_peso                        NUMERIC(7, 3),
     nu_altura                      NUMERIC(5, 1),
-    nu_medicao_pressao_sistolica   INTEGER,
-    nu_medicao_pressao_diastolica  INTEGER,
+    nu_pressao_sistolica   NUMERIC,
+    nu_pressao_diastolica  NUMERIC,
     nu_idade_gestacional_semanas   INTEGER
 );
 INSERT INTO tb_fat_atendimento_individual VALUES
     -- primeiro dia do período, presencial, com medidas
-    (1001, 101, 1, 11, 3, 1, 3, 10, 20, 30, NULL, '1990-01-01 00:00:00', 70.500, 165.0, 120, 80, NULL),
+    (1001, 101, 1, 11, 3, 1, 3, 10, 20, 30, 30001231, '1990-01-01 00:00:00', 70.500, 165.0, 120, 80, NULL),
     -- último dia do período, remoto (vídeo), no domicílio, sem medidas; pessoa pelo cadastro unificado
     (1002, 103, 1, 15, 6, 2, 4, 10, 20, 31, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
     -- excluído: o cadastro diz 1989-12-31, embora o atendimento diga 1990-06-01
@@ -384,7 +390,7 @@ INSERT INTO tb_fat_atendimento_individual VALUES
     -- grupo conflitante (F105), sem cadastro: vale a data do atendimento; não participou; sem local
     (1004, 105, 1, 12, 5, NULL, 2, 10, 20, 31, NULL, '2000-05-05 00:00:00', NULL, NULL, NULL, NULL, NULL),
     -- cadastro só em B: vale a data do atendimento; participação não informada (sentinela)
-    (1005, 106, 1, 13, 2, 1, 1, 11, 21, 30, NULL, '1995-01-01 00:00:00', NULL, NULL, NULL, NULL, NULL),
+    (1005, 106, 1, 13, 2, 1, 1, 11, 21, 1, NULL, '1995-01-01 00:00:00', NULL, NULL, NULL, NULL, NULL),
     -- excluídos pelo período (véspera do início e dia do fim exclusivo)
     (1006, 101, 1, 10, 3, 1, 3, 10, 20, 30, NULL, '1990-01-01 00:00:00', NULL, NULL, NULL, NULL, NULL),
     (1007, 101, 1, 16, 3, 1, 3, 10, 20, 30, NULL, '1990-01-01 00:00:00', NULL, NULL, NULL, NULL, NULL),
@@ -404,13 +410,13 @@ CREATE TABLE tb_fat_atd_ind_problemas (
     co_fat_atd_ind                 BIGINT,
     co_dim_ciap                    BIGINT,
     co_dim_cid                     BIGINT,
-    co_dim_situacao                BIGINT,
+    co_dim_situacao_problema                BIGINT,
     co_dim_data_fim_problema       BIGINT,
     st_avaliado                    INTEGER
 );
 INSERT INTO tb_fat_atd_ind_problemas VALUES
     -- CIAP e CID na mesma linha, avaliados, ativos (fim na data-sentinela)
-    (2001, 1001, 40, 50, 2, 1, 1),
+    (2001, 1001, 40, 50, 2, 30001231, 1),
     -- atualização da lista sem avaliação: resolvido em 2026-03-05
     (2002, 1001, 41, NULL, 4, 25, 0),
     -- código AB, registro anterior à 5.3.15 (avaliação e situação nulas)
@@ -474,7 +480,7 @@ CREATE TABLE tb_fat_atend_odonto_problemas (
     co_fat_atd_odnt                BIGINT,
     co_dim_ciap                    BIGINT,
     co_dim_cid                     BIGINT,
-    co_dim_situacao                BIGINT,
+    co_dim_situacao_problema                BIGINT,
     co_dim_data_fim_problema       BIGINT,
     st_avaliado                    INTEGER
 );
@@ -623,8 +629,8 @@ INSERT INTO tb_fat_vacinacao_vacina VALUES
     -- transcrição aplicada dentro do período e registrada depois dele
     (5104, 5003, 70, 82, 92, 13, TRUE),
     -- sem data de aplicação: a dose comum usa a data do registro; a transcrição sem data não sai
-    (5105, 5004, 73, 81, 90, NULL, NULL),
-    (5106, 5004, 70, 80, 90, NULL, TRUE),
+    (5105, 5004, 73, 81, 90, 30001231, NULL),
+    (5106, 5004, 70, 80, 90, 30001231, TRUE),
     (5107, 5005, 70, 80, 90, 12, FALSE),
     (5108, 5006, 70, 80, 90, 12, FALSE);
 
@@ -653,8 +659,8 @@ CREATE TABLE tb_fat_proced_atend (
     dt_nascimento                  DATE,
     nu_peso                        NUMERIC(7, 3),
     nu_altura                      NUMERIC(5, 1),
-    nu_medicao_pressao_sistolica   INTEGER,
-    nu_medicao_pressao_diastolica  INTEGER
+    nu_pressao_sistolica   NUMERIC,
+    nu_pressao_diastolica  NUMERIC
 );
 INSERT INTO tb_fat_proced_atend VALUES
     (6101, 6001, 101, '1990-01-01', 71.000, 165.5, 125, 82),
