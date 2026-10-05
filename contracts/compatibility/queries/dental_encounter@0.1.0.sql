@@ -82,9 +82,9 @@ atendimento AS (
 problema AS (
     SELECT pr.co_fat_atd_odnt,
            array_agg(DISTINCT CAST(ci.nu_ciap AS text) COLLATE "C" ORDER BY CAST(ci.nu_ciap AS text) COLLATE "C")
-               FILTER (WHERE ci.nu_ciap IS NOT NULL) AS ciap_codes,
+               FILTER (WHERE ci.nu_ciap IS NOT NULL AND CAST(ci.nu_ciap AS text) <> '-') AS ciap_codes,
            array_agg(DISTINCT CAST(cd.nu_cid AS text) COLLATE "C" ORDER BY CAST(cd.nu_cid AS text) COLLATE "C")
-               FILTER (WHERE cd.nu_cid IS NOT NULL) AS cid_codes
+               FILTER (WHERE cd.nu_cid IS NOT NULL AND CAST(cd.nu_cid AS text) <> '-') AS cid_codes
       FROM public.tb_fat_atend_odonto_problemas pr
       JOIN atendimento a ON a.co_seq_fat_atd_odnt = pr.co_fat_atd_odnt
       LEFT JOIN public.tb_dim_ciap ci ON ci.co_seq_dim_ciap = pr.co_dim_ciap
@@ -95,7 +95,7 @@ problema AS (
 realizado AS (
     SELECT op.co_fat_atd_odnt,
            array_agg(DISTINCT CAST(pc.co_proced AS text) COLLATE "C" ORDER BY CAST(pc.co_proced AS text) COLLATE "C")
-               FILTER (WHERE pc.co_proced IS NOT NULL) AS procedures_performed
+               FILTER (WHERE pc.co_proced IS NOT NULL AND CAST(pc.co_proced AS text) <> '-') AS procedures_performed
       FROM public.tb_fat_atend_odonto_proced op
       JOIN atendimento a ON a.co_seq_fat_atd_odnt = op.co_fat_atd_odnt
       LEFT JOIN public.tb_dim_procedimento pc ON pc.co_seq_dim_procedimento = op.co_dim_procedimento
@@ -110,8 +110,8 @@ SELECT CAST('tb_fat_atendimento_odonto' AS text) AS source_entity_type,
        NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
        NULLIF(CAST(us.nu_cnes AS text), '-') AS cnes,
        NULLIF(CAST(eq.nu_ine AS text), '-') AS ine,
-       CAST(ta.nu_identificador AS text) AS care_type_code,
-       CAST(la.nu_identificador AS text) AS care_location_code,
+       NULLIF(CAST(ta.nu_identificador AS text), '-') AS care_type_code,
+       NULLIF(CAST(la.nu_identificador AS text), '-') AS care_location_code,
        CASE WHEN CAST(tp.nu_identificador AS text) = '2' THEN FALSE
             WHEN CAST(tp.nu_identificador AS text) IN ('3', '4', '5', '6', '7') THEN TRUE
        END AS remote,

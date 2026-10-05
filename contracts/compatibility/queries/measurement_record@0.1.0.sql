@@ -67,7 +67,7 @@ atividade AS (
            mun.co_ibge,
            CAST(t.dt_registro AS date) AS measured_date,
            NULLIF(CAST(cbo.nu_cbo AS text), '-') AS cbo,
-           CAST(ta.nu_identificador AS text) AS activity_type_code
+           NULLIF(CAST(ta.nu_identificador AS text), '-') AS activity_type_code
       FROM public.tb_fat_atividade_coletiva ac
       JOIN mun ON mun.co_seq_dim_municipio = ac.co_dim_municipio
       JOIN public.tb_dim_tempo t ON t.co_seq_dim_tempo = ac.co_dim_tempo

@@ -189,6 +189,14 @@ da competência 2026-08 confirmaram duas famílias:
   vacina) vira nula fora de `1900-01-01..2100-12-31`. As datas do recorte de período não precisam disso:
   a sentinela não cai em janela alguma.
 
+- **Sentinela nas dimensões de código:** toda linha-sentinela traz `nu_identificador = '-'` (e CIAP, CID e
+  `co_proced` também `-`). Por robustez, todo código projetado de `nu_identificador` (`care_type_code`,
+  `care_location_code`, `outcome_code`, `dose_code`, `strategy_code`, `activity_type_code`, `status`,
+  `exit_reason`, `gender_identity`) usa `NULLIF(CAST(x AS text), '-')`. As listas montadas com `array_agg`
+  (`ciap_codes`, `cid_codes`, `procedures_requested`, `procedures_evaluated`, `procedures_performed`)
+  excluem o `-` no `FILTER`; sem códigos, a lista continua vazia (`{}`), como antes. A fixture tem
+  linhas-sentinela para tipo de atendimento, tipo de saída do cadastro, CIAP, CID e procedimento.
+
 Os demais códigos saem **como o DW grava**, como na consulta do C1. A validação ao vivo continua contando
 os valores fora do formato esperado (CNES com 7 dígitos, INE com 10, CBO com 6 caracteres, SIGTAP com 10
 dígitos ou AB); sobra de sentinela nova entra na consulta antes da promoção

@@ -92,14 +92,16 @@ INSERT INTO tb_dim_equipe VALUES
 -- nu_identificador INTEGER: suposição (código LEDI numérico). Ids diferentes do código, como no C1.
 CREATE TABLE tb_dim_tipo_atendimento (
     co_seq_dim_tipo_atendimento BIGINT PRIMARY KEY,
-    nu_identificador            INTEGER,
+    nu_identificador            VARCHAR(20),
     ds_tipo_atendimento         VARCHAR(200)
 );
 INSERT INTO tb_dim_tipo_atendimento VALUES
     (2, 1, 'Consulta agendada programada / Cuidado continuado'),
     (3, 2, 'Consulta agendada'),
     (5, 4, 'Escuta inicial / Orientação'),
-    (6, 5, 'Consulta no dia');
+    (6, 5, 'Consulta no dia'),
+    -- sentinela real do PEC: código '-' (por isso a coluna é texto)
+    (1, '-', 'NAO INFORMADO');
 
 CREATE TABLE tb_dim_local_atendimento (
     co_seq_dim_local_atendimento BIGINT PRIMARY KEY,
@@ -133,7 +135,8 @@ INSERT INTO tb_dim_ciap VALUES
     (40, 'T90', 'DIABETES NAO INSULINO-DEPENDENTE'),
     (41, 'K86', 'HIPERTENSAO SEM COMPLICACOES'),
     (42, 'W78', 'GRAVIDEZ'),
-    (43, 'ABP022', 'CODIGO AB SINTETICO');
+    (43, 'ABP022', 'CODIGO AB SINTETICO'),
+    (1, '-', 'SEM CIAP');
 
 CREATE TABLE tb_dim_cid (
     co_seq_dim_cid BIGINT PRIMARY KEY,
@@ -147,7 +150,8 @@ INSERT INTO tb_dim_cid VALUES
     (53, 'I10', 'HIPERTENSAO ESSENCIAL'),
     (54, 'E10', 'DIABETES MELLITUS INSULINO-DEPENDENTE'),
     (55, 'Z34', 'SUPERVISAO DE GRAVIDEZ NORMAL'),
-    (56, 'K021', 'CARIE DA DENTINA');
+    (56, 'K021', 'CARIE DA DENTINA'),
+    (1, '-', 'SEM CID');
 
 -- co_proced guarda SIGTAP só com dígitos ou código AB literal.
 CREATE TABLE tb_dim_procedimento (
@@ -163,7 +167,8 @@ INSERT INTO tb_dim_procedimento VALUES
     (65, '0307020070', 'PROCEDIMENTO ODONTOLOGICO SINTETICO'),
     (66, '0214010015', 'CODIGO FORA DA LISTA'),
     (67, '0203010019', 'EXAME CITOPATOLOGICO SINTETICO'),
-    (68, '0101020058', 'OUTRO PROCEDIMENTO ODONTOLOGICO');
+    (68, '0101020058', 'OUTRO PROCEDIMENTO ODONTOLOGICO'),
+    (1, '-', 'SEM PROCEDIMENTO');
 
 CREATE TABLE tb_dim_situacao_problema (
     co_seq_dim_situacao  BIGINT PRIMARY KEY,
@@ -200,13 +205,14 @@ INSERT INTO tb_dim_identidade_genero VALUES
 
 CREATE TABLE tb_dim_tipo_saida_cadastro (
     co_seq_dim_tipo_saida_cadastro BIGINT PRIMARY KEY,
-    nu_identificador               INTEGER,
+    nu_identificador               VARCHAR(20),
     ds_dim_tipo_saida_cadastro     VARCHAR(200)
 );
 INSERT INTO tb_dim_tipo_saida_cadastro VALUES
     (1, NULL, 'Não informado'),
     (2, 135, 'Óbito'),
-    (3, 136, 'Mudança de território');
+    (3, 136, 'Mudança de território'),
+    (4, '-', 'SENTINELA');
 
 CREATE TABLE tb_dim_desfecho_visita (
     co_seq_dim_desfecho_visita BIGINT PRIMARY KEY,
@@ -341,7 +347,7 @@ INSERT INTO tb_fat_cad_individual VALUES
     (8009, 110, 1, 1, 24, 10, 20, 2, 1, 1, '1991-07-07', NULL, 0, 0, 1, 0, NULL),
     (8010, 110, 1, 1, 13, 10, 20, 2, 1, 2, '1991-07-07', '2026-03-14', 1, 0, 1, 0, NULL),
     -- 111 (F111): recusa de cadastro, sem unidade nem equipe, no primeiro dia do período.
-    (8011, 111, 1, 1, 11, 1, 1, 5, 3, 1, '2001-01-01', NULL, 0, 1, 0, 0, NULL),
+    (8011, 111, 1, 1, 11, 1, 1, 5, 3, 4, '2001-01-01', NULL, 0, 1, 0, 0, NULL),
     -- 112 (M5012): versões fora do período (no dia seguinte ao fim e antes do início); sexo ignorado.
     (8012, 112, 1, 1, 16, 10, 20, 4, 1, 1, '1999-06-06', NULL, 0, 0, 1, 1, NULL),
     (8013, 112, 1, 1, 10, 10, 20, 4, 1, 1, '1999-06-06', NULL, 0, 0, 0, 0, NULL),
@@ -390,7 +396,7 @@ INSERT INTO tb_fat_atendimento_individual VALUES
     -- grupo conflitante (F105), sem cadastro: vale a data do atendimento; não participou; sem local
     (1004, 105, 1, 12, 5, NULL, 2, 10, 20, 31, NULL, '2000-05-05 00:00:00', NULL, NULL, NULL, NULL, NULL),
     -- cadastro só em B: vale a data do atendimento; participação não informada (sentinela)
-    (1005, 106, 1, 13, 2, 1, 1, 11, 21, 1, NULL, '1995-01-01 00:00:00', NULL, NULL, NULL, NULL, NULL),
+    (1005, 106, 1, 13, 1, 1, 1, 11, 21, 1, NULL, '1995-01-01 00:00:00', NULL, NULL, NULL, NULL, NULL),
     -- excluídos pelo período (véspera do início e dia do fim exclusivo)
     (1006, 101, 1, 10, 3, 1, 3, 10, 20, 30, NULL, '1990-01-01 00:00:00', NULL, NULL, NULL, NULL, NULL),
     (1007, 101, 1, 16, 3, 1, 3, 10, 20, 30, NULL, '1990-01-01 00:00:00', NULL, NULL, NULL, NULL, NULL),
@@ -428,7 +434,9 @@ INSERT INTO tb_fat_atd_ind_problemas VALUES
     (2007, 1004, NULL, 54, 2, 1, 1),
     -- município B e atendimento fora do período
     (2008, 1101, 40, NULL, 2, 1, 1),
-    (2009, 1006, 40, NULL, 2, 1, 1);
+    (2009, 1006, 40, NULL, 2, 1, 1),
+    -- código-sentinela de CIAP e de CID: não entra nas listas do atendimento
+    (2010, 1005, 1, 1, NULL, NULL, 1);
 
 CREATE TABLE tb_fat_atd_ind_procedimentos (
     co_seq_fat_atend_ind_proced    BIGINT PRIMARY KEY,
@@ -444,6 +452,8 @@ INSERT INTO tb_fat_atd_ind_procedimentos VALUES
     (2503, 1004, 67, NULL),
     -- código fora da lista
     (2504, 1004, 66, NULL),
+    -- procedimento-sentinela: não entra nas listas do atendimento
+    (2599, 1005, 1, 1),
     -- município B e atendimento fora do período
     (2505, 1101, 60, NULL),
     (2506, 1007, 60, NULL);
@@ -487,7 +497,8 @@ CREATE TABLE tb_fat_atend_odonto_problemas (
 INSERT INTO tb_fat_atend_odonto_problemas VALUES
     (3501, 3001, 42, NULL, 2, 1, 1),
     -- atualização da lista sem avaliação
-    (3502, 3001, NULL, 56, 2, 1, 0);
+    (3502, 3001, NULL, 56, 2, 1, 0),
+    (3503, 3002, 1, 1, NULL, NULL, 1);
 
 CREATE TABLE tb_fat_atend_odonto_proced (
     co_seq_fat_atend_odonto_proced BIGINT PRIMARY KEY,
@@ -497,7 +508,8 @@ CREATE TABLE tb_fat_atend_odonto_proced (
 INSERT INTO tb_fat_atend_odonto_proced VALUES
     (3601, 3001, 65),
     (3602, 3001, 68),
-    (3603, 3003, 65);
+    (3603, 3003, 65),
+    (3604, 3002, 1);
 
 -- ---------------------------------------------------------------------------------------------
 -- Visita domiciliar e territorial (MIVDT)

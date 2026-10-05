@@ -128,7 +128,7 @@ SELECT pb.tabela || '.' || e.coluna AS source_entity_type,
        cg.code_system AS code_system,
        cg.code AS code,
        pb.recorded_date AS recorded_date,
-       CAST(sp.nu_identificador AS text) AS status,
+       NULLIF(CAST(sp.nu_identificador AS text), '-') AS status,
        CASE WHEN fim.dt_registro BETWEEN DATE '1900-01-01' AND DATE '2100-12-31'
             THEN CAST(fim.dt_registro AS date) END AS resolved_date,
        CAST('PROFESSIONAL' AS text) AS basis,
