@@ -146,7 +146,7 @@ barato, mas uma ficha do CDS com data errada tiraria um evento de uma pessoa que
 `tb_fat_atendimento_odonto`, `tb_fat_proced_atend`, `tb_fat_visita_domiciliar`); `nu_pressao_*` são
 `numeric`. `CAST(float8 AS text)` depende de `extra_float_digits` da sessão: o pgJDBC fixa 3 (17 dígitos
 significativos, `65.099999999999994`) e a sessão do plano Rust usa o padrão (o mais curto, `65.1`). A
-captura ao vivo de 2026-08 achou 2 de 6466 linhas de `care_encounter` divergentes só em `weight_kg`.
+captura ao vivo de 2026-08 achou `<10` linhas de `care_encounter` divergentes só em `weight_kg`.
 Por isso as consultas projetam `CAST(CAST(x AS numeric) AS text)`: no PostgreSQL 9.6, `float8` → `numeric`
 usa `DBL_DIG` (15 dígitos) qualquer que seja a sessão, e o texto é o mesmo no JDBC e no Rust. O texto
 sai sem zeros à direita desnecessários (`70.3`, `165`). A fixture usa `double precision` e valores com

@@ -33,7 +33,7 @@ checksum e fixture regenerados, antes da rodada final:
   consultas devolvem nulo no lugar do `-`, e o omitem das listas de códigos.
 - **Data sentinela 3000-12-31** (`tb_dim_tempo` 30001231): datas opcionais fora de 1900–2100 viram
   nulo.
-- **Peso e altura em `double precision`:** a primeira aquisição v2 divergiu entre Rust e JDBC em 2
+- **Peso e altura em `double precision`:** a primeira aquisição v2 divergiu entre Rust e JDBC em `<10`
   linhas de `care_encounter`, porque `CAST(float8 AS text)` depende do `extra_float_digits` da sessão.
   As consultas passaram a converter por `numeric`, e o diferencial na fixture agora cobre o caso.
 
@@ -63,9 +63,6 @@ Rust e do JDBC são idênticas (mesmo hash, nenhuma linha só de um lado), e o m
 | `measurement_record` | 648 | 2,4 s |
 
 Cada sonda de `UNIQUE_KEY` mediu cerca de 1 s por capacidade, bem abaixo do limite de 30 s.
-
-`care_encounter` tem 6 466 linhas: as 6 468 da [cobertura](2026-09-30-pec-5528-cobertura.md) de
-2026-08, menos `<10` atendimentos sem cidadão.
 
 ## Diagnósticos
 
