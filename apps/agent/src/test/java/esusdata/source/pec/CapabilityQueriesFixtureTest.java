@@ -133,9 +133,9 @@ class CapabilityQueriesFixtureTest {
                     tb_fat_atend_odonto_problemas.co_dim_cid|3502|1100015|M5010|CID10|K021|2026-03-20|0|NULL|PROFESSIONAL|NULL
                     """),
             Map.entry(Capabilities.MEASUREMENT_RECORD, """
-                    tb_fat_atvdd_coletiva_part|7201|1100015|M5002|2026-03-20|3.600|51.0|NULL|NULL|223565|MIAC|5|{9,20}
+                    tb_fat_atvdd_coletiva_part|7201|1100015|M5002|2026-03-20|3.6|51.3|NULL|NULL|223565|MIAC|5|{9,20}
                     tb_fat_atvdd_coletiva_part|7202|1100015|M5001|2026-03-20|NULL|NULL|NULL|NULL|223565|MIAC|5|{9,20}
-                    tb_fat_atvdd_coletiva_part|7205|1100015|F105|2026-03-10|62.000|NULL|NULL|NULL|223565|MIAC|4|{}
+                    tb_fat_atvdd_coletiva_part|7205|1100015|F105|2026-03-10|65.1|NULL|NULL|NULL|223565|MIAC|4|{}
                     tb_fat_proced_atend|6101|1100015|M5001|2026-03-15|71|165.5|125|82|322205|MIP|NULL|NULL
                     """));
 

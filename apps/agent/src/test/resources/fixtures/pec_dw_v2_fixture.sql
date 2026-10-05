@@ -708,18 +708,18 @@ CREATE TABLE tb_fat_atvdd_coletiva_part (
     co_fat_atividade_coletiva      BIGINT,
     co_fat_cidadao_pec             BIGINT,
     dt_participante_nascimento     DATE,
-    nu_participante_peso           NUMERIC(7, 3),
-    nu_participante_altura         NUMERIC(5, 1)
+    nu_participante_peso           DOUBLE PRECISION,
+    nu_participante_altura         DOUBLE PRECISION
 );
 INSERT INTO tb_fat_atvdd_coletiva_part VALUES
-    (7201, 7001, 103, NULL, 3.600, 51.0),
+    (7201, 7001, 103, NULL, 3.6, 51.3),
     -- sem medidas, mas a atividade tem práticas em saúde
     (7202, 7001, 101, '1990-01-01', NULL, NULL),
     -- sem cidadão
     (7203, 7001, NULL, '1990-01-01', 60.000, 150.0),
     -- atividade sem prática: sem medidas não sai; com peso sai
     (7204, 7002, 105, '2000-05-05', NULL, NULL),
-    (7205, 7002, 105, '2000-05-05', 62.000, NULL),
+    (7205, 7002, 105, '2000-05-05', 65.1, NULL),
     -- município B
     (7206, 7003, 201, '1991-01-01', 70.000, NULL);
 

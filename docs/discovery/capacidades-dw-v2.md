@@ -141,7 +141,7 @@ barato, mas uma ficha do CDS com data errada tiraria um evento de uma pessoa que
 | `integer` | `CAST(… AS integer)` | `int4` |
 | `decimal` | `CAST(x AS text)`: texto decimal com ponto. O plano de execução recusa `numeric`, `float` e `timestamp` | `text` |
 
-`nu_peso` e `nu_altura` são `double precision` no PEC 5.5.28 (`tb_fat_atendimento_individual`,
+`nu_peso`, `nu_altura`, `nu_participante_peso` e `nu_participante_altura` são `double precision` no PEC 5.5.28 (`tb_fat_atvdd_coletiva_part`, `tb_fat_atendimento_individual`,
 `tb_fat_atendimento_odonto`, `tb_fat_proced_atend`, `tb_fat_visita_domiciliar`); `nu_pressao_*` são
 `numeric`. `CAST(float8 AS text)` depende de `extra_float_digits` da sessão: o pgJDBC fixa 3 (17 dígitos
 significativos, `65.099999999999994`) e a sessão do plano Rust usa o padrão (o mais curto, `65.1`). A
@@ -459,7 +459,7 @@ de pessoa, `tb_dim_municipio`, `tb_dim_tempo`, `tb_dim_cbo` e `tb_dim_tipo_ativi
 | Coluna | MIP | MIAC |
 |---|---|---|
 | `measured_date` | cabeçalho `co_dim_tempo` | cabeçalho da atividade `co_dim_tempo` |
-| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` (`double precision`, via `numeric`, 1.6) | `nu_participante_peso`, `nu_participante_altura` |
+| `weight_kg`, `height_cm` | `nu_peso`, `nu_altura` (`double precision`, via `numeric`, 1.6) | `nu_participante_peso`, `nu_participante_altura` (também `double precision`, via `numeric`) |
 | `systolic_mmhg`, `diastolic_mmhg` | `nu_pressao_sistolica`, `_diastolica` | nulos: o MIAC não tem PA de participante (lacuna L5) |
 | `cbo` | cabeçalho `co_dim_cbo` | cabeçalho da atividade `co_dim_cbo`, o profissional responsável |
 | `origin` | `MIP` | `MIAC` |
