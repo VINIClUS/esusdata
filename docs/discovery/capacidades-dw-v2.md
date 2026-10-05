@@ -7,11 +7,12 @@ Este documento descreve as consultas congeladas das dez capacidades da fundaçã
 vem, que transformação sofre e que vocabulário entrega. Registra também as decisões de mapeamento, as
 alternativas descartadas, o que só a validação ao vivo confirma e as lacunas.
 
-**Estado:** as dez entradas da matriz (`contracts/compatibility/pec-adapters.json`) estão `NOT_TESTED`.
-As consultas foram escritas a partir do [dicionário oficial do DW](2026-10-02-dw-dicionario-c2-c7.md) e
-testadas só numa fixture sintética em PostgreSQL 9.6. Nenhuma rodou contra um PEC real. As
-`signature_fingerprint` da matriz são as da fixture. A validação ao vivo segue o
-[runbook](runbook-validacao-capacidades.md).
+**Estado:** as dez entradas da matriz (`contracts/compatibility/pec-adapters.json`) estão `VALIDATED`
+para o PEC 5.5.28 desde 2026-10-05. As consultas foram escritas a partir do
+[dicionário oficial do DW](2026-10-02-dw-dicionario-c2-c7.md), testadas numa fixture sintética em
+PostgreSQL 9.6, corrigidas contra o [inventário do PEC de produção](2026-10-05-pec-5528-inventario-dw.md)
+e validadas ao vivo ([evidência](2026-10-05-pec-5528-capacidades.md)). As `signature_fingerprint` da
+matriz são as do PEC real. Uma versão nova do PEC segue o [runbook](runbook-validacao-capacidades.md).
 
 As convenções de códigos e vocabulários que as regras usam estão no guia
 [`docs/indicadores/como-adicionar.md`](../indicadores/como-adicionar.md), na seção "O que as capacidades
@@ -650,8 +651,8 @@ DW.
 - `CapabilityQueriesStaticTest`: binds tipados na ordem do descritor; nenhum `?` em comentário,
   literal ou operador; nenhuma coluna de PII nem o município de nascimento; tabelas com `public.`; nada
   além do 9.6 nem volátil.
-- `CapabilityMatrixConsistencyTest`: uma entrada `NOT_TESTED` por capacidade, presa ao checksum da
-  consulta e ao da fixture; `objects_used` igual às tabelas e colunas que a SQL lê; marcadores; e as três
-  entradas `VALIDATED` intactas.
+- `CapabilityMatrixConsistencyTest`: uma entrada `VALIDATED` por capacidade, presa ao checksum da
+  consulta, ao da fixture e ao digest aprovado; `objects_used` igual às tabelas e colunas que a SQL lê;
+  marcadores; e as três entradas `VALIDATED` anteriores intactas.
 - `CapabilityQueryReader`: leitor JDBC de referência, base dos testes diferenciais Rust × JDBC.
 - `CapabilityFingerprintCaptureLiveTest`: validação ao vivo opt-in ([runbook](runbook-validacao-capacidades.md)).

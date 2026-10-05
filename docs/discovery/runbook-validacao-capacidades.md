@@ -1,10 +1,14 @@
 # Runbook — validação ao vivo das capacidades da fundação (C2–C7)
 
 As dez capacidades da fundação ([ADR 0030](../adr/0030-pacotes-por-praticas-e-extrato-canonico-v2.md))
-têm consulta congelada em `contracts/compatibility/queries/` e entrada `NOT_TESTED` em
-`contracts/compatibility/pec-adapters.json`. As `signature_fingerprint` dessas entradas são as da
-fixture sintética, não as de um PEC. Nenhum pacote roda enquanto elas não forem `VALIDATED`, porque a
-elegibilidade exige isso.
+têm consulta congelada em `contracts/compatibility/queries/` e entrada em
+`contracts/compatibility/pec-adapters.json`. Nenhum pacote roda enquanto elas não forem `VALIDATED`,
+porque a elegibilidade exige isso.
+
+**Estado (2026-10-05):** as dez estão `VALIDATED` para o PEC 5.5.28, com as assinaturas do PEC de
+produção ([inventário](2026-10-05-pec-5528-inventario-dw.md),
+[validação](2026-10-05-pec-5528-capacidades.md)). Este runbook continua valendo para cada versão
+nova do PEC e para qualquer mudança de consulta, que é uma validação nova.
 
 Este runbook diz:
 
@@ -19,7 +23,7 @@ O mapeamento coluna a coluna e o que só a validação confirma estão em
 ## O que roda
 
 `apps/agent/src/test/java/esusdata/source/pec/CapabilityFingerprintCaptureLiveTest.java` é opt-in.
-Para cada entrada `NOT_TESTED` de capacidade da fundação, ele:
+Para cada entrada de capacidade da fundação, ele:
 
 1. **Captura a assinatura real** de cada objeto de `objects_used`. Usa o `JdbcCompatibilityCatalog`,
    o mesmo algoritmo que a matriz fixa. Registra também se a assinatura é igual à da fixture e o tempo
@@ -210,8 +214,8 @@ Nenhuma entrada é promovida sem as duas evidências abaixo. As duas rodam com
    - `test_evidence_ref`: o documento do passo 4.
    - `status_reason` e `test_notes` reescritos.
    - No mesmo commit, `CapabilityMatrixConsistencyTest` passa a fixar a entrada pelo digest, como faz
-     com as três já aprovadas, e deixa de exigir `NOT_TESTED` para ela.
-     `CapabilityQueriesFixtureTest` já confere só as assinaturas das entradas `NOT_TESTED`.
+     com as já aprovadas. `CapabilityQueriesFixtureTest` confere só as assinaturas das entradas
+     ainda `NOT_TESTED`.
 
 Uma versão nova do PEC entra em `pec_versions` só com a própria execução ao vivo (ADR 0023).
 
