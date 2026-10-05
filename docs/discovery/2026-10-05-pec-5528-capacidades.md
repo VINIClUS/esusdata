@@ -37,9 +37,10 @@ checksum e fixture regenerados, antes da rodada final:
   linhas de `care_encounter`, porque `CAST(float8 AS text)` depende do `extra_float_digits` da sessão.
   As consultas passaram a converter por `numeric`, e o diferencial na fixture agora cobre o caso.
 
-A aprovação humana das dez entradas foi dada sobre a evidência da rodada anterior à última correção
-(o sentinela `-` nas listas de códigos). A rodada final abaixo roda as consultas corrigidas e tem o
-mesmo resultado, sem nenhum `-` restante.
+A primeira aprovação humana das dez entradas foi dada sobre a evidência da rodada anterior à última
+correção (o sentinela `-` nas listas de códigos). A rodada final abaixo roda as consultas corrigidas,
+tem o mesmo resultado e nenhum `-` restante, e o mantenedor reconfirmou as dez sobre ela em
+2026-10-05.
 
 ## Resultado da rodada final
 
