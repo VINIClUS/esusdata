@@ -141,6 +141,7 @@ barato, mas uma ficha do CDS com data errada tiraria um evento de uma pessoa que
 | `bool` | `CASE WHEN CAST(x AS text) IN ('1','true') THEN TRUE WHEN … IN ('0','false') THEN FALSE END`: aceita inteiro 0/1 e booleano; qualquer outro valor sai nulo | `bool` |
 | `integer` | `CAST(… AS integer)` | `int4` |
 | `decimal` | `CAST(x AS text)`: texto decimal com ponto. O plano de execução recusa `numeric`, `float` e `timestamp` | `text` |
+| `text[]` | `array_agg(DISTINCT CAST(… AS text) COLLATE "C" ORDER BY …) FILTER (WHERE … IS NOT NULL)`: sem repetição, ordem binária, nunca elemento nulo; lista vazia `'{}'` quando a fonte tem a informação mas não há nada, nulo quando a fonte não tem a informação | `_text` |
 
 `nu_peso`, `nu_altura`, `nu_participante_peso` e `nu_participante_altura` são `double precision` no PEC 5.5.28 (`tb_fat_atvdd_coletiva_part`, `tb_fat_atendimento_individual`,
 `tb_fat_atendimento_odonto`, `tb_fat_proced_atend`, `tb_fat_visita_domiciliar`); `nu_pressao_*` são
@@ -151,7 +152,8 @@ Por isso as consultas projetam `CAST(CAST(x AS numeric) AS text)`: no PostgreSQL
 usa `DBL_DIG` (15 dígitos) qualquer que seja a sessão, e o texto é o mesmo no JDBC e no Rust. O texto
 sai sem zeros à direita desnecessários (`70.3`, `165`). A fixture usa `double precision` e valores com
 artefato binário (`70.3`, `165.1`, `3.45`) para que o teste diferencial pegue a regressão.
-| `text[]` | `array_agg(DISTINCT CAST(… AS text) COLLATE "C" ORDER BY …) FILTER (WHERE … IS NOT NULL)`: sem repetição, ordem binária, nunca elemento nulo; lista vazia `'{}'` quando a fonte tem a informação mas não há nada, nulo quando a fonte não tem a informação | `_text` |
+`Infinity` não converte para `numeric` no 9.6: a consulta falharia, em vez de devolver um valor errado.
+Peso e altura reais não têm `Infinity` nem `NaN`.
 
 Os tipos das colunas do DW não são publicados (lacuna L10), e os do `st_*` podem ser inteiro ou
 booleano. Por isso as conversões aceitam os dois. O teste da fixture confere nome, ordem e tipo de cada
@@ -181,14 +183,16 @@ da competência 2026-08 confirmaram duas famílias:
 
 - **Código `-`:** `tb_dim_equipe`, `tb_dim_unidade_saude` e `tb_dim_cbo` têm uma linha-sentinela de id 1
   com `nu_ine = '-'` ("SEM EQUIPE"), `nu_cnes = '-'` e `nu_cbo = '-'`. Sem tratamento, a captura contou
-  329 violações de formato de INE em `individual_registration` e 2 em `exam_request_evaluation`.
+  329 violações de formato de INE em `individual_registration` e `<10` em `exam_request_evaluation`.
   Toda consulta (exceto as três `VALIDATED`, congeladas) projeta `NULLIF(CAST(x.nu_ine AS text), '-')`, e
   o mesmo para `nu_cnes` e `nu_cbo`, inclusive nas CTEs onde são projetados primeiro.
 - **Data `3000-12-31`:** `tb_dim_tempo` tem a sentinela `co_seq_dim_tempo = 30001231` com
   `dt_registro = 3000-12-31` (o diagnóstico mostrou os 6468 atendimentos do mês com `co_dim_tempo_dum` nela).
   Toda data opcional lida de `tb_dim_tempo` (`lmp_date`, `resolved_date` e a data de aplicação da
   vacina) vira nula fora de `1900-01-01..2100-12-31`. As datas do recorte de período não precisam disso:
-  a sentinela não cai em janela alguma.
+  a sentinela não cai em janela alguma. Decisão: uma dose que não é transcrição e tem a data de aplicação
+  na sentinela passa a usar a data de registro, a mesma regra da dose sem data (a ficha registra no dia
+  da aplicação); antes ela ficava fora de qualquer janela. Na captura de 2026-08 não houve dose assim.
 
 - **Sentinela nas dimensões de código:** toda linha-sentinela traz `nu_identificador = '-'` (e CIAP, CID e
   `co_proced` também `-`). Por robustez, todo código projetado de `nu_identificador` (`care_type_code`,
@@ -618,7 +622,7 @@ DW.
 | **Corrigido em 2026-10-05:** as medidas de pressão são `nu_pressao_sistolica`/`nu_pressao_diastolica` (numeric, nulas) em `tb_fat_atendimento_individual` e `tb_fat_proced_atend`; a PK de `tb_dim_estrategia_vacinacao` é `co_seq_dim_estrategia_vacnacao` (grafia do PEC) | catálogo do inventário de 2026-10-05 | (resolvido) |
 | tipos das colunas (`st_*`, medidas, `nu_identificador`) | não publicados (L10) | fingerprints reais e `column_types` da saída | as conversões já aceitam inteiro e booleano; tipo inesperado vira nulo ou erro, nunca valor errado |
 | formato dos códigos e sentinelas | sentinela pode ter código próprio | `format_violations` da saída | normalizar na consulta (runbook, passo 4) |
-| **Confirmado em 2026-10-05:** sentinelas `-` (INE, CNES, CBO) e `3000-12-31` | a captura da competência 2026-08 contou 329 INE fora do formato em `individual_registration` e 2 em `exam_request_evaluation` | `format_violations` da saída | (resolvido: `NULLIF(…, '-')` e faixa 1900..2100 nas consultas, 1.8) |
+| **Confirmado em 2026-10-05:** sentinelas `-` (INE, CNES, CBO) e `3000-12-31` | a captura da competência 2026-08 contou 329 INE fora do formato em `individual_registration` e `<10` em `exam_request_evaluation` | `format_violations` da saída | (resolvido: `NULLIF(…, '-')` e faixa 1900..2100 nas consultas, 1.8) |
 | datas de aplicação da vacina | `co_dim_tempo_vacina_aplicada` entrou na 4.2.0 | diagnóstico `doses_by_transcription_and_application_date` | rever a reserva para a dose sem data |
 
 ## 5. Lacunas

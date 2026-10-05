@@ -7,8 +7,7 @@ consultas congeladas usam.
 
 ## Execução
 
-- **Acesso:** túnel `ssh esus`, porta local 15434, credencial `esus_leitura` do arquivo local
-  `pec-253.env` (0600).
+- **Acesso:** túnel SSH, papel somente leitura, credencial num arquivo local 0600.
 - **Teste:** `DwInventoryLiveTest`, que roda o script por JDBC e passa cada comando por `EXPLAIN`
   antes de executar.
 - **Script:** `contracts/compatibility/inventory/dw-inventory.sql`, `sha256:74dfdf4d2f03ff265560b9ac7f2b1723077b6a77b23ae7a02ddbfd17d1d96a0f`.
@@ -21,7 +20,7 @@ consultas congeladas usam.
 | Item | Valor |
 |---|---|
 | PostgreSQL | 9.6.13 (Windows, 64 bits) |
-| Sessão (1.1) | `esus_leitura`, `transacao_somente_leitura = on`, `repeatable read`, 30 s / 10 s |
+| Sessão (1.1) | papel somente leitura, `transacao_somente_leitura = on`, `repeatable read`, 30 s / 10 s |
 | PEC (1.2) | 5.5.28, maior versão em `tb_migracao` |
 | Último processamento do DW (1.3) | 2026-09-24. Por isso a validação usou 2026-08, a última competência completa. |
 | Objetos (1.4) | 54 `tb_fat_*`, 95 `tb_dim_*`, 2 `tb_acomp_*`, 6 `mv_*` |

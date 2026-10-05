@@ -7,8 +7,8 @@ Execução do [runbook de validação](runbook-validacao-capacidades.md) das cap
 
 ## Execução
 
-- **Acesso:** túnel `ssh esus`, porta local 15434, credencial `esus_leitura` do arquivo local
-  `pec-253.env` (0600). Só leitura, transação `READ ONLY` em `repeatable read`.
+- **Acesso:** túnel SSH, papel somente leitura, credencial num arquivo local 0600. Transação
+  `READ ONLY` em `repeatable read`.
 - **Competência:** 2026-08, a última completa (o DW foi processado pela última vez em 2026-09-24).
 - **Códigos de procedimento:** `0101040024`, `0301100039`, `0301010030`, `0214010015`, `0202010503`,
   `ABEX008` e `0301040095`.
