@@ -26,8 +26,8 @@ final class C3Limitations {
                     + " episódio. Resolve-se com a capacidade team; é a única lacuna bloqueante de C3.",
             "C3-LIM-06: A data de desfecho da gestação não está no DW (lacuna L2): usa-se a resolução do"
                     + " problema W78 na LPC e, sem ela, DUM+294 (item 17, p.2). Desfecho depois de DUM+294 é"
-                    + " ignorado. Código de parto, puerpério ou aborto não define a data. O resultado informa"
-                    + " quantos episódios usaram cada origem. Sem fechamento do W78, a consulta puerperal"
+                    + " ignorado. Código de parto, puerpério ou aborto não define a data. A contagem de episódios"
+                    + " por origem sai dos códigos de motivo das evidências (ELEGIVEL_*). Sem fechamento do W78, a consulta puerperal"
                     + " anterior a DUM+294 conta como gestação.",
             "C3-LIM-07: A pressão arterial da visita domiciliar não é lida (Quadro 03, p.6; lacuna L6): C"
                     + " pode ficar abaixo do SIAPS.",
@@ -60,8 +60,8 @@ final class C3Limitations {
             "C3-LIM-18: O corte local de extração é o último dia da competência e não reproduz o 20º dia"
                     + " útil do SIAPS (item 11, p.1; AMB-C3-21).",
             "C3-LIM-19: A gestação exige DUM ou IG e um código do 24 f na janela. Código sem DUM nem IG, e"
-                    + " DUM ou IG sem código, não entram no denominador; o resultado informa as duas"
-                    + " contagens (24 f, p.3; 4.1, p.5; AMB-C3-03).",
+                    + " DUM ou IG sem código, não entram no denominador; as duas contagens saem dos"
+                    + " códigos de motivo das evidências (EXCLUIDO_SEM_*) (24 f, p.3; 4.1, p.5; AMB-C3-03).",
             "C3-LIM-20: Vale a DUM do registro mais antigo da gestação; a IG é registrada em semanas"
                     + " inteiras e uma DUM derivada da IG pode errar até 6 dias. DUM fora de [data do"
                     + " atendimento − 294, data do atendimento] não é lida (4.1, p.5; AMB-C3-03).",
