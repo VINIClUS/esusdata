@@ -32,8 +32,8 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * The {@code team} capability (ADR 0031) on a real PostgreSQL 9.6 over the synthetic transactional
  * fixture: the exact states it reads, how the audit trail becomes validity intervals, its
- * municipal rule, the as-of lookup over what it reads, and its matrix entry (a {@code NOT_TESTED}
- * one, with the fixture's signatures, until the live capture and the user's approval).
+ * municipal rule, the as-of lookup over what it reads, and its matrix entry ({@code VALIDATED} live
+ * on 2026-10-06, carrying the real PEC's signatures).
  */
 // Linux containers: excluded on Windows (package-windows.ps1).
 @Tag("docker")
@@ -149,12 +149,12 @@ class TeamCapabilityTest {
     // --- the matrix entry ---------------------------------------------------------------------
 
     @Test
-    void theMatrixEntryIsNotTestedPinnedToThisQueryAndFixtureOnThePecOltpModel() throws Exception {
+    void theMatrixEntryIsValidatedPinnedToThisQueryAndFixtureOnThePecOltpModel() throws Exception {
         JsonNode entry = entry();
 
-        assertThat(text(entry, "status")).isEqualTo("NOT_TESTED");
-        assertThat(text(entry, "test_result")).isEqualTo("NOT_RUN");
-        assertThat(entry.has("approved_by")).as("nobody approved it yet").isFalse();
+        assertThat(text(entry, "status")).isEqualTo("VALIDATED");
+        assertThat(text(entry, "test_result")).isEqualTo("PASS");
+        assertThat(text(entry, "approved_at")).isEqualTo("2026-10-06");
         assertThat(text(entry, "read_model")).isEqualTo(contract.readModel()).isEqualTo("PEC_OLTP");
         assertThat(text(entry, "installation_role")).isEqualTo("PRONTUARIO");
         assertThat(text(entry, "adapter_version")).isEqualTo(contract.adapterVersion());
