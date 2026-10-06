@@ -84,25 +84,15 @@ final class C3Fixtures {
     /** The eleven practices of the Quadro 01, in order. */
     static final String ALL_PRACTICES = "ABCDEFGHIJK";
 
-    /** 1º trimestre = DUM+0..DUM+97, 3º trimestre = DUM+196 onwards (the test convention). */
-    static final TrimesterConvention CONVENTION = new TrimesterConvention(97, 196);
-
     /** Six prenatal consultation days besides the anchor (all before DUM+294). */
     static final List<Integer> MORE_PRENATAL_DAYS = List.of(126, 154, 182, 210, 238, 266);
 
-    private static final Set<EvidenceDecision> PRACTICE_DECISIONS = Set.of(
-            EvidenceDecision.PRACTICE_MET,
-            EvidenceDecision.PRACTICE_NOT_MET,
-            EvidenceDecision.PRACTICE_EXEMPT,
-            EvidenceDecision.PRACTICE_AMBIGUOUS);
+    private static final Set<EvidenceDecision> PRACTICE_DECISIONS =
+            Set.of(EvidenceDecision.PRACTICE_MET, EvidenceDecision.PRACTICE_NOT_MET, EvidenceDecision.PRACTICE_EXEMPT);
 
     private C3Fixtures() {}
 
     // ---- packs, contexts and datasets ----
-
-    static C3Pack conventionPack() {
-        return C3Pack.withTrimesterConvention(CONVENTION);
-    }
 
     static EvaluationContext context(YearMonth competencia) {
         return EvaluationContext.endOfMonth(IBGE, competencia);
@@ -412,8 +402,8 @@ final class C3Fixtures {
 
     /**
      * A linked pregnancy with DUM {@link #DUM}, no recorded outcome (D = DUM+294 = 2025-10-22), in
-     * which exactly the practices named in {@code practices} (letters A..K) are met under the test
-     * trimester convention; every other practice is clearly not met. The anchor consultation is on
+     * which exactly the practices named in {@code practices} (letters A..K) are met (production
+     * trimester convention: 1º trimestre up to DUM+97, 3º from DUM+196); every other practice is clearly not met. The anchor consultation is on
      * DUM+56 when A is wanted and on DUM+100 otherwise.
      */
     static List<Record> episode(String personKey, String ine, String practices) {
@@ -510,13 +500,6 @@ final class C3Fixtures {
         assertThat(row.decision()).as("practice %s", row.component()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
         assertThat(row.reasonCode()).isEqualTo("NAO_CUMPRIDA");
         assertThat(row.points()).isEqualTo(BigInteger.ZERO);
-    }
-
-    /** An undecided practice: PRACTICE_AMBIGUOUS with reason {@code AMBIGUIDADE_AMB_C3_<amb>} and no points. */
-    static void assertAmbiguous(EvidenceItem row, String amb) {
-        assertThat(row.decision()).as("practice %s", row.component()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
-        assertThat(row.reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_" + amb);
-        assertThat(row.points()).isNull();
     }
 
     /** An MIAI (or MIAOI) encounter under construction; every unset field stays {@code null}. */

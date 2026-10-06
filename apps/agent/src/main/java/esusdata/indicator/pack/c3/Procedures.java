@@ -24,11 +24,6 @@ final class Procedures {
         return counts(event) && C3Codes.ORIGIN_MIP.equals(C3Codes.token(event.origin()));
     }
 
-    /** Came from a MIAI (AMB-C3-18 (iv) for CBO 2234/3222). */
-    static boolean fromMiai(CanonicalProcedureEvent event) {
-        return C3Codes.ORIGIN_MIAI.equals(C3Codes.token(event.origin()));
-    }
-
     /** The SIGTAP code with digits only. */
     static String sigtap(CanonicalProcedureEvent event) {
         return digits(event.sigtapCode());

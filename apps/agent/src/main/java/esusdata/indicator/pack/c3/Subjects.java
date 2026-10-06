@@ -8,8 +8,9 @@ import java.util.Map;
 
 /**
  * The subjects of one person: each episode active in the competência, with its cohort verdict and,
- * when eligible, its practices; plus one ambiguous subject {@code personKey#sem-dum} when a 24 f
- * code falls outside every episode's window (AMB-C3-03 (iii), CT-C3-71/73).
+ * when eligible, its practices; plus one excluded subject {@code personKey#sem-dum} when a 24 f
+ * code falls outside every episode's window, a pregnancy code without a DUM or IG to date it
+ * (AMB-C3-03 (iii), reason {@code EXCLUIDO_SEM_DUM_NEM_IG}).
  */
 final class Subjects {
 
@@ -36,11 +37,10 @@ final class Subjects {
         PracticeEvaluator.PersonEvidence evidence = PracticeEvaluator.PersonEvidence.of(person);
         List<Subject> subjects = new ArrayList<>();
         for (Episode episode : episodes) {
-            Cohort.Activity activity = cohort.activity(episode);
-            if (activity == Cohort.Activity.INACTIVE) {
+            if (!cohort.active(episode)) {
                 continue;
             }
-            Verdict verdict = cohort.decide(episode, person, link, activity);
+            Verdict verdict = cohort.decide(episode, person, link);
             Map<Practice, PracticeOutcome> practices =
                     verdict.eligible() ? evaluator.evaluate(evidence, episode, teamTypes.eap76(link.ine())) : Map.of();
             subjects.add(new Subject(episode.key(), link, verdict, episode, practices));
@@ -48,7 +48,7 @@ final class Subjects {
         LocalDate orphan = codeWithoutDum(person, episodes);
         if (orphan != null) {
             Verdict personal = cohort.personal(person, link, orphan);
-            Verdict verdict = personal == null ? Verdict.ambiguous(Ambiguity.AMB_C3_03, orphan) : personal;
+            Verdict verdict = personal == null ? Verdict.excluded(C3Reasons.EXCLUIDO_SEM_DUM_NEM_IG, orphan) : personal;
             subjects.add(new Subject(person.personKey() + WITHOUT_DUM, link, verdict, null, Map.of()));
         }
         return subjects;
@@ -73,22 +73,21 @@ final class Subjects {
     }
 
     /**
-     * A code is a pregnancy code when it matches the pregnancy list exactly, or matches it at all
-     * while not matching the puerperium list exactly ({@code O15.2}, {@code O26.6} are puerperal).
+     * A code of the pregnancy list (the more specific list deciding, AMB-C3-08) outside every
+     * episode, or a puerperium code before every DUM.
      */
     private static boolean unexplained(CanonicalCareEvent event, LocalDate date, List<Episode> episodes) {
-        CodeMatch pregnancy = CodeMatch.of(event, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID);
-        CodeMatch puerperium = CodeMatch.of(event, C3Codes.PUERPERIUM_CIAP, C3Codes.PUERPERIUM_CID);
-        boolean pregnancyCode = pregnancy == CodeMatch.EXACT || (pregnancy.found() && puerperium != CodeMatch.EXACT);
-        if (pregnancyCode) {
+        if (CodeMatch.of(event, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID, C3Codes.PUERPERIUM_CID)) {
             return !covered(date, episodes);
         }
-        return puerperium.found() && !afterSomeDum(date, episodes);
+        boolean puerperium =
+                CodeMatch.of(event, C3Codes.PUERPERIUM_CIAP, C3Codes.PUERPERIUM_CID, C3Codes.PREGNANCY_CID);
+        return puerperium && !afterSomeDum(date, episodes);
     }
 
     private static boolean afterSomeDum(LocalDate date, List<Episode> episodes) {
         for (Episode episode : episodes) {
-            if (!date.isBefore(episode.primary().dum())) {
+            if (!date.isBefore(episode.window().dum())) {
                 return true;
             }
         }
@@ -97,7 +96,7 @@ final class Subjects {
 
     private static boolean covered(LocalDate date, List<Episode> episodes) {
         for (Episode episode : episodes) {
-            if (C3Dates.within(date, episode.primary().dum(), episode.coverageEnd())) {
+            if (C3Dates.within(date, episode.window().dum(), episode.coverageEnd())) {
                 return true;
             }
         }

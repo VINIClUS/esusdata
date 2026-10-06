@@ -4,10 +4,10 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
 /**
- * One reading of a pregnancy's dates (item 17, 4.1): the DUM and the end D used — the recorded
- * outcome, else the resolution of the pregnancy condition in the LPC (gap L2), else DUM + 294 days
- * (MET-21). The day D itself and the day D + 42 are
- * the boundaries the ficha leaves open (AMB-C3-04).
+ * The dates of one pregnancy (item 17, 4.1): the DUM and the end D used — the recorded outcome,
+ * else the resolution of the pregnancy condition in the LPC (gap L2), else DUM + 294 days
+ * (MET-21). The pregnancy is {@code [DUM, D]}, D inclusive; the puerperium is {@code (D, D + 42]},
+ * D + 42 inclusive (AMB-C3-04).
  */
 record GestationWindow(LocalDate dum, LocalDate end, EndSource endSource) {
 
@@ -27,59 +27,8 @@ record GestationWindow(LocalDate dum, LocalDate end, EndSource endSource) {
         SUBSTITUTE_294
     }
 
-    /** Where a date falls in this reading. */
-    enum Phase {
-        BEFORE,
-        /** {@code DUM <= x < D}: certainly pregnancy. */
-        PREGNANCY,
-        /** {@code x == D}: pregnancy or puerperium (AMB-C3-04). */
-        END_DAY,
-        /** {@code D < x <= D + 41}: certainly puerperium. */
-        PUERPERIUM,
-        /** {@code x == D + 42}: inside or outside the puerperium (AMB-C3-04). */
-        PUERPERIUM_LAST_DAY,
-        AFTER;
-
-        /** Pregnancy with its boundary day: {@code DUM <= x <= D}. */
-        boolean pregnant() {
-            return this == PREGNANCY || this == END_DAY;
-        }
-
-        /** Puerperium with its boundary days: {@code D <= x <= D + 42}. */
-        boolean puerperal() {
-            return this == END_DAY || this == PUERPERIUM || this == PUERPERIUM_LAST_DAY;
-        }
-
-        /** In a pregnancy window, a record on the day D counts only under one reading (AMB-C3-04). */
-        Ambiguity inPregnancy(Ambiguity own) {
-            return this == PREGNANCY ? own : Ambiguity.AMB_C3_04;
-        }
-
-        /** In a puerperium window, records on D and on D + 42 count only under one reading (AMB-C3-04). */
-        Ambiguity inPuerperium(Ambiguity own) {
-            return this == PUERPERIUM ? own : Ambiguity.AMB_C3_04;
-        }
-    }
-
     static GestationWindow substitute(LocalDate dum) {
         return new GestationWindow(dum, dum.plusDays(MAX_PREGNANCY_DAYS), EndSource.SUBSTITUTE_294);
-    }
-
-    Phase phaseOf(LocalDate date) {
-        if (date.isBefore(dum)) {
-            return Phase.BEFORE;
-        }
-        if (date.isBefore(end)) {
-            return Phase.PREGNANCY;
-        }
-        long afterEnd = ChronoUnit.DAYS.between(end, date);
-        if (afterEnd == 0) {
-            return Phase.END_DAY;
-        }
-        if (afterEnd < PUERPERIUM_DAYS) {
-            return Phase.PUERPERIUM;
-        }
-        return afterEnd == PUERPERIUM_DAYS ? Phase.PUERPERIUM_LAST_DAY : Phase.AFTER;
     }
 
     /** Days since the DUM: 0 on the DUM itself. */
@@ -87,18 +36,18 @@ record GestationWindow(LocalDate dum, LocalDate end, EndSource endSource) {
         return ChronoUnit.DAYS.between(dum, date);
     }
 
-    /** {@code DUM <= x <= D}: the pregnancy with its boundary day. */
+    /** {@code DUM <= x <= D}; a {@code null} date is in no window. */
     boolean inPregnancy(LocalDate date) {
         return C3Dates.within(date, dum, end);
     }
 
-    /** The last day of the certain puerperium, D + 41. */
-    LocalDate lastCertainDay() {
-        return end.plusDays(PUERPERIUM_DAYS - 1L);
+    /** {@code D < x <= D + 42}; a {@code null} date is in no window. */
+    boolean inPuerperium(LocalDate date) {
+        return C3Dates.within(date, end.plusDays(1), lastDay());
     }
 
-    /** The boundary day D + 42 (AMB-C3-04). */
-    LocalDate boundaryDay() {
+    /** The last day of the puerperium, D + 42 (the 42º dia de puerpério, NT 8/2026). */
+    LocalDate lastDay() {
         return end.plusDays(PUERPERIUM_DAYS);
     }
 }

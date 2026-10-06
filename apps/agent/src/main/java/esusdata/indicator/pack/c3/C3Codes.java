@@ -56,15 +56,12 @@ final class C3Codes {
 
     /**
      * Quadro 03 (p.6): blood pressure (C). Without 5151-05 (AMB-C3-14). "3224 Técnicos em Saúde
-     * Bucal" read as the TSB occupations 3224-05 and 3224-25 (dicionário do DW); another occupation
-     * of the family 3224 is AMB-C3-20.
+     * Bucal" read as the TSB occupations 3224-05 and 3224-25 (dicionário do DW); the other
+     * occupations of the family 3224 do not count (AMB-C3-20).
      */
     static final CboGroups BLOOD_PRESSURE_CBO = CboGroups.of(
             "2251", "2252", "2253", "2231", "2235", "3222", "2232", "2234", "2236", "2238", "2237", "2241", "2239",
             "3224-05", "3224-25");
-
-    /** The ACS occupation the Quadro 03 leaves out while accepting the MIVDT (AMB-C3-14 (i)). */
-    static final CboGroups ACS_CBO = CboGroups.of("5151-05");
 
     /** Quadro 04 (p.6–7): weight and height (D). With 5151-05, without 3224. */
     static final CboGroups ANTHROPOMETRY_CBO = CboGroups.of(
@@ -73,23 +70,16 @@ final class C3Codes {
 
     /**
      * Quadro 05 (p.7): home visits (E, J) by ACS or TACS. The quadro writes the TACS as the family
-     * {@code 3222}, the 24 d as the occupation {@code 3222-55}; another occupation of the family
-     * (técnico/auxiliar de enfermagem) is AMB-C3-16 (iii).
+     * {@code 3222}, the 24 d as the occupation {@code 3222-55}: only these two occupations count,
+     * not the other technicians and auxiliaries of the family (AMB-C3-16 (iii)).
      */
     static final CboGroups VISIT_CBO = CboGroups.of("5151-05", "3222-55");
 
-    static final CboGroups VISIT_CBO_FAMILY = CboGroups.of("3222");
-
-    /** 24 c/d (p.2–3): every CBO the ficha lists; dTpa outside them is AMB-C3-13. */
-    static final CboGroups LISTED_CBO = CboGroups.of(
-            "2235", "2231", "2251", "2252", "2253", "2232", "2234", "2236", "2238", "2237", "2241", "3222", "2239",
-            "5151-05", "3222-55", "3224");
-
-    /** Quadro 07 (p.7): tests and evaluated exams (G, H). */
+    /**
+     * Quadro 07 (p.7): tests and evaluated exams (G, H), in every model, MIAI included (AMB-C3-18
+     * (iv)).
+     */
     static final CboGroups TEST_CBO = CboGroups.of("2251", "2252", "2253", "2231", "2235", "2234", "3222");
-
-    /** The Quadro 07 CBO outside the 24 c consultation list: their MIAI records are AMB-C3-18 (iv). */
-    static final CboGroups TEST_CBO_OUTSIDE_CONSULT = CboGroups.of("2234", "3222");
 
     /**
      * Quadro 08 (p.8): oral health (K) — cirurgião-dentista and TSB, the TSB read as the
@@ -97,15 +87,12 @@ final class C3Codes {
      */
     static final CboGroups DENTAL_CBO = CboGroups.of("2232", "3224-05", "3224-25");
 
-    /** The family 3224 (ASB, protético …): only "talvez" for C and K (AMB-C3-20). */
-    static final CboGroups ORAL_HEALTH_FAMILY = CboGroups.of("3224");
-
     // ---- SIGTAP (24 h, p.3–4; Quadros 03, 04 e 07), digits only ----
 
     /** Quadro 03 (p.6): 03.01.10.003-9 Aferição da pressão arterial. */
     static final String BLOOD_PRESSURE_SIGTAP = "0301100039";
 
-    /** Quadro 04 (p.7): 01.01.04.002-4 Avaliação antropométrica (no values: AMB-C3-15 (i)). */
+    /** Quadro 04 (p.7): 01.01.04.002-4 Avaliação antropométrica (a pair on its day: AMB-C3-15 (i)). */
     static final String ANTHROPOMETRIC_EVALUATION_SIGTAP = "0101040024";
 
     /** Quadro 04 (p.7): 01.01.04.008-3 Medição de peso. */
@@ -115,8 +102,9 @@ final class C3Codes {
     static final String HEIGHT_SIGTAP = "0101040075";
 
     /**
-     * 24 h (p.3–4): consultation codes no quadro cites (AMB-C3-12) — 03.01.01.003-0, 006-4, 011-0,
-     * 012-9, 013-7 and 025-0.
+     * 24 h (p.3–4): consultation codes no quadro cites — 03.01.01.003-0, 006-4, 011-0, 012-9, 013-7
+     * and 025-0. A consultation only in the MIP does not count (AMB-C3-12): the codes stay in the
+     * request of the capability but the rule does not use them.
      */
     static final List<String> CONSULT_SIGTAP =
             List.of("0301010030", "0301010064", "0301010110", "0301010129", "0301010137", "0301010250");
@@ -137,8 +125,8 @@ final class C3Codes {
     static final List<String> HEPATITIS_C_SIGTAP = List.of("0214010090", "0214010309", "0202030059", "0202030679");
 
     /**
-     * Quadro 07 (p.8): 02.02.03.031-8 Anti-HTLV-1 + HTLV-2, which names none of the four agents
-     * (AMB-C3-18 (ii)).
+     * Quadro 07 (p.8): 02.02.03.031-8 Anti-HTLV-1 + HTLV-2, which names none of the four agents and
+     * covers none of them (AMB-C3-18 (ii)); requested with the others, never used.
      */
     static final String HTLV_SIGTAP = "0202030318";
 
@@ -190,8 +178,11 @@ final class C3Codes {
     /** Condition status "2" (resolvido): its resolution date is the pregnancy outcome candidate (L2). */
     static final String CONDITION_RESOLVED = "2";
 
-    /** Condition statuses "0" (ativo) and "1" (latente): the "ativos" of 24 f/g. */
-    static final List<String> CONDITION_ACTIVE = List.of("0", "1");
+    /**
+     * Condition statuses "0" (ativo), "1" (latente) and "2" (resolvido): the "ativos" of 24 g — a
+     * problem resolved later was active on the day it was recorded (AMB-C3-07 (ii)).
+     */
+    static final List<String> CONDITION_RECORDED = List.of("0", "1", CONDITION_RESOLVED);
 
     // ---- Modelos de informação (origem dos registros) ----
 
@@ -233,9 +224,9 @@ final class C3Codes {
         return CONDITION_RESOLVED.equals(token(condition.status()));
     }
 
-    /** True when the LPC condition is active or latent ("0", "1"); an unknown status is not. */
-    static boolean active(CanonicalCondition condition) {
-        return CONDITION_ACTIVE.contains(token(condition.status()));
+    /** True when the LPC condition is active, latent or resolved ("0", "1", "2"); an unknown status is not. */
+    static boolean recorded(CanonicalCondition condition) {
+        return CONDITION_RECORDED.contains(token(condition.status()));
     }
 
     /** True when a LEDI code is in the list, "5" and "05" being the same code. */

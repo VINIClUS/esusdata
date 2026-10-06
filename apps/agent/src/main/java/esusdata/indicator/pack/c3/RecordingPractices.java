@@ -18,8 +18,8 @@ import java.util.TreeSet;
 /**
  * Practices C and D: blood pressure (Quadro 03, p.6) and weight with height on the same day
  * (Quadro 04, p.6–7), at least 7 days during the pregnancy. The MIVDT carries no blood pressure
- * (limitation L6); a MIAC counts with activity 05/06 and the quadro's health practice, only one of
- * them being AMB-C3-19.
+ * (limitation L6); a MIAC counts with activity 05/06 and the quadro's health practice (AMB-C3-19).
+ * Each counts one record per day (AMB-C3-14 (ii), AMB-C3-15 (ii)).
  */
 final class RecordingPractices {
 
@@ -27,20 +27,20 @@ final class RecordingPractices {
 
     private RecordingPractices() {}
 
-    /** C: at least 7 blood-pressure records on distinct days. */
+    /** C: at least 7 blood-pressure records on distinct days, by the CBO of the Quadro 03. */
     static PracticeOutcome bloodPressure(PersonRecords person, GestationWindow window) {
-        CboRule rule = CboRule.BLOOD_PRESSURE;
-        List<DayTally.DayItem> items = new ArrayList<>();
+        List<Tally.Unit> units = new ArrayList<>();
         Set<LocalDate> fieldDays = new HashSet<>();
         for (CanonicalCareEvent event : person.individualCare()) {
-            if (both(event.systolicMmhg(), event.diastolicMmhg()) && rule.accepts(event.cbo())) {
-                add(items, window, EventRef.of(event), rule.ambiguityOf(event.cbo()));
+            if (both(event.systolicMmhg(), event.diastolicMmhg()) && C3Codes.BLOOD_PRESSURE_CBO.matches(event.cbo())) {
+                add(units, window, EventRef.of(event));
                 fieldDays.add(C3Dates.parse(event.careDate()));
             }
         }
         for (CanonicalMeasurement measurement : person.measurements()) {
-            if (both(measurement.systolicMmhg(), measurement.diastolicMmhg()) && rule.accepts(measurement.cbo())) {
-                measuredPressure(items, window, measurement);
+            if (both(measurement.systolicMmhg(), measurement.diastolicMmhg())
+                    && C3Codes.BLOOD_PRESSURE_CBO.matches(measurement.cbo())) {
+                addMeasured(units, window, measurement);
                 fieldDays.add(C3Dates.parse(measurement.measuredDate()));
             }
         }
@@ -48,26 +48,19 @@ final class RecordingPractices {
             EventRef event = EventRef.of(procedure);
             if (Procedures.fromMip(procedure)
                     && C3Codes.BLOOD_PRESSURE_SIGTAP.equals(Procedures.sigtap(procedure))
-                    && rule.accepts(procedure.cbo())
+                    && C3Codes.BLOOD_PRESSURE_CBO.matches(procedure.cbo())
                     && !fieldDays.contains(event.date())) {
-                add(items, window, event, rule.ambiguityOf(procedure.cbo()));
+                add(units, window, event);
             }
         }
-        return Tally.decide(SEVEN, DayTally.marks(items, Ambiguity.AMB_C3_14));
+        return Tally.decide(SEVEN, Tally.distinctDays(units));
     }
 
-    /**
-     * A MIP measurement counts as its CBO allows; a MIAC one needs activity 05/06 and a practice of
-     * the 24 e, only one of them being AMB-C3-19.
-     */
-    private static void measuredPressure(
-            List<DayTally.DayItem> items, GestationWindow window, CanonicalMeasurement measurement) {
-        Ambiguity byCbo = CboRule.BLOOD_PRESSURE.ambiguityOf(measurement.cbo());
-        MiacMatch miac = MiacMatch.of(measurement, C3Codes.MIAC_PRACTICES);
-        if (C3Codes.ORIGIN_MIP.equals(C3Codes.token(measurement.origin()))) {
-            add(items, window, EventRef.of(measurement), byCbo);
-        } else if (miac.counts()) {
-            add(items, window, EventRef.of(measurement), miac.ambiguity(byCbo));
+    /** A MIP measurement counts by its CBO; a MIAC one needs both code conditions (AMB-C3-19). */
+    private static void addMeasured(List<Tally.Unit> units, GestationWindow window, CanonicalMeasurement measurement) {
+        if (C3Codes.ORIGIN_MIP.equals(C3Codes.token(measurement.origin()))
+                || MiacMatch.counts(measurement, C3Codes.MIAC_PRACTICES)) {
+            add(units, window, EventRef.of(measurement));
         }
     }
 
@@ -81,11 +74,9 @@ final class RecordingPractices {
             measures.values(EventRef.of(visit), visit.weightKg(), visit.heightCm());
         }
         for (CanonicalMeasurement measurement : person.measurements()) {
-            MiacMatch miac = MiacMatch.of(measurement, C3Codes.MIAC_PRACTICES_ANTHROPOMETRY);
-            if (C3Codes.ORIGIN_MIP.equals(C3Codes.token(measurement.origin())) || miac == MiacMatch.BOTH) {
+            boolean mip = C3Codes.ORIGIN_MIP.equals(C3Codes.token(measurement.origin()));
+            if (mip || MiacMatch.counts(measurement, C3Codes.MIAC_PRACTICES_ANTHROPOMETRY)) {
                 measures.values(EventRef.of(measurement), measurement.weightKg(), measurement.heightCm());
-            } else if (miac.counts() && both(measurement.weightKg(), measurement.heightCm())) {
-                measures.undecided(EventRef.of(measurement), Ambiguity.AMB_C3_19);
             }
         }
         for (CanonicalProcedureEvent procedure : person.procedures()) {
@@ -93,12 +84,12 @@ final class RecordingPractices {
                 measures.procedure(EventRef.of(procedure), Procedures.sigtap(procedure));
             }
         }
-        return Tally.decide(SEVEN, DayTally.marks(measures.items(), Ambiguity.AMB_C3_15));
+        return Tally.decide(SEVEN, measures.units());
     }
 
-    private static void add(List<DayTally.DayItem> items, GestationWindow window, EventRef event, Ambiguity ambiguity) {
+    private static void add(List<Tally.Unit> units, GestationWindow window, EventRef event) {
         if (window.inPregnancy(event.date())) {
-            items.add(DayTally.DayItem.of(event, window.phaseOf(event.date()).inPregnancy(ambiguity)));
+            units.add(Tally.Unit.of(event));
         }
     }
 
@@ -111,12 +102,12 @@ final class RecordingPractices {
         return PackSupport.positive(value);
     }
 
-    /** The weights, heights and undecided pairs of the pregnancy, by day (Quadro 04). */
+    /** The weights, heights and evaluations of the pregnancy, by day (Quadro 04). */
     private static final class Measures {
         private final GestationWindow window;
         private final SortedMap<LocalDate, List<EventRef>> weights = new TreeMap<>();
         private final SortedMap<LocalDate, List<EventRef>> heights = new TreeMap<>();
-        private final SortedMap<LocalDate, List<Support>> undecided = new TreeMap<>();
+        private final SortedMap<LocalDate, List<EventRef>> evaluations = new TreeMap<>();
         private final Set<LocalDate> fieldWeights = new HashSet<>();
         private final Set<LocalDate> fieldHeights = new HashSet<>();
 
@@ -140,7 +131,8 @@ final class RecordingPractices {
 
         /**
          * A MIP measurement procedure; on a day whose field already has the same measure it is the
-         * same act and adds nothing (call after every field value).
+         * same act and adds nothing (call after every field value). The anthropometric evaluation
+         * is a pair of weight and height on its day (AMB-C3-15 (i)).
          */
         void procedure(EventRef event, String sigtap) {
             boolean weighed = fieldWeights.contains(event.date());
@@ -151,42 +143,32 @@ final class RecordingPractices {
             switch (sigtap) {
                 case C3Codes.WEIGHT_SIGTAP -> putUnless(weighed, weights, event);
                 case C3Codes.HEIGHT_SIGTAP -> putUnless(measured, heights, event);
-                case C3Codes.ANTHROPOMETRIC_EVALUATION_SIGTAP -> {
-                    if (!weighed && !measured) {
-                        undecided(event, Ambiguity.AMB_C3_15);
-                    }
-                }
+                case C3Codes.ANTHROPOMETRIC_EVALUATION_SIGTAP -> put(evaluations, event);
                 default -> {
                     // not an anthropometry code
                 }
             }
         }
 
-        /** A record that is a pair only under one reading: AMB-C3-15 (i) or AMB-C3-19. */
-        void undecided(EventRef event, Ambiguity ambiguity) {
-            if (C3Codes.ANTHROPOMETRY_CBO.matches(event.cbo()) && window.inPregnancy(event.date())) {
-                undecided.computeIfAbsent(event.date(), d -> new ArrayList<>()).add(new Support(event, ambiguity));
-            }
-        }
-
-        List<DayTally.DayItem> items() {
+        /** One pair per day: the weight and the height of the day, else the evaluation of the day. */
+        List<Tally.Unit> units() {
             NavigableSet<LocalDate> days = new TreeSet<>(weights.keySet());
             days.addAll(heights.keySet());
-            days.addAll(undecided.keySet());
-            List<DayTally.DayItem> items = new ArrayList<>();
+            days.addAll(evaluations.keySet());
+            List<Tally.Unit> units = new ArrayList<>();
             for (LocalDate day : days) {
-                GestationWindow.Phase phase = window.phaseOf(day);
                 List<EventRef> w = sorted(weights, day);
                 List<EventRef> h = sorted(heights, day);
-                for (int i = 0; i < Math.min(w.size(), h.size()); i++) {
-                    items.add(new DayTally.DayItem(day, List.of(w.get(i), h.get(i)), phase.inPregnancy(null)));
-                }
-                for (Support support : undecided.getOrDefault(day, List.of())) {
-                    items.add(new DayTally.DayItem(
-                            day, List.of(support.event()), phase.inPregnancy(support.ambiguity())));
+                if (w.isEmpty() || h.isEmpty()) {
+                    if (evaluations.containsKey(day)) {
+                        units.add(new Tally.Unit(
+                                day, List.of(sorted(evaluations, day).get(0))));
+                    }
+                } else {
+                    units.add(new Tally.Unit(day, List.of(w.get(0), h.get(0))));
                 }
             }
-            return items;
+            return units;
         }
 
         private void putUnless(boolean already, SortedMap<LocalDate, List<EventRef>> byDay, EventRef event) {

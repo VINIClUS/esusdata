@@ -15,90 +15,64 @@ import java.util.TreeMap;
  */
 final class OtherPractices {
 
-    /** "a partir da 20ª semana": certainly from IG 20s0d (DUM + 140) under every reading. */
-    private static final long DTPA_CERTAIN_FROM = 140;
-
-    /** IG 19s0d (DUM + 133): the first day the ordinal reading already accepts (AMB-C3-01). */
-    private static final long DTPA_ORDINAL_FROM = 133;
+    /** "a partir da 20ª semana": from IG 20s0d (DUM + 140), completed weeks (AMB-C3-01). */
+    private static final long DTPA_FROM = 140;
 
     private OtherPractices() {}
 
     /**
-     * F: a dose of "57" is certain in {@code [DUM + 140, D)} by a listed CBO; "talvez" in {@code
-     * DUM + 133..139} (AMB-C3-01), in {@code [D, D + 42]} from DUM + 133 on (AMB-C3-17 (i)) or by
-     * a CBO outside the lists (AMB-C3-13). Before DUM + 133 it never counts, even after an early D.
-     * The application date is the capability's scope column, never missing (EMENDA 1).
+     * F: a dose of "57", by any CBO that sends the record (AMB-C3-13), applied in {@code [DUM +
+     * 140, D + 42]} (AMB-C3-17). The application date is the capability's scope column, never
+     * missing (EMENDA 1).
      */
     static PracticeOutcome dtpa(PersonRecords person, GestationWindow window) {
-        SortedMap<LocalDate, TallyMark> byDate = new TreeMap<>();
+        SortedMap<LocalDate, Tally.Unit> byDate = new TreeMap<>();
         for (CanonicalImmunization dose : person.immunizations()) {
-            TallyMark mark = C3Codes.DTPA_ADULT.equals(C3Codes.token(dose.immunobiologicalCode()))
-                    ? dtpaMark(EventRef.of(dose), window)
-                    : null;
-            if (mark == null) {
-                continue;
+            if (C3Codes.DTPA_ADULT.equals(C3Codes.token(dose.immunobiologicalCode())) && inWindow(dose, window)) {
+                EventRef event = EventRef.of(dose);
+                byDate.merge(event.date(), Tally.Unit.of(event), OtherPractices::sameDose);
             }
-            byDate.merge(mark.events().get(0).date(), mark, OtherPractices::sameDose);
         }
         return Tally.decide(1, List.copyOf(byDate.values()));
     }
 
+    private static boolean inWindow(CanonicalImmunization dose, GestationWindow window) {
+        LocalDate date = C3Dates.parse(dose.applicationDate());
+        return date != null && window.day(date) >= DTPA_FROM && !date.isAfter(window.lastDay());
+    }
+
     /**
      * The same dose (person, "57", application date) from the MIV and from a transcription is one
-     * dose (MET-32): the certain record, else the first in evidence order.
+     * dose (MET-32): the first in evidence order.
      */
-    private static TallyMark sameDose(TallyMark a, TallyMark b) {
-        if (a.certain() != b.certain()) {
-            return a.certain() ? a : b;
-        }
+    private static Tally.Unit sameDose(Tally.Unit a, Tally.Unit b) {
         return EventRef.ORDER.compare(a.events().get(0), b.events().get(0)) <= 0 ? a : b;
     }
 
     /**
      * K: an individual dental encounter (MIAOI), or a collective activity (MIAC) with activity
-     * 05/06 and practice flúor/escovação (LEDI 2, 9) — only one of them being AMB-C3-19 — by a
-     * dentist or TSB during the pregnancy; another occupation of the family 3224 is AMB-C3-20.
+     * 05/06 and practice flúor/escovação (LEDI 2, 9) — both conditions, AMB-C3-19 — by a dentist
+     * or TSB (3224-05, 3224-25; AMB-C3-20) during the pregnancy.
      */
     static PracticeOutcome dental(PersonRecords person, GestationWindow window) {
-        List<TallyMark> marks = new ArrayList<>();
+        List<Tally.Unit> units = new ArrayList<>();
         for (CanonicalCareEvent event : person.dentalCare()) {
-            if (CboRule.DENTAL.accepts(event.cbo())) {
-                addPregnancy(marks, EventRef.of(event), CboRule.DENTAL.ambiguityOf(event.cbo()), window);
+            if (C3Codes.DENTAL_CBO.matches(event.cbo())) {
+                addPregnancy(units, EventRef.of(event), window);
             }
         }
         for (CanonicalMeasurement activity : person.measurements()) {
-            MiacMatch miac = MiacMatch.of(activity, C3Codes.MIAC_PRACTICES_ORAL_HEALTH);
-            if (miac.counts() && CboRule.DENTAL.accepts(activity.cbo())) {
-                Ambiguity byCbo = CboRule.DENTAL.ambiguityOf(activity.cbo());
-                addPregnancy(marks, EventRef.of(activity), miac.ambiguity(byCbo), window);
+            if (MiacMatch.counts(activity, C3Codes.MIAC_PRACTICES_ORAL_HEALTH)
+                    && C3Codes.DENTAL_CBO.matches(activity.cbo())) {
+                addPregnancy(units, EventRef.of(activity), window);
             }
         }
-        return Tally.decide(1, marks);
+        return Tally.decide(1, units);
     }
 
-    private static void addPregnancy(
-            List<TallyMark> marks, EventRef event, Ambiguity ambiguity, GestationWindow window) {
+    private static void addPregnancy(List<Tally.Unit> units, EventRef event, GestationWindow window) {
         if (window.inPregnancy(event.date())) {
-            marks.add(TallyMark.of(event, window.phaseOf(event.date()).inPregnancy(ambiguity)));
+            units.add(Tally.Unit.of(event));
         }
-    }
-
-    /** The dose's mark, or {@code null} when it falls outside every reading of the window. */
-    private static TallyMark dtpaMark(EventRef dose, GestationWindow window) {
-        LocalDate date = dose.date();
-        if (date == null) {
-            return null; // guard only: the capability never returns a dose without its date
-        }
-        long day = window.day(date);
-        if (day < DTPA_ORDINAL_FROM) {
-            return null;
-        }
-        if (!date.isBefore(window.end())) {
-            return date.isAfter(window.boundaryDay()) ? null : TallyMark.of(dose, Ambiguity.AMB_C3_17);
-        }
-        if (day >= DTPA_CERTAIN_FROM) {
-            return TallyMark.of(dose, C3Codes.LISTED_CBO.matches(dose.cbo()) ? null : Ambiguity.AMB_C3_13);
-        }
-        return TallyMark.of(dose, Ambiguity.AMB_C3_01);
     }
 }

@@ -10,12 +10,11 @@ import static esusdata.indicator.pack.c3.C3Fixtures.OTHER_INE;
 import static esusdata.indicator.pack.c3.C3Fixtures.OUTCOME;
 import static esusdata.indicator.pack.c3.C3Fixtures.SUBSTITUTE_END;
 import static esusdata.indicator.pack.c3.C3Fixtures.anchor;
-import static esusdata.indicator.pack.c3.C3Fixtures.assertAmbiguous;
 import static esusdata.indicator.pack.c3.C3Fixtures.assertMet;
+import static esusdata.indicator.pack.c3.C3Fixtures.assertNotMet;
 import static esusdata.indicator.pack.c3.C3Fixtures.care;
 import static esusdata.indicator.pack.c3.C3Fixtures.computeNovember;
 import static esusdata.indicator.pack.c3.C3Fixtures.context;
-import static esusdata.indicator.pack.c3.C3Fixtures.conventionPack;
 import static esusdata.indicator.pack.c3.C3Fixtures.dataset;
 import static esusdata.indicator.pack.c3.C3Fixtures.dental;
 import static esusdata.indicator.pack.c3.C3Fixtures.dum;
@@ -80,7 +79,7 @@ class C3PackTest {
     void descriptor_declaresElevenPracticesTheLimitationsAndNoCompleteGate() {
         PackDescriptor d = new C3Pack().descriptor();
         assertThat(d.id()).isEqualTo(C3Pack.ID).isEqualTo("c3-gestacao-puerperio");
-        assertThat(d.ruleVersion()).isEqualTo("c3-gestacao-puerperio@0.1.0");
+        assertThat(d.ruleVersion()).isEqualTo("c3-gestacao-puerperio@0.2.0");
         assertThat(d.code()).isEqualTo("C3");
         assertThat(d.valueKind()).isEqualTo(ValueKind.SCORE);
         assertThat(d.monthlyEligibility()).isEqualTo(MonthlyEligibility.MONTHS_WITH_COHORT_EVENT);
@@ -93,12 +92,15 @@ class C3PackTest {
                         BigInteger.TEN, nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine());
         assertThat(d.gates()).isEqualTo(ReleaseGates.noneComplete());
         assertThat(d.executionEnabled()).isFalse();
-        assertThat(d.standingLimitations()).isNotEmpty().noneMatch(l -> l.contains("Regra em implementação"));
-        // L1: the team type (eAP 76) is usually absent; L2: the outcome date is usually absent.
-        assertThat(d.standingLimitations())
-                .anySatisfy(l -> assertThat(l).containsAnyOf("L1", "tipo de equipe", "tipo da equipe"));
-        assertThat(d.standingLimitations())
-                .anySatisfy(l -> assertThat(l).containsAnyOf("L2", "data de desfecho", "Data de desfecho"));
+        // the 34 limitations of the decision record, each prefixed with its stable code
+        assertThat(d.standingLimitations()).hasSize(34);
+        for (int i = 0; i < 34; i++) {
+            assertThat(d.standingLimitations().get(i)).startsWith(String.format("C3-LIM-%02d: ", i + 1));
+        }
+        assertThat(d.standingLimitations()).noneMatch(l -> l.contains("RULE_AMBIGUITY"));
+        // L1: the team type (eAP 76) is absent (the only blocking gap); L2: the outcome date is absent.
+        assertThat(d.standingLimitations().get(4)).contains("tipo de equipe", "lacuna L1");
+        assertThat(d.standingLimitations().get(5)).contains("lacuna L2", "DUM+294");
     }
 
     @Test
@@ -196,7 +198,7 @@ class C3PackTest {
 
     @Test
     void met20_allElevenPracticesScoreOneHundredOnTheZeroToHundredScale() {
-        RuleOutcome outcome = computeNovember(conventionPack(), fullEpisode(P1));
+        RuleOutcome outcome = computeNovember(new C3Pack(), fullEpisode(P1));
         IndicatorResult result = outcome.result();
 
         assertThat(result.status()).isEqualTo(IndicatorStatus.COMPUTED);
@@ -220,39 +222,31 @@ class C3PackTest {
     }
 
     @Test
-    void met20_withoutTrimesterConventionGAndHAreAmbiguousAndTheOtherNineDecided() {
+    void met20_theProductionPackDecidesGAndHWithTheTrimesterConvention() {
         RuleOutcome outcome = computeNovember(new C3Pack(), fullEpisode(P1));
         IndicatorResult result = outcome.result();
 
-        assertThat(result.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(result.numerator()).isNull();
-        assertThat(result.valueExact()).isNull();
-        assertThat(result.valueText()).isNull();
-        assertThat(result.classification()).isNull();
-        assertThat(result.denominator()).isEqualTo(BigInteger.ONE);
-        assertThat(result.limitations()).anySatisfy(l -> assertThat(l).containsAnyOf("AMB-C3-02", "AMB_C3_02"));
+        assertThat(result.status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(result.limitations()).noneMatch(l -> l.contains("AMB-C3-02: não"));
         String key = episodeKey(P1, DUM);
-        assertThat(episodeRow(outcome, key).decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
-        assertThat(episodeRow(outcome, key).points()).isNull();
-        for (char code : List.of('A', 'B', 'C', 'D', 'E', 'F', 'I', 'J', 'K')) {
-            assertMet(practice(outcome, key, String.valueOf(code)), code == 'A' ? 10 : 9);
-        }
-        assertAmbiguous(practice(outcome, key, "G"), "02");
-        assertAmbiguous(practice(outcome, key, "H"), "02");
-        assertThat(result.components())
-                .filteredOn(c -> "G".equals(c.code()) || "H".equals(c.code()))
-                .hasSize(2)
-                .allSatisfy(c -> {
-                    assertThat(c.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-                    assertThat(c.value()).isNull();
-                });
+        assertMet(practice(outcome, key, "G"), 9);
+        assertMet(practice(outcome, key, "H"), 9);
+    }
+
+    @Test
+    void met20_theTrimesterConventionIsAHookOfThePack() {
+        // G tests on DUM+60: not in a first trimester that ends on DUM+50
+        C3Pack custom = C3Pack.withTrimesterConvention(new TrimesterConvention(50, 196));
+        RuleOutcome outcome = computeNovember(custom, fullEpisode(P1));
+        assertNotMet(practice(outcome, episodeKey(P1, DUM), "G"));
+        assertMet(practice(outcome, episodeKey(P1, DUM), "H"), 9);
     }
 
     // ---- CT-C3-02..07: points per episode and the team mean ----
 
     @Test
     void ct02_onlyAScoresTen() {
-        RuleOutcome outcome = computeNovember(conventionPack(), episode(P1, INE, "A"));
+        RuleOutcome outcome = computeNovember(new C3Pack(), episode(P1, INE, "A"));
         assertThat(outcome.result().numerator()).isEqualTo(BigInteger.TEN);
         assertThat(outcome.result().valueExact()).isEqualByComparingTo(ExactRatio.of(10, 1));
         assertThat(outcome.result().classification()).isEqualTo(Classification.REGULAR);
@@ -260,7 +254,7 @@ class C3PackTest {
 
     @Test
     void ct03_allButAScoresNinety() {
-        RuleOutcome outcome = computeNovember(conventionPack(), episode(P1, INE, "BCDEFGHIJK"));
+        RuleOutcome outcome = computeNovember(new C3Pack(), episode(P1, INE, "BCDEFGHIJK"));
         assertThat(outcome.result().numerator()).isEqualTo(BigInteger.valueOf(90));
         assertThat(outcome.result().valueExact()).isEqualByComparingTo(ExactRatio.of(90, 1));
         assertThat(outcome.result().classification()).isEqualTo(Classification.OTIMO);
@@ -270,7 +264,7 @@ class C3PackTest {
     void ct04_hundredAndFortySixAverageSeventyThreeBom() {
         List<Record> records = new ArrayList<>(fullEpisode(P1));
         records.addAll(episode(P2, INE, "ABCDE"));
-        IndicatorResult result = computeNovember(conventionPack(), records).result();
+        IndicatorResult result = computeNovember(new C3Pack(), records).result();
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(146));
         assertThat(result.denominator()).isEqualTo(BigInteger.TWO);
         assertThat(result.valueExact()).isEqualByComparingTo(ExactRatio.of(73, 1));
@@ -285,7 +279,7 @@ class C3PackTest {
         records.addAll(fullEpisode(P2));
         records.addAll(fullEpisode(P3));
         records.addAll(episode(P4, INE, ""));
-        IndicatorResult result = computeNovember(conventionPack(), records).result();
+        IndicatorResult result = computeNovember(new C3Pack(), records).result();
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(300));
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(4));
         assertThat(result.valueExact()).isEqualByComparingTo(ExactRatio.of(75, 1));
@@ -298,7 +292,7 @@ class C3PackTest {
         records.addAll(fullEpisode(P1));
         records.addAll(fullEpisode(P2));
         records.addAll(episode(P3, INE, "ABC"));
-        IndicatorResult result = computeNovember(conventionPack(), records).result();
+        IndicatorResult result = computeNovember(new C3Pack(), records).result();
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(228));
         assertThat(result.valueExact()).isEqualByComparingTo(ExactRatio.of(76, 1));
         assertThat(result.classification()).isEqualTo(Classification.OTIMO);
@@ -308,14 +302,14 @@ class C3PackTest {
     void ct07_fiftyIsSuficienteAndTwentyFiveIsRegular() {
         List<Record> two = new ArrayList<>(fullEpisode(P1));
         two.addAll(episode(P2, INE, ""));
-        IndicatorResult fifty = computeNovember(conventionPack(), two).result();
+        IndicatorResult fifty = computeNovember(new C3Pack(), two).result();
         assertThat(fifty.valueExact()).isEqualByComparingTo(ExactRatio.of(50, 1));
         assertThat(fifty.classification()).isEqualTo(Classification.SUFICIENTE);
 
         List<Record> four = new ArrayList<>(two);
         four.addAll(episode(P3, INE, ""));
         four.addAll(episode(P4, INE, ""));
-        IndicatorResult twentyFive = computeNovember(conventionPack(), four).result();
+        IndicatorResult twentyFive = computeNovember(new C3Pack(), four).result();
         assertThat(twentyFive.valueExact()).isEqualByComparingTo(ExactRatio.of(25, 1));
         assertThat(twentyFive.classification()).isEqualTo(Classification.REGULAR);
     }
@@ -368,7 +362,7 @@ class C3PackTest {
         List<Record> records = new ArrayList<>(fullEpisode(P1));
         records.addAll(episode(P2, OTHER_INE, ""));
         records.addAll(episode(P3, null, ""));
-        C3Pack pack = conventionPack();
+        C3Pack pack = new C3Pack();
 
         RuleOutcome computed = pack.compute(dataset(NOVEMBER, records), context(NOVEMBER));
         assertThat(computed.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
@@ -444,7 +438,7 @@ class C3PackTest {
         records.add(anchor(P5, dum(56), DUM));
         records.add(care(P5, dum(120)).ciap("W82").build());
 
-        RuleOutcome outcome = computeNovember(conventionPack(), records);
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
 
         List<EvidenceItem> episodes = outcome.evidence().stream()
                 .filter(e -> e.subjectKind() == EvidenceSubjectKind.EPISODE && e.component() == null)
@@ -548,7 +542,7 @@ class C3PackTest {
         records.add(dentalVisit);
         records.add(dentalVisit);
         records.add(records.get(2)); // the anchor consultation (after person and registration) again
-        RuleOutcome outcome = computeNovember(conventionPack(), records);
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
 
         String key = episodeKey(P1, DUM);
         assertThat(outcome.result().numerator()).isEqualTo(HUNDRED);

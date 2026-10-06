@@ -26,9 +26,9 @@ final class PracticeWeights {
         return specs.get(practice);
     }
 
-    /** The sum of the weights met or exempt; {@code null} while any practice is ambiguous. */
+    /** The sum of the weights met or exempt; {@code null} for a subject that was not scored. */
     BigInteger points(Subject subject) {
-        if (!subject.eligible() || subject.ambiguous()) {
+        if (!subject.eligible()) {
             return null;
         }
         List<ComponentSpec> satisfied = new ArrayList<>();

@@ -32,11 +32,12 @@ import java.util.TreeMap;
  * C3 — Cuidado na gestação e puerpério (Tech Spec §2.4; ficha transcrita em {@code docs/metodologia/c3-gestacao-puerperio.md}).
  *
  * <p>Episódios (gestações) identificados pela DUM ou pela idade gestacional do MIAI; coorte da
- * competência (gestantes e puérperas ativas, vínculo no corte, óbito, aborto); onze práticas em
- * decisão tri-estado (cumpre / não cumpre / ambígua); escore {@code Σ pontos ÷ episódios
- * elegíveis} na escala 0–100. Ambiguidade da ficha nunca vira escolha silenciosa: o resultado fica
- * {@code RULE_AMBIGUITY}. Enquanto houver portão incompleto, {@link #evaluate} devolve {@code
- * BLOCKED} com as contagens ({@link RuleOutcomes#gate}).
+ * competência (gestantes e puérperas ativas, vínculo no corte, óbito, aborto); onze práticas
+ * (cumpre / não cumpre); escore {@code Σ pontos ÷ episódios elegíveis} na escala 0–100. Cada
+ * ambiguidade da ficha tem leitura decidida e registrada em {@code docs/indicadores/decisoes/
+ * c3-gestacao-puerperio.md}: a regra nunca devolve {@code RULE_AMBIGUITY}. Enquanto houver
+ * portão incompleto, {@link #evaluate} devolve {@code BLOCKED} com as contagens ({@link
+ * RuleOutcomes#gate}).
  */
 public final class C3Pack implements IndicatorRule {
 
@@ -44,7 +45,7 @@ public final class C3Pack implements IndicatorRule {
     private static final String PUERPERIUM = "puerpério";
 
     public static final String ID = "c3-gestacao-puerperio";
-    public static final String RULE_VERSION = ID + "@0.1.0";
+    public static final String RULE_VERSION = ID + "@0.2.0";
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -139,16 +140,16 @@ public final class C3Pack implements IndicatorRule {
 
     private final TrimesterConvention convention;
 
-    /** The production rule: no trimester convention is documented (AMB-C3-02). */
+    /** The production rule: trimesters up to IG 13s6d and from IG 28s0d (AMB-C3-02). */
     public C3Pack() {
-        this(null);
+        this(TrimesterConvention.PRODUCTION);
     }
 
     private C3Pack(TrimesterConvention convention) {
         this.convention = convention;
     }
 
-    /** The rule once a trimester convention is documented at Portão B (AMB-C3-02). */
+    /** The rule with another trimester convention: a test hook. */
     static C3Pack withTrimesterConvention(TrimesterConvention convention) {
         return new C3Pack(Objects.requireNonNull(convention, "convention"));
     }
