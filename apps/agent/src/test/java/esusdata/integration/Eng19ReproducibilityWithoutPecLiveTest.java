@@ -75,8 +75,8 @@ class Eng19ReproducibilityWithoutPecLiveTest {
         ExtractionManifest reloadedManifest = reader.readManifest(extractDir, extractionId);
         List<CanonicalEncounter> canonicalEncounters = reader.readEncounters(extractDir, reloadedManifest);
 
-        IndicatorResult result = C1Rule.computeEvidenceOnly(
-                canonicalEncounters, reloadedManifest.municipalityIbge(), "2026-03", "2026-03-31");
+        IndicatorResult result =
+                C1Rule.compute(canonicalEncounters, reloadedManifest.municipalityIbge(), "2026-03", "2026-03-31");
 
         // --- Assert: identical to the independently-measured psql/pgJDBC baseline. ---
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(7100));

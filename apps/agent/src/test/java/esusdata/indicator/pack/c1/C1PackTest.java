@@ -60,7 +60,7 @@ class C1PackTest {
     }
 
     @Test
-    void theMunicipalResultIsC1RuleUnchanged() {
+    void theMunicipalResultIsC1RuleUnchangedAndUngated() {
         List<CanonicalEncounter> encounters = sample();
         RuleOutcome outcome = new C1Pack()
                 .evaluate(
@@ -68,7 +68,8 @@ class C1PackTest {
                         EvaluationContext.endOfMonth("3541307", MARCH));
         IndicatorResult expected = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
         assertThat(outcome.result()).isEqualTo(expected);
-        assertThat(outcome.result().status()).isEqualTo(IndicatorResult.IndicatorStatus.BLOCKED);
+        // ADR 0032: the pack never gates; the executor blocks it while a gate has not passed.
+        assertThat(outcome.result().status()).isEqualTo(IndicatorResult.IndicatorStatus.COMPUTED);
         assertThat(outcome.result().numerator()).isEqualTo(BigInteger.TWO);
         assertThat(outcome.result().denominator()).isEqualTo(BigInteger.valueOf(3));
     }

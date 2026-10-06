@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.auth.model.Role;
 import esusdata.indicator.model.EvaluationContext;
+import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.RuleOutcomes;
@@ -50,6 +51,7 @@ class QualityComponentApiTest extends ApiFixtureSupport {
         publishResult(manager, ibge, "2026-05", c1(ibge, "2026-05"), List.of()); // the next quadrimestre
         IndicatorResult c2 = RuleOutcomes.pending(
                         new C2Pack().descriptor(),
+                        GateStatus.pending(new C2Pack().descriptor()),
                         EvaluationContext.endOfMonth(ibge, YearMonth.of(2026, 2)),
                         "Regra em implementação (ADR 0030).")
                 .result();

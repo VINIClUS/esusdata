@@ -22,8 +22,8 @@ import org.junit.jupiter.api.Test;
 /**
  * What C1 publishes with no gate approved, pinned from v0.1.9 (ADR 0032): every C1 result,
  * municipal and per team, is BLOCKED with its exact counts — including a team whose encounters all
- * fall outside the ficha's CBO list (a 0/0 that was BLOCKED, never NO_DENOMINATOR). The gate
- * reasons are the only thing S1 adds (Portão C, which C1 used to take as passed).
+ * fall outside the ficha's CBO list (a 0/0 that was BLOCKED, never NO_DENOMINATOR). What changes
+ * with S1 is only the gate reasons: A, B and D as they apply (Portão E is gone, ADR 0032).
  */
 class C1PublishedBaselineTest {
 

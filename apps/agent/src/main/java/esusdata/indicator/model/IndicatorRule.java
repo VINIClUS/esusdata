@@ -8,9 +8,11 @@ import java.util.Optional;
  * clock. The run pipeline asks it what to read, reads it through the execution plane, and hands
  * the canonical records back.
  *
- * <p>{@link #evaluate} always returns the exact counts it computed; while {@link
- * PackDescriptor#executionEnabled()} is false the value and classification stay unavailable
- * ({@code BLOCKED}) and the gate reasons go into the limitations — see {@link RuleOutcomes#gate}.
+ * <p>{@link #evaluate} always returns the exact counts it computed, ungated: a rule never
+ * decides whether its value may be released. The release gates (ADR 0032) are the executor's job,
+ * applied in one place through {@link RuleOutcomes#gate} — while any has not passed, the value and
+ * classification stay unavailable ({@code BLOCKED}) and the reasons go into the limitations. A
+ * caller other than the executor must not publish or expose what {@link #evaluate} returns.
  */
 public interface IndicatorRule {
 

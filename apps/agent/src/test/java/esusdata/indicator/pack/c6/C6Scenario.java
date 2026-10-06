@@ -2,6 +2,7 @@ package esusdata.indicator.pack.c6;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.indicator.TestGates;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.CanonicalHomeVisit;
@@ -148,7 +149,8 @@ final class C6Scenario {
 
     /** The gated result ({@code new C6Pack().evaluate}) for the base competência. */
     RuleOutcome evaluate() {
-        return new C6Pack().evaluate(build(), context(COMPETENCIA));
+        C6Pack pack = new C6Pack();
+        return TestGates.published(pack.descriptor(), pack.evaluate(build(), context(COMPETENCIA)));
     }
 
     static CanonicalRegistration registration(String key, LocalDate date, String ine) {

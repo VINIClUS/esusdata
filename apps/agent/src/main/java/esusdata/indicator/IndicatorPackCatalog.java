@@ -1,6 +1,10 @@
 package esusdata.indicator;
 
 import esusdata.indicator.model.ComponentSpec;
+import esusdata.indicator.model.GateCheck;
+import esusdata.indicator.model.GateChecks;
+import esusdata.indicator.model.GateId;
+import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.ValueKind;
@@ -13,7 +17,7 @@ import java.util.Optional;
  * The catalog behind {@code GET /api/v1/indicator-packs} (§1.10 L385): every compiled rule plus
  * the Nota Final do Componente III, which is computed on read from published results (ADR 0030).
  * Framework-free. Being listed here does not enable execution (ENG-34): every pack ships with the
- * gates it has not passed, never silently omitted.
+ * gates it has not passed (ADR 0032), never silently omitted.
  */
 public final class IndicatorPackCatalog {
 
@@ -39,16 +43,30 @@ public final class IndicatorPackCatalog {
             List<String> requiredCapabilities,
             List<String> methodologySources,
             List<String> standingLimitations,
-            boolean runnable) {
+            boolean runnable,
+            GateStatus gates) {
+        /**
+         * The pack's gates as the registry and its own limitations say: A and D from the registry,
+         * B from the descriptor, C left pending — it is decided per source and per run, so {@code
+         * executionEnabled} and {@code blockedGates} here speak of A, B and D only.
+         */
         static PackEntry of(PackDescriptor d, boolean runnable) {
+            GateStatus gates = ReleaseGateRegistry.bundled()
+                    .statusOf(d)
+                    .withEvaluated(
+                            GateChecks.calculationModel(d, null),
+                            GateCheck.pending("avaliado por fonte e a cada execução"));
+            List<String> blocked = gates.incompleteReasons().stream()
+                    .filter(reason -> !reason.equals(GateId.C.incompleteReason()))
+                    .toList();
             return new PackEntry(
                     d.id(),
                     d.ruleVersion(),
                     d.family(),
                     d.unit(),
                     d.dependsOn(),
-                    d.executionEnabled(),
-                    d.blockedGates(),
+                    blocked.isEmpty(),
+                    blocked,
                     d.code(),
                     d.title(),
                     d.packageId(),
@@ -57,7 +75,8 @@ public final class IndicatorPackCatalog {
                     d.requiredCapabilities(),
                     d.methodologySources(),
                     d.standingLimitations(),
-                    runnable);
+                    runnable,
+                    gates);
         }
     }
 

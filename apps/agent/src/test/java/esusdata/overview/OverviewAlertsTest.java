@@ -75,6 +75,8 @@ class OverviewAlertsTest {
                 List.of(),
                 true,
                 List.of(),
+                List.of(),
+                false,
                 "r",
                 status,
                 null,

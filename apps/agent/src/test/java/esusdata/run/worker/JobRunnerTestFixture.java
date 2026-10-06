@@ -13,6 +13,7 @@ import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
 import esusdata.config.SqliteConfig;
 import esusdata.indicator.IndicatorRuleRegistry;
+import esusdata.indicator.ReleaseGateRegistry;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.result.JdbcEvidenceRepository;
 import esusdata.result.JdbcExtractionManifestRepository;
@@ -180,6 +181,12 @@ public final class JobRunnerTestFixture implements AutoCloseable {
                 liveAcquisitionCooldownMargin);
     }
 
+    /** The registry the executors of this fixture gate by: the shipped one unless a test passes packs. */
+    public ReleaseGateRegistry gateRegistry = ReleaseGateRegistry.bundled();
+
+    /** The compatibility matrix {@link #replay} checks the source's capabilities against (Portão C). */
+    public PecCompatibilityMatrix replayMatrix = PecCompatibilityMatrix.fromClasspathResource();
+
     /**
      * An executor over this fixture's database and extracts that resolves {@code rules} — any
      * {@link IndicatorRule} instance, registered in the release or not — before the registry (ADR
@@ -207,7 +214,8 @@ public final class JobRunnerTestFixture implements AutoCloseable {
                         }
                     }
                     return IndicatorRuleRegistry.require(pack, ruleVersion);
-                });
+                },
+                gateRegistry);
     }
 
     /**
@@ -240,7 +248,7 @@ public final class JobRunnerTestFixture implements AutoCloseable {
         if (!job.jobId().equals(jobId)) {
             throw new IllegalStateException("another queued job was taken first: " + job.jobId());
         }
-        return executor(PecCompatibilityMatrix.fromClasspathResource(), new UnusedAcquisition(), rule)
+        return executor(replayMatrix, new UnusedAcquisition(), rule)
                 .runFromExtract(context(job), new CancellationToken());
     }
 

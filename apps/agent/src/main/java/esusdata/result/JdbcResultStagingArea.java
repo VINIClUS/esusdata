@@ -47,8 +47,8 @@ public final class JdbcResultStagingArea implements ResultStagingArea {
                     extraction_id, adapter_version, calculation_policy_version, limitations_json,
                     input_fingerprint, evidence_grain, value_kind, value_exact_numerator,
                     value_exact_denominator, components_json, team_results_json,
-                    consolidation_eligible)
-                VALUES (?,?,?,?,?, 'OPEN', ?,?,?,?, ?,?,?,?,?,?, ?,?,?,?,?, ?,?, ?,?,?,?,?,?)
+                    consolidation_eligible, gate_snapshot_json)
+                VALUES (?,?,?,?,?, 'OPEN', ?,?,?,?, ?,?,?,?,?,?, ?,?,?,?,?, ?,?, ?,?,?,?,?,?,?)
                 """,
                 request.stagingId(),
                 request.jobId(),
@@ -77,7 +77,8 @@ public final class JdbcResultStagingArea implements ResultStagingArea {
                 exact == null ? null : exact.denominator().toString(),
                 ResultJson.writeComponents(result.components()),
                 ResultJson.writeTeams(request.teams()),
-                result.consolidationEligible() ? 1 : 0);
+                result.consolidationEligible() ? 1 : 0,
+                request.gateSnapshotJson());
         return request.stagingId();
     }
 

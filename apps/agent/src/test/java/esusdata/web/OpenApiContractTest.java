@@ -102,6 +102,31 @@ class OpenApiContractTest extends SecuritySliceTestSupport {
         assertThat(idempotencyKey.get("required")).isEqualTo(true);
     }
 
+    /**
+     * ADR 0032: the structured gates are documented where the API returns them — the pack catalog
+     * and the Painel's indicators — with the automated-check shape and no approver.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void gatesAreDocumentedOnThePackCatalogAndThePainelIndicator() throws Exception {
+        Map<String, Object> document;
+        try (InputStream in = Files.newInputStream(CONTRACT_PATH)) {
+            document = new Yaml().load(in);
+        }
+        Map<String, Object> schemas =
+                (Map<String, Object>) ((Map<String, Object>) document.get("components")).get("schemas");
+        Map<String, Object> pack =
+                (Map<String, Object>) ((Map<String, Object>) schemas.get("IndicatorPackResponse")).get("properties");
+        Map<String, Object> gate =
+                (Map<String, Object>) ((Map<String, Object>) schemas.get("GateResponse")).get("properties");
+        String overview = String.valueOf(schemas.get("Overview"));
+
+        assertThat(pack).containsKeys("gates", "gateRegistryStale", "blockedGates");
+        assertThat(gate).containsKeys("gate", "label", "status", "check", "checkedAt", "evidenceRefs");
+        assertThat(gate).doesNotContainKeys("approvedBy", "approvedAt");
+        assertThat(overview).contains("gates=").contains("gateRegistryStale=");
+    }
+
     private static Set<ParamRef> handlerParams(HandlerMethod handlerMethod) {
         Set<ParamRef> params = new TreeSet<>();
         for (MethodParameter parameter : handlerMethod.getMethodParameters()) {

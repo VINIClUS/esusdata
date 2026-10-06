@@ -1286,6 +1286,13 @@ components:
               missingCapabilities: { type: array, items: { type: string } }
               executionEnabled: { type: boolean }
               blockedGates: { type: array, items: { type: string } }
+              gates:
+                type: array
+                items: { $ref: "#/components/schemas/GateResponse" }
+                description: >-
+                  Portões A–D as they stand for this municipality (ADR 0032): C from its sources, A and D
+                  from the gate registry, B from the pack's own limitations.
+              gateRegistryStale: { type: boolean, description: "the registry only knows an older rule_version: its checks no longer count" }
               resultId: { type: string, nullable: true }
               status: { type: string, nullable: true, description: "the published result's status; null when not published" }
               value: { type: string, nullable: true }
@@ -1673,6 +1680,13 @@ components:
         blockedGates:
           type: array
           items: { type: string }
+          description: Reasons of the gates not passed, A, B and D (C is decided per source); kept for older clients.
+        gates:
+          type: array
+          items: { $ref: "#/components/schemas/GateResponse" }
+        gateRegistryStale:
+          type: boolean
+          description: The gate registry only knows an older rule_version of this pack ("aprovação anulada por nova versão").
         code: { type: string, example: C4 }
         title: { type: string, example: Cuidado da pessoa com diabetes }
         packageId: { type: string, example: qualidade-esf-eap-2026-06 }
@@ -1693,6 +1707,20 @@ components:
         runnable:
           type: boolean
           description: False for a composite read from published results (the Nota Final); nothing enqueues it.
+
+    GateResponse:
+      type: object
+      description: >-
+        One release gate (ADR 0032, amending Tech Spec §4.4: Portão E removed, A–D automatic). Nobody signs a
+        gate off, so there is a check id and a date, never an approver.
+      properties:
+        gate: { type: string, enum: [A, B, C, D] }
+        label: { type: string, example: Portão A (fonte e vigência) }
+        status: { type: string, enum: [PENDING, PASSED, FAILED] }
+        check: { type: string, nullable: true, description: "the automated check, e.g. conferencia-fichas@1" }
+        checkedAt: { type: string, nullable: true, description: "yyyy-MM-dd; null while pending or when read outside a run" }
+        evidenceRefs: { type: array, items: { type: string }, description: Repo-relative documents the check relied on. }
+        note: { type: string, nullable: true }
 
     ValueKind:
       type: string

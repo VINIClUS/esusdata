@@ -3,10 +3,13 @@ package esusdata.result;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.auth.model.Role;
+import esusdata.indicator.TestGates;
 import esusdata.indicator.model.CanonicalEncounter;
 import esusdata.indicator.model.CanonicalModality;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.SourceRef;
+import esusdata.indicator.pack.c1.C1Pack;
 import esusdata.indicator.pack.c1.C1Rule;
 import esusdata.web.ApiFixtureSupport;
 import java.net.URI;
@@ -36,8 +39,10 @@ class BlockedResultRenderingTest extends ApiFixtureSupport {
                 encounter(0, CanonicalModality.PROGRAMADO),
                 encounter(1, CanonicalModality.PROGRAMADO),
                 encounter(2, CanonicalModality.ESPONTANEO));
-        // Default overload uses ReleaseGates.knownIncomplete() — the real, current gate state.
-        IndicatorResult blocked = C1Rule.compute(encounters, MUNICIPALITY, "2026-03", "2026-03-31");
+        // The rule is ungated; the executor's gates, as this release ships them, block it (ADR 0032).
+        IndicatorResult blocked = RuleOutcomes.gate(
+                TestGates.shipped(new C1Pack().descriptor()),
+                C1Rule.compute(encounters, MUNICIPALITY, "2026-03", "2026-03-31"));
         assertThat(blocked.status()).isEqualTo(IndicatorResult.IndicatorStatus.BLOCKED);
 
         publishResult(manager, MUNICIPALITY, "2026-03", blocked, List.of());

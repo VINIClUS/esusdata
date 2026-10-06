@@ -2,8 +2,10 @@ package esusdata.indicator.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.indicator.TestGates;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import java.math.BigInteger;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -11,7 +13,7 @@ import org.junit.jupiter.api.Test;
 /** §4.4: an unreleased pack keeps its exact counts but never shows a value or a band. */
 class RuleOutcomesTest {
 
-    private static PackDescriptor descriptor(ReleaseGates gates, List<String> standing) {
+    private static PackDescriptor descriptor(List<String> standing) {
         return new PackDescriptor(
                 "c9-teste",
                 "c9-teste@0.1.0",
@@ -25,7 +27,6 @@ class RuleOutcomesTest {
                 "c9-exact-score@1",
                 List.of("citizen"),
                 List.of(ComponentSpec.practice("A", "A", 100, "12 meses")),
-                gates,
                 standing,
                 MonthlyEligibility.ALL_MONTHS,
                 BudgetHint.engineeringDefault(),
@@ -57,23 +58,41 @@ class RuleOutcomesTest {
 
     @Test
     void anUnreleasedPackBlocksTheValueAndKeepsTheCounts() {
-        IndicatorResult gated = RuleOutcomes.gate(descriptor(ReleaseGates.noneComplete(), List.of()), computed());
+        IndicatorResult gated = RuleOutcomes.gate(pending(), computed());
         assertThat(gated.status()).isEqualTo(IndicatorStatus.BLOCKED);
         assertThat(gated.valueText()).isNull();
         assertThat(gated.valueExact()).isNull();
         assertThat(gated.classification()).isNull();
         assertThat(gated.numerator()).isEqualTo(BigInteger.valueOf(100));
         assertThat(gated.components()).hasSize(1);
-        assertThat(gated.limitations()).contains("limitação própria").hasSize(6);
+        assertThat(gated.limitations()).contains("limitação própria").hasSize(5);
     }
 
     @Test
     void aReleasedPackPublishesAsComputed() {
         IndicatorResult result = computed();
-        assertThat(RuleOutcomes.gate(descriptor(ReleaseGates.allComplete(), List.of()), result))
-                .isSameAs(result);
-        assertThat(descriptor(ReleaseGates.allComplete(), List.of("pendência")).executionEnabled())
-                .isFalse();
+        assertThat(RuleOutcomes.gate(passed(), result)).isSameAs(result);
+    }
+
+    @Test
+    void aBlockingStandingLimitationFailsPortaoBEvenWithEveryRegisteredGatePassed() {
+        PackDescriptor withLimitation = descriptor(List.of("pendência"));
+        GateCheck registered = new GateCheck(GateCheck.State.PASSED, "x@1", "2026-10-06", List.of(), null);
+        GateStatus status = GateStatus.pending(withLimitation)
+                .withEvaluated(
+                        GateChecks.calculationModel(withLimitation, LocalDate.of(2026, 10, 6)),
+                        GateChecks.adapter(List.of(), null));
+        assertThat(status.check(GateId.B).state()).isEqualTo(GateCheck.State.FAILED);
+        assertThat(RuleOutcomes.gate(status, computed()).status()).isEqualTo(IndicatorStatus.BLOCKED);
+        assertThat(registered.isPassed()).isTrue();
+    }
+
+    private static GateStatus pending() {
+        return GateStatus.pending(descriptor(List.of()));
+    }
+
+    private static GateStatus passed() {
+        return TestGates.allPassed(descriptor(List.of()));
     }
 
     @Test
@@ -91,16 +110,16 @@ class RuleOutcomesTest {
                 "3541307",
                 List.of(),
                 "c9-exact-score@1");
-        IndicatorResult gated = RuleOutcomes.gate(descriptor(ReleaseGates.noneComplete(), List.of()), noDenominator);
+        IndicatorResult gated = RuleOutcomes.gate(pending(), noDenominator);
         assertThat(gated.status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
-        assertThat(gated.limitations()).hasSize(5);
+        assertThat(gated.limitations()).hasSize(4);
     }
 
     @Test
     void gatingAnOutcomeGatesEveryTeam() {
         RuleOutcome outcome =
                 new RuleOutcome(computed(), List.of(new TeamResult("0000000001", null, computed())), List.of());
-        RuleOutcome gated = RuleOutcomes.gate(descriptor(ReleaseGates.noneComplete(), List.of()), outcome);
+        RuleOutcome gated = RuleOutcomes.gate(pending(), outcome);
         assertThat(gated.teams())
                 .singleElement()
                 .satisfies(t -> assertThat(t.result().status()).isEqualTo(IndicatorStatus.BLOCKED));
@@ -109,7 +128,8 @@ class RuleOutcomesTest {
     @Test
     void aPendingPackSaysWhyAndNeverCounts() {
         RuleOutcome pending = RuleOutcomes.pending(
-                descriptor(ReleaseGates.noneComplete(), List.of("pendente")),
+                descriptor(List.of("pendente")),
+                pending(),
                 EvaluationContext.endOfMonth("3541307", YearMonth.of(2026, 3)),
                 "em implementação");
         assertThat(pending.result().status()).isEqualTo(IndicatorStatus.BLOCKED);

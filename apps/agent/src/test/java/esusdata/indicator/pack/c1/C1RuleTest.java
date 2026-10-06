@@ -8,7 +8,6 @@ import esusdata.indicator.model.CanonicalModality;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.SourceRef;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -25,7 +24,7 @@ class C1RuleTest {
     @Test
     void met03_zeroNumeratorWithValidDenominatorIsARealZeroNotAFailure() {
         List<CanonicalEncounter> encounters = encounters(0, 5, 0);
-        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.COMPUTED);
         assertThat(result.numerator()).isEqualTo(BigInteger.ZERO);
@@ -38,7 +37,7 @@ class C1RuleTest {
     @Test
     void met04_zeroDenominatorYieldsNullValueAndNoDenominatorStatus() {
         List<CanonicalEncounter> encounters = encounters(0, 0, 0);
-        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.NO_DENOMINATOR);
         assertThat(result.valueText()).isNull();
@@ -50,13 +49,12 @@ class C1RuleTest {
     @Test
     void met18_60PercentIsOtimoAnd80PercentIsRegular() {
         // 60 programados, 40 espontaneos -> 60/(60+40) = 60%
-        IndicatorResult sixty =
-                C1Rule.computeEvidenceOnly(encounters(60, 40, 0, "2026-01-15"), "3541307", "2026-01", "2026-01-31");
+        IndicatorResult sixty = C1Rule.compute(encounters(60, 40, 0, "2026-01-15"), "3541307", "2026-01", "2026-01-31");
         assertThat(sixty.classification()).isEqualTo(Classification.OTIMO);
 
         // 80 programados, 20 espontaneos -> 80%
         IndicatorResult eighty =
-                C1Rule.computeEvidenceOnly(encounters(80, 20, 0, "2026-02-15"), "3541307", "2026-02", "2026-02-28");
+                C1Rule.compute(encounters(80, 20, 0, "2026-02-15"), "3541307", "2026-02", "2026-02-28");
         assertThat(eighty.classification()).isEqualTo(Classification.REGULAR);
     }
 
@@ -85,7 +83,7 @@ class C1RuleTest {
     @Test
     void unmappedEncountersAreExcludedFromBothArmsAndReportedAsALimitation() {
         List<CanonicalEncounter> encounters = encounters(6, 4, 3);
-        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(6));
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(10)); // 6+4, not 13
@@ -96,7 +94,7 @@ class C1RuleTest {
     @Test
     void realData202603BaselineReproducesRegularAt70_7947Percent() {
         List<CanonicalEncounter> encounters = encounters(7100, 2929, 0);
-        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.COMPUTED);
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(7100));
@@ -106,34 +104,12 @@ class C1RuleTest {
     }
 
     @Test
-    void normalCalculationIsBlockedUntilEveryReleaseGateIsExplicitlyComplete() {
+    void theRuleIsUngatedAndKeepsItsStandingLimitationsForPortaoB() {
         IndicatorResult result = C1Rule.compute(encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31");
-
-        assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.BLOCKED);
-        assertThat(result.valueText()).isNull();
-        assertThat(result.classification()).isNull();
-        assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(60));
-        assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(100));
-        assertThat(result.limitations()).anyMatch(l -> l.contains("Portão"));
-    }
-
-    @Test
-    void evidenceOnlyCalculationRemainsAvailableDespiteStandingLimitations() {
-        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.COMPUTED);
         assertThat(result.valueText()).isEqualTo("60.0000");
         assertThat(result.classification()).isEqualTo(Classification.OTIMO);
-    }
-
-    @Test
-    void allCompleteFlagsCannotOverrideKnownStandingLimitations() {
-        IndicatorResult result =
-                C1Rule.compute(encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31", ReleaseGates.allComplete());
-
-        assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.BLOCKED);
-        assertThat(result.valueText()).isNull();
-        assertThat(result.classification()).isNull();
         assertThat(result.limitations()).anyMatch(l -> l.contains("C1-LIM-01"));
     }
 
@@ -144,7 +120,7 @@ class C1RuleTest {
             encounters.add(encounterWithCbo("p" + cbo, CanonicalModality.PROGRAMADO, cbo));
             encounters.add(encounterWithCbo("e" + cbo, CanonicalModality.ESPONTANEO, cbo));
         }
-        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(7));
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(14));
@@ -159,7 +135,7 @@ class C1RuleTest {
         encounters.add(encounterWithCbo("x1", CanonicalModality.PROGRAMADO, "223405"));
         encounters.add(encounterWithCbo("x2", CanonicalModality.ESPONTANEO, "515105"));
         encounters.add(encounterWithCbo("x3", CanonicalModality.PROGRAMADO, "225105"));
-        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(2));
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(4));
@@ -171,7 +147,7 @@ class C1RuleTest {
         List<CanonicalEncounter> encounters = new ArrayList<>(encounters(1, 1, 0));
         encounters.add(encounterWithCbo("n1", CanonicalModality.PROGRAMADO, null));
         encounters.add(encounterWithCbo("n2", CanonicalModality.ESPONTANEO, "  "));
-        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.numerator()).isEqualTo(BigInteger.ONE);
         assertThat(result.denominator()).isEqualTo(BigInteger.TWO);
@@ -183,7 +159,7 @@ class C1RuleTest {
         List<CanonicalEncounter> encounters = List.of(
                 encounterWithCbo("h1", CanonicalModality.PROGRAMADO, "2251-42"),
                 encounterWithCbo("h2", CanonicalModality.ESPONTANEO, "2235-05"));
-        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.numerator()).isEqualTo(BigInteger.ONE);
         assertThat(result.denominator()).isEqualTo(BigInteger.TWO);
@@ -194,7 +170,7 @@ class C1RuleTest {
         List<CanonicalEncounter> encounters = List.of(
                 encounterWithCbo("u1", CanonicalModality.UNMAPPED, "515105"),
                 encounterWithCbo("u2", CanonicalModality.UNMAPPED, "225142"));
-        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
+        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.limitations()).anyMatch(l -> l.contains("1 atendimento(s) com CBO ausente ou fora"));
         assertThat(result.limitations()).anyMatch(l -> l.contains("1 atendimento(s) com tipo de atendimento"));
@@ -226,14 +202,14 @@ class C1RuleTest {
 
     @Test
     void evidenceOutsideTheRequestedMunicipalityIsRejectedBeforeCounting() {
-        assertThatThrownBy(() -> C1Rule.computeEvidenceOnly(encounters(1, 0, 0), "3550308", "2026-03", "2026-03-31"))
+        assertThatThrownBy(() -> C1Rule.compute(encounters(1, 0, 0), "3550308", "2026-03", "2026-03-31"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("municipality");
     }
 
     @Test
     void evidenceOutsideTheRequestedCompetencyIsRejectedBeforeCounting() {
-        assertThatThrownBy(() -> C1Rule.computeEvidenceOnly(encounters(1, 0, 0), "3541307", "2026-04", "2026-04-30"))
+        assertThatThrownBy(() -> C1Rule.compute(encounters(1, 0, 0), "3541307", "2026-04", "2026-04-30"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("referencePeriod");
     }

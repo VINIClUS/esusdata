@@ -31,6 +31,7 @@ import static esusdata.indicator.pack.c3.C3Fixtures.supporting;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import esusdata.indicator.TestGates;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ComponentSpec;
@@ -44,7 +45,6 @@ import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.SourceRef;
@@ -90,7 +90,7 @@ class C3PackTest {
                 .extracting(ComponentSpec::weight)
                 .containsExactly(
                         BigInteger.TEN, nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine());
-        assertThat(d.gates()).isEqualTo(ReleaseGates.noneComplete());
+        assertThat(TestGates.shipped(d).isComplete()).isFalse();
         assertThat(d.executionEnabled()).isFalse();
         // the 34 limitations of the decision record, each prefixed with its stable code
         assertThat(d.standingLimitations()).hasSize(34);
@@ -330,8 +330,9 @@ class C3PackTest {
         assertThat(computed.valueText()).isEqualTo("0.0000");
         assertThat(computed.classification()).isEqualTo(Classification.REGULAR);
 
-        IndicatorResult gated =
-                pack.evaluate(dataset(NOVEMBER, records), context(NOVEMBER)).result();
+        IndicatorResult gated = TestGates.published(
+                        pack.descriptor(), pack.evaluate(dataset(NOVEMBER, records), context(NOVEMBER)))
+                .result();
         assertThat(gated.status()).isEqualTo(IndicatorStatus.BLOCKED);
         assertThat(gated.numerator()).isEqualTo(BigInteger.ZERO);
         assertThat(gated.denominator()).isEqualTo(BigInteger.TWO);
@@ -372,7 +373,8 @@ class C3PackTest {
         assertThat(computed.result().valueText()).isEqualTo("50.0000");
         assertThat(computed.result().classification()).isEqualTo(Classification.SUFICIENTE);
 
-        RuleOutcome outcome = pack.evaluate(dataset(NOVEMBER, records), context(NOVEMBER));
+        RuleOutcome outcome =
+                TestGates.published(pack.descriptor(), pack.evaluate(dataset(NOVEMBER, records), context(NOVEMBER)));
         IndicatorResult result = outcome.result();
         assertThat(result.status()).isEqualTo(IndicatorStatus.BLOCKED);
         assertThat(result.numerator()).isEqualTo(HUNDRED);

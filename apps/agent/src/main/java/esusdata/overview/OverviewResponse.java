@@ -1,5 +1,6 @@
 package esusdata.overview;
 
+import esusdata.indicator.GateResponse;
 import java.util.List;
 
 /**
@@ -48,6 +49,8 @@ public record OverviewResponse(
             List<String> missingCapabilities,
             boolean executionEnabled,
             List<String> blockedGates,
+            List<GateResponse> gates,
+            boolean gateRegistryStale,
             String resultId,
             String status,
             String value,

@@ -5,7 +5,6 @@ import esusdata.indicator.model.ComponentKind;
 import esusdata.indicator.model.ComponentSpec;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.ValueKind;
 import java.math.BigInteger;
 import java.util.List;
@@ -42,7 +41,6 @@ public final class ComponentIII {
                     indicator("c5-cuidado-hipertensao", "C5 — Cuidado da pessoa com hipertensão", 1),
                     indicator("c6-cuidado-pessoa-idosa", "C6 — Cuidado da pessoa idosa", 1),
                     indicator("c7-prevencao-cancer", "C7 — Cuidado da mulher na prevenção do câncer", 2)),
-            ReleaseGates.noneComplete(),
             List.of(
                     "Dependência dos portões de C1–C7: a Nota Final só existe quando os resultados mensais dos sete"
                             + " indicadores do quadrimestre estão publicados e calculados; um mês bloqueado, ausente ou"

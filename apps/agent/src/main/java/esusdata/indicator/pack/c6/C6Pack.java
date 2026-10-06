@@ -16,10 +16,8 @@ import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
-import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.Scores;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
@@ -152,7 +150,6 @@ public final class C6Pack implements IndicatorRule {
                             "Ter registro de 01 (uma) dose da vacina contra influenza, nos últimos 12 meses.",
                             25,
                             TWELVE_MONTHS)),
-            ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.practicesPack(),
@@ -201,7 +198,7 @@ public final class C6Pack implements IndicatorRule {
 
     @Override
     public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
-        return RuleOutcomes.gate(DESCRIPTOR, compute(data, context));
+        return compute(data, context);
     }
 
     @Override

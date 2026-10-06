@@ -3,6 +3,7 @@ package esusdata.indicator.pack.componente3;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ComponentSpec;
 import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
@@ -77,12 +78,12 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
         List<UnitResult> units = input.units().stream()
                 .map(unit -> unit(quadrimestre, unit, municipal, rules))
                 .toList();
-        return new ComponentIIIResult(quadrimestre, units, limitations(quadrimestre));
+        return new ComponentIIIResult(quadrimestre, units, limitations(quadrimestre, input.gates()));
     }
 
-    private static List<String> limitations(Quadrimestre quadrimestre) {
+    private static List<String> limitations(Quadrimestre quadrimestre, GateStatus gates) {
         List<String> limitations = new ArrayList<>(ComponentIII.DESCRIPTOR.standingLimitations());
-        limitations.addAll(ComponentIII.DESCRIPTOR.blockedGates());
+        limitations.addAll(gates.incompleteReasons());
         if (FinancialTransition.isDerived(quadrimestre)) {
             limitations.add("AMB-CIII-10: a classificação financeira de " + quadrimestre
                     + " é derivada (Portaria GM/MS nº 10.994/2026, § 3º com § 6º), não literal.");

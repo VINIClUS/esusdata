@@ -1,5 +1,6 @@
 package esusdata.indicator.pack.c5;
 
+import esusdata.indicator.TestGates;
 import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalDataset;
@@ -567,7 +568,8 @@ final class C5TestData {
 
         /** The gated result ({@code evaluate}) for competência 2026-03. */
         RuleOutcome evaluate() {
-            return new C5Pack().evaluate(dataset(), march());
+            C5Pack pack = new C5Pack();
+            return TestGates.published(pack.descriptor(), pack.evaluate(dataset(), march()));
         }
 
         /** The result before the release gates, for competência 2026-03. */

@@ -191,6 +191,12 @@
         <directory>${project.basedir}/../../contracts/compatibility</directory>
         <targetPath>compatibility</targetPath>
       </resource>
+      <!-- the release-gate registry is a contract too (ADR 0032); the jar carries the file the
+           application validates at startup, never the evidence documents it points at -->
+      <resource>
+        <directory>${project.basedir}/../../contracts/indicators</directory>
+        <targetPath>indicators</targetPath>
+      </resource>
     </resources>
     <!-- Build-plugin floors (ADR 0021): the backend-build SBOM is scanned like what ships, and
          these plugins, already at their newest release, still pull libraries with HIGH CVEs. Each

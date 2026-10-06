@@ -16,7 +16,6 @@ import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
@@ -54,7 +53,6 @@ public final class C1Pack implements IndicatorRule {
             C1Rule.CALCULATION_POLICY_VERSION,
             List.of(CAPABILITY),
             List.of(),
-            ReleaseGates.adapterOnly(),
             C1Rule.standingLimitations(),
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.engineeringDefault(),

@@ -27,9 +27,7 @@ import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.RuleOutcome;
-import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
 import java.math.BigInteger;
@@ -178,7 +176,6 @@ public final class C2Pack implements IndicatorRule {
                             "Ter vacinas contra difteria, tétano, coqueluche, hepatite B, infecções causadas por Haemophilus influenzae tipo b, poliomielite, sarampo, caxumba e rubéola, pneumocócica, registradas com todas as doses recomendadas.",
                             20,
                             "sem janela de idade própria (AMB-C2-10)")),
-            ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.MONTHS_WITH_COHORT_EVENT,
             BudgetHint.practicesPack(),
@@ -212,7 +209,7 @@ public final class C2Pack implements IndicatorRule {
 
     @Override
     public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
-        return RuleOutcomes.gate(DESCRIPTOR, compute(data, context));
+        return compute(data, context);
     }
 
     /**

@@ -10,6 +10,7 @@ import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.DataRequirements;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.RuleOutcome;
@@ -227,7 +228,7 @@ class PackReplayTest {
 
         @Override
         public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
-            return RuleOutcomes.pending(pack.descriptor(), context, PENDING);
+            return RuleOutcomes.pending(pack.descriptor(), GateStatus.pending(pack.descriptor()), context, PENDING);
         }
 
         @Override

@@ -215,10 +215,10 @@ class ReportExportStoreTest {
                     created_at, state, indicator_pack, rule_version, municipality_ibge, reference_period,
                     status, value_text, numerator_text, denominator_text, denominator_kind, data_cutoff,
                     extraction_id, adapter_version, calculation_policy_version, input_fingerprint,
-                    evidence_grain)
+                    evidence_grain, gate_snapshot_json)
                 VALUES (?, ?, 1, 'proc-1', ?, 'PUBLISHED', ?, 'c1-mais-acesso@0.2.0', ?, ?, 'COMPUTED',
                     '60.0000', '3', '5', 'K', '2026-03-31', ?, 'adapter@1', 'c1-exact-ratio@1', 'fp',
-                    'ENCOUNTER')
+                    'ENCOUNTER', '{}')
                 """, stagingId, jobId, publishedAt, C1, ibge, period, extractionId);
         jdbc.update(
                 """
@@ -227,10 +227,10 @@ class ReportExportStoreTest {
                     denominator_text, denominator_kind, data_cutoff, extraction_id, adapter_version,
                     calculation_policy_version, input_fingerprint, result_nature, validation_status,
                     completeness_status, consistency_level, reproducibility_level, canonical_schema_version,
-                    evidence_grain, app_build, published_at)
+                    evidence_grain, app_build, published_at, gate_snapshot_json)
                 VALUES (?, ?, ?, ?, ?, ?, 'c1-mais-acesso@0.2.0', ?, ?, 'COMPUTED', '60.0000', '3', '5', 'K',
                     '2026-03-31', ?, 'adapter@1', 'c1-exact-ratio@1', 'fp', 'OFFICIAL_RULE', 'VALID',
-                    'COMPLETE', 'SNAPSHOT', 'REPRODUCIBLE', 'canonical@1', 'ENCOUNTER', 'dev', ?)
+                    'COMPLETE', 'SNAPSHOT', 'REPRODUCIBLE', 'canonical@1', 'ENCOUNTER', 'dev', ?, '{}')
                 """,
                 resultId,
                 jobId,

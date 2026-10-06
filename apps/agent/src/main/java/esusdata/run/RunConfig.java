@@ -5,6 +5,7 @@ import esusdata.auth.ScopeResolver;
 import esusdata.config.SqliteConfig;
 import esusdata.config.SqliteProperties;
 import esusdata.indicator.IndicatorRuleRegistry;
+import esusdata.indicator.ReleaseGateRegistry;
 import esusdata.result.JdbcEvidenceRepository;
 import esusdata.result.JdbcExtractionManifestRepository;
 import esusdata.result.JdbcResultRepository;
@@ -216,11 +217,21 @@ public class RunConfig {
         return new SourcePacks(capabilityEligibility);
     }
 
+    /**
+     * ADR 0032: the release-gate registry, loaded and validated when the context starts — an invalid
+     * file, or a registered pack without an entry, stops the application; it never runs without gates.
+     */
+    @Bean
+    public ReleaseGateRegistry releaseGateRegistry() {
+        return ReleaseGateRegistry.bundled();
+    }
+
     /** ADR 0030: the Nota Final do Componente III, computed on read from published results. */
     @Bean
     @DependsOn(SqliteConfig.FLYWAY_MIGRATION)
-    public QualityComponentService qualityComponentService(ResultRepository resultRepository, Clock clock) {
-        return new QualityComponentService(resultRepository, clock);
+    public QualityComponentService qualityComponentService(
+            ResultRepository resultRepository, Clock clock, ReleaseGateRegistry releaseGateRegistry) {
+        return new QualityComponentService(resultRepository, clock, releaseGateRegistry);
     }
 
     // --- jobrunner -------------------------------------------------------------------------
@@ -326,7 +337,8 @@ public class RunConfig {
             Acquisition acquisitionPort,
             AcquisitionGuard acquisitionGuard,
             Duration liveAcquisitionCooldownMargin,
-            CapabilityEligibility capabilityEligibility) {
+            CapabilityEligibility capabilityEligibility,
+            ReleaseGateRegistry releaseGateRegistry) {
         return new RunExecutor(
                 extractStore,
                 jobRepository,
@@ -340,7 +352,8 @@ public class RunConfig {
                 acquisitionGuard,
                 liveAcquisitionCooldownMargin,
                 capabilityEligibility,
-                IndicatorRuleRegistry::require);
+                IndicatorRuleRegistry::require,
+                releaseGateRegistry);
     }
 
     // JobWorker implements SmartLifecycle — Spring's lifecycle processor calls start()/stop()
