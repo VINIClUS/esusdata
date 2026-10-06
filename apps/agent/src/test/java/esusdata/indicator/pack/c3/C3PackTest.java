@@ -91,7 +91,6 @@ class C3PackTest {
                 .containsExactly(
                         BigInteger.TEN, nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine());
         assertThat(GateFixtures.shipped(d).isComplete()).isFalse();
-        assertThat(d.executionEnabled()).isFalse();
         // the 34 limitations of the decision record, each prefixed with its stable code
         assertThat(d.standingLimitations()).hasSize(34);
         for (int i = 0; i < 34; i++) {

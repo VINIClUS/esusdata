@@ -18,7 +18,7 @@
     },
     {
       "pack": "c2-desenvolvimento-infantil",
-      "rule_version": "c2-desenvolvimento-infantil@0.1.0",
+      "rule_version": "c2-desenvolvimento-infantil@0.2.0",
       "gates": {
         "A": {
           "status": "PENDING",
@@ -33,7 +33,7 @@
     },
     {
       "pack": "c3-gestacao-puerperio",
-      "rule_version": "c3-gestacao-puerperio@0.1.0",
+      "rule_version": "c3-gestacao-puerperio@0.2.0",
       "gates": {
         "A": {
           "status": "PENDING",
@@ -108,7 +108,7 @@
     },
     {
       "pack": "componente-iii-nota-final",
-      "rule_version": "componente-iii-nota-final@0.2.0",
+      "rule_version": "componente-iii-nota-final@0.3.0",
       "gates": {
         "A": {
           "status": "PENDING",
