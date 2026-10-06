@@ -49,7 +49,7 @@ public final class C5Pack implements IndicatorRule {
     private static final String TWELVE_MONTHS = "12 meses";
 
     public static final String ID = "c5-cuidado-hipertensao";
-    public static final String RULE_VERSION = ID + "@0.1.0";
+    public static final String RULE_VERSION = ID + "@0.2.0";
 
     /**
      * C5 has no age criterion and counts its windows in civil months ({@link
@@ -59,37 +59,50 @@ public final class C5Pack implements IndicatorRule {
     public static final AgeAt.AnniversaryRule ANNIVERSARY_RULE = AgeAt.AnniversaryRule.CLAMP_TO_MONTH_END;
 
     private static final List<String> STANDING_LIMITATIONS = List.of(
-            "Item 4.4: registros de outros municípios e estabelecimentos do país não estão no PEC local.",
-            "Histórico da condição «desde 2013» limitado ao que a instalação local do PEC registrou.",
-            "Óbito no CadSUS fora do alcance: usa o óbito e a saída do cadastro registrados no PEC.",
-            "Lacuna L8: vínculo da NT 30/2025 e desempate da Portaria SAPS/MS 161/2024 reconstruídos pela"
-                    + " versão do cadastro individual vigente no corte.",
-            "Lacuna L1: tipo de equipe ausente no DW. Sem tipo comprovado, nem a validação eSF 70/eAP 76"
-                    + " (item 24 b) nem a exceção eAP 76 da prática D (AMB-C5-01) são aplicadas; D é exigida.",
-            "Cadastro individual lido nos últimos 24 meses: pessoa cuja última versão é anterior fica sem"
-                    + " vínculo (convenção do pacote; a NT 30/2025 não foi transcrita).",
-            "Validação de equipes e SCNES (Portaria GM/MS 3.493/2024; PRC GM/MS 02/2017) fora do alcance do"
-                    + " PEC local.",
-            "Conformidade da identificação com o CadSUS (item 24 a) não conferida.",
-            "Corte de envio no 20º dia útil e envio tardio da gestão local (itens 11 e 33) fora do alcance.",
-            "Lacuna L12: situação vigente do problema lida pela última linha de cada código.",
-            "Lacuna L6: PA da visita domiciliar (MIVDT) sem campo no registro canônico; não entra na prática B.",
-            "Lacuna L5: o DW não tem PA de participante de atividade coletiva; o MIAC (AMB-C5-06) só"
-                    + " comprova B se a medição vier com PA.",
-            "MIAO (atendimento odontológico) não aceito para PA, peso e altura: os Quadros 03 e 04 não o citam.",
-            "Ficha de procedimentos (MIP) só comprova B e C pelo código SIGTAP; medida da escuta inicial sem código"
-                    + " não conta (conferir no Portão C se o PEC gera o código).",
-            "AMB-C5-06 (provisória): MIAC aceito para PA e para peso e altura (Quadros 03 e 04).",
-            "CNS profissional identificado (item 24 e) não conferido.",
-            "Habilitação SIGTAP por CBO (item 24 g) não conferida: vale o CBO do quadro da prática.",
-            "AMB-C5-02 (provisória): janelas de 6 e 12 meses civis completos até o fim da competência.",
-            "AMB-C5-03 (provisória): visitas com intervalo de 30 dias corridos ou mais.",
-            "AMB-C5-04 (provisória): só a lista literal de CIAP-2 e CID-10 da ficha; situação «resolvido» ou"
-                    + " «concluído» conta como resolvida.",
-            "AMB-C5-05 (provisória): consulta da prática A só pelo MIAI; procedimento de consulta não conta.",
-            "AMB-C5-07 (provisória): peso e altura na mesma data civil, de qualquer registro aceito.",
-            "AMB-C5-08 (provisória): CBO de quatro dígitos casa pelo prefixo; com hífen, exato.",
-            "AMB-C5-09 (provisória): desfecho da visita domiciliar não filtrado.");
+            "C5-LIM-01: Só entra o que foi registrado neste PEC; registros de outros estabelecimentos e municípios "
+                    + "e o histórico da condição em outra instalação não aparecem.",
+            "C5-LIM-02: Óbito no CadSUS não é visível: vale o óbito e a saída do cadastro registrados no PEC.",
+            "C5-LIM-03: O vínculo é reconstruído pela versão do cadastro individual vigente no corte (24 meses "
+                    + "lidos); a regra nacional é apurada no SIAPS.",
+            "C5-LIM-04: Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de D para eAP não "
+                    + "são aplicados.",
+            "C5-LIM-05: Cadastro individual lido nos 24 meses até a competência; pessoa cuja última versão é "
+                    + "anterior fica sem vínculo.",
+            "C5-LIM-06: Composição e carga horária da equipe (SCNES) não são conferidas; vale o tipo 70/76 da "
+                    + "capacidade `team`.",
+            "C5-LIM-07: A conformidade da identificação com o CadSUS não é conferida.",
+            "C5-LIM-08: O SIAPS extrai no 20º dia útil e só vê o que chegou até lá; a leitura local pode incluir "
+                    + "registros enviados depois.",
+            "C5-LIM-09: A situação vigente do problema é a última linha de cada código (maior sequência de "
+                    + "evolução com data até o corte).",
+            "C5-LIM-10: A pressão arterial aferida em visita domiciliar não é lida; B pode sair subestimada.",
+            "C5-LIM-11: O DW não tem PA de participante de atividade coletiva; B não conta esse registro.",
+            "C5-LIM-12: Atendimento odontológico (MIAO) não vale para PA, peso e altura: os Quadros 03 e 04 não o "
+                    + "citam.",
+            "C5-LIM-13: A ficha de procedimentos (MIP) só comprova B e C pelo código SIGTAP; medida da escuta "
+                    + "inicial sem código não conta.",
+            "C5-LIM-14: O MIAC vale para PA e para peso e altura, só para participante identificado (CPF/CNS) com "
+                    + "o campo preenchido; o quadro, mais específico, prevalece sobre o item 24 e.",
+            "C5-LIM-15: O CNS profissional é presumido presente em registro do PEC; não é conferido.",
+            "C5-LIM-16: A habilitação de CBO na tabela SIGTAP não é aplicada: vale o CBO do quadro da prática.",
+            "C5-LIM-17: As janelas de 6 e 12 meses são meses civis completos terminando no último dia da "
+                    + "competência, inclusive; nunca 180 ou 365 dias.",
+            "C5-LIM-18: As visitas da prática D cumprem com diferença de datas de 30 dias corridos ou mais entre "
+                    + "duas visitas na janela; no mesmo dia não formam par.",
+            "C5-LIM-19: Condição por correspondência exata com os 26 códigos CID-10 e os 2 CIAP-2 da ficha; "
+                    + "subcódigo não listado não entra por analogia, e os encontrados são contados. Entra a "
+                    + "condição avaliada na lista de problemas desde 2013 ou em atendimento dos últimos 12 meses; "
+                    + "sai quem tem todas as condições elegíveis resolvidas (latente é ativo; concluído vale só "
+                    + "como resolvido). A condição avaliada só em atendimento anterior a 12 meses, sem linha na "
+                    + "lista, não entra.",
+            "C5-LIM-20: A consulta (A) vale só pelo MIAI de médico ou enfermeiro; procedimento de consulta não "
+                    + "conta e não se exige hipertensão como problema avaliado.",
+            "C5-LIM-21: Peso e altura contam na mesma data civil, de qualquer combinação de registros aceitos, ou "
+                    + "pelo procedimento 01.01.04.002-4 por CBO habilitado.",
+            "C5-LIM-22: CBO de quatro dígitos casa pelo prefixo da família; com hífen, exato; 2239 prevalece "
+                    + "sobre a descrição «ortopedistas» do item 24 d.",
+            "C5-LIM-23: O desfecho da visita domiciliar não é filtrado; vale o motivo da visita preenchido por "
+                    + "ACS/TACS.");
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -262,12 +275,12 @@ public final class C5Pack implements IndicatorRule {
         List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
         long outOfList = C5Conditions.outOfListCount(data.conditions());
         if (outOfList > 0) {
-            limitations.add("AMB-C5-04: " + outOfList
+            limitations.add("C5-LIM-19/diagnóstico: " + outOfList
                     + " registro(s) de condição com código fora da lista literal da ficha (diagnóstico, não entram).");
         }
         long outOfVocabulary = C5Conditions.of(data.conditions(), cutoff).outOfVocabularyCount();
         if (outOfVocabulary > 0) {
-            limitations.add("AMB-C5-04: " + outOfVocabulary
+            limitations.add("C5-LIM-19/diagnóstico: " + outOfVocabulary
                     + " linha(s) de condição com situação ou base fora do vocabulário (diagnóstico).");
         }
         return limitations;

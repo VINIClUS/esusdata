@@ -195,21 +195,22 @@ class C5DescriptorTest {
 
         assertThat(limitations)
                 .anySatisfy(text -> assertThat(text)
-                        .startsWith("Lacuna L1:")
-                        .contains("validação eSF 70/eAP 76")
-                        .contains("AMB-C5-01"))
-                .anySatisfy(
-                        text -> assertThat(text).contains("últimos 24 meses").contains("NT 30/2025"))
-                .anySatisfy(text -> assertThat(text).contains("3.493/2024").contains("SCNES"))
-                .anySatisfy(text -> assertThat(text).contains("CadSUS").contains("item 24 a"))
-                .anySatisfy(text -> assertThat(text).contains("20º dia útil"))
-                .anySatisfy(text -> assertThat(text).startsWith("Lacuna L12:"))
-                .anySatisfy(text -> assertThat(text).startsWith("Lacuna L5:").contains("AMB-C5-06"))
-                .anySatisfy(text -> assertThat(text).startsWith("MIAO"));
+                        .startsWith("C5-LIM-04:")
+                        .contains("validação eSF 70 / eAP 76")
+                        .contains("crédito de D para eAP"))
+                .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-03:").contains("24 meses"))
+                .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-06:").contains("SCNES"))
+                .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-07:").contains("CadSUS"))
+                .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-08:").contains("20º dia útil"))
+                .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-09:"))
+                .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-11:").contains("atividade coletiva"))
+                .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-12:").contains("MIAO"))
+                .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-13:").contains("MIP"))
+                .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-14:").contains("MIAC"))
+                .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-15:").contains("CNS profissional"));
         assertThat(limitations)
-                .contains("AMB-C5-06 (provisória): MIAC aceito para PA e para peso e altura (Quadros 03 e 04).")
-                .contains("CNS profissional identificado (item 24 e) não conferido.")
-                .anySatisfy(text -> assertThat(text).startsWith("Ficha de procedimentos (MIP) só comprova B e C"))
+                .noneMatch(text -> text.contains("provisória"))
+                .noneMatch(text -> text.contains("Portão C"))
                 .noneMatch(text -> text.startsWith("Motivo da visita"))
                 .noneMatch(text -> text.startsWith("Condição sem CBO"));
     }

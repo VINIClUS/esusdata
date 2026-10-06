@@ -234,17 +234,17 @@ Item 33 (p. 3), literal: «Considerando que há necessidade de registro qualific
 
 ## Ambiguidades
 
-Tratamentos com o mesmo sentido de [C4](c4-cuidado-diabetes.md#ambiguidades): `RULE_AMBIGUITY` bloqueia o resultado afetado; "limitação" = convenção provisória declarada, exibida e confirmada na reconciliação (Portão D). Testes de fronteira afetados ficam com expectativa bloqueada para homologação.
+Tratamentos com o mesmo sentido de [C4](c4-cuidado-diabetes.md#ambiguidades): `RULE_AMBIGUITY` bloqueia o resultado afetado; "limitação" = convenção declarada e exibida. Desde `c6-cuidado-pessoa-idosa@0.2.0` as convenções abaixo são leituras **decididas** (`docs/indicadores/decisoes/c6-cuidado-pessoa-idosa.md`, `DECLARED_CONVENTION`, códigos `C6-LIM-nn`).
 
 **AMB-C6-01 — Exceção eAP tipo 76 na prática C (visitas).** p. 2 (item 24 b): «A boa prática (C) não será condicionante de pontuação para eAP, tipo 76, atendendo as condições previstas na PRC GM/MS nº 02/2017.» Mesma questão de AMB-C4-01 (C2 usa «considera a pontuação integral» e C3 «consideram a pontuação integral»). Leituras não adotadas: (i) creditar 25 pontos de C; (ii) excluir C e renormalizar sobre 75; (iii) só não exigir C, sem crédito. **Tratamento: `RULE_AMBIGUITY`** no resultado das equipes eAP 76 até P07 (MET-23): exibir A, B e D separadas e C como informativa; sem escore, sem faixa, sem atribuição ou redistribuição. eSF 70 sem efeito.
 
-**AMB-C6-02 — Âncora e fronteiras da janela de 12 meses.** p. 1–2 e p. 4 («nos últimos 12 meses»); item 17 «Não se aplica.»; item 11 «20º dia útil». Igual a AMB-C4-02. **Tratamento: limitação**, convenção provisória: 12 meses civis completos terminando no último dia da competência, inclusive (competência 2026-03: 2025-04-01 a 2026-03-31); nunca 365 dias.
+**AMB-C6-02 — Âncora e fronteiras da janela de 12 meses.** p. 1–2 e p. 4 («nos últimos 12 meses»); item 17 «Não se aplica.»; item 11 «20º dia útil». Igual a AMB-C4-02. **Tratamento: limitação**, convenção decidida: 12 meses civis completos terminando no último dia da competência, inclusive (competência 2026-03: 2025-04-01 a 2026-03-31); nunca 365 dias.
 
 **AMB-C6-03 — Contagem do «intervalo mínimo de 30 (trinta) dias entre as visitas».** p. 2 e p. 4–5. Igual a AMB-C4-03. **Tratamento: limitação**: `data2 − data1 ≥ 30` dias corridos; 30 exatos com expectativa provisória.
 
 **AMB-C6-04 — Remissão do vínculo.** p. 1 (item 14: «conforme regras da Portaria SAPS/MS nº 161/2024») × C4/C5 item 14 («Nota Técnicaº 30/2025-CGESCO/DESCO/SAPS/MS»); em C5 a nota de rodapé 2 registra a troca da referência para a NT 30/2025, e C6 não registra troca equivalente. Impacto: composição do denominador, se as duas regras de vínculo diferirem. **Tratamento: limitação**: usar o mesmo módulo de coorte vinculada de C4/C5, registrar no pacote a remissão literal de C6 e marcar a divergência para reconciliação; o desempate de mudança de equipe (Portaria SAPS/MS nº 161/2024) é o mesmo nas três fichas.
 
-**AMB-C6-05 — Data de referência da idade.** p. 1 (item 14 «com idade igual ou superior a 60 anos no período»), p. 4 (itens 4.1 e 4.3 «no período»). «no período» pode significar ter 60 anos em algum dia do mês da competência ou durante todo o mês. Impacto: quem completa 60 anos dentro do mês. **Tratamento: limitação**, convenção provisória: idade completa no último dia da competência (quem completa 60 anos em qualquer dia do mês entra), calculada por aniversário civil, e não por 365 dias × 60; fronteira marcada para reconciliação (Tech Spec §2.4: idade no corte metodológico).
+**AMB-C6-05 — Data de referência da idade.** p. 1 (item 14 «com idade igual ou superior a 60 anos no período»), p. 4 (itens 4.1 e 4.3 «no período»). «no período» pode significar ter 60 anos em algum dia do mês da competência ou durante todo o mês. Impacto: quem completa 60 anos dentro do mês. **Tratamento: limitação**, convenção decidida: idade completa no último dia da competência (quem completa 60 anos em qualquer dia do mês entra), calculada por aniversário civil, e não por 365 dias × 60; fronteira marcada para reconciliação (Tech Spec §2.4: idade no corte metodológico).
 
 **AMB-C6-06 — Escopo da consulta (prática A).** p. 4 (Quadro 02), p. 3 (item 24 f) e p. 4 (item 4.4). Igual a AMB-C4-05 (MIAI apenas × códigos SIGTAP de consulta; «alocado conforme os códigos das equipes descritos» × «registros de qualquer profissional habilitado em estabelecimento de saúde da APS, no país»). **Tratamento: limitação**, leitura literal do Quadro 02.
 
@@ -260,13 +260,15 @@ Tratamentos com o mesmo sentido de [C4](c4-cuidado-diabetes.md#ambiguidades): `R
 
 ### Convenções do pacote sem texto da ficha que as decida (registradas na integração, S-C6-05)
 
-A sessão do pacote adotou as leituras abaixo sem trecho da ficha que as decida. Ficam registradas
-para a revisão dos Portões A/B; cada uma está declarada nas limitações permanentes do `C6Pack`.
+A sessão do pacote adotou as leituras abaixo sem trecho da ficha que as decida; o registro de
+decisões as adotou (`DECLARED_CONVENTION`), e cada uma está declarada nas limitações permanentes do `C6Pack`.
 
 **AMB-C6-12 — Aniversário de 29/02.** A ficha diz "60 anos ou mais" no último dia da competência e
-não trata o nascimento em 29/02. **Leitura do pacote:** `AnniversaryRule.CLAMP_TO_MONTH_END`
-(29/02 + 60 anos num ano não bissexto = 28/02), a mesma aritmética da faixa de nascimento do bind. Só
-muda o resultado para quem nasceu em 29/02 e completa 60 anos num ano não bissexto.
+não trata o nascimento em 29/02. **Leitura decidida (C6-D3; `c6-cuidado-pessoa-idosa@0.2.0`):** `AnniversaryRule.NEXT_DAY`
+(29/02 + 60 anos num ano não bissexto = 01/03, Lei nº 810/1949, art. 3º; como em C7). Até a 0.1.0 o
+pacote usava `CLAMP_TO_MONTH_END` (28/02). A faixa de nascimento do bind continua lida com `minusYears`
+(superconjunto: ninguém elegível fica sem leitura). Só muda o resultado para quem nasceu em 29/02 e
+completa 60 anos numa competência de fevereiro de ano não bissexto.
 
 **AMB-C6-13 — Vínculo local por versões do cadastro (§1.7.3; AMB-C6-04).** **Leitura do pacote:**
 vale a versão completa do cadastro individual de maior data até o corte; cadastro simplificado não
@@ -311,22 +313,22 @@ Base comum (salvo indicação): competência 2026-03 (corte 2026-03-31; ADR 0004
 
 | id | cenário sintético | resultado esperado | origem |
 |---|---|---|---|
-| T-C6-01 | Nascida em 1966-03-31 (60 anos em 2026-03-31); variante nascida em 1966-04-01 | 1966-03-31: entra em 2026-03. 1966-04-01: não entra (59 anos no corte) — provisório | ficha p. 1, p. 4; AMB-C6-05; Tech Spec §2.4 |
+| T-C6-01 | Nascida em 1966-03-31 (60 anos em 2026-03-31); variante nascida em 1966-04-01 | 1966-03-31: entra em 2026-03. 1966-04-01: não entra (59 anos no corte) — convenção decidida | ficha p. 1, p. 4; AMB-C6-05; Tech Spec §2.4 |
 | T-C6-02 | Nascida em 1966-03-15 (completa 60 anos no meio do mês) | Entra em 2026-03 | ficha p. 1 («no período»); AMB-C6-05 |
 | T-C6-03 | 59 anos no corte, com A, B, C e D cumpridas | Fora do numerador e do denominador | ficha p. 2, p. 4 |
-| T-C6-04 | Consulta em 2025-04-01; variante em 2025-03-31 | 2025-04-01: A cumpre. 2025-03-31: não cumpre — provisório (com "365 dias" inclusivo cumpriria) | AMB-C6-02; Tech Spec §1.7.2 |
+| T-C6-04 | Consulta em 2025-04-01; variante em 2025-03-31 | 2025-04-01: A cumpre. 2025-03-31: não cumpre — convenção decidida (com "365 dias" inclusivo cumpriria) | AMB-C6-02; Tech Spec §1.7.2 |
 | T-C6-05 | Única consulta em 2025-09-20 | A cumpre em C6 (12 meses); a mesma data não cumpriria A de C4/C5 (6 meses) | ficha p. 4 |
 | T-C6-06 | Peso em 2026-02-10 e altura em 2026-02-11 | B não cumpre | ficha p. 2, p. 4 |
 | T-C6-07 | Peso e altura no mesmo dia, na MIVDT, por ACS (`5151-05`) | B cumpre | ficha p. 4–5 |
-| T-C6-08 | Visitas de ACS com 29, 30 e 31 dias de intervalo (2026-01-01 → 01-30 / 01-31 / 02-01) | 29: C não cumpre; 30: cumpre — provisório; 31: cumpre | ficha p. 2, p. 4–5; AMB-C6-03 |
+| T-C6-08 | Visitas de ACS com 29, 30 e 31 dias de intervalo (2026-01-01 → 01-30 / 01-31 / 02-01) | 29: C não cumpre; 30: cumpre — convenção decidida; 31: cumpre | ficha p. 2, p. 4–5; AMB-C6-03 |
 | T-C6-09 | Influenza `33` aplicada em 2025-05-10; variante `77` | D cumpre nos dois casos | ficha p. 3, p. 5 |
 | T-C6-10 | Mesma dose (`77`, 2025-05-10) registrada duas vezes, ou MIV + transcrição da mesma aplicação | Uma evidência; D = 25 (não 50) | ficha p. 5; Tech Spec §2.4; MET-32 |
-| T-C6-11 | Duas doses distintas na janela (2025-04-20 e 2026-03-10) | D = 25 — provisório | AMB-C6-08 |
+| T-C6-11 | Duas doses distintas na janela (2025-04-20 e 2026-03-10) | D = 25 — convenção decidida | AMB-C6-08 |
 | T-C6-12 | Única dose em 2025-03-15 | D não cumpre (fora de 12 meses civis) | ficha p. 4; AMB-C6-02 |
 | T-C6-13 | Dose de imunobiológico de influenza com código diferente de `33`/`77` | Não conta | ficha p. 3, p. 5 |
-| T-C6-14 | Transcrição digitada em 2026-02-01 de dose aplicada em 2024-12-01 | D não cumpre (vale a data de aplicação) — provisório | AMB-C6-09 |
+| T-C6-14 | Transcrição digitada em 2026-02-01 de dose aplicada em 2024-12-01 | D não cumpre (vale a data de aplicação) — convenção decidida | AMB-C6-09 |
 | T-C6-15 | Dose aplicada em outro município, só na RNDS | D não comprovada localmente; resultado com limitação de fonte (RIA/RNDS), sem afirmar ausência de vacinação | ficha p. 3, p. 5; Tech Spec §2.4 |
-| T-C6-16 | Dose registrada no MIV por profissional cujo CBO não está no item 24 d | D cumpre — provisório | AMB-C6-10 |
+| T-C6-16 | Dose registrada no MIV por profissional cujo CBO não está no item 24 d | D cumpre — convenção decidida | AMB-C6-10 |
 | T-C6-17 | Equipe eAP 76; pessoa X com A, B e D e sem C; pessoa Y só com D | `RULE_AMBIGUITY` no resultado da equipe. Valores discriminantes: X = 100 (i) / 100 (ii) / 75 (iii); Y = 50 (i) / 33,33… (ii) / 25 (iii) | MET-23; P07; AMB-C6-01 |
 | T-C6-18 | Pessoa X vinculada a eSF 70 | 75 pontos | ficha p. 2 |
 | T-C6-19 | Pessoa de 70 anos com todas as condições da lista de problemas do PEC marcadas como resolvidas | Permanece no denominador (C6 não interrompe por condição) | ficha p. 1 |

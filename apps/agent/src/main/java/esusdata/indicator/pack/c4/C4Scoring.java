@@ -37,9 +37,9 @@ final class C4Scoring {
             + " ficam exibidas separadamente e o escore fica indisponível até a reconciliação com o Siaps (MET-23,"
             + " P07).";
 
-    /** AMB-C4-04: a status outside 0/1/2 is diagnosed, not converted silently. */
-    static final String UNKNOWN_STATUS = "AMB-C4-04: %d pessoa(s) do denominador com situação de condição nula ou"
-            + " fora de 0/1/2 (LEDI) mantida(s) como não resolvida(s); a confirmar no Portão C.";
+    /** C4-LIM-20 (AMB-C4-04): a status outside 0/1/2 is diagnosed, not converted silently. */
+    static final String UNKNOWN_STATUS = "C4-LIM-20: %d pessoa(s) com situação de condição nula ou fora de 0/1/2"
+            + " foram mantidas como não resolvidas.";
 
     /** One eligible person with the decision of every practice. */
     record Scored(Subject subject, SortedMap<String, Outcome> outcomes) {

@@ -83,7 +83,7 @@ class C5PackReplayTest {
         assertThat(published.denominatorText()).isEqualTo("3");
         assertThat(published.denominatorKind()).isEqualTo("PESSOAS_COM_HIPERTENSAO_VINCULADAS");
         assertThat(published.canonicalSchemaVersion()).isEqualTo("2");
-        assertThat(published.limitationsJson()).contains("Portão A", "Portão E", "Lacuna L1");
+        assertThat(published.limitationsJson()).contains("Portão A", "Portão E", "C5-LIM-04");
         assertThat(ResultJson.readComponents(published.componentsJson()))
                 .extracting(
                         ResultJson.StoredComponent::code,

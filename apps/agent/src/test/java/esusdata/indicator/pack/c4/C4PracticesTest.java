@@ -205,7 +205,7 @@ class C4PracticesTest {
 
     @Test
     void t_c4_10_weightInEncounterAndHeightProcedureSameDayMeetC() {
-        // AMB-C4-07, provisional.
+        // AMB-C4-07 (decidida em C4-D3).
         RuleOutcome o = withBase(
                 care("p1", d(2026, 2, 10), ENFERMEIRO).weight("80").build(),
                 procedure("p1", d(2026, 2, 10), C4Codes.HEIGHT, "PERFORMED", ENFERMEIRO));
@@ -215,7 +215,7 @@ class C4PracticesTest {
 
     @Test
     void t_c4_11_anthropometryProcedureAloneMeetsC() {
-        // AMB-C4-07, provisional.
+        // AMB-C4-07 (decidida em C4-D3).
         RuleOutcome o = withBase(procedure("p1", d(2026, 2, 10), C4Codes.ANTHROPOMETRY, "PERFORMED", ENFERMEIRO));
 
         assertThat(met(o, "p1", "C")).isTrue();
@@ -269,7 +269,7 @@ class C4PracticesTest {
 
     @Test
     void t_c4_14_visitsThirtyDaysApartMeetD() {
-        // AMB-C4-03, provisional.
+        // AMB-C4-03 (decidida em C4-D3).
         RuleOutcome o = withBase(visit("p1", d(2026, 1, 1), ACS), visit("p1", d(2026, 1, 31), ACS));
 
         assertThat(met(o, "p1", "D")).isTrue();
@@ -391,7 +391,7 @@ class C4PracticesTest {
 
     @Test
     void t_c4_23_hba1cOnlyByPharmacistDoesNotMeetE() {
-        // AMB-C4-06, provisional: Quadro 06 as published (no 2234).
+        // AMB-C4-06 (decidida em C4-D3): Quadro 06 as published (no 2234).
         RuleOutcome o = withBase(
                 procedure("p1", d(2025, 12, 1), C4Codes.HBA1C, "REQUESTED", FARMACEUTICO),
                 care("p1", d(2025, 12, 2), FARMACEUTICO)

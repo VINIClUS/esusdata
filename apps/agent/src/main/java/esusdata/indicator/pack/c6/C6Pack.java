@@ -48,8 +48,8 @@ import java.util.TreeSet;
  * C6 — Cuidado da pessoa idosa (Tech Spec §2.4; ficha transcrita em {@code docs/metodologia/c6-cuidado-pessoa-idosa.md}).
  *
  * <p>Média dos pontos (A, B, C e D, 25 cada) das pessoas de 60 anos ou mais vinculadas no último
- * dia da competência, sem ×100. As convenções provisórias das ambiguidades da ficha (AMB-C6-xx)
- * estão nas limitações permanentes do descritor; enquanto houver uma, ou um portão incompleto, o
+ * dia da competência, sem ×100. As convenções decididas das ambiguidades da ficha (AMB-C6-xx)
+ * viajam como limitações permanentes (C6-LIM-nn) do descritor; enquanto houver uma, ou um portão incompleto, o
  * resultado sai {@code BLOCKED} com as contagens.
  */
 public final class C6Pack implements IndicatorRule {
@@ -60,7 +60,7 @@ public final class C6Pack implements IndicatorRule {
     private static final int OLDEST_AGE_READ = 130;
 
     public static final String ID = "c6-cuidado-pessoa-idosa";
-    public static final String RULE_VERSION = ID + "@0.1.0";
+    public static final String RULE_VERSION = ID + "@0.2.0";
 
     /** Reason code of practice C for a person of an eAP tipo 76 team while P07 is open. */
     static final String C_REASON_EAP = "C_AMBIGUA_EAP76_AMB_C6_01";
@@ -77,41 +77,40 @@ public final class C6Pack implements IndicatorRule {
             + "corte (§1.7.3: sem escolher um): a prática C dessas equipes fica sem decisão e o resultado sem valor.";
 
     private static final List<String> STANDING_LIMITATIONS = List.of(
-            "Dados fora do PEC local: doses só na RNDS/RIA (lacuna L4) não aparecem e a falta de integração não é "
-                    + "ausência de vacinação; registros de profissionais de outros municípios («no país», item 4.4) "
-                    + "e o «Óbito no CadSUS» (item 15) não estão no extrato.",
-            "Vínculo: a ficha remete à Portaria SAPS/MS nº 161/2024 (AMB-C6-04); o vínculo é a versão completa "
-                    + "do cadastro individual local vigente no corte, lida nos 24 meses civis até a competência (quem "
-                    + "não teve versão nesse período fica sem vínculo); estimativa local que não equivale ao vínculo "
-                    + "do Siaps (lacuna L8). Saída 136 (mudança de território) e 135 "
-                    + "(óbito) são códigos LEDI do dicionário do DW, não da ficha; outro código de saída exclui "
-                    + "(EXCLUIDO_SAIDA_CADASTRO_NAO_MAPEADA). Pessoa sem INE no cadastro vigente não está «vinculada "
-                    + "à equipe» (item 23) e sai como EXCLUIDO_SEM_VINCULO.",
-            "Exclusões que a ficha não define (item 15 só interrompe por território, equipe e óbito), adotadas "
-                    + "localmente em vez do desempate da Portaria SAPS/MS nº 161/2024: data de nascimento divergente "
-                    + "entre registros da mesma pessoa, versões do cadastro da mesma data divergentes, recusa de "
-                    + "cadastro e ficha inativa. Se o DW marcar versões substituídas como inativas, a exclusão por "
-                    + "ficha inativa precisa ser validada no Portão C.",
-            "Tipo de equipe ausente no DW (lacuna L1): a exceção eAP tipo 76 da prática C (AMB-C6-01) só é "
-                    + "reconhecida quando o extrato traz o tipo; sem ele, C é exigida de todas as equipes e a "
-                    + "validação de equipes (Portaria GM/MS nº 3.493/2024, SCNES) não é feita. Com tipo conhecido "
-                    + "fora de 70/76 a pessoa sai (EXCLUIDO_EQUIPE_FORA_DO_ESCOPO).",
-            "Não verificados no PEC local: CNS profissional identificado, estabelecimento de APS, habilitação de "
-                    + "CBO na tabela SIGTAP (item 24 f), identificação conforme CadSUS (item 24 a) e o corte do "
-                    + "20º dia útil (item 11).",
-            "AMB-C6-02: janela de 12 meses civis terminando no último dia da competência, nunca 365 dias. "
-                    + "AMB-C6-05: idade completa no último dia da competência, aniversário CLAMP_TO_MONTH_END "
-                    + "(29/02 + 1 ano = 28/02).",
-            "AMB-C6-06: consulta (A) só pelo MIAI com CBO do Quadro 02, presencial ou remota, sem códigos "
-                    + "SIGTAP de consulta e sem exigir o problema/condição avaliada do item 24 e.",
-            "AMB-C6-07/AMB-C6-11: peso e altura (B) na mesma data civil, em qualquer combinação de MIAI, MIP, "
-                    + "MIAC, MIVDT e SIGTAP 0101040083/0101040075, ou 0101040024 sozinho (SIGTAP só de MIP ou MIAI), "
-                    + "medidas só de MIP ou MIAC e, no MIVDT, só de ACS/TACS com motivo preenchido (item 24 e), por CBO "
-                    + "do Quadro 03; procedimento consolidado não chega da capacidade.",
-            "AMB-C6-03: visitas (C) de ACS/TACS com motivo preenchido e a primeira e a última distantes "
-                    + "≥ 30 dias corridos; desfecho não filtrado.",
-            "AMB-C6-08/09/10: influenza (D) 33 ou 77 com data de aplicação na janela, transcrição incluída, "
-                    + "qualquer profissional; a mesma vacina na mesma data é uma dose e doses distintas não somam.");
+            "C6-LIM-01: Doses só no RIA/RNDS, registros de outros municípios e o óbito no CadSUS não estão no PEC "
+                    + "local; D pode sair subestimada.",
+            "C6-LIM-02: O vínculo é a versão do cadastro individual local vigente no corte (24 meses lidos), "
+                    + "estimativa que não equivale ao vínculo do SIAPS.",
+            "C6-LIM-03: Só vale a versão completa do cadastro de maior data até o corte; cadastro simplificado e "
+                    + "pessoa sem INE não vinculam (EXCLUIDO_SEM_VINCULO) e versões do mesmo dia divergentes excluem "
+                    + "como conflito. Saída 136 (mudança de território) e 135 (óbito) são os códigos LEDI "
+                    + "reconhecidos; outro código de saída exclui (EXCLUIDO_SAIDA_CADASTRO_NAO_MAPEADA), com "
+                    + "contagem.",
+            "C6-LIM-04: Recusa de cadastro, ficha inativa, data de nascimento divergente e versões conflitantes "
+                    + "excluem a pessoa com motivo próprio; a semântica de ficha inativa no DW não é publicada e a "
+                    + "contagem por motivo é divulgada.",
+            "C6-LIM-05: Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de C para eAP não "
+                    + "são aplicados.",
+            "C6-LIM-06: Habilitação de CBO na tabela SIGTAP e estabelecimento de APS não são conferidos; o CNS "
+                    + "profissional é presumido presente em registro do PEC.",
+            "C6-LIM-07: A conformidade da identificação com o CadSUS não é conferida.",
+            "C6-LIM-08: O SIAPS extrai no 20º dia útil e só vê o que chegou até lá; a leitura local pode incluir "
+                    + "registros enviados depois.",
+            "C6-LIM-09: A janela é de 12 meses civis terminando no último dia da competência, nunca 365 dias. A "
+                    + "idade é em anos completos no último dia da competência; quem completa 60 anos em qualquer "
+                    + "dia do mês entra, e o aniversário de 29/02 cai em 01/03.",
+            "C6-LIM-10: A consulta (A) vale só pelo MIAI com CBO do Quadro 02, presencial ou remota, sem códigos "
+                    + "SIGTAP de consulta e sem exigir problema ou condição avaliada.",
+            "C6-LIM-11: Peso e altura (B) contam na mesma data civil, em qualquer combinação de MIAI, MIP, MIAC, "
+                    + "MIVDT e SIGTAP 0101040083/0101040075, ou 0101040024 sozinho (só de MIP ou MIAI), por CBO do "
+                    + "Quadro 03; MIAC só com participante identificado e MIVDT só de ACS/TACS com motivo "
+                    + "preenchido; 2239 vale por quatro dígitos.",
+            "C6-LIM-12: As visitas (C) são de ACS/TACS com motivo preenchido; a primeira e a última visita válida "
+                    + "na janela distam 30 dias corridos ou mais, no mesmo dia não formam par, e o desfecho não é "
+                    + "filtrado.",
+            "C6-LIM-13: Influenza (D): pelo menos uma dose de 33 ou 77 aplicada nos 12 meses da janela, "
+                    + "transcrição com data de aplicação incluída, sem filtro de CBO; a mesma vacina na mesma data "
+                    + "é uma dose, e doses distintas não somam nem anulam.");
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,

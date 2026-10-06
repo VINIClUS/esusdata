@@ -387,8 +387,9 @@ class C5ResultTest {
                 .ungated();
 
         assertThat(teamOf(outcome, INE).cnes()).isNull();
-        assertThat(outcome.result().limitations()).anyMatch(text -> text.startsWith("AMB-C5-04:"));
-        assertThat(teamOf(outcome, INE).result().limitations()).noneMatch(text -> text.startsWith("AMB-C5-04:"));
+        assertThat(outcome.result().limitations()).anyMatch(text -> text.startsWith("C5-LIM-19/diagnóstico:"));
+        assertThat(teamOf(outcome, INE).result().limitations())
+                .noneMatch(text -> text.startsWith("C5-LIM-19/diagnóstico:"));
     }
 
     // ---- §1.6: a capability not read is never a zero ----

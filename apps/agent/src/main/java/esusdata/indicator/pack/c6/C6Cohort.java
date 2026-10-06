@@ -24,11 +24,13 @@ import java.util.TreeSet;
 final class C6Cohort {
 
     /**
-     * The anniversary convention C6 declares (ENG-27): {@code java.time}/PostgreSQL, the same
-     * arithmetic as the birth-date bind of {@link C6Pack#requirements}. A 60th birthday only falls
-     * on a missing 29/02 when the 60th year is not a leap year (born 29/02/2040, competência 2100-02).
+     * The anniversary convention C6 declares (ENG-27): decision C6-D3 (AMB-C6-12): a 29/02
+     * anniversary falls on 01/03 (Lei nº 810/1949, art. 3º), as in C7. The birth-date bind of
+     * {@link C6Pack#requirements} is a superset (it clamps), so no one eligible is left unread. A 60th
+     * birthday only falls on a missing 29/02 when the 60th year is not a leap year (born 29/02/2040,
+     * competência 2100-02).
      */
-    static final AgeAt.AnniversaryRule ANNIVERSARY = AgeAt.AnniversaryRule.CLAMP_TO_MONTH_END;
+    static final AgeAt.AnniversaryRule ANNIVERSARY = AgeAt.AnniversaryRule.NEXT_DAY;
 
     static final String ELIGIBLE = "ELEGIVEL_60_ANOS_VINCULADO";
     static final String NO_BIRTH_DATE = "EXCLUIDO_SEM_DATA_NASCIMENTO";

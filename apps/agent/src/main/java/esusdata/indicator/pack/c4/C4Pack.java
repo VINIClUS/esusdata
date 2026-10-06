@@ -50,38 +50,47 @@ public final class C4Pack implements IndicatorRule {
     private static final String TWELVE_MONTHS = "12 meses";
 
     public static final String ID = "c4-cuidado-diabetes";
-    public static final String RULE_VERSION = ID + "@0.1.0";
+    public static final String RULE_VERSION = ID + "@0.2.0";
 
     /** What keeps the local value from being the Siaps value, whatever the gates say (ADR 0030). */
     private static final List<String> STANDING_LIMITATIONS = List.of(
-            "Dados fora do PEC local: a ficha considera «registros de qualquer profissional habilitado em"
-                    + " estabelecimento de saúde da APS, no país» (item 4.4) e a condição avaliada «desde 2013» em"
-                    + " qualquer instalação; aqui só entra o que foi registrado neste PEC.",
-            "Óbito no CadSUS, vínculo da NT nº 30/2025 e desempate da Portaria SAPS/MS nº 161/2024 são apurados no"
-                    + " Siaps: o pacote usa o óbito e a saída registrados no PEC e o vínculo da última versão do"
-                    + " cadastro individual até o corte, lida nos últimos 24 meses (estimativa local, lacuna L8).",
-            "Tipo de equipe (eSF 70 / eAP 76) ausente do DW (lacuna L1): a validação de equipes do item 24 b"
-                    + " (Portaria GM/MS nº 3.493/2024) e a exceção da prática D para eAP tipo 76 (AMB-C4-01) só são"
-                    + " aplicadas quando houver fonte do tipo; equipe sem tipo comprovado é calculada sem a exceção"
-                    + " e sem pontuação presumida.",
-            "Condição avaliada (AMB-C4-04): entra a condição da lista de problemas avaliada por médico/enfermeiro"
-                    + " desde 2013 ou o atendimento individual dos últimos 12 meses com T89/T90/E10/E11/E14."
-                    + " Interrupção quando o último estado de todas as condições elegíveis da lista é «Resolvido»"
-                    + " (LEDI 2): «Latente» conta como ativa, «concluído» não tem código próprio e nova avaliação"
-                    + " em atendimento não reabre a lista.",
-            "Fontes que o DW não tem ou não descreve: pressão arterial na visita domiciliar (L6) e na atividade"
-                    + " coletiva (L5), o campo de avaliação dos pés do MIAI (AMB-C4-09), a tabela SIGTAP de habilitação de CBO (AMB-C4-08) e a"
-                    + " lotação do profissional na equipe (AMB-C4-05 b). Consultas do MIP (03.01.01.003-0,"
-                    + " 03.01.01.006-4, 03.01.01.025-0) não são lidas nem comprovam a prática A. Códigos SIGTAP/ABEX"
-                    + " vêm só dos procedimentos do MIAI e do MIP (nunca do MIAO), cada fato uma vez; a visita"
-                    + " domiciliar só conta por ACS/TACS com motivo preenchido (item 24 e).",
-            "Corte de envio: o Siaps extrai no «20º dia útil de cada mês» (item 11) e só vê o que chegou até lá;"
-                    + " a leitura local pode incluir registros enviados depois.",
-            "Convenções provisórias da ficha, a confirmar na reconciliação: janelas de 6 e 12 meses civis até o"
-                    + " fim da competência (AMB-C4-02); intervalo de visitas como diferença de datas ≥ 30 dias"
-                    + " (AMB-C4-03); consulta sem exigir diabetes como condição avaliada (AMB-C4-05); farmacêutico"
-                    + " fora da prática E (AMB-C4-06); peso e altura de quaisquer registros da mesma data, ou"
-                    + " avaliação antropométrica sozinha (AMB-C4-07).");
+            "C4-LIM-01: Só entra o que foi registrado neste PEC: registros de outros estabelecimentos e municípios, "
+                    + "e a condição avaliada em outra instalação, não aparecem.",
+            "C4-LIM-02: Óbito no CadSUS e vínculo nacional são apurados no SIAPS; aqui vale a última versão do "
+                    + "cadastro individual (24 meses lidos) no corte, estimativa local.",
+            "C4-LIM-03: Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de D para eAP não "
+                    + "são aplicados.",
+            "C4-LIM-04: Condição ativa: entra a condição avaliada por médico ou enfermeiro na lista de problemas "
+                    + "desde 2013 (T89, T90, E10, E11, E14) ou em atendimento individual dos últimos 12 meses; sai "
+                    + "quem tem todas as condições elegíveis com último estado resolvido até o corte. Latente conta "
+                    + "como ativa, concluído vale só como resolvido, e nova avaliação em atendimento não reabre a "
+                    + "lista. A condição avaliada só em atendimento anterior a 12 meses, sem linha na lista de "
+                    + "problemas, não entra.",
+            "C4-LIM-05: A pressão arterial aferida em visita domiciliar não é lida; B pode sair subestimada.",
+            "C4-LIM-06: O DW não tem PA de participante de atividade coletiva; B não conta esse registro.",
+            "C4-LIM-07: O campo de avaliação dos pés do atendimento individual não é lido; F é comprovada só por "
+                    + "03.01.04.009-5.",
+            "C4-LIM-08: A tabela SIGTAP de habilitação de CBO não é aplicada: vale o CBO do quadro da prática.",
+            "C4-LIM-09: A lotação do profissional em equipe 70/76 é do SCNES e não é conferida; vale o item 4.4 "
+                    + "(qualquer profissional habilitado).",
+            "C4-LIM-10: A consulta (A) vale só pelo atendimento individual (presencial, domiciliar ou remoto) de "
+                    + "médico ou enfermeiro com algum problema ou condição avaliado, sem exigir diabetes; consultas "
+                    + "da ficha de procedimentos (03.01.01.003-0, 03.01.01.006-4, 03.01.01.025-0) não comprovam A.",
+            "C4-LIM-11: SIGTAP/ABEX vêm só dos procedimentos do MIAI e do MIP, cada fato uma vez; a visita "
+                    + "domiciliar só conta por ACS/TACS com motivo preenchido (item 24 e).",
+            "C4-LIM-12: O SIAPS extrai no 20º dia útil e só vê o que chegou até lá; a leitura local pode incluir "
+                    + "registros enviados depois.",
+            "C4-LIM-13: As janelas de 6 e 12 meses são meses civis completos terminando no último dia da "
+                    + "competência, inclusive; nunca 180 ou 365 dias.",
+            "C4-LIM-14: As visitas da prática D cumprem com duas visitas válidas na janela e diferença de datas de "
+                    + "30 dias corridos ou mais; no mesmo dia não formam par.",
+            "C4-LIM-15: O CBO 2234 (farmacêutico) não vale na prática E; vale na prática F.",
+            "C4-LIM-16: Peso e altura (C) contam na mesma data civil, de qualquer combinação de registros aceitos "
+                    + "(MIAI, MIP, MIAC, MIVDT), ou pelo procedimento 01.01.04.002-4 sozinho por CBO do quadro; em "
+                    + "dias diferentes não cumprem.",
+            "C4-LIM-17: Atividade coletiva conta só pelo participante identificado (CPF/CNS) com peso e altura; a "
+                    + "prática E vale pelo quadro: solicitação ou avaliação de hemoglobina glicada na janela, por "
+                    + "CBO do Quadro 06, com a data do próprio registro.");
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,

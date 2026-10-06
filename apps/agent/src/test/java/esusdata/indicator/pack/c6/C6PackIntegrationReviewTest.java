@@ -272,14 +272,18 @@ class C6PackIntegrationReviewTest {
     }
 
     @Test
-    void eng27_bornOn29FebruaryTurns60OnTheClampedAnniversary() {
+    void eng27_bornOn29FebruaryTurns60OnMarchFirstButIsStillReadInFebruary() {
         YearMonth feb2100 = YearMonth.of(2100, 2);
         LocalDate born = LocalDate.of(2040, 2, 29);
         PartRequirement citizen = new C6Pack().requirements(feb2100).parts().get(0);
         RuleOutcome outcome = scenario().person(P, born).linked(P, INE_A).compute(feb2100);
 
         assertThat(citizen.dateParams().get(PartRequirement.BIRTH_DATE_TO)).isEqualTo(born);
-        assertThat(subjectRow(outcome, P).decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
+        // The bind is a superset (it clamps), so the person is read; C6-D3 (NEXT_DAY) keeps them out of 28/02.
+        assertThat(exclusionReason(outcome, P)).isEqualTo("EXCLUIDO_IDADE_MENOR_60");
+        YearMonth mar2100 = YearMonth.of(2100, 3);
+        RuleOutcome march = scenario().person(P, born).linked(P, INE_A).compute(mar2100);
+        assertThat(subjectRow(march, P).decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
     }
 
     @Test

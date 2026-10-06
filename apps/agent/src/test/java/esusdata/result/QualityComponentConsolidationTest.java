@@ -176,7 +176,7 @@ class QualityComponentConsolidationTest extends ApiFixtureSupport {
                 c1 ? "PROGRAMADOS_MAIS_ESPONTANEOS" : null,
                 null,
                 period,
-                c1 ? C1Rule.RULE_VERSION : pack + "@0.1.0",
+                c1 ? C1Rule.RULE_VERSION : pack + (pack.matches("c[456]-.*") ? "@0.2.0" : "@0.1.0"),
                 YearMonth.parse(period).atEndOfMonth().toString(),
                 IBGE,
                 List.of(),

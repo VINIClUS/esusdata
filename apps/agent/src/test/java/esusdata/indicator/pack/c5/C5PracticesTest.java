@@ -83,8 +83,8 @@ class C5PracticesTest {
     }
 
     @Test
-    void tC5_02_provisionalAmbC5_02_onlyConsultationOnSeptember30DoesNotMeetA() {
-        // Provisório até AMB-C5-02: N meses civis completos terminando no último dia da competência.
+    void tC5_02_ambC5_02_onlyConsultationOnSeptember30DoesNotMeetA() {
+        // Decidido em C5-D3 (AMB-C5-02): N meses civis completos terminando no último dia da competência.
         RuleOutcome outcome = scenario()
                 .eligible(P1)
                 .add(consultation(P1, LocalDate.of(2025, 9, 30), CBO_NURSE))
@@ -194,8 +194,8 @@ class C5PracticesTest {
     }
 
     @Test
-    void tC5_08_provisionalAmbC5_06_bloodPressureInCollectiveActivityMeetsB() {
-        // Provisório até AMB-C5-06: MIAC só nos Quadros, não no item 24 e.
+    void tC5_08_ambC5_06_bloodPressureInCollectiveActivityMeetsB() {
+        // Decidido em C5-D3 (AMB-C5-06): MIAC só nos Quadros, não no item 24 e.
         RuleOutcome outcome = scenario()
                 .eligible(P1)
                 .add(bloodPressureMeasurement(P1, LocalDate.of(2026, 1, 12), CBO_NURSE, ORIGIN_MIAC))
@@ -256,8 +256,8 @@ class C5PracticesTest {
     }
 
     @Test
-    void tC5_11_provisionalAmbC5_02_anthropometryOnFirstDayOfTwelveMonthWindowOnly() {
-        // Provisório até AMB-C5-02: com "365 dias" inclusivo, 2025-03-31 cumpriria.
+    void tC5_11_ambC5_02_anthropometryOnFirstDayOfTwelveMonthWindowOnly() {
+        // Decidido em C5-D3 (AMB-C5-02): com "365 dias" inclusivo, 2025-03-31 cumpriria.
         RuleOutcome outcome = scenario()
                 .eligible(P1)
                 .withAnthropometry(P1, LocalDate.of(2025, 4, 1))
@@ -344,8 +344,8 @@ class C5PracticesTest {
     }
 
     @Test
-    void tC5_13_provisionalAmbC5_03_visitsThirtyDaysApartMeetD() {
-        // Provisório até AMB-C5-03: data2 − data1 ≥ 30 dias corridos.
+    void tC5_13_ambC5_03_visitsThirtyDaysApartMeetD() {
+        // Decidido em C5-D3 (AMB-C5-03): data2 − data1 ≥ 30 dias corridos.
         RuleOutcome outcome = scenario()
                 .eligible(P1)
                 .withVisits(P1, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31))
@@ -365,8 +365,8 @@ class C5PracticesTest {
     }
 
     @Test
-    void tC5_15_provisionalAmbC5_09_visitsWithDifferentOutcomesMeetD() {
-        // Provisório até AMB-C5-09: o desfecho da visita não é filtrado (60 dias de intervalo).
+    void tC5_15_ambC5_09_visitsWithDifferentOutcomesMeetD() {
+        // Decidido em C5-D3 (AMB-C5-09): o desfecho da visita não é filtrado (60 dias de intervalo).
         RuleOutcome outcome = scenario()
                 .eligible(P1)
                 .add(visit(P1, LocalDate.of(2025, 12, 1), CBO_ACS, "1"))
