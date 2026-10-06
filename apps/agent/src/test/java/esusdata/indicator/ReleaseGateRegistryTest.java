@@ -42,13 +42,15 @@ class ReleaseGateRegistryTest {
     }
 
     @Test
-    void thePackagedRegistryCoversEveryRegisteredPackWithGateDPendingAndAPassedForC1ToC7() {
+    void thePackagedRegistryCoversEveryRegisteredPackWithGateDPendingAndAPassedForC1ToC7AndTheNotaFinal() {
         ReleaseGateRegistry bundled = ReleaseGateRegistry.bundled();
 
         for (PackDescriptor d : ReleaseGateRegistry.registeredPacks()) {
             GateStatus status = bundled.statusOf(d);
             assertThat(status.stale()).as(d.id()).isFalse();
-            GateCheck.State expectedA = d.id().matches("c[1-7]-.*") ? GateCheck.State.PASSED : GateCheck.State.PENDING;
+            GateCheck.State expectedA = d.id().matches("c[1-7]-.*|componente-iii-nota-final")
+                    ? GateCheck.State.PASSED
+                    : GateCheck.State.PENDING;
             assertThat(status.check(GateId.A).state()).as(d.id()).isEqualTo(expectedA);
             assertThat(status.check(GateId.D).state()).as(d.id()).isEqualTo(GateCheck.State.PENDING);
             assertThat(status.isComplete()).isFalse();

@@ -7,7 +7,9 @@ import esusdata.indicator.pack.c4.C4Pack;
 import esusdata.indicator.pack.c5.C5Pack;
 import esusdata.indicator.pack.c6.C6Pack;
 import esusdata.indicator.pack.c7.C7Pack;
+import esusdata.indicator.pack.componente3.ComponentIII;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +33,43 @@ public record GatePack(String packId, String code, int siapsCode, LocalDate last
 
     /** The last of the six SEI signatures of the NT 8/2026. */
     static final LocalDate NT8_LAST_SIGNATURE = LocalDate.of(2026, 6, 1);
+
+    /** The SIAPS code the Nota Final's rows carry in a snapshot: it is not an indicator. */
+    static final int NOTA_FINAL_CODE = 0;
+
+    /**
+     * The Nota Final do Componente III ({@code siaps-nota-final-por-classe@1}, docs/indicadores/
+     * portoes/portao-d-nota-final-siaps.md): not one of {@link #all()}. Its signature date is the
+     * latest of the seven fichas (and the NT 8/2026), so its floor is the latest floor of C1–C7.
+     */
+    public static final GatePack NOTA_FINAL = new GatePack(
+            ComponentIII.ID,
+            "CIII",
+            NOTA_FINAL_CODE,
+            ALL.stream().map(GatePack::floor).max(LocalDate::compareTo).orElseThrow());
+
+    /** True for the Nota Final, whose rule, check and SIAPS rows differ from those of C1–C7. */
+    public boolean isNotaFinal() {
+        return siapsCode == NOTA_FINAL_CODE;
+    }
+
+    /** The id of the automated check that decides this pack's D. */
+    public String checkId() {
+        return isNotaFinal() ? Comparison.CHECK_ID_NOTA_FINAL : Comparison.CHECK_ID;
+    }
+
+    /** The document that fixes this pack's D rule. */
+    public String ruleDocument() {
+        return "docs/indicadores/portoes/"
+                + (isNotaFinal() ? "portao-d-nota-final-siaps.md" : "portao-d-conciliacao-siaps.md");
+    }
+
+    /** The seven packs and the Nota Final: everything the live check decides. */
+    public static List<GatePack> allWithNotaFinal() {
+        List<GatePack> everything = new ArrayList<>(ALL);
+        everything.add(NOTA_FINAL);
+        return List.copyOf(everything);
+    }
 
     /** The latest signature date among the pack's ficha and the NT 8/2026. */
     public LocalDate floor() {

@@ -3,10 +3,14 @@ package esusdata.run.worker;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.indicator.model.CanonicalFixtures;
+import esusdata.indicator.model.Capabilities;
+import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.pack.c1.C1Rule;
 import esusdata.indicator.pack.c7.C7Pack;
 import esusdata.indicator.sensitivity.PackSensitivity.PackReport;
 import esusdata.indicator.sensitivity.ReportWriter;
 import esusdata.indicator.sensitivity.SensitivityRunner;
+import esusdata.run.extract.ExtractFixtures;
 import esusdata.run.extract.ExtractFixturesV2;
 import esusdata.run.worker.SensitivityExtracts.PackInput;
 import java.nio.file.Files;
@@ -26,6 +30,8 @@ class SensitivityExtractsTest {
     private static final YearMonth JUNE = YearMonth.of(2026, 6);
     private static final String INE = "0000346268";
     private static final LocalDate LINK = LocalDate.of(2025, 9, 1);
+    private static final YearMonth MARCH = YearMonth.of(2026, 3);
+    private static final String ENCOUNTERS_INE = "0000346268";
 
     @TempDir
     Path extracts;
@@ -58,6 +64,70 @@ class SensitivityExtractsTest {
         assertThat(SensitivityExtracts.fromDirectory(extracts, YearMonth.of(2026, 5)))
                 .as("another competência is a different read plan")
                 .isEmpty();
+    }
+
+    private static PackInput c1(List<PackInput> inputs) {
+        return inputs.stream()
+                .filter(input ->
+                        C1Rule.INDICATOR_PACK.equals(input.rule().descriptor().id()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    @Test
+    void c1IsReadWithItsTeamSupplementAndFilteredAsProductionDoes() throws Exception {
+        ExtractFixtures.writeTeamsOfType(
+                extracts, "ext-c1-team", "src-1", CanonicalFixtures.IBGE, MARCH, "76", ENCOUNTERS_INE);
+        ExtractFixtures.write(extracts, "ext-c1", "src-1", CanonicalFixtures.IBGE, "2026-03", 7, 3, 2);
+
+        PackInput input = c1(SensitivityExtracts.fromDirectory(extracts, MARCH));
+        RuleOutcome outcome = input.rule().evaluate(input.data(), input.context());
+
+        assertThat(input.data().windowOf(Capabilities.TEAM))
+                .as("the supplement was read")
+                .isPresent();
+        assertThat(outcome.result().numerator().intValue()).isEqualTo(7);
+        assertThat(outcome.result().denominator().intValue()).isEqualTo(10);
+        assertThat(outcome.teams())
+                .singleElement()
+                .satisfies(team -> assertThat(team.ine()).isEqualTo(ENCOUNTERS_INE));
+    }
+
+    @Test
+    void c1LeavesOutTheTeamsOfATypeOtherThan70And76() throws Exception {
+        ExtractFixtures.writeTeamsOfType(
+                extracts, "ext-c1-team", "src-1", CanonicalFixtures.IBGE, MARCH, "72", ENCOUNTERS_INE);
+        ExtractFixtures.write(extracts, "ext-c1", "src-1", CanonicalFixtures.IBGE, "2026-03", 7, 3, 2);
+
+        PackInput input = c1(SensitivityExtracts.fromDirectory(extracts, MARCH));
+        RuleOutcome outcome = input.rule().evaluate(input.data(), input.context());
+
+        assertThat(outcome.teams())
+                .as("the team of type 72 is not a team of C1")
+                .isEmpty();
+        assertThat(outcome.result().denominator().intValue()).isZero();
+        assertThat(outcome.result().limitations()).anyMatch(l -> l.startsWith("C1-LIM-10/contagem"));
+    }
+
+    @Test
+    void c1WithoutItsTeamExtractIsNotAcceptedNorRunWithoutTheFilter() throws Exception {
+        ExtractFixtures.write(extracts, "ext-c1", "src-1", CanonicalFixtures.IBGE, "2026-03", 7, 3, 2);
+        Files.delete(extracts.resolve("ext-c1-team.manifest.json"));
+
+        assertThat(SensitivityExtracts.fromDirectory(extracts, MARCH))
+                .noneMatch(input ->
+                        C1Rule.INDICATOR_PACK.equals(input.rule().descriptor().id()));
+    }
+
+    @Test
+    void c1WithATeamExtractOfAnotherPeriodIsNotAccepted() throws Exception {
+        ExtractFixtures.writeTeams(
+                extracts, "ext-c1-team", "src-1", CanonicalFixtures.IBGE, YearMonth.of(2026, 2), ENCOUNTERS_INE);
+        ExtractFixtures.write(extracts, "ext-c1", "src-1", CanonicalFixtures.IBGE, "2026-03", 7, 3, 2);
+
+        assertThat(SensitivityExtracts.fromDirectory(extracts, MARCH))
+                .noneMatch(input ->
+                        C1Rule.INDICATOR_PACK.equals(input.rule().descriptor().id()));
     }
 
     @Test

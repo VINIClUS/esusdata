@@ -1,7 +1,9 @@
 # Runbook: conferência do Portão D com o SIAPS público
 
-Regra, elegibilidade e limiar: `docs/indicadores/portoes/portao-d-conciliacao-siaps.md`
-(`siaps-distribuicao-por-classe@1`). Este texto só diz como rodar.
+Regra, elegibilidade e limiar de C1–C7: `docs/indicadores/portoes/portao-d-conciliacao-siaps.md`
+(`siaps-distribuicao-por-classe@1`); da Nota Final do Componente III:
+`docs/indicadores/portoes/portao-d-nota-final-siaps.md` (`siaps-nota-final-por-classe@1`). Este texto só
+diz como rodar.
 
 O produto nunca chama o SIAPS. A conferência é ferramenta de desenvolvimento na árvore de testes
 (`apps/agent/src/test/java/esusdata/indicator/reconciliation`). Ela só roda com
@@ -9,9 +11,26 @@ O produto nunca chama o SIAPS. A conferência é ferramenta de desenvolvimento n
 
 ## Quando rodar
 
-Nas versões finais das regras de C1–C7, depois que o quadrimestre elegível estiver publicado no
+Nas versões finais das regras de C1–C7 e da Nota Final, depois que o quadrimestre elegível estiver publicado no
 SIAPS (hoje 2026Q2; sem ele o resultado é PENDING, "aguardando 2026Q2 no SIAPS"). Não rodar contra o
 PEC de produção antes disso, a não ser para o modo informativo combinado.
+
+## Lista antes de rodar
+
+1. Túnel para o PEC no ar, arquivo de segredos e binário do plano de execução (abaixo). Só leitura.
+2. **C1 como em produção (ADR 0033, `c1-mais-acesso@0.5.0`).** A ferramenta adquire e lê o C1 pelo mesmo
+   `ReadPlan` da execução: o extrato v1 de encontros **e** o extrato suplementar da capacidade `team`
+   (`<id>-team`), lidos juntos, e avalia com o mesmo `IndicatorRule.evaluate`, que aplica o filtro de
+   tipo de equipe (INE 70/76). Um C1 sem o par é recusado (fica sem entradas locais, PENDING), nunca
+   calculado sem o filtro. O harness de sensibilidade usa o mesmo caminho.
+3. **Extratos antigos de C1.** Se `apps/agent/target/portao-d/extratos` já tem extratos `sensibilidade-c1-*`
+   de antes do ADR 0033 (sem o `-team`), apagar esses arquivos antes de rodar; senão o C1 é adquirido de
+   novo sobre o mesmo id.
+4. Os quatro meses do quadrimestre de referência têm de poder ser lidos (a ferramenta adquire os que
+   faltam: sete extratos por mês, mais o `-team` do C1).
+5. O SIAPS publicou o quadrimestre de referência (hoje 2026Q2); senão tudo fica PENDING com
+   "aguardando ...".
+6. Revisar o diff de `contracts/indicators/release-gates.json` antes de commitar (só `gates.D`).
 
 ## Como rodar
 
@@ -52,6 +71,15 @@ sensibilidade e reaproveitados em `apps/agent/target/portao-d/extratos` numa seg
 | Contagens por classe e classes por INE (`*-contagens.csv`, `*-equipes.csv`) | `apps/agent/target/portao-d/` | não |
 | Snapshot do SIAPS, extratos | `apps/agent/target/portao-d/` | não |
 
+**Nota Final do Componente III.** Na mesma rodada, depois dos sete packs, a ferramenta compara a
+classe final de cada equipe (consolidação da NT 8/2026 sobre os resultados mensais sem bloqueio de
+C1–C7, os mesmos extratos e o mesmo snapshot) com as linhas `QUALIDADE` de `classificacaoFinalComponente`.
+Não há chamada nova ao SIAPS. O resumo é `portao-d-componente-iii-nota-final-<quadrimestre>.md` e, com
+`observatorio.gate.d.registry`, o resultado decidido vai para `gates.D` da entrada
+`componente-iii-nota-final`. Um snapshot salvo antes desta versão já traz a lista
+`classificacaoFinalComponente` (é a resposta inteira do SIAPS); sem ela a Nota Final fica PENDING
+("o SIAPS não devolveu a classificação final").
+
 A evidência de cada pack é o resumo: o registro guarda `ref` (caminho relativo ao repositório) e o
 `sha256` do arquivo. Rodar um pack de novo reescreve só o resumo dele.
 
@@ -72,13 +100,6 @@ A evidência de cada pack é o resumo: o registro guarda `ref` (caminho relativo
   de confiar nele, conferir com um arquivo baixado de verdade. O nome do indicador na coluna
   "Indicador por tipo de equipe" é aceito com ou sem o sufixo " - eSF"/" - eAP" e qualquer outro nome
   é recusado. A conferência por JSON não depende dele.
-- C1 usa o caminho de aquisição v1 (encontros). A nota `2026-10-06-sensibilidade-2026-08.md` registra que o
-  harness de sensibilidade não reproduziu o C1 por causa desse caminho (lacuna conhecida do harness; a causa
-  exata não foi investigada aqui). A conferência trata o C1 por conta própria: os encontros são agrupados por
-  INE e contados com `C1Rule.computeEvidenceOnly`; o valor exato vem de `ResultJson.exactValue`,
-  como o produto armazena. Esse caminho tem teste unitário com dados sintéticos, mas ainda não foi
-  exercitado ao vivo contra o PEC.
-
 ## Depois de registrar o D
 
 Com o D registrado em `release-gates.json` e a versão liberada, não é preciso recalcular nada à mão: o

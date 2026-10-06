@@ -72,7 +72,7 @@ public final class SummaryWriter {
                 | Indicador | Tipo | N_S | N_L | Sem classe local | D | T | Veredito |
                 |---|---|---|---|---|---|---|---|
                 """.formatted(
-                        Comparison.CHECK_ID,
+                        verdict.pack().checkId(),
                         verdict.pack().packId(),
                         verdict.ruleVersion(),
                         verdict.quadrimestre(),
@@ -82,13 +82,14 @@ public final class SummaryWriter {
         for (RowResult row : verdict.rows()) {
             text.append(tableRow(verdict.pack().code(), row)).append('\n');
         }
-        text.append("""
+        text.append(
+                """
 
                 Equipes locais fora da lista do SIAPS (excluídas): %s.
 
                 Contagens por classe e classes por equipe ficam só no diretório local ignorado pelo controle de versão.
-                Regra: `docs/indicadores/portoes/portao-d-conciliacao-siaps.md`.
-                """.formatted(mask(verdict.localNotInSiaps())));
+                Regra: `%s`.
+                """.formatted(mask(verdict.localNotInSiaps()), verdict.pack().ruleDocument()));
         return text.toString();
     }
 

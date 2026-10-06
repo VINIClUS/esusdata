@@ -6,6 +6,7 @@ import esusdata.indicator.reconciliation.Comparison.TeamSplit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -55,7 +56,21 @@ public record PackVerdict(
     /** Compares one pack's local classes with the SIAPS counts of {@code snapshot}. */
     public static PackVerdict evaluate(
             GatePack pack, String ruleVersion, Mode mode, SiapsSnapshot snapshot, LocalClasses local) {
-        List<SiapsSnapshot.Team> listed = snapshot.teamsOf(pack.siapsCode());
+        List<SiapsSnapshot.Team> listed;
+        if (pack.isNotaFinal()) {
+            // siaps-nota-final-por-classe@1: a snapshot without the QUALIDADE rows of the final
+            // classification, or without one of the seven team lists, has nothing to compare
+            if (!snapshot.hasFinalRows()) {
+                return pending(pack, ruleVersion, mode, "o SIAPS não devolveu a classificação final (QUALIDADE)");
+            }
+            Optional<List<SiapsSnapshot.Team>> common = snapshot.notaFinalTeams();
+            if (common.isEmpty()) {
+                return pending(pack, ruleVersion, mode, "faltam listas de equipes de C1–C7 no SIAPS");
+            }
+            listed = common.get();
+        } else {
+            listed = snapshot.teamsOf(pack.siapsCode());
+        }
         List<RowResult> rows = new ArrayList<>();
         List<TeamLine> lines = new ArrayList<>();
         for (String type : List.of(SiapsParser.ESF, SiapsParser.EAP)) {
