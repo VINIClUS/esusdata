@@ -131,9 +131,9 @@ Em C7 não há exceção de eAP: só a validação 70/76 se aplica. Hoje `C7Coho
 
 **Decisão: leitura 4 (reescala).** Subgrupo sem denominador sai da soma e do divisor. Se os quatro estão vazios, o mês é `NO_DENOMINATOR` (sem valor) e **não entra** na média quadrimestral. Mês com subgrupos vazios, mas algum presente, entra na média com o valor reescalado.
 
-**Princípio: P1 (unidade «Percentual», máximo 100), com P2 por analogia e P5.**
+**Princípio: P2 por analogia (NT 8, item 4.1) e P5 decidem; P1 só dá o contexto de escala.** A ficha é muda sobre `y = 0`. De P1 vem apenas que o indicador é «Percentual» e que as faixas são únicas.
 
-- Item 18: «Unidade de medida: Percentual.» (`c7-prevencao-cancer.txt:98`). Item 4.4: «A pontuação pode alcançar um valor máximo de 100 pontos» (`:301-303`). Item 30: faixas únicas, «Ótimo: > 75 e ≤ 100» (`:244`). Um percentual dos pontos possíveis não pode ter teto de 70 só porque a equipe não tem meninas de 9 a 14 anos.
+- Contexto de P1: item 18, «Unidade de medida: Percentual.» (`c7-prevencao-cancer.txt:98`); Quadro 01, «Somatório em pontos … 100»; item 30, faixas únicas, «Ótimo: > 75 e ≤ 100» (`:244`). Um percentual dos pontos possíveis não deve ter teto de 70 só porque a equipe não tem meninas de 9 a 14 anos. Isto não repete a leitura «100 pontos para cada pessoa» do item 4.4, que C7-D5 (AMB-C7-02) descarta: aqui o 100 é a escala do indicador por subpopulação, não uma média por pessoa.
 - Item 23: cada parcela é `(x/y) × peso` e o indicador é `(A+B+C+D)`. Nada diz o que fazer se `y = 0`; a ficha não impõe a leitura 2.
 - NT 8, item 4.1, «Atenção»: o resultado quadrimestral considera «apenas os meses que possuam crianças que completaram dois anos e gestações que atingiram o 42° dia de puerpério» (`q08-nt-08-2026-componentes-ii-iii.txt:51-54`). O texto vale só para C2 e C3. Aplica-se aqui por analogia (P5) o mesmo princípio: ausência de denominador não vira zero.
 - A MET-17 da Tech Spec trata do **ISF histórico** («Um componente do ISF ausente»), não de C7 nem do Componente III. A pendência P10 pede só «Tratamento metodológico confirmado» (`Tech_Spec_Observatorio_APS_v0_4.md:1862`); esta decisão o confirma com regra explícita. O «não renormalizar» do §2.4 (l.797) é substituído por esta decisão (emenda de 2026-10-06; a versão da regra sobe).
@@ -148,7 +148,7 @@ Em C7 não há exceção de eAP: só a validação 70/76 se aplica. Hoje `C7Coho
 - `C7Pack.java`: `CALCULATION_POLICY_VERSION = "c7-exact-score@2"`; `RULE_VERSION = ID + "@0.2.0"`.
 - `componente3/Nt08Consolidation.java`: mês `NO_DENOMINATOR` de C7 fora da média, como C2/C3 (conferir o ponto de entrada perto da l.77).
 
-**Testes.** `C7RuleTest.ct06_emptySubgroupBMakesTheScoreUnavailableNever70` (l.164) passa a esperar valor reescalado (exemplo: com B vazio, A=1/2, C=3/4, D=0/2 dá `(20·½ + 30·¾ + 20·0)·100/70 = 45,0`) e nunca 32,1428… (zero). Novos: dois subgrupos vazios; quatro vazios (`NO_DENOMINATOR`, fora da média). `C7PackReplayTest` (l.122, equipe dois com `RULE_AMBIGUITY` e valor nulo) passa a esperar `COMPUTED` com o valor reescalado; recalcular os números. `ct01` (MET-24: 40) não muda.
+**Testes.** `C7RuleTest.ct06_emptySubgroupBMakesTheScoreUnavailableNever70` (l.164) passa a esperar valor reescalado (exemplo: com B vazio, A=1/2, C=3/4, D=0/2: `20·½ + 30·¾ + 20·0 = 32,5`; reescalado `32,5·100/70 = 46,4285…`; a leitura «zero» daria 32,5 e deve falhar o teste). Novos: dois subgrupos vazios; quatro vazios (`NO_DENOMINATOR`, fora da média). `C7PackReplayTest` (l.122, equipe dois com `RULE_AMBIGUITY` e valor nulo) passa a esperar `COMPUTED` com o valor reescalado; recalcular os números. `ct01` (MET-24: 40) não muda.
 
 ---
 
@@ -212,7 +212,7 @@ Totais: **1 BLOCKING_GAP** (C7-LIM-04, temporária), 4 OUT_OF_REACH (01, 02, 03,
 | C7-D1 / AMB-C7-06 | Dose de HPV vale do 9º aniversário em diante, sem teto em meses | P1 + P3 | Sim, só para 14 anos com dose única precoce; sobe B |
 | C7-D2 / AMB-C7-08 | 02.02.10.025-1 conta de 2026-01 em diante, com registros de 2025 na janela de 60 meses | P1 (+ P3) | Sim, só registros ago–dez/2025; sobe A |
 | C7-D3 / AMB-C7-05 | Homem transgênero fora de B; aos 9–13 anos sem subgrupo, excluído | P1 | Sim, `<10` pessoas; tira o caso ambíguo |
-| C7-D4 / P10 / AMB-C7-01 | Subgrupo vazio: escore reescalado sobre os pesos presentes; 4 vazios: sem valor, fora da média | P1 + P2 (analogia) + P5 | Sim, para equipes com subgrupo vazio; maior que o valor com zero |
+| C7-D4 / P10 / AMB-C7-01 | Subgrupo vazio: escore reescalado sobre os pesos presentes; 4 vazios: sem valor, fora da média | P2 (analogia) + P5; P1 só dá a escala | Sim, para equipes com subgrupo vazio; maior que o valor com zero |
 | C7-D5 | Fim de todo `AMBIGUOUS_*`; C7 nunca devolve `RULE_AMBIGUITY` | decisão do mantenedor | Não (consequência de D1–D4) |
 | C7-D6 | Convenções de CBO, domiciliar, códigos, idade e janelas | P1/P5 | Não (já aplicadas) |
 | C7-LIM-04 | L1 é lacuna bloqueante até `team` VALIDATED; depois, regra de tipo comum | P1 (itens 11 e 24 b) | Sim após `team`: equipes sem tipo ou de outro tipo saem |
