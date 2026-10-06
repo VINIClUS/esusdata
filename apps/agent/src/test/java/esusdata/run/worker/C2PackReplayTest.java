@@ -84,6 +84,8 @@ class C2PackReplayTest {
 
     private ExtractionManifest extract(String id) throws Exception {
         return ExtractFixturesV2.forRule(new C2Pack(), COMPETENCIA)
+                .add(CanonicalFixtures.team(TEAM_ONE, CNES_ONE, "70"))
+                .add(CanonicalFixtures.team(TEAM_TWO, CNES_TWO, "70"))
                 .add(CanonicalFixtures.person("p1", P1_BIRTH, "FEMININO"))
                 .add(CanonicalFixtures.registration("p1", P1_BIRTH.plusDays(3), CNES_ONE, TEAM_ONE))
                 .add(

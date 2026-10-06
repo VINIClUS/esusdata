@@ -49,6 +49,14 @@ class C2PackReviewTest {
     private static CanonicalDataset.Builder child() {
         return extractWindows(MARCH)
                 .add(CanonicalFixtures.person(KEY, BIRTH, "FEMININO"))
+                .add(CanonicalFixtures.registration(KEY, BIRTH.plusDays(5), "1234567", INE))
+                .add(CanonicalFixtures.teamState(INE, "1234567", "70", "2020-01-01", null));
+    }
+
+    /** Like {@link #child()} but the INE's type is whatever the test adds (none: the child has no team type). */
+    private static CanonicalDataset.Builder childWithoutTeam() {
+        return extractWindows(MARCH)
+                .add(CanonicalFixtures.person(KEY, BIRTH, "FEMININO"))
                 .add(CanonicalFixtures.registration(KEY, BIRTH.plusDays(5), "1234567", INE));
     }
 
@@ -177,11 +185,12 @@ class C2PackReviewTest {
                 .add(CanonicalFixtures.person(KEY, BIRTH, "FEMININO"))
                 .add(CanonicalFixtures.registration(KEY, BIRTH.plusDays(5), "1234567", INE));
         DateWindow window = DateWindow.lastCivilMonths(MARCH, 26);
-        for (String capability : Capabilities.ALL) {
+        for (String capability : Capabilities.PACKAGED) {
             if (!Capabilities.IMMUNIZATION_HISTORY.equals(capability)) {
                 data.window(capability, window);
             }
         }
+        data.add(CanonicalFixtures.teamState(INE, "1234567", "70", "2020-01-01", null));
         RuleOutcome outcome = new C2Pack().evaluate(data.build(), CONTEXT);
         assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.UNSUPPORTED_SOURCE);
         assertThat(outcome.result().numerator()).isNull();
@@ -215,17 +224,33 @@ class C2PackReviewTest {
     void item24b_equipeDeTipoConhecidoForaDe70e76SaiDaCoorte() {
         CanonicalTeam other =
                 new CanonicalTeam(CanonicalFixtures.ref("cnes"), IBGE, INE, "1234567", "71", "2026-01-01");
-        RuleOutcome outcome = C2Pack.compute(child().add(other).build(), CONTEXT);
+        RuleOutcome outcome = C2Pack.compute(childWithoutTeam().add(other).build(), CONTEXT);
         assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
         assertThat(outcome.evidence())
                 .singleElement()
-                .satisfies(e -> assertThat(e.reasonCode()).isEqualTo(C2Cohort.TEAM_TYPE_NOT_CONSIDERED));
+                .satisfies(e -> assertThat(e.reasonCode()).isEqualTo("EXCLUIDO_EQUIPE_FORA_DO_ESCOPO"));
+        assertThat(outcome.result().limitations())
+                .anyMatch(l -> l.startsWith("C2-LIM-16/contagem: 1 criança(s)") && l.contains("1 de outro tipo"));
     }
 
     @Test
-    void item24b_tipoObservadoDepoisDoCorteNaoIsentaD() {
-        CanonicalTeam later =
-                new CanonicalTeam(CanonicalFixtures.ref("cnes"), IBGE, INE, "1234567", "76", "2026-04-02");
+    void c2_d2_semTipoOuComDoisTiposNoUltimoDiaACriancaSaiDaCoorteComMotivo() {
+        RuleOutcome without = C2Pack.compute(childWithoutTeam().build(), CONTEXT);
+        RuleOutcome conflict = C2Pack.compute(
+                childWithoutTeam()
+                        .add(CanonicalFixtures.teamState(INE, "1234567", "70", "2020-01-01", null))
+                        .add(CanonicalFixtures.teamState(INE, "1234567", "76", "2020-01-01", null))
+                        .build(),
+                CONTEXT);
+
+        assertThat(without.evidence().get(0).reasonCode()).isEqualTo("EXCLUIDO_EQUIPE_SEM_TIPO");
+        assertThat(conflict.evidence().get(0).reasonCode()).isEqualTo("EXCLUIDO_TIPO_EQUIPE_CONFLITANTE");
+        assertThat(conflict.result().limitations()).anyMatch(l -> l.contains("1 de tipo conflitante"));
+    }
+
+    @Test
+    void item24b_estadoQueComecaDepoisDoUltimoDiaNaoCreditaD() {
+        CanonicalTeam later = CanonicalFixtures.teamState(INE, "1234567", "76", "2026-04-02", null);
         RuleOutcome outcome = C2Pack.compute(child().add(later).build(), CONTEXT);
         assertThat(practice(outcome, "D").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
     }
@@ -380,7 +405,8 @@ class C2PackReviewTest {
         LocalDate birth = LocalDate.of(2024, 3, 20);
         CanonicalDataset.Builder data = extractWindows(MARCH)
                 .add(CanonicalFixtures.person(KEY, birth, "FEMININO"))
-                .add(CanonicalFixtures.registration(KEY, birth.plusDays(5), "1234567", INE));
+                .add(CanonicalFixtures.registration(KEY, birth.plusDays(5), "1234567", INE))
+                .add(CanonicalFixtures.teamState(INE, "1234567", "70", "2020-01-01", null));
         for (int days : new int[] {60, 120, 180}) {
             data.add(dose(birth.plusDays(days), "42")).add(dose(birth.plusDays(days), "22"));
         }
@@ -427,15 +453,26 @@ class C2PackReviewTest {
     }
 
     @Test
-    void item17_tipoDeEquipeSemDataNaoIsentaD() {
-        CanonicalTeam undated = new CanonicalTeam(CanonicalFixtures.ref("cnes"), IBGE, INE, "1234567", "76", null);
-        RuleOutcome outcome = C2Pack.compute(child().add(undated).build(), CONTEXT);
+    void validTo_eExclusivoEOEstadoQueTerminaNoUltimoDiaNaoCobreACompetencia() {
+        // March ends on 2026-03-31: a 76 state valid to 2026-03-31 (exclusive) does not cover it, the 70 one does
+        CanonicalTeam eap = CanonicalFixtures.teamState(INE, "1234567", "76", "2020-01-01", "2026-03-31");
+        CanonicalTeam esf = CanonicalFixtures.teamState(INE, "1234567", "70", "2026-03-31", null);
+        RuleOutcome outcome =
+                C2Pack.compute(childWithoutTeam().add(eap).add(esf).build(), CONTEXT);
         assertThat(practice(outcome, "D").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
     }
 
     @Test
     void item20_janelasDosRequisitosSaoExatas() {
+        assertThat(new C2Pack().requirements(MARCH).parts())
+                .extracting(PartRequirement::capability)
+                .contains(Capabilities.TEAM);
         for (PartRequirement part : new C2Pack().requirements(MARCH).parts()) {
+            if (Capabilities.TEAM.equals(part.capability())) {
+                assertThat(part.periodStart()).isEqualTo(LocalDate.of(2026, 3, 1));
+                assertThat(part.periodEndExclusive()).isEqualTo(LocalDate.of(2026, 4, 1));
+                continue;
+            }
             assertThat(part.periodStart()).isEqualTo(LocalDate.of(2024, 2, 1));
             assertThat(part.periodEndExclusive()).isEqualTo(LocalDate.of(2026, 4, 1));
             assertThat(part.dateParams())

@@ -5,6 +5,7 @@ import esusdata.indicator.model.AgeAt.AnniversaryRule;
 import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalRegistration;
 import esusdata.indicator.model.EvaluationContext;
+import esusdata.indicator.model.TeamScope;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
@@ -36,7 +37,6 @@ final class C2Cohort {
     static final String REFUSED = "EXCLUIDO_RECUSA_CADASTRO";
     static final String TERRITORY_CHANGE = "INTERROMPIDO_MUDANCA_TERRITORIO";
     static final String DEATH = "INTERROMPIDO_OBITO";
-    static final String TEAM_TYPE_NOT_CONSIDERED = "EXCLUIDO_TIPO_EQUIPE_NAO_CONSIDERADO";
 
     /** Same-day versions are ordered by the source id as a number (length, then text): "10" after "9". */
     private static final Comparator<CanonicalRegistration> LATEST = Comparator.comparing(
@@ -64,15 +64,14 @@ final class C2Cohort {
     }
 
     /**
-     * 24 b (p.2): only eSF (70) and eAP (76) teams are considered. A child linked to a team whose
-     * type is known and is neither leaves the cohort; an unknown type keeps it (gap L1, declared).
+     * 24 b (p.2): only eSF (70) and eAP (76) teams are considered. A child linked to a team the rule
+     * does not consider leaves the cohort with the reason ({@link TeamScope.Decision#exclusionReason}).
      */
-    static Member onConsideredTeam(Member member, String teamType) {
-        if (!member.eligible() || teamType == null || C2Codes.CONSIDERED_TEAM_TYPES.contains(teamType)) {
+    static Member onConsideredTeam(Member member, TeamScope.Decision team) {
+        if (!member.eligible() || team == null || team.considered()) {
             return member;
         }
-        return new Member(
-                member.person(), member.clock(), false, TEAM_TYPE_NOT_CONSIDERED, member.ine(), member.cnes());
+        return new Member(member.person(), member.clock(), false, team.exclusionReason(), member.ine(), member.cnes());
     }
 
     private static String exclusion(
