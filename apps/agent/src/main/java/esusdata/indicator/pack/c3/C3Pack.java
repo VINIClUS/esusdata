@@ -11,12 +11,15 @@ import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.model.TeamScope;
 import esusdata.indicator.model.ValueKind;
+import esusdata.indicator.pack.PackSupport;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -42,7 +45,16 @@ public final class C3Pack implements IndicatorRule {
     private static final String PUERPERIUM = "puerpério";
 
     public static final String ID = "c3-gestacao-puerperio";
-    public static final String RULE_VERSION = ID + "@0.2.0";
+    /** C3-LIM-05 (C3-D1): E and J are credited in full to the eAP 76 episodes that did not observe them. */
+    static final String EAP_CREDIT = "C3-LIM-05/contagem: E e J creditadas integralmente (%d pontos cada) para %d"
+            + " episódio(s) de equipes eAP 76, conforme o item 24 b; creditadas por falta de visita: E em %d e J em %d.";
+
+    /** C3-LIM-10 (C3-D2): the records left out because their team is not a considered one. */
+    static final String TEAM_EXCLUSIONS = "C3-LIM-10/contagem: %d registro(s) de gestação vinculado(s) a equipe fora da"
+            + " regra de tipo (70 ou 76 vigente no fim da competência) ficaram fora: %d de equipe sem tipo, %d de tipo"
+            + " conflitante e %d de outro tipo.";
+
+    public static final String RULE_VERSION = ID + "@0.3.0";
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -65,7 +77,8 @@ public final class C3Pack implements IndicatorRule {
                     Capabilities.EXAM_REQUEST_EVALUATION,
                     Capabilities.HOME_VISIT,
                     Capabilities.MEASUREMENT_RECORD,
-                    Capabilities.IMMUNIZATION_HISTORY),
+                    Capabilities.IMMUNIZATION_HISTORY,
+                    Capabilities.TEAM),
             List.of(
                     ComponentSpec.practice(
                             "A",
@@ -168,9 +181,13 @@ public final class C3Pack implements IndicatorRule {
                 competencia.plusMonths(1).atDay(1));
         List<PartRequirement> parts = new ArrayList<>();
         for (String capability : DESCRIPTOR.requiredCapabilities()) {
+            if (Capabilities.TEAM.equals(capability)) {
+                continue;
+            }
             DateWindow window = Capabilities.INDIVIDUAL_REGISTRATION.equals(capability) ? registrations : period;
             parts.add(PartRequirement.personScoped(capability, window, births, codes(capability)));
         }
+        parts.add(PackSupport.teamPart(competencia));
         return new DataRequirements(DataRequirements.V2, parts);
     }
 
@@ -187,7 +204,7 @@ public final class C3Pack implements IndicatorRule {
         }
         LocalDate cutoff = context.dataCutoff();
         SortedMap<String, PersonRecords> people = RecordIndex.of(data, context.municipalityIbge());
-        TeamTypes teamTypes = new TeamTypes(data.teams(), cutoff);
+        TeamTypes teamTypes = new TeamTypes(data.teams(), context.competencia().atEndOfMonth());
         Subjects builder = new Subjects(
                 new Cohort(context.competencia(), cutoff, teamTypes),
                 new PracticeEvaluator(convention),
@@ -205,7 +222,27 @@ public final class C3Pack implements IndicatorRule {
         EvidenceRows rows = new EvidenceRows(weights);
         List<EvidenceItem> evidence = new ArrayList<>();
         subjects.forEach(s -> evidence.addAll(rows.of(s)));
-        return new RuleOutcome(results.result(subjects), results.teams(subjects), evidence);
+        IndicatorResult municipal = results.result(subjects);
+        String left = teamExclusions(subjects);
+        if (left != null) {
+            municipal = municipal.withLimitation(left);
+        }
+        return new RuleOutcome(municipal, results.teams(subjects), evidence);
+    }
+
+    /** The records the team-type rule left out, by reason: a disclosure for the municipal result (C3-LIM-10). */
+    private static String teamExclusions(List<Subject> subjects) {
+        long without = count(subjects, TeamScope.REASON_WITHOUT_TYPE);
+        long conflict = count(subjects, TeamScope.REASON_CONFLICT);
+        long other = count(subjects, TeamScope.REASON_OUT_OF_SCOPE);
+        long all = without + conflict + other;
+        return all == 0 ? null : TEAM_EXCLUSIONS.formatted(all, without, conflict, other);
+    }
+
+    private static long count(List<Subject> subjects, String reason) {
+        return subjects.stream()
+                .filter(s -> reason.equals(s.verdict().reasonCode()))
+                .count();
     }
 
     @Override

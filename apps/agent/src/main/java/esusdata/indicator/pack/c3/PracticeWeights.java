@@ -26,7 +26,7 @@ final class PracticeWeights {
         return specs.get(practice);
     }
 
-    /** The sum of the weights met or exempt; {@code null} for a subject that was not scored. */
+    /** The sum of the weights met or credited; {@code null} for a subject that was not scored. */
     BigInteger points(Subject subject) {
         if (!subject.eligible()) {
             return null;

@@ -24,12 +24,15 @@ import java.util.TreeSet;
  */
 final class C2Tally {
 
+    private static final int D_INDEX = 3;
+
     private final PackDescriptor descriptor;
     private final int practices;
     private final long[] met;
     private BigInteger points = BigInteger.ZERO;
     private long subjects;
-    private long teamTypeUnknown;
+    private long eapChildren;
+    private long eapObserved;
     private final SortedSet<String> cnes = new TreeSet<>();
 
     C2Tally(PackDescriptor descriptor) {
@@ -41,8 +44,11 @@ final class C2Tally {
     void add(ScoredChild child) {
         subjects++;
         points = points.add(child.points(descriptor.components()));
-        if (child.teamTypeUnknown()) {
-            teamTypeUnknown++;
+        if (child.eap76()) {
+            eapChildren++;
+            if (child.observedD()) {
+                eapObserved++;
+            }
         }
         cnes.add(Objects.requireNonNullElse(child.member().cnes(), "")); // unknown never agrees
         for (int i = 0; i < practices; i++) {
@@ -95,9 +101,9 @@ final class C2Tally {
 
     private List<String> limitations() {
         List<String> limitations = new ArrayList<>(descriptor.standingLimitationLines());
-        if (teamTypeUnknown > 0) {
-            limitations.add(teamTypeUnknown + " criança(s) de equipe sem tipo comprovado na fonte (C2-LIM-05):"
-                    + " a pontuação integral da prática D para eAP tipo 76 não foi aplicada.");
+        if (eapChildren > 0) {
+            limitations.add(C2Pack.EAP_CREDIT.formatted(
+                    descriptor.components().get(D_INDEX).weight(), eapChildren, eapObserved));
         }
         return limitations;
     }

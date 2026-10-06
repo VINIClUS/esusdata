@@ -21,8 +21,9 @@ import java.util.List;
  * item 24-c lists seven six-digit occupations, valid for numerator and denominator alike;
  * encounters with a missing CBO or one outside the list are excluded from both and counted
  * ({@code cbo_policy=FICHA_24C}). The ficha has a single list with no transition rule, so 225125
- * and 225250 (footnote additions) are valid in every competência (decision C1-D1). Team type,
- * professional CNS and the other ficha fields are still not checked. Portão D (reconciliation
+ * and 225250 (footnote additions) are valid in every competência (decision C1-D1). The team
+ * type (C1-D2) is applied by {@link C1Pack} when the read brings the team part; professional CNS
+ * and the other ficha fields are not checked. Portão D (reconciliation
  * against Siaps/SISAB) is a gate state kept by the release workflow, not a limitation of the
  * rule (decision C1-D4).
  *
@@ -34,8 +35,8 @@ public final class C1Rule {
     /** Indicator pack identity — distinct from {@link #RULE_VERSION}, which versions the rule. */
     public static final String INDICATOR_PACK = "c1-mais-acesso";
 
-    public static final String RULE_VERSION = "c1-mais-acesso@0.3.0";
-    public static final String CALCULATION_POLICY_VERSION = "c1-exact-ratio@1";
+    public static final String RULE_VERSION = "c1-mais-acesso@0.4.0";
+    public static final String CALCULATION_POLICY_VERSION = "c1-exact-ratio@2";
     public static final String DENOMINATOR_KIND = "PROGRAMADOS_MAIS_ESPONTANEOS";
 
     /** Reason code of the evidence row of an encounter left out by the CBO filter. */

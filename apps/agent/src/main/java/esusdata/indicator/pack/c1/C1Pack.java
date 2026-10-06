@@ -4,6 +4,7 @@ import esusdata.indicator.model.BudgetHint;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalEncounter;
 import esusdata.indicator.model.CanonicalModality;
+import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.DataRequirements;
 import esusdata.indicator.model.EvaluationContext;
@@ -19,6 +20,7 @@ import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamResult;
+import esusdata.indicator.model.TeamScope;
 import esusdata.indicator.model.ValueKind;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -52,7 +54,10 @@ public final class C1Pack implements IndicatorRule {
                             + "225125, 225250, 223565, 223505), em toda competência; CBO ausente ou fora da lista é "
                             + "excluído e contado."),
             Limitation.blockingGap(
-                    "C1-LIM-03", "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 (item 24-b) não é feita."),
+                    "C1-LIM-03",
+                    "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 (item 24-b) não é feita: a leitura"
+                            + " v1 do C1 ainda não traz a capacidade `team`; o filtro de INE (C1-LIM-10) só atua quando"
+                            + " o extrato a traz."),
             Limitation.outOfReach(
                     "C1-LIM-06",
                     "O SIAPS extrai no 20º dia útil e só conta o enviado até o 10º dia do mês seguinte; "
@@ -69,6 +74,11 @@ public final class C1Pack implements IndicatorRule {
                     "C1-LIM-11",
                     "A lotação do profissional na equipe (SCNES) não é conferida; vale o INE registrado no "
                             + "atendimento."));
+
+    /** C1-LIM-10 (C1-D2): the encounters left out because their team is not a considered one. */
+    static final String TEAM_EXCLUSIONS = "C1-LIM-10/contagem: %d atendimento(s) de INE fora da regra de tipo (70 ou 76"
+            + " vigente no fim da competência) ficaram fora do numerador e do denominador: %d sem INE ou de equipe sem"
+            + " tipo, %d de tipo conflitante e %d de outro tipo.";
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             C1Rule.INDICATOR_PACK,
@@ -109,10 +119,20 @@ public final class C1Pack implements IndicatorRule {
 
     @Override
     public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
-        List<CanonicalEncounter> encounters = data.encounters();
+        List<CanonicalEncounter> all = data.encounters();
         String period = context.referencePeriod();
         String cutoff = context.dataCutoff().toString();
+        // C1-D2: the INE filter acts only when the extract carries the team part (the v1 read does not yet)
+        TeamScope scope = data.windowOf(Capabilities.TEAM).isPresent()
+                ? TeamScope.of(data.teams(), context.competencia().atEndOfMonth())
+                : null;
+        List<CanonicalEncounter> encounters =
+                all.stream().filter(e -> teamReason(scope, e) == null).toList();
         IndicatorResult municipal = C1Rule.compute(encounters, context.municipalityIbge(), period, cutoff);
+        String left = teamExclusions(scope, all);
+        if (left != null) {
+            municipal = municipal.withLimitation(left);
+        }
 
         Map<String, List<CanonicalEncounter>> byTeam = new LinkedHashMap<>();
         for (CanonicalEncounter e : encounters) {
@@ -126,7 +146,30 @@ public final class C1Pack implements IndicatorRule {
             teams.add(new TeamResult(
                     ine, agreedCnes(members), C1Rule.compute(members, context.municipalityIbge(), period, cutoff)));
         }
-        return new RuleOutcome(municipal, teams, evidence(encounters));
+        return new RuleOutcome(municipal, teams, evidence(all, scope));
+    }
+
+    /**
+     * The team-rule reason an encounter is left out, or {@code null}: only encounters of the ficha's
+     * CBO list are judged (the CBO filter comes first), and only when a scope exists.
+     */
+    private static String teamReason(TeamScope scope, CanonicalEncounter e) {
+        if (scope == null || !C1Rule.isFichaCbo(e.cbo())) {
+            return null;
+        }
+        return scope.decide(e.ine()).exclusionReason();
+    }
+
+    private static String teamExclusions(TeamScope scope, List<CanonicalEncounter> all) {
+        long without = count(scope, all, TeamScope.REASON_WITHOUT_TYPE);
+        long conflict = count(scope, all, TeamScope.REASON_CONFLICT);
+        long other = count(scope, all, TeamScope.REASON_OUT_OF_SCOPE);
+        long total = without + conflict + other;
+        return total == 0 ? null : TEAM_EXCLUSIONS.formatted(total, without, conflict, other);
+    }
+
+    private static long count(TeamScope scope, List<CanonicalEncounter> all, String reason) {
+        return all.stream().filter(e -> reason.equals(teamReason(scope, e))).count();
     }
 
     @Override
@@ -139,10 +182,17 @@ public final class C1Pack implements IndicatorRule {
      * outside the ficha's CBO list is {@code EXCLUDED} with {@link C1Rule#REASON_CBO_OUTSIDE_FICHA}.
      */
     static List<EvidenceItem> evidence(List<CanonicalEncounter> encounters) {
+        return evidence(encounters, null);
+    }
+
+    /** The evidence rows; with a team scope, an encounter of an INE the team rule does not consider is excluded too. */
+    static List<EvidenceItem> evidence(List<CanonicalEncounter> encounters, TeamScope scope) {
         List<EvidenceItem> items = new ArrayList<>(encounters.size());
         for (CanonicalEncounter e : encounters) {
             boolean inFicha = C1Rule.isFichaCbo(e.cbo());
-            EvidenceDecision decision = inFicha ? byModality(e.modality()) : EvidenceDecision.EXCLUDED;
+            String teamReason = teamReason(scope, e);
+            EvidenceDecision decision =
+                    !inFicha || teamReason != null ? EvidenceDecision.EXCLUDED : byModality(e.modality());
             items.add(new EvidenceItem(
                     EvidenceSubjectKind.EVENT,
                     null,
@@ -150,7 +200,7 @@ public final class C1Pack implements IndicatorRule {
                     e.careDate(),
                     null,
                     decision,
-                    inFicha ? null : C1Rule.REASON_CBO_OUTSIDE_FICHA,
+                    inFicha ? teamReason : C1Rule.REASON_CBO_OUTSIDE_FICHA,
                     null,
                     e.cnes(),
                     e.ine(),

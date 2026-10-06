@@ -26,7 +26,6 @@ final class C3Reasons {
 
     static final String CUMPRIDA = "CUMPRIDA";
     static final String NAO_CUMPRIDA = "NAO_CUMPRIDA";
-    static final String EAP_TIPO_76_PONTUACAO_INTEGRAL = "EAP_TIPO_76_PONTUACAO_INTEGRAL";
     static final String EVIDENCIA = "EVIDENCIA";
 
     private C3Reasons() {}

@@ -4,7 +4,7 @@ import esusdata.indicator.model.AgeAt;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalRegistration;
-import esusdata.indicator.pack.c6.C6Teams.TeamType;
+import esusdata.indicator.model.TeamScope;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -43,7 +43,6 @@ final class C6Cohort {
     static final String INACTIVE = "EXCLUIDO_CADASTRO_INATIVO";
     static final String CHANGE_OF_TERRITORY = "INTERROMPIDO_MUDANCA_TERRITORIO";
     static final String UNMAPPED_EXIT = "EXCLUIDO_SAIDA_CADASTRO_NAO_MAPEADA";
-    static final String TEAM_OUT_OF_SCOPE = "EXCLUIDO_EQUIPE_FORA_DO_ESCOPO";
 
     private static final Comparator<CanonicalRegistration> BY_VERSION = Comparator.comparing(
                     (CanonicalRegistration r) -> LocalDate.parse(r.registrationDate()))
@@ -56,11 +55,16 @@ final class C6Cohort {
      *
      * @param link the registration version in force at the cutoff, or {@code null}
      * @param reasonCode {@link #ELIGIBLE} or the first exclusion that applies
-     * @param teamType the type of the linked team, or {@code null} when the extract does not say
+     * @param team what the team-type rule says about the linked team, or {@code null} without a link
      */
-    record Subject(String personKey, CanonicalRegistration link, String reasonCode, TeamType teamType) {
+    record Subject(String personKey, CanonicalRegistration link, String reasonCode, TeamScope.Decision team) {
         boolean eligible() {
             return ELIGIBLE.equals(reasonCode);
+        }
+
+        /** The person belongs to an eAP 76 team (item 24 b): practice C is credited in full. */
+        boolean eap76() {
+            return team != null && team.eap76();
         }
 
         String ine() {
@@ -73,7 +77,7 @@ final class C6Cohort {
     }
 
     /** Every person key of the person and registration parts, in key order. */
-    static List<Subject> resolve(CanonicalDataset data, LocalDate ageReference, LocalDate cutoff, C6Teams teams) {
+    static List<Subject> resolve(CanonicalDataset data, LocalDate ageReference, LocalDate cutoff, TeamScope teams) {
         Map<String, List<CanonicalPerson>> persons = new TreeMap<>();
         data.persons()
                 .forEach(p -> persons.computeIfAbsent(p.personKey(), k -> new ArrayList<>())
@@ -90,15 +94,15 @@ final class C6Cohort {
             List<CanonicalPerson> rows = persons.getOrDefault(key, List.of());
             Link link = link(registrations.getOrDefault(key, List.of()), cutoff);
             CanonicalRegistration version = link.conflicting() ? null : link.version();
-            TeamType type = version == null ? null : teams.typeOf(version.ine()).orElse(null);
+            TeamScope.Decision team = version == null || version.ine() == null ? null : teams.decide(version.ine());
             String reason = personExclusion(rows, ageReference, cutoff);
             if (reason == null) {
                 reason = linkExclusion(link);
             }
-            if (reason == null && type == TeamType.OUT_OF_SCOPE) {
-                reason = TEAM_OUT_OF_SCOPE;
+            if (reason == null && team != null && !team.considered()) {
+                reason = team.exclusionReason();
             }
-            subjects.add(new Subject(key, version, reason == null ? ELIGIBLE : reason, type));
+            subjects.add(new Subject(key, version, reason == null ? ELIGIBLE : reason, team));
         }
         return subjects;
     }

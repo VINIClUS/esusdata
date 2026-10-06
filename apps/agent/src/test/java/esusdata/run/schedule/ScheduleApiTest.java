@@ -173,10 +173,10 @@ class ScheduleApiTest extends ApiFixtureSupport {
                         + "\"publishedPacks\":[\"c1-mais-acesso\"]}")
                 .contains("{\"referencePeriod\":\"2026-02\",\"count\":20,\"published\":false,"
                         + "\"publishedPacks\":[\"c2-desenvolvimento-infantil\"]}")
-                .contains("{\"indicatorPack\":\"c1-mais-acesso\",\"ruleVersion\":\"c1-mais-acesso@0.3.0\","
+                .contains("{\"indicatorPack\":\"c1-mais-acesso\",\"ruleVersion\":\"c1-mais-acesso@0.4.0\","
                         + "\"availability\":\"AVAILABLE\",\"missingCapabilities\":[]}")
                 .contains("{\"indicatorPack\":\"c2-desenvolvimento-infantil\","
-                        + "\"ruleVersion\":\"c2-desenvolvimento-infantil@0.2.0\",\"availability\":\"UNSUPPORTED_SOURCE\","
+                        + "\"ruleVersion\":\"c2-desenvolvimento-infantil@0.3.0\",\"availability\":\"UNSUPPORTED_SOURCE\","
                         + "\"missingCapabilities\":[\"citizen\",\"individual_registration\",\"care_encounter\"")
                 .contains("\"indicatorPack\":\"c7-prevencao-cancer\"")
                 .doesNotContain("componente-iii-nota-final");
@@ -191,7 +191,7 @@ class ScheduleApiTest extends ApiFixtureSupport {
                 "PROGRAMADOS_MAIS_ESPONTANEOS",
                 null,
                 period,
-                "c1-mais-acesso@0.3.0",
+                "c1-mais-acesso@0.4.0",
                 YearMonth.parse(period).atEndOfMonth().toString(),
                 municipality,
                 List.of(),

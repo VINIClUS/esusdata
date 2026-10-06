@@ -25,6 +25,7 @@ import static esusdata.indicator.pack.c6.C6Scenario.scenario;
 import static esusdata.indicator.pack.c6.C6Scenario.subjectRow;
 import static esusdata.indicator.pack.c6.C6Scenario.supportingRows;
 import static esusdata.indicator.pack.c6.C6Scenario.teamOf;
+import static esusdata.indicator.pack.c6.C6Scenario.teamState;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.indicator.model.CanonicalFixtures;
@@ -479,51 +480,56 @@ class C6PackTest {
     }
 
     @Test
-    void tC6_17_met23_eap76RuleAmbiguityAndPracticeCIsInformative() {
+    void tC6_17_met23_eap76CreditsPracticeCInFullAndTheResultIsComputed() {
         RuleOutcome outcome = eap76Scenario().compute();
 
-        assertRuleAmbiguity(outcome.result());
-        assertRuleAmbiguity(teamOf(outcome, INE_A).result());
+        // X: A+B+D observed (75) + C credited = 100; Y: D (25) + C credited = 50
+        assertComputed(outcome.result(), 150, 2, "75.0000", Classification.BOM);
+        assertComputed(teamOf(outcome, INE_A).result(), 150, 2, "75.0000", Classification.BOM);
         assertComponent(outcome.result(), "A", 1, 2);
         assertComponent(outcome.result(), "B", 1, 2);
-        assertComponent(outcome.result(), "C", 0, 2);
+        assertComponent(outcome.result(), "C", 2, 2);
         assertComponent(outcome.result(), "D", 2, 2);
-        assertThat(component(outcome.result(), "C").status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(component(outcome.result(), "C").value()).isNull();
-        assertThat(component(outcome.result(), "A").status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(component(outcome.result(), "C").status()).isEqualTo(IndicatorStatus.COMPUTED);
         for (String key : List.of(X, Y)) {
             EvidenceItem c = practiceRow(outcome, key, "C");
-            assertThat(c.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
-            assertThat(c.reasonCode()).isEqualTo("C_AMBIGUA_EAP76_AMB_C6_01");
-            assertThat(c.points()).isNull();
-            assertThat(points(outcome, key)).isNull();
+            assertThat(c.decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+            assertThat(c.reasonCode()).isEqualTo("PRATICA_CREDITADA_EAP76");
+            assertThat(c.points()).isEqualTo(pts(25));
         }
-        assertThat(practiceRow(outcome, X, "A").points()).isEqualTo(pts(25));
-        assertThat(practiceRow(outcome, Y, "D").points()).isEqualTo(pts(25));
+        assertThat(points(outcome, X)).isEqualTo(pts(100));
+        assertThat(points(outcome, Y)).isEqualTo(pts(50));
+        assertThat(outcome.result().limitations())
+                .anyMatch(l -> l.startsWith("C6-LIM-14/contagem:")
+                        && l.contains("(25 pontos) para 2 pessoa(s)")
+                        && l.endsWith("observada em 0."));
     }
 
     @Test
-    void met23_eap76RuleAmbiguityIsKeptByTheGate() {
+    void met23_eap76CreditSurvivesTheGateAndKeepsTheCounts() {
         RuleOutcome outcome = eap76Scenario().evaluate();
 
-        assertRuleAmbiguity(outcome.result());
-        assertRuleAmbiguity(teamOf(outcome, INE_A).result());
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.BLOCKED);
+        assertThat(outcome.result().numerator()).isEqualTo(BigInteger.valueOf(150));
+        assertThat(outcome.result().denominator()).isEqualTo(BigInteger.TWO);
+        assertThat(teamOf(outcome, INE_A).result().status()).isEqualTo(IndicatorStatus.BLOCKED);
     }
 
     @Test
-    void met23_eap76PersonWithVisitsHasCAmbiguousWithItsVisitsAsSupport() {
+    void met23_eap76PersonWithVisitsKeepsCObservedWithItsVisitsAsSupport() {
         RuleOutcome outcome = scenario().team(INE_A, "76").elder(X).practiceC(X).compute();
 
         EvidenceItem c = practiceRow(outcome, X, "C");
-        assertThat(c.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
-        assertThat(c.reasonCode()).isEqualTo("C_AMBIGUA_EAP76_AMB_C6_01");
-        assertThat(c.points()).isNull();
+        assertThat(c.decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(c.reasonCode()).isEqualTo("C_DUAS_VISITAS_30_DIAS"); // observed, not credited
+        assertThat(c.points()).isEqualTo(pts(25));
         assertThat(supportingRows(outcome, X)).hasSize(2);
         assertComponent(outcome.result(), "C", 1, 1);
+        assertThat(outcome.result().limitations()).anyMatch(l -> l.endsWith("observada em 1."));
     }
 
     @Test
-    void met23_eap76TeamMakesTheMunicipalResultAmbiguousButNotTheEsfTeam() {
+    void met23_eap76CreditDoesNotSpreadToTheEsfTeam() {
         RuleOutcome outcome = scenario()
                 .team(INE_A, "76")
                 .team(INE_B, "70")
@@ -534,31 +540,32 @@ class C6PackTest {
                 .practiceD(Y)
                 .compute();
 
-        assertRuleAmbiguity(outcome.result());
-        assertRuleAmbiguity(teamOf(outcome, INE_A).result());
+        assertComputed(outcome.result(), 100, 2, "50.0000", Classification.SUFICIENTE);
+        assertComputed(teamOf(outcome, INE_A).result(), 50, 1, "50.0000", Classification.SUFICIENTE);
         assertComputed(teamOf(outcome, INE_B).result(), 50, 1, "50.0000", Classification.SUFICIENTE);
         assertThat(practiceRow(outcome, Y, "C").reasonCode()).isEqualTo("C_SEM_DUAS_VISITAS_30_DIAS");
         assertThat(points(outcome, Y)).isEqualTo(pts(50));
+        assertThat(points(outcome, X)).isEqualTo(pts(50));
+        assertThat(teamOf(outcome, INE_B).result().limitations()).noneMatch(l -> l.startsWith("C6-LIM-14/contagem"));
     }
 
     @Test
-    void met23_onlyTheLatestTeamObservationUpToTheCutoffDecidesTheType() {
+    void met23_onlyTheStateValidOnTheLastDayDecidesTheType() {
         RuleOutcome later76 = scenario()
-                .add(C6Scenario.team(INE_A, "70", "2024-01-01"))
-                .add(C6Scenario.team(INE_A, "76", "2026-04-10"))
-                .add(C6Scenario.team(INE_A, "76", null))
+                .add(teamState(INE_A, "70", "2024-01-01", "2026-04-10"))
+                .add(teamState(INE_A, "76", "2026-04-10", null))
                 .elder(X)
                 .practiceA(X)
                 .compute();
         RuleOutcome became76 = scenario()
-                .add(C6Scenario.team(INE_A, "70", "2024-01-01"))
-                .add(C6Scenario.team(INE_A, "76", "2025-06-01"))
+                .add(teamState(INE_A, "70", "2024-01-01", "2025-06-01"))
+                .add(teamState(INE_A, "76", "2025-06-01", null))
                 .elder(X)
                 .practiceA(X)
                 .compute();
 
         assertComputed(later76.result(), 25, 1, "25.0000", Classification.REGULAR);
-        assertRuleAmbiguity(became76.result());
+        assertComputed(became76.result(), 50, 1, "50.0000", Classification.SUFICIENTE);
     }
 
     @Test
@@ -659,16 +666,5 @@ class C6PackTest {
                 .practiceD(X)
                 .elder(Y)
                 .practiceD(Y);
-    }
-
-    private static void assertRuleAmbiguity(IndicatorResult result) {
-        assertThat(result.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(result.valueExact()).isNull();
-        assertThat(result.valueText()).isNull();
-        assertThat(result.classification()).isNull();
-        assertThat(result.numerator()).isNull();
-        assertThat(result.denominator()).isNotNull();
-        assertThat(result.components()).hasSize(4);
-        assertThat(result.limitations()).anyMatch(l -> l.contains("AMB-C6-01"));
     }
 }

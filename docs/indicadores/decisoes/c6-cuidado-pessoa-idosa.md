@@ -126,3 +126,13 @@ Totais: **1 BLOCKING_GAP** (C6-LIM-05, temporária até `team`), 5 OUT_OF_REACH 
 | C6-D2 / AMB-C6-17 | Tipo conflitante, sem tipo ou fora de 70/76: equipe não considerada, pessoa excluída com motivo; nunca `RULE_AMBIGUITY` | P1 + P5 | Sim após `team` (denominador) |
 | C6-D3 / AMB-C6-05/12 | Aniversário de 29/02 em 01/03 (`NEXT_DAY`) | P2/P3 (Lei nº 810/1949) | Marginal (29/02, competência de fevereiro) |
 | C6-D3 / AMB-C6-02, 03, 04, 06 a 11, 13 a 16 | Convenções adotadas como decididas | P1/P2/P5 | Não (já aplicadas) |
+
+> **Nota de 2026-10-06 (tipo de equipe nas regras).** Implementada na regra `c6-cuidado-pessoa-idosa@0.3.0` (política de cálculo `c6-exact-score@2`).
+>
+> C6-D1 (C creditada à pessoa de equipe eAP 76 sem as duas visitas: `PRATICA_CREDITADA_EAP76`, `PRACTICE_MET`, 25 pontos, `C6-LIM-14/contagem`; a visita observada continua como evidência) e C6-D2 (pessoa de equipe sem tipo, de tipo conflitante ou de outro tipo fora da coorte, com motivo e `C6-LIM-15/contagem`) estão implementadas. O estado `CONFLICTING` do antigo `C6Teams` deixou de existir: o conflito é decidido por `TeamScope` na data do último dia da competência, como as demais regras, e a pessoa sai com `EXCLUIDO_TIPO_EQUIPE_CONFLITANTE` (antes deixava só a prática C indecidida). `team` entrou nas capacidades exigidas e na leitura.
+>
+> **Limitações:** C6-LIM-05 sai da lista (era `BLOCKING_GAP`, L1 fechada); entram C6-LIM-14 e C6-LIM-15 (`DECLARED_CONVENTION`).
+>
+> **Vigência (`valid_to`).** O item 1 do cabeçalho diz `validTo` nulo ou `>= fim`. O contrato da capacidade `team` define `valid_to` como **exclusivo** (`[valid_from, valid_to)`; cabeçalho de `contracts/compatibility/queries/team@0.1.0.sql` e `CanonicalTeam.validOn`, ADR 0031): um estado cujo `valid_to` é o último dia da competência já foi substituído nesse dia. A regra aplica `validFrom <= fim < validTo`; sem estado que cubra o dia, vale o mais recente com `validFrom <= fim` (item 11 das fichas, "a última competência válida"). Razão: P1/P2 não dizem nada sobre a borda; o contrato de dados é a fonte do significado de `valid_to` e a leitura inclusiva contaria como vigente uma equipe que já mudou de tipo.
+>
+> **Cobertura.** Em 2026-08, todo INE com cadastro ativo tem tipo válido no último dia e nenhum tem dois (`docs/discovery/2026-10-06-cobertura-tipo-de-equipe.md`). Portão A: `PASSED` pela conferência das fichas (`docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md`); Portão D segue `PENDING`. `blocking_gaps_closed`: `C6-LIM-05`.

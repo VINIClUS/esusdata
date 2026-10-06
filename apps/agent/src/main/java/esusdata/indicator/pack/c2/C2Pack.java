@@ -30,12 +30,13 @@ import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamResult;
+import esusdata.indicator.model.TeamScope;
 import esusdata.indicator.model.ValueKind;
+import esusdata.indicator.pack.PackSupport;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -81,16 +82,17 @@ public final class C2Pack implements IndicatorRule {
                     "C2-LIM-04",
                     "Interrupção do acompanhamento (item 15, AMB-C2-12): a criança sai da coorte quando a versão"
                             + " cadastral mais recente até o corte registra saída por mudança de território ou óbito."),
-            Limitation.blockingGap(
+            Limitation.convention(
                     "C2-LIM-05",
-                    "O tipo de equipe (eSF 70, eAP 76) não está no extrato (lacuna L1): a pontuação integral da"
-                            + " prática D para eAP 76 (item 24 b) não pode ser aplicada. Fecha quando a capacidade `team`"
-                            + " estiver VALIDATED."),
+                    "Prática D creditada integralmente (20 pontos) à criança de equipe eAP 76, observada ou não"
+                            + " (item 24 b, C2-D1). O tipo de equipe é o vigente no último dia da competência; sem tipo,"
+                            + " com dois tipos ou com outro tipo, a criança sai da coorte e a contagem é divulgada"
+                            + " (C2-LIM-16)."),
             Limitation.convention(
                     "C2-LIM-06",
                     "A alocação do profissional em equipe 70/76 (Quadro 02) só é verificada quando o tipo da"
-                            + " equipe do atendimento é conhecido. Com tipo desconhecido a consulta é aceita; com tipo"
-                            + " conhecido fora de 70/76, não conta."),
+                            + " equipe do atendimento é conhecido. Com tipo desconhecido ou conflitante a consulta é"
+                            + " aceita; com tipo conhecido fora de 70/76, não conta."),
             Limitation.convention(
                     "C2-LIM-07",
                     "Puericultura (Quadro 02) é reconhecida pelo CIAP-2 A98 ou CID-10 Z001 entre os problemas"
@@ -131,8 +133,8 @@ public final class C2Pack implements IndicatorRule {
                             + " (AMB-C2-08 iii) e desfecho 'realizada'; a 2ª visita é posterior ao 30º dia."),
             Limitation.convention(
                     "C2-LIM-16",
-                    "Criança vinculada a equipe de tipo conhecido diferente de 70 e 76 sai da coorte (item 24 b);"
-                            + " com tipo desconhecido ela permanece."),
+                    "Criança vinculada a equipe sem tipo, com dois tipos no último dia da competência ou com tipo"
+                            + " diferente de 70 e 76 sai da coorte (item 24 b, C2-D2), com a contagem por motivo."),
             Limitation.convention(
                     "C2-LIM-17",
                     "Atendimento individual no domicílio (local 4) conta como presencial e como consulta"
@@ -173,8 +175,20 @@ public final class C2Pack implements IndicatorRule {
 
     private static final long SIX_MONTHS = 6;
 
+    /**
+     * C2-LIM-05 (C2-D1): practice D is credited in full to the children of eAP 76 teams (item 24 b).
+     */
+    static final String EAP_CREDIT = "C2-LIM-05/contagem: D creditada integralmente (%d pontos) para %d criança(s) de"
+            + " equipes eAP 76, conforme o item 24 b; observada em %d.";
+
+    /** C2-LIM-16 (C2-D2): the children left out because their team is not a considered one. */
+    static final String TEAM_EXCLUSIONS =
+            "C2-LIM-16/contagem: %d criança(s) vinculada(s) a equipe fora da regra de tipo"
+                    + " (70 ou 76 vigente no fim da competência) ficaram fora: %d de equipe sem tipo, %d de tipo conflitante e"
+                    + " %d de outro tipo.";
+
     public static final String ID = "c2-desenvolvimento-infantil";
-    public static final String RULE_VERSION = ID + "@0.2.0";
+    public static final String RULE_VERSION = ID + "@0.3.0";
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -194,7 +208,8 @@ public final class C2Pack implements IndicatorRule {
                     Capabilities.PROCEDURE_PERFORMED,
                     Capabilities.HOME_VISIT,
                     Capabilities.MEASUREMENT_RECORD,
-                    Capabilities.IMMUNIZATION_HISTORY),
+                    Capabilities.IMMUNIZATION_HISTORY,
+                    Capabilities.TEAM),
             List.of(
                     ComponentSpec.practice(
                             "A",
@@ -247,8 +262,11 @@ public final class C2Pack implements IndicatorRule {
                 competencia.plusMonths(1).atDay(1));
         List<PartRequirement> parts = new ArrayList<>();
         for (String capability : DESCRIPTOR.requiredCapabilities()) {
-            parts.add(PartRequirement.personScoped(capability, period, births, codes(capability)));
+            if (!Capabilities.TEAM.equals(capability)) {
+                parts.add(PartRequirement.personScoped(capability, period, births, codes(capability)));
+            }
         }
+        parts.add(PackSupport.teamPart(competencia));
         return new DataRequirements(DataRequirements.V2, parts);
     }
 
@@ -283,7 +301,9 @@ public final class C2Pack implements IndicatorRule {
                 data.measurements(), ibge, CanonicalMeasurement::municipalityIbge, CanonicalMeasurement::personKey);
         Map<String, List<CanonicalImmunization>> doses = byPerson(
                 data.immunizations(), ibge, CanonicalImmunization::municipalityIbge, CanonicalImmunization::personKey);
-        Map<String, String> teamTypes = teamTypes(data.teams(), ibge, context.dataCutoff());
+        requireTeamsInMunicipality(data.teams(), ibge);
+        TeamScope scope = TeamScope.of(data.teams(), context.competencia().atEndOfMonth());
+        Map<String, String> teamTypes = consultTypes(data.teams(), scope);
 
         C2Tally municipal = new C2Tally(DESCRIPTOR);
         SortedMap<String, C2Tally> teams = new TreeMap<>();
@@ -291,7 +311,8 @@ public final class C2Pack implements IndicatorRule {
         for (CanonicalPerson person : persons(data.persons(), ibge)) {
             String key = person.personKey();
             C2Cohort.Member member = C2Cohort.classify(person, registrations.getOrDefault(key, List.of()), context);
-            member = C2Cohort.onConsideredTeam(member, teamTypes.get(member.ine()));
+            TeamScope.Decision team = member.ine() == null ? null : scope.decide(member.ine());
+            member = C2Cohort.onConsideredTeam(member, team);
             if (!member.eligible()) {
                 evidence.add(personRow(member, context, EvidenceDecision.EXCLUDED, null));
                 continue;
@@ -305,14 +326,34 @@ public final class C2Pack implements IndicatorRule {
                     measurements.getOrDefault(key, List.of()),
                     doses.getOrDefault(key, List.of()),
                     teamTypes);
-            ScoredChild child = score(member, records, teamTypes.get(member.ine()));
+            ScoredChild child = score(member, records, team != null && team.eap76());
             municipal.add(child);
             teams.computeIfAbsent(member.ine(), ine -> new C2Tally(DESCRIPTOR)).add(child);
             evidence.addAll(evidence(child, context));
         }
         List<TeamResult> teamResults = new ArrayList<>(teams.size());
         teams.forEach((ine, tally) -> teamResults.add(new TeamResult(ine, tally.cnes(), tally.result(context))));
-        return new RuleOutcome(municipal.result(context), teamResults, evidence);
+        IndicatorResult result = municipal.result(context);
+        String left = teamExclusions(evidence);
+        if (left != null) {
+            result = result.withLimitation(left);
+        }
+        return new RuleOutcome(result, teamResults, evidence);
+    }
+
+    /** The children the team-type rule left out, by reason: a disclosure for the municipal result (C2-LIM-16). */
+    private static String teamExclusions(List<EvidenceItem> evidence) {
+        long without = count(evidence, TeamScope.REASON_WITHOUT_TYPE);
+        long conflict = count(evidence, TeamScope.REASON_CONFLICT);
+        long other = count(evidence, TeamScope.REASON_OUT_OF_SCOPE);
+        long all = without + conflict + other;
+        return all == 0 ? null : TEAM_EXCLUSIONS.formatted(all, without, conflict, other);
+    }
+
+    private static long count(List<EvidenceItem> evidence, String reason) {
+        return evidence.stream()
+                .filter(e -> e.decision() == EvidenceDecision.EXCLUDED && reason.equals(e.reasonCode()))
+                .count();
     }
 
     @Override
@@ -331,9 +372,9 @@ public final class C2Pack implements IndicatorRule {
         return lists;
     }
 
-    private static ScoredChild score(C2Cohort.Member member, ChildRecords records, String teamType) {
-        PracticeOutcome visits =
-                C2Codes.TEAM_TYPE_EAP.equals(teamType) ? PracticeOutcome.exempt("D") : VisitPractice.evaluate(records);
+    private static ScoredChild score(C2Cohort.Member member, ChildRecords records, boolean eap76) {
+        PracticeOutcome observed = VisitPractice.evaluate(records);
+        PracticeOutcome visits = eap76 && !observed.scores() ? PracticeOutcome.credited("D") : observed;
         ChildClock clock = member.clock();
         LocalDate cutoff = records.cutoff();
         boolean firstMonthOpen = clock.day(cutoff) <= ChildClock.LAST_DAY_OF_FIRST_30;
@@ -347,7 +388,7 @@ public final class C2Pack implements IndicatorRule {
                         open(AnthropometryPractice.evaluate(records), twoYearsOpen),
                         open(visits, sixMonthsOpen),
                         open(VaccinePractice.evaluate(records), twoYearsOpen)),
-                teamType == null);
+                eap76);
     }
 
     /**
@@ -423,14 +464,13 @@ public final class C2Pack implements IndicatorRule {
     private static EvidenceDecision decision(PracticeOutcome outcome) {
         return switch (outcome.status()) {
             case MET -> EvidenceDecision.PRACTICE_MET;
-            case EXEMPT -> EvidenceDecision.PRACTICE_EXEMPT;
             case NOT_MET -> EvidenceDecision.PRACTICE_NOT_MET;
         };
     }
 
     private static BigInteger practicePoints(PracticeOutcome outcome, ComponentSpec spec) {
         return switch (outcome.status()) {
-            case MET, EXEMPT -> spec.weight();
+            case MET -> spec.weight();
             case NOT_MET -> BigInteger.ZERO;
         };
     }
@@ -506,31 +546,27 @@ public final class C2Pack implements IndicatorRule {
         return new RuleOutcome(result, List.of(), List.of());
     }
 
-    /**
-     * The CNES team type per INE as last observed up to the cutoff, when the source has it (it does
-     * not today: DW gap L1).
-     */
-    private static Map<String, String> teamTypes(List<CanonicalTeam> teams, String ibge, LocalDate cutoff) {
-        List<CanonicalTeam> observed = new ArrayList<>();
+    private static void requireTeamsInMunicipality(List<CanonicalTeam> teams, String ibge) {
         for (CanonicalTeam t : teams) {
             requireMunicipality(ibge, t.municipalityIbge());
-            boolean known = t.ine() != null && t.teamTypeCode() != null;
-            if (known && !observedOn(t).isAfter(cutoff)) {
-                observed.add(t);
-            }
         }
-        observed.sort(Comparator.comparing(C2Pack::observedOn));
-        Map<String, String> types = new HashMap<>();
-        for (CanonicalTeam t : observed) {
-            types.put(t.ine(), t.teamTypeCode());
-        }
-        return types;
     }
 
-    /** The day a team was observed (a date or a timestamp); without one it proves nothing on any cutoff. */
-    private static LocalDate observedOn(CanonicalTeam team) {
-        String at = team.observedAt();
-        return at == null || at.length() < 10 ? LocalDate.MAX : LocalDate.parse(at.substring(0, 10));
+    /**
+     * The single type of each INE the team rule knows, for the consult filter (AMB-C2-11): an INE
+     * without a type or with two stays out of the map and its consults are accepted.
+     */
+    private static Map<String, String> consultTypes(List<CanonicalTeam> teams, TeamScope scope) {
+        Map<String, String> types = new HashMap<>();
+        for (CanonicalTeam t : teams) {
+            if (t.ine() != null) {
+                String code = scope.decide(t.ine()).typeCode();
+                if (code != null) {
+                    types.put(t.ine().strip(), code);
+                }
+            }
+        }
+        return types;
     }
 
     private static <T> Map<String, List<T>> byPerson(

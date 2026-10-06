@@ -4,6 +4,7 @@ import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalPregnancyOutcome;
+import esusdata.indicator.model.TeamScope;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -59,7 +60,7 @@ final class Cohort {
     }
 
     /**
-     * Link, team type (24 b: only types 70 and 76 when the type is known) and death, which do not
+     * Link, team type (24 b: only types 70 and 76, valid on the last day) and death, which do not
      * depend on the episode's dates; {@code null} when they hold.
      */
     Verdict personal(PersonRecords person, RegistrationLink link, LocalDate eventDate) {
@@ -69,8 +70,9 @@ final class Cohort {
         if (link.exclusion() != null) {
             return Verdict.excluded(link.exclusion(), eventDate);
         }
-        if (teamTypes.outOfScope(link.ine())) {
-            return Verdict.excluded(C3Reasons.EXCLUIDO_EQUIPE_FORA_DO_ESCOPO, eventDate);
+        TeamScope.Decision team = teamTypes.decide(link.ine());
+        if (!team.considered()) {
+            return Verdict.excluded(team.exclusionReason(), eventDate);
         }
         for (CanonicalPerson record : person.persons()) {
             LocalDate death = C3Dates.parse(record.deathDate());

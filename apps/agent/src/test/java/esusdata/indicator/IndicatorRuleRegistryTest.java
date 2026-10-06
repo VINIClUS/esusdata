@@ -111,7 +111,7 @@ class IndicatorRuleRegistryTest {
 
     @Test
     void requireRefusesUnknownPacksAndOtherVersions() {
-        assertThat(IndicatorRuleRegistry.require("c1-mais-acesso", "c1-mais-acesso@0.3.0")
+        assertThat(IndicatorRuleRegistry.require("c1-mais-acesso", "c1-mais-acesso@0.4.0")
                         .descriptor()
                         .code())
                 .isEqualTo("C1");

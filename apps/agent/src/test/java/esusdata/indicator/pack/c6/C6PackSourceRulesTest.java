@@ -9,9 +9,10 @@ import static esusdata.indicator.pack.c6.C6Scenario.LINKED_ON;
 import static esusdata.indicator.pack.c6.C6Scenario.exclusionReason;
 import static esusdata.indicator.pack.c6.C6Scenario.homeVisit;
 import static esusdata.indicator.pack.c6.C6Scenario.met;
+import static esusdata.indicator.pack.c6.C6Scenario.practiceRow;
 import static esusdata.indicator.pack.c6.C6Scenario.scenario;
 import static esusdata.indicator.pack.c6.C6Scenario.subjectRow;
-import static esusdata.indicator.pack.c6.C6Scenario.team;
+import static esusdata.indicator.pack.c6.C6Scenario.teamState;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -19,7 +20,6 @@ import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CanonicalRegistration;
-import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.RuleOutcome;
 import java.time.LocalDate;
 import java.util.List;
@@ -104,29 +104,39 @@ class C6PackSourceRulesTest {
     }
 
     @Test
-    void met23_sameDayTeamObservationsAreOrderedByInstantNotByExtractOrder() {
+    void met23_theTypeIsTheOneValidOnTheLastDayOfTheCompetenciaWhateverTheExtractOrder() {
         RuleOutcome laterEap = scenario()
                 .elder("p")
-                .add(team(INE_A, "76", "2026-03-01T15:00:00Z"))
-                .add(team(INE_A, "70", "2026-03-01T08:00:00Z"))
+                .add(teamState(INE_A, "76", "2026-03-01", null))
+                .add(teamState(INE_A, "70", "2024-01-01", "2026-03-01"))
                 .compute();
         RuleOutcome laterEsf = scenario()
                 .elder("p")
-                .add(team(INE_A, "70", "2026-03-01T15:00:00Z"))
-                .add(team(INE_A, "76", "2026-03-01T08:00:00Z"))
+                .add(teamState(INE_A, "70", "2026-03-01", null))
+                .add(teamState(INE_A, "76", "2024-01-01", "2026-03-01"))
                 .compute();
 
-        assertThat(laterEap.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(laterEsf.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(practiceRow(laterEap, "p", "C").reasonCode()).isEqualTo("PRATICA_CREDITADA_EAP76");
+        assertThat(practiceRow(laterEsf, "p", "C").reasonCode()).isEqualTo("C_SEM_DUAS_VISITAS_30_DIAS");
     }
 
     @Test
-    void met23_malformedTeamObservationIsRefusedNotGuessed() {
-        C6Scenario short1 = scenario().elder("p").add(team(INE_A, "76", "2026-03"));
-        C6Scenario text = scenario().elder("p").add(team(INE_A, "76", "ontem à tarde"));
+    void c6d2_validToIsExclusiveAndAStateBeginningAfterTheLastDayIsNotYetTheTeamsType() {
+        // the competência ends on 2026-03-31: a 76 state ending that day does not cover it...
+        RuleOutcome endsOnTheLastDay = scenario()
+                .elder("p")
+                .add(teamState(INE_A, "76", "2024-01-01", "2026-03-31"))
+                .add(teamState(INE_A, "70", "2026-03-31", null))
+                .compute();
+        // ...and one that begins the day after is not in force, so the earlier one stands
+        RuleOutcome beginsAfter = scenario()
+                .elder("p")
+                .add(teamState(INE_A, "70", "2024-01-01", "2026-04-01"))
+                .add(teamState(INE_A, "76", "2026-04-01", null))
+                .compute();
 
-        assertThatThrownBy(short1::compute).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(text::compute).isInstanceOf(IllegalArgumentException.class);
+        assertThat(practiceRow(endsOnTheLastDay, "p", "C").reasonCode()).isEqualTo("C_SEM_DUAS_VISITAS_30_DIAS");
+        assertThat(practiceRow(beginsAfter, "p", "C").reasonCode()).isEqualTo("C_SEM_DUAS_VISITAS_30_DIAS");
     }
 
     @Test

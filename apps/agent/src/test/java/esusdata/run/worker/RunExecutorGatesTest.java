@@ -132,7 +132,7 @@ class RunExecutorGatesTest {
         assertThat(published.numeratorText()).isEqualTo("0");
         assertThat(published.denominatorText()).isEqualTo("0");
         assertThat(published.limitationsJson())
-                .contains("Portão A (fonte e vigência) incompleto", "Portão D (reconciliação) incompleto");
+                .contains("Portão B (modelo de cálculo) incompleto", "Portão D (reconciliação) incompleto");
         JsonNode snapshot = snapshotOf(published);
         assertThat(snapshot.get("pack").asString()).isEqualTo(C1Rule.INDICATOR_PACK);
         assertThat(snapshot.get("gates").get("B").get("status").asString()).isEqualTo("FAILED");

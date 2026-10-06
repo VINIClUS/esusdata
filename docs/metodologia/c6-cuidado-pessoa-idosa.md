@@ -337,3 +337,8 @@ Base comum (salvo indicação): competência 2026-03 (corte 2026-03-31; ADR 0004
 | T-C6-22 | Resultados exatos 75, 75,0001, 50,0001 e 25 | Bom, Ótimo, Bom, Regular; sem arredondar antes | ficha p. 3; ADR 0005 |
 | T-C6-23 | Dois cadastros com o mesmo CNS | Uma pessoa no denominador | ficha p. 2 (24 a); MET-32 |
 | T-C6-24 | Nenhuma pessoa elegível | `NO_DENOMINATOR` | MET-04 |
+
+## Nota de 2026-10-06: tipo de equipe na regra
+
+A regra `c6-cuidado-pessoa-idosa@0.3.0` aplica o item 24 b da ficha: só equipes de tipo 70 (eSF) ou 76 (eAP), vigente no último dia da competência (`valid_from <= dia < valid_to`), entram. Equipe sem tipo, com dois tipos ou de outro tipo deixa a pessoa fora da coorte com o motivo (`EXCLUIDO_EQUIPE_SEM_TIPO`, `EXCLUIDO_TIPO_EQUIPE_CONFLITANTE`, `EXCLUIDO_EQUIPE_FORA_DO_ESCOPO`) e uma contagem divulgada. C6-D1 (C creditada à pessoa de equipe eAP 76 sem as duas visitas: `PRATICA_CREDITADA_EAP76`, `PRACTICE_MET`, 25 pontos, `C6-LIM-14/contagem`; a visita observada continua como evidência) e C6-D2 (pessoa de equipe sem tipo, de tipo conflitante ou de outro tipo fora da coorte, com motivo e `C6-LIM-15/contagem`) estão implementadas. O estado `CONFLICTING` do antigo `C6Teams` deixou de existir: o conflito é decidido por `TeamScope` na data do último dia da competência, como as demais regras, e a pessoa sai com `EXCLUIDO_TIPO_EQUIPE_CONFLITANTE` (antes deixava só a prática C indecidida). `team` entrou nas capacidades exigidas e na leitura. Detalhe e fontes em `docs/indicadores/decisoes/c6-cuidado-pessoa-idosa.md`.
+

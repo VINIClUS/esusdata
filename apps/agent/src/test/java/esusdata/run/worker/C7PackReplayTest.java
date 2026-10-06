@@ -58,6 +58,8 @@ class C7PackReplayTest {
 
     private ExtractionManifest extract(String id) throws Exception {
         ExtractFixturesV2.Builder builder = ExtractFixturesV2.forRule(new C7Pack(), COMPETENCIA);
+        builder.add(CanonicalFixtures.team(TEAM_ONE, "2750325", "70"));
+        builder.add(CanonicalFixtures.team(TEAM_TWO, "2750333", "70"));
         woman(builder, "p1", "1971-01-15", "2750325", TEAM_ONE); // 55: A, C, D
         woman(builder, "p2", "1966-01-15", "2750325", TEAM_ONE); // 60: A, C, D
         woman(builder, "p3", "2012-01-15", "2750325", TEAM_ONE); // 14: B, C

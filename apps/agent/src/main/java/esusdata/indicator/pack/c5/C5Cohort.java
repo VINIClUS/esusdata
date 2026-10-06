@@ -4,6 +4,7 @@ import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalRegistration;
+import esusdata.indicator.model.TeamScope;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -35,8 +36,6 @@ final class C5Cohort {
     static final String DEATH = "EXCLUIDO_OBITO";
     static final String LEFT_TERRITORY = "EXCLUIDO_SAIDA_TERRITORIO";
     static final String NO_LINK = "EXCLUIDO_SEM_VINCULO";
-    /** The team of the link has a known type other than eSF 70 or eAP 76 (items 14 and 24 b, p. 1–2). */
-    static final String TEAM_NOT_ELIGIBLE = "EXCLUIDO_EQUIPE_NAO_ELEGIVEL";
 
     static final String CONDITIONS_RESOLVED = "EXCLUIDO_CONDICOES_RESOLVIDAS";
 
@@ -49,18 +48,25 @@ final class C5Cohort {
     private static final Pattern NUMERIC = Pattern.compile("\\d+");
 
     private final C5Conditions conditions;
-    private final C5Teams teams;
+    private final TeamScope teams;
     private final Map<String, CanonicalRegistration> links = new HashMap<>();
     private final Set<String> deaths = new HashSet<>();
 
     /** One person's decision, with the team of the registration in force (if any). */
-    record Decision(String personKey, String reasonCode, String cnes, String ine) {
+    record Decision(String personKey, String reasonCode, String cnes, String ine, boolean eap76) {
         boolean eligible() {
             return ELIGIBLE.equals(reasonCode);
         }
+
+        /** Excluded because the team of the link is not a considered one (C5-D2). */
+        boolean teamExcluded() {
+            return TeamScope.REASON_WITHOUT_TYPE.equals(reasonCode)
+                    || TeamScope.REASON_CONFLICT.equals(reasonCode)
+                    || TeamScope.REASON_OUT_OF_SCOPE.equals(reasonCode);
+        }
     }
 
-    private C5Cohort(CanonicalDataset data, LocalDate cutoff, C5Teams teams) {
+    private C5Cohort(CanonicalDataset data, LocalDate cutoff, TeamScope teams) {
         this.teams = teams;
         conditions = C5Conditions.of(data.conditions(), cutoff);
         for (CanonicalRegistration r : data.registrations()) {
@@ -75,7 +81,7 @@ final class C5Cohort {
     }
 
     /** One decision per person of the reconstructed population, ordered by person key. */
-    static SortedMap<String, Decision> decide(CanonicalDataset data, LocalDate cutoff, C5Teams teams) {
+    static SortedMap<String, Decision> decide(CanonicalDataset data, LocalDate cutoff, TeamScope teams) {
         C5Cohort cohort = new C5Cohort(data, cutoff, teams);
         SortedMap<String, Decision> decisions = new TreeMap<>();
         for (String person : population(data)) {
@@ -138,8 +144,13 @@ final class C5Cohort {
         CanonicalRegistration link = links.get(person);
         String reason = reason(person, link);
         return link == null
-                ? new Decision(person, reason, null, null)
-                : new Decision(person, reason, link.cnes(), link.ine());
+                ? new Decision(person, reason, null, null, false)
+                : new Decision(
+                        person,
+                        reason,
+                        link.cnes(),
+                        link.ine(),
+                        teams.decide(link.ine()).eap76());
     }
 
     /** The first reason that applies, in the order of the contract; {@link #ELIGIBLE} otherwise. */
@@ -156,8 +167,9 @@ final class C5Cohort {
         if (!isLinked(link)) {
             return NO_LINK;
         }
-        if (teams.isIneligible(link.ine())) {
-            return TEAM_NOT_ELIGIBLE;
+        TeamScope.Decision team = teams.decide(link.ine());
+        if (!team.considered()) {
+            return team.exclusionReason();
         }
         return conditions.state(person) == C5Conditions.State.ALL_RESOLVED ? CONDITIONS_RESOLVED : ELIGIBLE;
     }

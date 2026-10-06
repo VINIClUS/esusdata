@@ -408,3 +408,13 @@ Contagem por classe: 1 BLOCKING_GAP (C3-LIM-05); 13 OUT_OF_REACH (01, 02, 03, 04
 4. As citações do CAB 32, do PCDT e do FAQ do Previne vêm de PDFs oficiais baixados em 2026-10-06. O FAQ é de 2022 e vale como precedente do mesmo ministério, não como regra do C3.
 
 > **Nota de 2026-10-06 (S2, limitações tipadas).** C3-LIM-07 (PA da visita, L6) passa de `DECLARED_CONVENTION` a `OUT_OF_REACH` para o PEC 5.5.28, pelo inventário de `docs/discovery/2026-10-06-pec-5528-l6-exame-do-pe.md` (a coluna da PA da visita tem `<10` linhas em mais de meio milhão), como C4-LIM-05 e C5-LIM-10. Texto: «A pressão arterial da visita domiciliar não está registrada no DW desta instalação (PEC 5.5.28; Quadro 03, p.6; lacuna L6): C pode ficar abaixo do SIAPS.»
+
+> **Nota de 2026-10-06 (tipo de equipe nas regras).** Implementada na regra `c3-gestacao-puerperio@0.3.0` (política de cálculo `c3-exact-score@1 (inalterada)`).
+>
+> C3-D1 (E e J creditadas ao episódio de equipe eAP 76 que não as cumpriu: `PRATICA_CREDITADA_EAP76`, `PRACTICE_MET`, 9 pontos cada; antes a regra substituía mesmo a visita observada pela isenção `PRACTICE_EXEMPT`/`EAP_TIPO_76_PONTUACAO_INTEGRAL`, hoje a visita observada é mantida como evidência) e C3-D2 (episódio de equipe sem tipo, de tipo conflitante ou de outro tipo sai, com motivo e a contagem `C3-LIM-10/contagem`) estão implementadas; `team` entrou nas capacidades exigidas e na leitura.
+>
+> **Limitações:** C3-LIM-05 deixa de ser `BLOCKING_GAP` e passa a `DECLARED_CONVENTION` (crédito de E e J para eAP 76; id mantido, texto novo); C3-LIM-10 tem o texto reescrito (exclusão por tipo, com motivo e contagem). C3-LIM-21 (alocação do profissional) permanece como estava.
+>
+> **Vigência (`valid_to`).** O item 1 do cabeçalho diz `validTo` nulo ou `>= fim`. O contrato da capacidade `team` define `valid_to` como **exclusivo** (`[valid_from, valid_to)`; cabeçalho de `contracts/compatibility/queries/team@0.1.0.sql` e `CanonicalTeam.validOn`, ADR 0031): um estado cujo `valid_to` é o último dia da competência já foi substituído nesse dia. A regra aplica `validFrom <= fim < validTo`; sem estado que cubra o dia, vale o mais recente com `validFrom <= fim` (item 11 das fichas, "a última competência válida"). Razão: P1/P2 não dizem nada sobre a borda; o contrato de dados é a fonte do significado de `valid_to` e a leitura inclusiva contaria como vigente uma equipe que já mudou de tipo.
+>
+> **Cobertura.** Em 2026-08, todo INE com cadastro ativo tem tipo válido no último dia e nenhum tem dois (`docs/discovery/2026-10-06-cobertura-tipo-de-equipe.md`). Portão A: `PASSED` pela conferência das fichas (`docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md`); Portão D segue `PENDING`. `blocking_gaps_closed`: `C3-LIM-05`.

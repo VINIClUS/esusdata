@@ -61,7 +61,7 @@ class ReleaseGatesSchemaTest {
     @Test
     void aPassedGateWithoutEvidenceIsRefusedByTheSchemaAndByTheLoader() throws Exception {
         ObjectNode root = packaged();
-        ObjectNode a = gate(root, C1.id(), "A");
+        ObjectNode a = gate(root, C1.id(), "D");
         a.put("status", "PASSED").put("check", "conferencia-fichas@1").put("checked_at", "2026-10-06");
 
         assertThat(schema().validate(root)).isNotEmpty();
@@ -86,7 +86,7 @@ class ReleaseGatesSchemaTest {
     @Test
     void aPendingGateThatNamesACheckAndAGateOutsideAAndDAreRefusedByBoth() throws Exception {
         ObjectNode half = packaged();
-        gate(half, C1.id(), "A").put("check", "conferencia-fichas@1");
+        gate(half, C1.id(), "D").put("check", "conferencia-fichas@1");
         assertThat(schema().validate(half)).isNotEmpty();
         assertThatThrownBy(() -> ReleaseGateRegistry.fromJson(half.toString()))
                 .isInstanceOf(IllegalStateException.class);
@@ -102,7 +102,7 @@ class ReleaseGatesSchemaTest {
     @Test
     void aPassedGateWithEveryFieldIsAcceptedByBoth() throws Exception {
         ObjectNode root = packaged();
-        ObjectNode a = gate(root, C1.id(), "A");
+        ObjectNode a = gate(root, C1.id(), "D");
         a.put("status", "PASSED").put("check", "conferencia-fichas@1").put("checked_at", "2026-10-06");
         a.set(
                 "evidence",

@@ -34,4 +34,6 @@ O descritor do Componente III tem dez limitações permanentes, agora com códig
 | CIII-LIM-07 | AMB-CIII-09/10 (leitura de «quadrimestre» na Portaria 10.994/2026) | DECLARED_CONVENTION |
 | CIII-LIM-08 | AMB-CIII-12 (prazo de envio e 20º dia útil) | OUT_OF_REACH |
 | CIII-LIM-09 | AMB-CIII-13 (equipes novas, segundo recálculo) | OUT_OF_REACH |
-| CIII-LIM-10 | Pesos eSF/eAP aplicados a toda equipe (L1) | DECLARED_CONVENTION |
+| CIII-LIM-10 | Pesos eSF/eAP aplicados às equipes de tipo 70 ou 76 que C1–C7 consideram (L1 fechada, ver nota de 2026-10-06) | DECLARED_CONVENTION |
+
+> **Nota de 2026-10-06 (tipo de equipe).** O texto de CIII-LIM-10 deixa de citar a lacuna L1: os pesos do Quadro 2 (iguais para eSF e eAP) valem para as equipes que as regras de C1 a C7 passam a considerar (tipo 70 ou 76 vigente no último dia da competência, capacidade `team`). A classe não muda (DECLARED_CONVENTION). Fonte e razão: NT 8/2026 (Quadro 2) e item 24 b das fichas (P2/P1); cobertura em `docs/discovery/2026-10-06-cobertura-tipo-de-equipe.md`. O C1 só filtra o INE quando o extrato traz `team`; em produção ele ainda lê o extrato v1.

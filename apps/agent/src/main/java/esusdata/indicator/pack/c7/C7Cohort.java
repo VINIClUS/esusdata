@@ -4,6 +4,7 @@ import esusdata.indicator.model.AgeAt;
 import esusdata.indicator.model.AgeAt.AnniversaryRule;
 import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalRegistration;
+import esusdata.indicator.model.TeamScope;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +42,7 @@ final class C7Cohort {
     static final String EXCLUIDO_CADASTRO_SIMPLIFICADO = "EXCLUIDO_CADASTRO_SIMPLIFICADO";
     static final String EXCLUIDO_VINCULO_CONFLITANTE = "EXCLUIDO_VINCULO_CONFLITANTE";
     static final String EXCLUIDO_PESSOA_CONFLITANTE = "EXCLUIDO_PESSOA_CONFLITANTE";
+    // team-type rule (C7-D2): the reasons are TeamScope's, shared by every pack of the component
     /** A trans man of 9 to 13: B is "do sexo feminino" and A, C and D start later (C7-D3). */
     static final String EXCLUIDO_HOMEM_TRANSGENERO_SEM_SUBGRUPO = "EXCLUIDO_HOMEM_TRANSGENERO_SEM_SUBGRUPO";
 
@@ -78,7 +80,10 @@ final class C7Cohort {
      * on any of them counts.
      */
     static List<Member> resolve(
-            List<CanonicalPerson> persons, List<CanonicalRegistration> registrations, LocalDate reference) {
+            List<CanonicalPerson> persons,
+            List<CanonicalRegistration> registrations,
+            TeamScope teams,
+            LocalDate reference) {
         Map<String, List<CanonicalRegistration>> versions = new TreeMap<>();
         for (CanonicalRegistration r : registrations) {
             versions.computeIfAbsent(r.personKey(), k -> new ArrayList<>()).add(r);
@@ -89,13 +94,13 @@ final class C7Cohort {
         }
         List<Member> members = new ArrayList<>(byKey.size());
         for (List<CanonicalPerson> rows : byKey.values()) {
-            members.add(decide(rows, versions.getOrDefault(rows.get(0).personKey(), List.of()), reference));
+            members.add(decide(rows, versions.getOrDefault(rows.get(0).personKey(), List.of()), teams, reference));
         }
         return members;
     }
 
     private static Member decide(
-            List<CanonicalPerson> rows, List<CanonicalRegistration> versions, LocalDate reference) {
+            List<CanonicalPerson> rows, List<CanonicalRegistration> versions, TeamScope teams, LocalDate reference) {
         CanonicalPerson person = rows.get(0);
         LocalDate birth = LocalDate.parse(person.birthDate());
         long age = birth.isAfter(reference) ? -1 : AgeAt.completedYears(birth, reference, ANNIVERSARY);
@@ -103,11 +108,19 @@ final class C7Cohort {
                 && C7Codes.IDENTIDADE_HOMEM_TRANSGENERO.equals(person.genderIdentity());
         Link link = link(versions, reference);
         String reason = conflicting(rows) ? EXCLUIDO_PESSOA_CONFLITANTE : exclusion(rows, age, link, reference);
+        if (reason == null) {
+            reason = teamExclusion(link, teams);
+        }
         boolean eligible = reason == null;
         if (eligible) {
             reason = transMan ? ELEGIVEL_HOMEM_TRANSGENERO : ELEGIVEL_SEXO_FEMININO;
         }
         return new Member(person.personKey(), birth, age, transMan, eligible, reason, link.cnes(), link.ine());
+    }
+
+    /** The team-type rule's reason (C7-D2) when the link's team is not a considered one, else {@code null}. */
+    private static String teamExclusion(Link link, TeamScope teams) {
+        return link.ine() == null ? null : teams.decide(link.ine()).exclusionReason();
     }
 
     private static boolean conflicting(List<CanonicalPerson> rows) {

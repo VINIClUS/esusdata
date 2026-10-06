@@ -65,6 +65,7 @@ class C4PackReplayTest {
      */
     private ExtractionManifest extract(String id) throws Exception {
         return ExtractFixturesV2.forRule(new C4Pack(), COMPETENCIA)
+                .add(CanonicalFixtures.team(INE, CNES, "70"))
                 .add(CanonicalFixtures.registration("p1", LocalDate.of(2025, 1, 10), CNES, INE))
                 .add(CanonicalFixtures.conditionEvaluatedBy(
                         "p1", "CID10", "E11", LocalDate.of(2020, 5, 10), "0", MEDICO))

@@ -3,7 +3,9 @@ package esusdata.source.pec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import esusdata.indicator.ReleaseGateRegistry;
 import esusdata.indicator.model.Capabilities;
+import esusdata.indicator.model.PackDescriptor;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -159,5 +161,22 @@ class CapabilityEligibilityTest {
                     assertThat(entry.status()).isEqualTo("VALIDATED");
                     assertThat(entry.readModel()).isEqualTo("PEC_OLTP");
                 });
+    }
+
+    @Test
+    void everyPackThatReadsTheTeamTypeIsEligibleOnAPec5528DwSource() {
+        CapabilityEligibility eligibility = new CapabilityEligibility(PecCompatibilityMatrix.fromClasspathResource());
+        List<PackDescriptor> readers = ReleaseGateRegistry.registeredPacks().stream()
+                .filter(d -> d.requiredCapabilities().contains(Capabilities.TEAM))
+                .toList();
+
+        assertThat(readers)
+                .extracting(PackDescriptor::code)
+                .containsExactlyInAnyOrder("C2", "C3", "C4", "C5", "C6", "C7");
+        for (PackDescriptor pack : readers) {
+            assertThat(eligibility.missing(pack.requiredCapabilities(), PEC_5_5_28))
+                    .as(pack.id())
+                    .isEmpty();
+        }
     }
 }

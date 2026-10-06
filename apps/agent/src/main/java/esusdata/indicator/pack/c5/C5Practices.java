@@ -10,6 +10,7 @@ import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CboGroups;
 import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
+import esusdata.indicator.model.TeamScope;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -71,11 +72,10 @@ final class C5Practices {
     private final Map<String, List<CanonicalHomeVisit>> visits;
 
     /**
-     * One practice's decision, with the records behind it in evidence order. An {@code ambiguous}
-     * practice is one the ficha does not decide for the person (AMB-C5-01): {@code met} then only
-     * says whether it was observed, and it earns no points.
+     * One practice's decision, with the records behind it in evidence order. A {@code credited}
+     * practice is D of a person of an eAP 76 team without the visits (C5-D1): it counts as met.
      */
-    record Outcome(String code, boolean met, String reasonCode, List<C5Event> support, boolean ambiguous) {
+    record Outcome(String code, boolean met, String reasonCode, List<C5Event> support, boolean credited) {
         Outcome {
             support = List.copyOf(support);
         }
@@ -85,12 +85,11 @@ final class C5Practices {
         }
 
         /**
-         * The same observation, undecided by the ficha for {@code reason}; its records stay as
-         * support and the reason code keeps what was observed ({@code AMB-C5-01:CUMPRIDA}), so the
-         * observed count can be rebuilt from the evidence (ENG-36).
+         * The practice credited in full to a person of an eAP 76 team (item 24 b, P07, C5-D1): it
+         * counts as met with its records kept as support, and the reason says it was credited.
          */
-        Outcome undecided(String reason) {
-            return new Outcome(code, met, reason + ":" + reasonCode, support, true);
+        Outcome asCredited() {
+            return new Outcome(code, true, TeamScope.REASON_CREDITED_EAP76, support, true);
         }
     }
 

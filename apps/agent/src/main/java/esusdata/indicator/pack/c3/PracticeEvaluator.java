@@ -44,8 +44,8 @@ final class PracticeEvaluator {
         outcomes.put(Practice.K, OtherPractices.dental(records, window));
         if (eap76) {
             for (Practice practice : Practice.values()) {
-                if (practice.exemptForEap76()) {
-                    outcomes.put(practice, PracticeOutcome.EXEMPT);
+                if (practice.creditedForEap76() && !outcomes.get(practice).scores()) {
+                    outcomes.put(practice, PracticeOutcome.CREDITED);
                 }
             }
         }

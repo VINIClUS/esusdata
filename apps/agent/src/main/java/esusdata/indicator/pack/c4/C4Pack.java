@@ -49,7 +49,7 @@ public final class C4Pack implements IndicatorRule {
     private static final String TWELVE_MONTHS = "12 meses";
 
     public static final String ID = "c4-cuidado-diabetes";
-    public static final String RULE_VERSION = ID + "@0.2.0";
+    public static final String RULE_VERSION = ID + "@0.3.0";
 
     /** What keeps the local value from being the Siaps value, whatever the gates say (ADR 0030). */
     private static final List<Limitation> STANDING_LIMITATIONS = List.of(
@@ -61,10 +61,6 @@ public final class C4Pack implements IndicatorRule {
                     "C4-LIM-02",
                     "Óbito no CadSUS e vínculo nacional são apurados no SIAPS; aqui vale a última versão do "
                             + "cadastro individual (24 meses lidos) no corte, estimativa local."),
-            Limitation.blockingGap(
-                    "C4-LIM-03",
-                    "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de D para eAP não "
-                            + "são aplicados."),
             Limitation.convention(
                     "C4-LIM-04",
                     "Condição ativa: entra a condição avaliada por médico ou enfermeiro na lista de problemas "
@@ -120,7 +116,15 @@ public final class C4Pack implements IndicatorRule {
                     "C4-LIM-17",
                     "Atividade coletiva conta só pelo participante identificado (CPF/CNS) com peso e altura; a "
                             + "prática E vale pelo quadro: solicitação ou avaliação de hemoglobina glicada na janela, por "
-                            + "CBO do Quadro 06, com a data do próprio registro."));
+                            + "CBO do Quadro 06, com a data do próprio registro."),
+            Limitation.convention(
+                    "C4-LIM-18",
+                    "D creditada integralmente (20 pontos) para as pessoas de equipes eAP 76, conforme o item 24 b; "
+                            + "a contagem creditada e a observada de cada resultado estão nas limitações dele."),
+            Limitation.convention(
+                    "C4-LIM-19",
+                    "Só equipes de tipo 70 ou 76 vigente no fim da competência entram; equipes de outro tipo, "
+                            + "conflitantes ou sem tipo ficam fora, com motivo e contagem."));
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -132,7 +136,7 @@ public final class C4Pack implements IndicatorRule {
             ValueKind.SCORE,
             "percentual",
             "PESSOAS_COM_DIABETES_VINCULADAS",
-            "c4-exact-score@1",
+            "c4-exact-score@2",
             List.of(
                     Capabilities.CITIZEN,
                     Capabilities.INDIVIDUAL_REGISTRATION,
@@ -141,7 +145,8 @@ public final class C4Pack implements IndicatorRule {
                     Capabilities.EXAM_REQUEST_EVALUATION,
                     Capabilities.HOME_VISIT,
                     Capabilities.MEASUREMENT_RECORD,
-                    Capabilities.CONDITION_LIST),
+                    Capabilities.CONDITION_LIST,
+                    Capabilities.TEAM),
             List.of(
                     ComponentSpec.practice(
                             "A",
@@ -212,6 +217,7 @@ public final class C4Pack implements IndicatorRule {
         }
         parts.add(PartRequirement.personScoped(
                 Capabilities.CONDITION_LIST, new DateWindow(since, end), births, codes(Capabilities.CONDITION_LIST)));
+        parts.add(PackSupport.teamPart(competencia));
         return new DataRequirements(DataRequirements.V2, parts);
     }
 
@@ -258,7 +264,9 @@ public final class C4Pack implements IndicatorRule {
         List<Scored> people = new ArrayList<>();
         SortedMap<String, List<Scored>> byTeam = new TreeMap<>();
         SortedMap<String, SortedSet<String>> teamCnes = new TreeMap<>();
-        for (Subject subject : C4Cohort.resolve(data, cutoff)) {
+        List<Subject> subjects =
+                C4Cohort.resolve(data, cutoff, context.competencia().atEndOfMonth());
+        for (Subject subject : subjects) {
             if (subject.countsForTeam()) {
                 // a linked team keeps its row even when nobody of it is eligible (NO_DENOMINATOR, T-C4-36)
                 byTeam.computeIfAbsent(subject.link().ine(), k -> new ArrayList<>());
@@ -281,7 +289,14 @@ public final class C4Pack implements IndicatorRule {
                     agreed(teamCnes.get(team.getKey())),
                     C4Scoring.result(DESCRIPTOR, context, team.getValue())));
         }
-        return new RuleOutcome(C4Scoring.result(DESCRIPTOR, context, people), teams, evidence);
+        return new RuleOutcome(
+                withTeamExclusions(C4Scoring.result(DESCRIPTOR, context, people), subjects), teams, evidence);
+    }
+
+    /** The municipal result also says how many people the team-type rule left out (C4-LIM-19). */
+    private static IndicatorResult withTeamExclusions(IndicatorResult result, List<Subject> subjects) {
+        String note = C4Scoring.teamExclusions(subjects);
+        return note == null ? result : PackSupport.withLimitation(result, note);
     }
 
     @Override

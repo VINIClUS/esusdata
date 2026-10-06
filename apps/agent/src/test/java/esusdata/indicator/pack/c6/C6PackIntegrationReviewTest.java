@@ -17,8 +17,8 @@ import static esusdata.indicator.pack.c6.C6Scenario.practiceRow;
 import static esusdata.indicator.pack.c6.C6Scenario.registration;
 import static esusdata.indicator.pack.c6.C6Scenario.scenario;
 import static esusdata.indicator.pack.c6.C6Scenario.subjectRow;
-import static esusdata.indicator.pack.c6.C6Scenario.team;
 import static esusdata.indicator.pack.c6.C6Scenario.teamOf;
+import static esusdata.indicator.pack.c6.C6Scenario.teamState;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.indicator.model.CanonicalDataset;
@@ -94,38 +94,43 @@ class C6PackIntegrationReviewTest {
     }
 
     @Test
-    void laterObservationWithoutTypeDoesNotEraseAKnownEap() {
+    void aStateWithoutTypeDoesNotEraseAKnownEap() {
         RuleOutcome outcome = scenario()
-                .add(team(INE_A, "76", "2025-01-01"))
-                .add(team(INE_A, null, "2026-01-01"))
+                .add(teamState(INE_A, "76", "2025-01-01", null))
+                .add(teamState(INE_A, null, "2026-01-01", null))
                 .elder(P)
                 .compute();
 
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-    }
-
-    @Test
-    void undatedTypeIsIgnoredAndReported() {
-        RuleOutcome outcome =
-                scenario().add(team(INE_A, "76", null)).elder(P).practiceA(P).compute();
-
         assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
-        assertThat(outcome.result().limitations()).anyMatch(l -> l.startsWith("1 observação(ões) de tipo de equipe"));
+        assertThat(practiceRow(outcome, P, "C").reasonCode()).isEqualTo("PRATICA_CREDITADA_EAP76");
     }
 
     @Test
-    void twoTypesAtTheSameLatestInstantAreAmbiguousNotChosen() {
+    void twoTypesOnTheLastDayLeaveThePersonOutAsAConflictNotChosen() {
         RuleOutcome outcome = scenario()
-                .add(team(INE_A, "70", "2026-01-01T10:00:00Z"))
-                .add(team(INE_A, "76", "2026-01-01T10:00:00Z"))
+                .add(teamState(INE_A, "70", "2025-01-01", null))
+                .add(teamState(INE_A, "76", "2025-01-01", null))
                 .elder(P)
                 .practiceA(P)
                 .compute();
 
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(practiceRow(outcome, P, "C").decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
-        assertThat(practiceRow(outcome, P, "C").reasonCode()).isEqualTo("C_AMBIGUA_TIPO_EQUIPE_CONFLITANTE");
-        assertThat(outcome.result().limitations()).anyMatch(l -> l.startsWith("Tipo de equipe divergente"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
+        assertThat(subjectRow(outcome, P).decision()).isEqualTo(EvidenceDecision.EXCLUDED);
+        assertThat(exclusionReason(outcome, P)).isEqualTo("EXCLUIDO_TIPO_EQUIPE_CONFLITANTE");
+        assertThat(outcome.teams()).isEmpty();
+        assertThat(outcome.result().limitations())
+                .anyMatch(l -> l.startsWith("C6-LIM-15/contagem: 1 pessoa(s)") && l.contains("1 de tipo conflitante"));
+    }
+
+    @Test
+    void aTeamWithoutAnyTypeLeavesThePersonOutWithItsReason() {
+        RuleOutcome outcome = scenario()
+                .add(teamState(INE_A, null, "2025-01-01", null))
+                .elder(P)
+                .compute();
+
+        assertThat(exclusionReason(outcome, P)).isEqualTo("EXCLUIDO_EQUIPE_SEM_TIPO");
+        assertThat(outcome.result().limitations()).anyMatch(l -> l.contains("1 de equipe sem tipo"));
     }
 
     @Test
@@ -267,6 +272,7 @@ class C6PackIntegrationReviewTest {
         assertThat(registrations.periodStart()).isEqualTo(LocalDate.of(2024, 4, 1));
         assertThat(registrations.periodEndExclusive()).isEqualTo(LocalDate.of(2026, 4, 1));
         assertThat(parts)
+                .filteredOn(p -> !Capabilities.TEAM.equals(p.capability()))
                 .allMatch(
                         p -> p.dateParams().get(PartRequirement.BIRTH_DATE_FROM).equals(LocalDate.of(1896, 3, 1)));
     }
@@ -313,6 +319,7 @@ class C6PackIntegrationReviewTest {
                 data.window(part.capability(), read);
             }
         }
+        data.add(CanonicalFixtures.team(INE_A, C6Scenario.CNES, "70"));
         data.add(CanonicalFixtures.person(P, BORN_70, "FEMININO"));
         data.add(registration(P, LINKED_ON, INE_A));
         data.add(CanonicalFixtures.encounter(P, LocalDate.of(2026, 1, 15), CBO_MEDICO, false));

@@ -294,7 +294,7 @@ class C4ScoreTest {
     // ---- T-C4-30 / MET-23 / AMB-C4-01: eAP 76 -----------------------------------------------------
 
     @Test
-    void t_c4_30_eap76TeamIsRuleAmbiguityWithPracticesShownSeparately() {
+    void t_c4_30_eap76TeamIsCreditedPracticeDInFullAndComputed() {
         RuleOutcome o = ungated(data().diabetic("x", INE_EAP)
                 .add(allButVisits("x"))
                 .diabetic("y", INE_EAP)
@@ -302,74 +302,72 @@ class C4ScoreTest {
                 .build());
 
         for (IndicatorResult r : List.of(o.result(), teamOf(o, INE_EAP).result())) {
-            assertThat(r.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-            assertThat(r.valueText()).isNull();
-            assertThat(r.valueExact()).isNull();
-            assertThat(r.classification()).isNull();
-            assertThat(r.numerator()).isNull(); // AMB-C4-01: «não compor escore» — no sum of points
+            assertThat(r.status()).isEqualTo(IndicatorStatus.COMPUTED);
             assertThat(r.denominator()).isEqualTo(big(2));
             assertThat(r.components()).extracting(ResultComponent::code).containsExactlyElementsOf(CODES);
+            // D is credited to both: the component's numerator equals its denominator
             assertThat(r.components())
                     .extracting(ResultComponent::numerator)
-                    .containsExactly(big(2), big(1), big(1), big(0), big(1), big(1));
-            assertThat(r.components()).extracting(ResultComponent::denominator).containsOnly(big(2));
-            ResultComponent d = component(r, "D");
-            assertThat(d.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-            assertThat(d.value()).isNull();
-            assertThat(component(r, "A").status()).isEqualTo(IndicatorStatus.COMPUTED);
+                    .containsExactly(big(2), big(1), big(1), big(2), big(1), big(1));
+            assertThat(component(r, "D").status()).isEqualTo(IndicatorStatus.COMPUTED);
+            // x met everything but the visits (80) and y only A (20); D credited to both (+20 each)
+            assertThat(r.numerator()).isEqualTo(big(140));
         }
-        // No integral credit, no redistribution: no score per person, D informative.
         for (String key : List.of("x", "y")) {
-            assertThat(personRow(o, key).decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
-            assertThat(personRow(o, key).points()).isNull();
             EvidenceItem dRow = practiceRow(o, key, "D");
-            assertThat(dRow.reasonCode()).isEqualTo(C4Reasons.PRACTICE_INFORMATIVE_EAP);
-            assertThat(dRow.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
-            assertThat(dRow.points()).isNull();
+            assertThat(dRow.decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+            assertThat(dRow.reasonCode()).isEqualTo(C4Reasons.PRACTICE_CREDITED_EAP);
+            assertThat(dRow.points()).isEqualTo(big(20));
         }
-        assertThat(met(o, "x", "A")).isTrue();
-        assertThat(practiceRow(o, "x", "A").points()).isEqualTo(big(20));
-        assertThat(met(o, "y", "B")).isFalse();
+        assertThat(personRow(o, "x").points()).isEqualTo(big(100));
+        assertThat(personRow(o, "y").points()).isEqualTo(big(40));
+        assertThat(o.result().limitations())
+                .anyMatch(l -> l.startsWith("C4-LIM-18/contagem:") && l.contains("(20 pontos) para 2 pessoa(s)"))
+                .anyMatch(l -> l.endsWith("observada em 0."));
         assertThat(o.evidence()).noneMatch(e -> e.decision() == EvidenceDecision.PRACTICE_EXEMPT);
     }
 
     @Test
-    void met23_eapExceptionIsNotCreditOrRedistributionAndSurvivesTheGate() {
+    void met23_eapCreditKeepsThePointsOfAnObservedDAndTheEsfStillNeedsIt() {
         CanonicalDataset data = data().diabetic("x", INE_EAP)
                 .add(allButVisits("x"))
                 .diabetic("v", INE_EAP)
                 .addAll(twoVisits("v"))
+                .diabetic("e", INE_ESF)
+                .add(allButVisits("e"))
                 .build();
 
         RuleOutcome o = ungated(data);
-        // D observed for "v": counted in the component, but the ficha does not decide it — no points.
         EvidenceItem vD = practiceRow(o, "v", "D");
-        assertThat(vD.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
-        assertThat(vD.reasonCode()).isEqualTo(C4Reasons.PRACTICE_INFORMATIVE_EAP);
-        assertThat(vD.points()).isNull();
-        assertThat(o.result().numerator()).isNull(); // no score composed: no credit, no redistribution
-        assertThat(component(o.result(), "D").numerator()).isEqualTo(big(1));
+        assertThat(vD.decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(vD.reasonCode()).isEqualTo(C4Reasons.PRACTICE_MET); // observed, not credited
+        assertThat(vD.points()).isEqualTo(big(20));
+        assertThat(practiceRow(o, "x", "D").reasonCode()).isEqualTo(C4Reasons.PRACTICE_CREDITED_EAP);
+        // the eSF person without visits does not get D
+        assertThat(practiceRow(o, "e", "D").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+        assertThat(personRow(o, "e").points()).isEqualTo(big(80));
+        assertThat(component(o.result(), "D").numerator()).isEqualTo(big(2));
+        assertThat(o.result().limitations())
+                .anyMatch(l -> l.contains("para 2 pessoa(s)") && l.endsWith("observada em 1."));
 
         IndicatorResult gatedResult = gated(data).result();
-        assertThat(gatedResult.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        assertThat(gatedResult.status()).isEqualTo(IndicatorStatus.BLOCKED); // the gates hide the value only
         assertThat(gatedResult.valueText()).isNull();
-        assertThat(gatedResult.classification()).isNull();
-        assertThat(gatedResult.numerator()).isNull();
-        assertThat(gatedResult.denominator()).isEqualTo(big(2));
+        assertThat(gatedResult.numerator()).isEqualTo(o.result().numerator());
+        assertThat(gatedResult.denominator()).isEqualTo(big(3));
         assertThat(gatedResult.components()).hasSize(6);
     }
 
     @Test
-    void met23_eapAmbiguityDoesNotSpreadToEsfTeamsButBlocksTheMunicipalValue() {
+    void met23_eapCreditDoesNotSpreadToEsfTeams() {
         RuleOutcome o = ungated(data().diabetic("esf")
                 .addAll(fullCare("esf"))
                 .diabetic("eap", INE_EAP)
                 .add(allButVisits("eap"))
                 .build());
 
-        assertThat(o.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(o.result().valueText()).isNull();
-        assertThat(o.result().numerator()).isNull();
+        assertThat(o.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(o.result().numerator()).isEqualTo(big(200));
         assertThat(o.result().denominator()).isEqualTo(big(2));
 
         IndicatorResult esf = teamOf(o, INE_ESF).result();
@@ -378,19 +376,41 @@ class C4ScoreTest {
         assertThat(esf.classification()).isEqualTo(Classification.OTIMO);
         assertThat(points(o, "esf")).isEqualTo(big(100));
         assertThat(practiceRow(o, "esf", "D").reasonCode()).isEqualTo(C4Reasons.PRACTICE_MET);
+        assertThat(esf.limitations()).noneMatch(l -> l.startsWith("C4-LIM-18/contagem"));
 
-        assertThat(teamOf(o, INE_EAP).result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        assertThat(teamOf(o, INE_EAP).result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
-    void amb_c4_01_unknownTeamTypeDoesNotApplyTheException() {
-        RuleOutcome o =
-                ungated(data().diabetic("x", INE_UNKNOWN).add(allButVisits("x")).build());
+    void c4_d2_teamWithoutTypeLeavesThePersonOutWithItsReasonAndACount() {
+        RuleOutcome o = ungated(data().diabetic("x", INE_UNKNOWN)
+                .add(allButVisits("x"))
+                .diabetic("ok")
+                .addAll(fullCare("ok"))
+                .build());
 
-        assertThat(o.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
-        assertThat(points(o, "x")).isEqualTo(big(80));
-        assertThat(practiceRow(o, "x", "D").reasonCode()).isEqualTo(C4Reasons.PRACTICE_NOT_MET);
-        assertThat(practiceRow(o, "x", "D").points()).isEqualTo(big(0));
+        assertThat(personRow(o, "x").decision()).isEqualTo(EvidenceDecision.EXCLUDED);
+        assertThat(personRow(o, "x").reasonCode()).isEqualTo(C4Reasons.TEAM_WITHOUT_TYPE);
+        assertThat(o.result().denominator()).isEqualTo(big(1));
+        assertThat(o.teams()).extracting(TeamResult::ine).containsExactly(INE_ESF);
+        assertThat(o.result().limitations())
+                .anyMatch(l -> l.startsWith("C4-LIM-19/contagem: 1 pessoa(s)") && l.contains("1 de equipe sem tipo"));
+    }
+
+    @Test
+    void c4_d2_conflictingAndOutOfScopeTypesAreExcludedWithTheirOwnReasons() {
+        RuleOutcome o = ungated(data().add(
+                        C4Data.team("0000400001", "7777777", "70"),
+                        C4Data.team("0000400001", "7777777", "76"),
+                        C4Data.team("0000400002", "7777777", "72"))
+                .diabetic("c", "0000400001")
+                .diabetic("o", "0000400002")
+                .build());
+
+        assertThat(personRow(o, "c").reasonCode()).isEqualTo(C4Reasons.TEAM_TYPE_CONFLICT);
+        assertThat(personRow(o, "o").reasonCode()).isEqualTo(C4Reasons.TEAM_TYPE_OUT_OF_SCOPE);
+        assertThat(o.result().status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
+        assertThat(o.teams()).isEmpty();
     }
 
     // ---- gates: BLOCKED by default with exact counts ---------------------------------------------

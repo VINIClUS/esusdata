@@ -184,7 +184,7 @@ class C1RuleTest {
 
     @Test
     void ruleVersionAndStandingLimitationsFollowTheRecordedDecisions() {
-        assertThat(C1Rule.RULE_VERSION).isEqualTo("c1-mais-acesso@0.3.0");
+        assertThat(C1Rule.RULE_VERSION).isEqualTo("c1-mais-acesso@0.4.0");
         assertThat(new C1Pack().descriptor().standingLimitationLines())
                 .anyMatch(l -> l.startsWith("C1-LIM-01:") && l.contains("em toda competência"))
                 .anyMatch(l -> l.startsWith("C1-LIM-06:") && l.contains("20º dia útil"))

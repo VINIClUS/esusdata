@@ -91,7 +91,8 @@ class C5CohortTest {
     private static final String NO_LINK = "EXCLUIDO_SEM_VINCULO";
     private static final String ALL_RESOLVED = "EXCLUIDO_CONDICOES_RESOLVIDAS";
     private static final String NO_CONDITION_IN_PERIOD = "EXCLUIDO_SEM_CONDICAO_AVALIADA";
-    private static final String TEAM_NOT_ELIGIBLE = "EXCLUIDO_EQUIPE_NAO_ELEGIVEL";
+    private static final String TEAM_NOT_ELIGIBLE = "EXCLUIDO_EQUIPE_FORA_DO_ESCOPO";
+    private static final String TEAM_WITHOUT_TYPE = "EXCLUIDO_EQUIPE_SEM_TIPO";
 
     // ---- codes (item 24 f) ----
 
@@ -451,9 +452,9 @@ class C5CohortTest {
 
     @Test
     void teams_knownTypeOtherThanEsf70OrEap76Excludes() {
-        // Items 14 and 24 b: only eSF (70) and eAP (76); without a known type nothing is validated.
+        // Items 14 and 24 b: only eSF (70) and eAP (76); a team without a known type is not considered.
         RuleOutcome outcome = scenario()
-                .add(team(INE, CNES, "71"), team(INE_2, CNES_2, "70"))
+                .add(team(INE, CNES, "71"), team(INE_2, CNES_2, "70"), team("0000003333", CNES, null))
                 .eligible(P1)
                 .linked(P2)
                 .add(resolvedCondition(P2, CID10, "I10", RESOLVED, LocalDate.of(2025, 6, 1)))
@@ -467,8 +468,8 @@ class C5CohortTest {
         assertExcluded(outcome, P2, TEAM_NOT_ELIGIBLE); // before EXCLUIDO_CONDICOES_RESOLVIDAS
         assertExcluded(outcome, P3, NO_LINK); // after EXCLUIDO_SEM_VINCULO
         assertPractices(outcome, P4);
-        assertPractices(outcome, P5); // no type known for this INE
-        assertThat(outcome.result().denominator()).isEqualTo(BigInteger.TWO);
+        assertExcluded(outcome, P5, TEAM_WITHOUT_TYPE); // no type known for this INE (C5-D2)
+        assertThat(outcome.result().denominator()).isEqualTo(BigInteger.ONE);
     }
 
     // ---- T-C5-24: C5 is computed on its own ----

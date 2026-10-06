@@ -163,6 +163,7 @@ class C4IntegrationReviewTest {
         CanonicalCareEvent encounter =
                 care("p1", d(2026, 2, 10), MEDICO).requested(C4Codes.HBA1C).build();
         CanonicalDataset onlyEncounter = CanonicalDataset.builder()
+                .add(C4Data.team(INE_ESF, CNES, "70"))
                 .add(registration("p1", LINKED_ON, INE_ESF))
                 .add(activeCondition("p1", "CID10", "E11", DIAGNOSED_ON))
                 .add(encounter)
@@ -225,8 +226,13 @@ class C4IntegrationReviewTest {
                 Capabilities.MEASUREMENT_RECORD)) {
             assertThat(parts.get(twelve).periodStart()).isEqualTo(LocalDate.of(2025, 4, 1));
         }
+        assertThat(parts.get(Capabilities.TEAM).dateParams()).isEmpty();
+        assertThat(parts.get(Capabilities.TEAM).arrayParams()).isEmpty();
         for (PartRequirement part : r.parts()) {
             assertThat(part.periodEndExclusive()).isEqualTo(LocalDate.of(2026, 4, 1));
+            if (Capabilities.TEAM.equals(part.capability())) {
+                continue; // no scope date and no birth range: the team types are read whole
+            }
             assertThat(part.dateParams())
                     .containsEntry(PartRequirement.BIRTH_DATE_FROM, LocalDate.of(1896, 3, 1))
                     .containsEntry(PartRequirement.BIRTH_DATE_TO, LocalDate.of(2026, 3, 31));

@@ -55,6 +55,8 @@ final class C6Scenario {
     static final String EXIT_OBITO = "135";
 
     private final CanonicalDataset.Builder builder = CanonicalDataset.builder();
+    private final java.util.Set<String> linkedIne = new java.util.LinkedHashSet<>();
+    private final java.util.Set<String> teamsGiven = new java.util.HashSet<>();
 
     private C6Scenario() {}
 
@@ -70,6 +72,11 @@ final class C6Scenario {
 
     C6Scenario add(Record canonicalRecord) {
         builder.add(canonicalRecord);
+        if (canonicalRecord instanceof CanonicalRegistration r && r.ine() != null) {
+            linkedIne.add(r.ine());
+        } else if (canonicalRecord instanceof CanonicalTeam t) {
+            teamsGiven.add(t.ine());
+        }
         return this;
     }
 
@@ -134,7 +141,16 @@ final class C6Scenario {
         return practiceA(key).practiceB(key).practiceC(key).practiceD(key);
     }
 
+    /**
+     * Every INE a registration names and no test gave a team for is an eSF 70 team, as the source
+     * would have it: a team without a type is left out of the cohort (C6-D2).
+     */
     CanonicalDataset build() {
+        linkedIne.forEach(ine -> {
+            if (teamsGiven.add(ine)) {
+                builder.add(team(ine, "70", null));
+            }
+        });
         return builder.build();
     }
 
@@ -222,6 +238,11 @@ final class C6Scenario {
                 cbo,
                 CNES,
                 INE_A);
+    }
+
+    /** One state of a team's type, valid from {@code from} (inclusive) until {@code to} (exclusive, null = open). */
+    static CanonicalTeam teamState(String ine, String teamTypeCode, String from, String to) {
+        return CanonicalFixtures.teamState(ine, CNES, teamTypeCode, from, to);
     }
 
     static CanonicalTeam team(String ine, String teamTypeCode, String observedAt) {

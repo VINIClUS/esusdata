@@ -33,13 +33,7 @@ final class C6Evidence {
             if (a == null) {
                 items.add(person(s, reference, null, EvidenceDecision.EXCLUDED, s.reasonCode(), null));
             } else {
-                items.add(person(
-                        s,
-                        reference,
-                        null,
-                        EvidenceDecision.ELIGIBLE,
-                        s.reasonCode(),
-                        a.ambiguous() ? null : a.points()));
+                items.add(person(s, reference, null, EvidenceDecision.ELIGIBLE, s.reasonCode(), a.points()));
                 for (Practice p : Practice.values()) {
                     practice(items, a, p, reference);
                 }
@@ -49,13 +43,15 @@ final class C6Evidence {
     }
 
     private static void practice(List<EvidenceItem> items, Assessment a, Practice p, String reference) {
-        boolean met = a.met(p);
-        boolean ambiguous = a.ambiguous() && p == Practice.C;
-        String reason = ambiguous ? a.visitsAmbiguity() : p.reason(met);
-        BigInteger points = met ? C6Pack.spec(p).weight() : BigInteger.ZERO;
+        boolean observed = a.met(p);
+        boolean credited = a.credited(p);
+        boolean counted = observed || credited;
+        String reason = credited ? C6Pack.C_REASON_CREDITED_EAP : p.reason(observed);
+        BigInteger points = counted ? C6Pack.spec(p).weight() : BigInteger.ZERO;
         List<Support> supports = a.practices().get(p);
-        String date = met ? supports.get(supports.size() - 1).date().toString() : reference;
-        items.add(person(a.subject(), date, p.name(), decision(met, ambiguous), reason, ambiguous ? null : points));
+        String date = observed ? supports.get(supports.size() - 1).date().toString() : reference;
+        EvidenceDecision decision = counted ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
+        items.add(person(a.subject(), date, p.name(), decision, reason, points));
         for (Support event : supports) {
             items.add(new EvidenceItem(
                     EvidenceSubjectKind.PERSON,
@@ -71,13 +67,6 @@ final class C6Evidence {
                     event.cbo(),
                     event.model()));
         }
-    }
-
-    private static EvidenceDecision decision(boolean met, boolean ambiguous) {
-        if (ambiguous) {
-            return EvidenceDecision.PRACTICE_AMBIGUOUS;
-        }
-        return met ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
     }
 
     private static EvidenceItem person(

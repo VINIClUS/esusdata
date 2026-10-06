@@ -42,11 +42,12 @@ class C7PackTest {
                 .isEqualTo(BigInteger.valueOf(100));
         assertThat(d.components()).allMatch(c -> c.kind() == ComponentKind.SUBGROUP);
         assertThat(GateFixtures.shipped(d).isComplete()).isFalse();
-        assertThat(GateFixtures.shipped(d).incompleteReasons()).hasSize(3);
+        assertThat(GateFixtures.shipped(d).incompleteReasons()).hasSize(1); // only D: A passed, B has no blocking gap
         assertThat(d.standingLimitationLines())
                 .isNotEmpty()
                 .noneMatch(l -> l.contains("Regra em implementação"))
-                .anyMatch(l -> l.startsWith("C7-LIM-04: ") && l.contains("tipo de equipe"))
+                .anyMatch(l -> l.startsWith("C7-LIM-15: ") && l.contains("tipo 70 ou 76"))
+                .noneMatch(l -> l.startsWith("C7-LIM-04: "))
                 .anyMatch(l -> l.startsWith("C7-LIM-03: "))
                 .anyMatch(l -> l.startsWith("C7-LIM-05: "))
                 .anyMatch(l -> l.startsWith("C7-LIM-14: "))
@@ -57,7 +58,6 @@ class C7PackTest {
                         "C7-LIM-01",
                         "C7-LIM-02",
                         "C7-LIM-03",
-                        "C7-LIM-04",
                         "C7-LIM-05",
                         "C7-LIM-06",
                         "C7-LIM-07",
@@ -67,8 +67,9 @@ class C7PackTest {
                         "C7-LIM-11",
                         "C7-LIM-12",
                         "C7-LIM-13",
-                        "C7-LIM-14");
-        assertThat(d.ruleVersion()).isEqualTo("c7-prevencao-cancer@0.2.0");
+                        "C7-LIM-14",
+                        "C7-LIM-15");
+        assertThat(d.ruleVersion()).isEqualTo("c7-prevencao-cancer@0.3.0");
         assertThat(d.calculationPolicyVersion()).isEqualTo("c7-exact-score@2");
         assertThat(d.requiredCapabilities())
                 .containsExactlyInAnyOrderElementsOf(

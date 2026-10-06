@@ -45,18 +45,20 @@ class LimitationKindsTest {
     }
 
     @Test
-    void theTeamTypeIsTheOnlyBlockingGapOfEachIndicatorPack() {
-        Map<String, String> teamGap = Map.of(
-                "c1-mais-acesso", "C1-LIM-03",
-                "c2-desenvolvimento-infantil", "C2-LIM-05",
-                "c3-gestacao-puerperio", "C3-LIM-05",
-                "c4-cuidado-diabetes", "C4-LIM-03",
-                "c5-cuidado-hipertensao", "C5-LIM-04",
-                "c6-cuidado-pessoa-idosa", "C6-LIM-05",
-                "c7-prevencao-cancer", "C7-LIM-04");
-        teamGap.forEach((id, code) -> assertThat(pack(id).blockingLimitations())
+    void onlyC1KeepsABlockingGapAfterTheTeamTypeWasWired() {
+        // C2-C7 read the team type (L1 closed); C1 still reads the v1 extract that carries no team part
+        for (String id : List.of(
+                "c2-desenvolvimento-infantil",
+                "c3-gestacao-puerperio",
+                "c4-cuidado-diabetes",
+                "c5-cuidado-hipertensao",
+                "c6-cuidado-pessoa-idosa",
+                "c7-prevencao-cancer")) {
+            assertThat(pack(id).blockingLimitations()).as(id).isEmpty();
+        }
+        assertThat(pack("c1-mais-acesso").blockingLimitations())
                 .extracting(Limitation::code)
-                .containsExactly(code));
+                .containsExactly("C1-LIM-03");
     }
 
     @Test

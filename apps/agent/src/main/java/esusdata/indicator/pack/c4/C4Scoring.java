@@ -29,13 +29,18 @@ import java.util.SortedMap;
 final class C4Scoring {
 
     /**
-     * AMB-C4-01 as the pack applies it (MET-23, P07): the ficha says practice D «não será
-     * condicionante de pontuação para eAP, tipo 76» without saying what happens to its 20 points.
+     * C4-LIM-18 (P07, C4-D1): practice D is credited in full to the people of eAP 76 teams, observed
+     * or not (item 24 b).
      */
-    static final String EAP_AMBIGUITY = "AMB-C4-01: equipe eAP tipo 76 — a prática D «não será condicionante de"
-            + " pontuação» e a ficha não diz o que acontece com os 20 pontos; sem pesos redistribuídos, as práticas"
-            + " ficam exibidas separadamente e o escore fica indisponível até a reconciliação com o Siaps (MET-23,"
-            + " P07).";
+    static final String EAP_CREDIT =
+            "C4-LIM-18/contagem: D creditada integralmente (%d pontos) para %d pessoa(s) de equipes"
+                    + " eAP 76, conforme o item 24 b; observada em %d.";
+
+    /** C4-LIM-19 (C4-D2): the people left out because their team is not a considered one. */
+    static final String TEAM_EXCLUSIONS =
+            "C4-LIM-19/contagem: %d pessoa(s) vinculada(s) a equipe fora da regra de tipo (70 ou"
+                    + " 76 vigente no fim da competência) ficaram fora: %d de equipe sem tipo, %d de tipo conflitante e %d de"
+                    + " outro tipo.";
 
     /** C4-LIM-20 (AMB-C4-04): a status outside 0/1/2 is diagnosed, not converted silently. */
     static final String UNKNOWN_STATUS = "C4-LIM-20: %d pessoa(s) com situação de condição nula ou fora de 0/1/2"
@@ -48,10 +53,19 @@ final class C4Scoring {
             return subject.eap76();
         }
 
-        /** The weights of the practices observed as met (Quadro 01), D included. */
-        BigInteger observedPoints(List<ComponentSpec> specs) {
-            return Scores.points(
-                    specs.stream().filter(s -> outcomes.get(s.code()).met()).toList());
+        /** Whether practice {@code code} counts for this person: observed, or D credited to an eAP 76. */
+        boolean counts(String code) {
+            return outcomes.get(code).met() || creditedD(code);
+        }
+
+        /** D of an eAP 76 person who had no two valid visits: credited in full (C4-D1). */
+        boolean creditedD(String code) {
+            return eap76() && C4Practices.D.equals(code) && !outcomes.get(code).met();
+        }
+
+        /** The weights of the practices that count (Quadro 01), D credited for an eAP 76. */
+        BigInteger points(List<ComponentSpec> specs) {
+            return Scores.points(specs.stream().filter(s -> counts(s.code())).toList());
         }
     }
 
@@ -62,15 +76,13 @@ final class C4Scoring {
         BigInteger subjects = BigInteger.valueOf(people.size());
         BigInteger total = BigInteger.ZERO;
         for (Scored p : people) {
-            total = total.add(p.observedPoints(specs));
+            total = total.add(p.points(specs));
         }
-        boolean eap76 = people.stream().anyMatch(Scored::eap76);
         Optional<ExactRatio> mean = Scores.meanPoints(total, subjects);
-        IndicatorStatus status = status(mean, eap76);
-        ExactRatio value = status == IndicatorStatus.COMPUTED ? mean.orElseThrow() : null;
-        Optional<ExactRatio> shown = Optional.ofNullable(value);
-        // AMB-C4-01: «não compor escore» — no sum of points while the eAP 76 reading is open
-        BigInteger numerator = status == IndicatorStatus.RULE_AMBIGUITY ? null : total;
+        IndicatorStatus status = mean.isEmpty() ? IndicatorStatus.NO_DENOMINATOR : IndicatorStatus.COMPUTED;
+        ExactRatio value = mean.orElse(null);
+        Optional<ExactRatio> shown = mean;
+        BigInteger numerator = total;
         return new IndicatorResult(
                 status,
                 shown.map(v -> v.toScaledBigDecimal(4).toPlainString()).orElse(null),
@@ -82,37 +94,32 @@ final class C4Scoring {
                 descriptor.ruleVersion(),
                 context.dataCutoff().toString(),
                 context.municipalityIbge(),
-                limitations(descriptor, people, status),
+                limitations(descriptor, people),
                 descriptor.calculationPolicyVersion(),
                 descriptor.valueKind(),
                 value,
-                components(specs, people, subjects, eap76),
+                components(specs, people, subjects),
                 true);
     }
 
-    private static IndicatorStatus status(Optional<ExactRatio> mean, boolean eap76) {
-        if (mean.isEmpty()) {
-            return IndicatorStatus.NO_DENOMINATOR;
-        }
-        return eap76 ? IndicatorStatus.RULE_AMBIGUITY : IndicatorStatus.COMPUTED;
-    }
-
     private static List<ResultComponent> components(
-            List<ComponentSpec> specs, List<Scored> people, BigInteger subjects, boolean eap76) {
+            List<ComponentSpec> specs, List<Scored> people, BigInteger subjects) {
         List<ResultComponent> components = new ArrayList<>(specs.size());
         for (ComponentSpec spec : specs) {
-            long met = people.stream()
-                    .filter(p -> p.outcomes().get(spec.code()).met())
-                    .count();
-            components.add(component(spec, BigInteger.valueOf(met), subjects, eap76));
+            long met = people.stream().filter(p -> p.counts(spec.code())).count();
+            components.add(ResultComponent.of(spec, BigInteger.valueOf(met), subjects));
         }
         return components;
     }
 
-    private static List<String> limitations(PackDescriptor descriptor, List<Scored> people, IndicatorStatus status) {
+    private static List<String> limitations(PackDescriptor descriptor, List<Scored> people) {
         List<String> limitations = new ArrayList<>();
-        if (status == IndicatorStatus.RULE_AMBIGUITY) {
-            limitations.add(EAP_AMBIGUITY);
+        long eap = people.stream().filter(Scored::eap76).count();
+        if (eap > 0) {
+            long observed = people.stream()
+                    .filter(p -> p.eap76() && p.outcomes().get(C4Practices.D).met())
+                    .count();
+            limitations.add(EAP_CREDIT.formatted(weightOfD(descriptor), eap, observed));
         }
         long unknownStatus = people.stream()
                 .filter(p -> p.subject().unknownConditionStatus())
@@ -124,13 +131,29 @@ final class C4Scoring {
         return limitations;
     }
 
-    /** Practice D with eAP 76 people in it is undecided (AMB-C4-01): exact counts, no value. */
-    private static ResultComponent component(ComponentSpec spec, BigInteger met, BigInteger subjects, boolean eap76) {
-        if (eap76 && C4Practices.D.equals(spec.code())) {
-            return new ResultComponent(
-                    spec.code(), spec.kind(), spec.weight(), met, subjects, null, IndicatorStatus.RULE_AMBIGUITY);
-        }
-        return ResultComponent.of(spec, met, subjects);
+    private static BigInteger weightOfD(PackDescriptor descriptor) {
+        return descriptor.components().stream()
+                .filter(c -> C4Practices.D.equals(c.code()))
+                .findFirst()
+                .orElseThrow()
+                .weight();
+    }
+
+    /**
+     * The people of the cohort left out because their team is not considered, by reason (C4-D2): a
+     * disclosure for the municipal result, once.
+     */
+    static String teamExclusions(List<Subject> subjects) {
+        long without = count(subjects, C4Reasons.TEAM_WITHOUT_TYPE);
+        long conflict = count(subjects, C4Reasons.TEAM_TYPE_CONFLICT);
+        long other = count(subjects, C4Reasons.TEAM_TYPE_OUT_OF_SCOPE);
+        return without + conflict + other == 0
+                ? null
+                : TEAM_EXCLUSIONS.formatted(without + conflict + other, without, conflict, other);
+    }
+
+    private static long count(List<Subject> subjects, String reason) {
+        return subjects.stream().filter(s -> reason.equals(s.exclusion())).count();
     }
 
     /** The person row of an excluded candidate. */
@@ -142,7 +165,7 @@ final class C4Scoring {
     static List<EvidenceItem> eligible(Scored scored, List<ComponentSpec> specs) {
         Subject subject = scored.subject();
         List<EvidenceItem> rows = new ArrayList<>();
-        BigInteger points = scored.eap76() ? null : scored.observedPoints(specs);
+        BigInteger points = scored.points(specs);
         rows.add(row(subject, null, null, EvidenceDecision.ELIGIBLE, C4Reasons.ELIGIBLE, points));
         List<EvidenceItem> supports = new ArrayList<>();
         for (ComponentSpec spec : specs) {
@@ -157,18 +180,13 @@ final class C4Scoring {
     }
 
     private static EvidenceItem practice(Scored scored, ComponentSpec spec, Outcome outcome) {
-        if (scored.eap76() && C4Practices.D.equals(spec.code())) {
-            return row(
-                    scored.subject(),
-                    spec.code(),
-                    null,
-                    EvidenceDecision.PRACTICE_AMBIGUOUS,
-                    C4Reasons.PRACTICE_INFORMATIVE_EAP,
-                    null);
-        }
-        EvidenceDecision decision = outcome.met() ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
-        String reason = outcome.met() ? C4Reasons.PRACTICE_MET : C4Reasons.PRACTICE_NOT_MET;
-        BigInteger points = outcome.met() ? spec.weight() : BigInteger.ZERO;
+        boolean credited = scored.creditedD(spec.code());
+        boolean met = outcome.met() || credited;
+        EvidenceDecision decision = met ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
+        String reason = credited
+                ? C4Reasons.PRACTICE_CREDITED_EAP
+                : outcome.met() ? C4Reasons.PRACTICE_MET : C4Reasons.PRACTICE_NOT_MET;
+        BigInteger points = met ? spec.weight() : BigInteger.ZERO;
         return row(scored.subject(), spec.code(), null, decision, reason, points);
     }
 

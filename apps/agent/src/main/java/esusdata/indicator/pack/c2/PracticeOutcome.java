@@ -1,6 +1,7 @@
 package esusdata.indicator.pack.c2;
 
 import esusdata.indicator.model.SourceRef;
+import esusdata.indicator.model.TeamScope;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -9,15 +10,12 @@ record PracticeOutcome(String component, Status status, String reasonCode, List<
 
     static final String MET = "CUMPRIDA";
     static final String NOT_MET = "NAO_CUMPRIDA";
-    static final String EXEMPT_EAP = "ISENTA_EAP_76";
     /** Not met while the practice's window is still open on the cutoff (Tech Spec §2.4 C2). */
     static final String NOT_MET_WINDOW_OPEN = "NAO_CUMPRIDA_PRAZO_ABERTO";
 
     enum Status {
         MET,
-        NOT_MET,
-        /** The ficha scores it without evidence (D for eAP tipo 76). */
-        EXEMPT
+        NOT_MET
     }
 
     PracticeOutcome {
@@ -35,12 +33,13 @@ record PracticeOutcome(String component, Status status, String reasonCode, List<
         return status == Status.NOT_MET ? new PracticeOutcome(component, status, NOT_MET_WINDOW_OPEN, support) : this;
     }
 
-    static PracticeOutcome exempt(String component) {
-        return new PracticeOutcome(component, Status.EXEMPT, EXEMPT_EAP, List.of());
+    /** The practice credited in full to a child of an eAP 76 team (item 24 b, C2-D1): met, without the event. */
+    static PracticeOutcome credited(String component) {
+        return new PracticeOutcome(component, Status.MET, TeamScope.REASON_CREDITED_EAP76, List.of());
     }
 
     boolean scores() {
-        return status == Status.MET || status == Status.EXEMPT;
+        return status == Status.MET;
     }
 
     /** A source record a practice decision rests on, with what the evidence row shows of it. */

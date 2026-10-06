@@ -131,7 +131,7 @@ class C6PackContractTest {
     // ---- requirements and descriptor ---------------------------------------------------------------
 
     @Test
-    void requirements_readSevenPartsWithThe12MonthWindowAndTheCodeLists() {
+    void requirements_readEightPartsWithThe12MonthWindowAndTheCodeLists() {
         DataRequirements requirements = pack.requirements(YearMonth.of(2026, 3));
 
         assertThat(requirements.canonicalSchemaVersion()).isEqualTo(DataRequirements.V2);
@@ -144,7 +144,8 @@ class C6PackContractTest {
                         Capabilities.PROCEDURE_PERFORMED,
                         Capabilities.HOME_VISIT,
                         Capabilities.IMMUNIZATION_HISTORY,
-                        Capabilities.MEASUREMENT_RECORD);
+                        Capabilities.MEASUREMENT_RECORD,
+                        Capabilities.TEAM);
         for (String practice : List.of(
                 Capabilities.CARE_ENCOUNTER,
                 Capabilities.PROCEDURE_PERFORMED,
@@ -156,6 +157,7 @@ class C6PackContractTest {
             assertThat(part.periodEndExclusive()).as(practice).isEqualTo(PRACTICES_UNTIL);
         }
         assertThat(requirements.parts())
+                .filteredOn(p -> !Capabilities.TEAM.equals(p.capability()))
                 .allSatisfy(p -> assertThat(p.dateParams().get(PartRequirement.BIRTH_DATE_TO))
                         .as(p.capability())
                         .isEqualTo(LocalDate.of(1966, 3, 31)));

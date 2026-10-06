@@ -40,8 +40,8 @@ class IndicatorPackCatalogTest {
                 IndicatorPackCatalog.find("c1-mais-acesso").orElseThrow();
         assertThat(c1.family()).isEqualTo("QUALIDADE_ESF_EAP");
         assertThat(c1.title()).isEqualTo("Mais acesso");
-        // A, B and D: Portão C is decided per source, not by the catalog.
-        assertThat(c1.blockedGates()).hasSize(3);
+        // B (C1-LIM-03 still blocks) and D: A passed on 2026-10-06; Portão C is decided per source, not by the catalog.
+        assertThat(c1.blockedGates()).hasSize(2);
         assertThat(IndicatorPackCatalog.find("c9-inexistente")).isEmpty();
     }
 

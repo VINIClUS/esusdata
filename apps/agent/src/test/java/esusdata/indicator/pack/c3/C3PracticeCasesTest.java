@@ -446,17 +446,32 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct36_eapType76ScoresEAndJInFullWithoutVisits() {
+    void ct36_eapType76CreditsEAndJInFullWithoutVisits() {
         List<Record> records = withAnchorOn(dum(56));
         records.add(team(INE, "76"));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
         for (String code : List.of("E", "J")) {
             EvidenceItem row = practice(outcome, code);
-            assertThat(row.decision()).isEqualTo(EvidenceDecision.PRACTICE_EXEMPT);
-            assertThat(row.reasonCode()).isEqualTo("EAP_TIPO_76_PONTUACAO_INTEGRAL");
+            assertThat(row.decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+            assertThat(row.reasonCode()).isEqualTo("PRATICA_CREDITADA_EAP76");
             assertThat(row.points()).isEqualTo(BigInteger.valueOf(9));
         }
         assertThat(outcome.result().numerator()).isEqualTo(BigInteger.valueOf(28));
+        assertThat(outcome.result().limitations())
+                .anyMatch(l -> l.startsWith("C3-LIM-05/contagem:")
+                        && l.contains("(9 pontos cada) para 1 episódio(s)")
+                        && l.endsWith("E em 1 e J em 1."));
+    }
+
+    @Test
+    void c3_d1_eap76KeepsTheObservedVisitsAsEvidenceInsteadOfCrediting() {
+        List<Record> records = withVisits(dum(140), dum(210), dum(260));
+        records.add(team(INE, "76"));
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
+        EvidenceItem e = practice(outcome, "E");
+        assertThat(e.decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(e.reasonCode()).isEqualTo("CUMPRIDA");
+        assertThat(outcome.result().limitations()).anyMatch(l -> l.endsWith("E em 0 e J em 1."));
     }
 
     @Test

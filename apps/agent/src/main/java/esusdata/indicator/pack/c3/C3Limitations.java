@@ -29,12 +29,11 @@ final class C3Limitations {
                     "C3-LIM-04",
                     "O vínculo nacional segue a NT nº 30/2025 e é apurado pelo SIAPS; aqui é aproximado"
                             + " pelo cadastro individual local vigente no corte (item 14, p.1; lacuna L8)."),
-            Limitation.blockingGap(
+            Limitation.convention(
                     "C3-LIM-05",
-                    "O tipo de equipe não está no DW (lacuna L1): sem tipo comprovado, a pontuação"
-                            + " integral de E e J para eAP tipo 76 não é aplicada e equipes de outro tipo não são"
-                            + " excluídas (24 b, p.2). O valor de equipes eAP fica subestimado em até 18 pontos por"
-                            + " episódio. Resolve-se com a capacidade team; é a única lacuna bloqueante de C3."),
+                    "E e J são creditadas integralmente (9 pontos cada) ao episódio de equipe eAP 76 que não as"
+                            + " cumpriu (24 b, p.2; C3-D1); a visita observada continua como evidência. O tipo é o"
+                            + " vigente no último dia da competência."),
             Limitation.convention(
                     "C3-LIM-06",
                     "A data de desfecho da gestação não está no DW (lacuna L2): usa-se a resolução do"
@@ -58,9 +57,9 @@ final class C3Limitations {
                             + " ocupações da família 3224 não contam em C e K (Quadros 03 e 08; AMB-C3-20)."),
             Limitation.convention(
                     "C3-LIM-10",
-                    "Equipe com tipo conhecido diferente de 70 e 76 no corte exclui o episódio; cadastro"
-                            + " sem INE não é vínculo (24 b, p.2; item 14, p.1). Sem tipo conhecido, a equipe não é"
-                            + " excluída (ver C3-LIM-05)."),
+                    "Equipe sem tipo, com dois tipos no último dia da competência ou com tipo diferente de 70 e"
+                            + " 76 exclui o episódio, com a contagem por motivo (24 b, p.2; C3-D2); cadastro sem INE"
+                            + " não é vínculo (item 14, p.1)."),
             Limitation.convention(
                     "C3-LIM-11",
                     "A gestação inclui o dia D e o puerpério vai de D+1 a D+42, com D+42 inclusive. O mês"

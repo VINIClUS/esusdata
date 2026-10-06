@@ -37,6 +37,7 @@ import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -78,7 +79,7 @@ class C2PackCasesTest {
 
     private static final BigInteger VINTE = BigInteger.valueOf(20);
     private static final Set<EvidenceDecision> DECISOES_DE_PRATICA =
-            Set.of(EvidenceDecision.PRACTICE_MET, EvidenceDecision.PRACTICE_NOT_MET, EvidenceDecision.PRACTICE_EXEMPT);
+            Set.of(EvidenceDecision.PRACTICE_MET, EvidenceDecision.PRACTICE_NOT_MET);
 
     private final List<Record> registros = new ArrayList<>();
 
@@ -842,16 +843,20 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_43_eap76SemVisitaTemDIsenta() {
+    void ct_c2_43_eap76SemVisitaTemDCreditada() {
         crianca(CRIANCA, N);
         add(equipe("76"));
 
         RuleOutcome outcome = calcular();
 
         EvidenceItem d = pratica(outcome, CRIANCA, "D");
-        assertThat(d.decision()).isEqualTo(EvidenceDecision.PRACTICE_EXEMPT);
+        assertThat(d.decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
         assertThat(d.points()).isEqualTo(VINTE);
-        assertThat(d.reasonCode()).isEqualTo("ISENTA_EAP_76");
+        assertThat(d.reasonCode()).isEqualTo("PRATICA_CREDITADA_EAP76");
+        assertThat(outcome.result().limitations())
+                .anyMatch(l -> l.startsWith("C2-LIM-05/contagem:")
+                        && l.contains("(20 pontos) para 1 criança(s)")
+                        && l.endsWith("observada em 0."));
         assertThat(componente(outcome.result(), "D").numerator()).isEqualTo(BigInteger.ONE);
         assertThat(pessoa(outcome, CRIANCA).points()).isEqualTo(VINTE);
     }
@@ -864,7 +869,7 @@ class C2PackCasesTest {
         RuleOutcome outcome = calcular();
 
         assertNaoCumpre(outcome, CRIANCA, "D");
-        assertThat(outcome.evidence()).noneMatch(e -> e.decision() == EvidenceDecision.PRACTICE_EXEMPT);
+        assertThat(outcome.evidence()).noneMatch(e -> "PRATICA_CREDITADA_EAP76".equals(e.reasonCode()));
     }
 
     @Test
@@ -1516,15 +1521,16 @@ class C2PackCasesTest {
             assertThat(c.weight()).isEqualTo(VINTE);
         });
         assertThat(GateFixtures.shipped(descritor).isComplete()).isFalse();
-        assertThat(descritor.blockingLimitations()).isNotEmpty();
+        assertThat(descritor.blockingLimitations()).isEmpty(); // L1 closed: the team type is wired (C2-D1/D2)
         List<String> limitacoes = descritor.standingLimitationLines();
         assertThat(limitacoes).noneMatch(l -> l.contains("Regra em implementação"));
-        assertThat(limitacoes).anyMatch(menciona("L1", "tipo de equipe"));
+        assertThat(limitacoes).anyMatch(l -> l.startsWith("C2-LIM-05:") && l.contains("eAP 76"));
+        assertThat(limitacoes).anyMatch(l -> l.startsWith("C2-LIM-16:") && l.contains("sem tipo"));
         assertThat(limitacoes).anyMatch(menciona("L7", "puericultura"));
         assertThat(limitacoes).anyMatch(menciona("RNDS", "RIA"));
         assertThat(limitacoes).anyMatch(l -> l.toLowerCase(Locale.ROOT).contains("cadsus")); // CT-67
         assertThat(limitacoes).anyMatch(menciona("AMB-C2-03"));
-        assertThat(descritor.ruleVersion()).isEqualTo("c2-desenvolvimento-infantil@0.2.0");
+        assertThat(descritor.ruleVersion()).isEqualTo("c2-desenvolvimento-infantil@0.3.0");
         assertThat(limitacoes).hasSize(25);
         for (int i = 0; i < limitacoes.size(); i++) {
             assertThat(limitacoes.get(i)).startsWith(String.format("C2-LIM-%02d: ", i + 1));
@@ -1560,14 +1566,21 @@ class C2PackCasesTest {
                         Capabilities.PROCEDURE_PERFORMED,
                         Capabilities.HOME_VISIT,
                         Capabilities.MEASUREMENT_RECORD,
-                        Capabilities.IMMUNIZATION_HISTORY);
+                        Capabilities.IMMUNIZATION_HISTORY,
+                        Capabilities.TEAM);
 
         PartRequirement cidadao = parte(requisitos, Capabilities.CITIZEN);
         LocalDate nascidosDesde = cidadao.dateParams().get(PartRequirement.BIRTH_DATE_FROM);
         assertThat(nascidosDesde).isBeforeOrEqualTo(LocalDate.of(2024, 2, 29)).isAfter(LocalDate.of(2023, 3, 31));
         assertThat(cidadao.dateParams().get(PartRequirement.BIRTH_DATE_TO)).isEqualTo(CORTE);
 
+        PartRequirement equipe = parte(requisitos, Capabilities.TEAM);
+        assertThat(equipe.periodStart()).isEqualTo(LocalDate.of(2026, 3, 1));
+        assertThat(equipe.periodEndExclusive()).isEqualTo(LocalDate.of(2026, 4, 1));
         for (PartRequirement parte : requisitos.parts()) {
+            if (Capabilities.TEAM.equals(parte.capability())) {
+                continue;
+            }
             assertThat(parte.periodStart().getDayOfMonth()).isEqualTo(1);
             assertThat(parte.periodStart()).isBeforeOrEqualTo(nascidosDesde);
             assertThat(parte.periodEndExclusive()).isEqualTo(LocalDate.of(2026, 4, 1));
@@ -1605,6 +1618,14 @@ class C2PackCasesTest {
     private CanonicalDataset dados(EvaluationContext contexto) {
         CanonicalDataset.Builder builder = C2PackReviewTest.extractWindows(contexto.competencia());
         registros.forEach(builder::add);
+        // a child's team without a record has no type and leaves the cohort (C2-D2): default every linked INE to eSF 70
+        Set<String> typed = new HashSet<>();
+        registros.stream().filter(CanonicalTeam.class::isInstance).forEach(r -> typed.add(((CanonicalTeam) r).ine()));
+        registros.stream()
+                .filter(CanonicalRegistration.class::isInstance)
+                .map(r -> ((CanonicalRegistration) r).ine())
+                .filter(ine -> ine != null && typed.add(ine))
+                .forEach(ine -> builder.add(equipeDeIne(ine, "70")));
         return builder.build();
     }
 

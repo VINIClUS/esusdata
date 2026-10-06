@@ -17,6 +17,7 @@ import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.ValueKind;
+import esusdata.indicator.pack.PackSupport;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -34,7 +35,7 @@ import java.util.TreeMap;
 public final class C7Pack implements IndicatorRule {
 
     public static final String ID = "c7-prevencao-cancer";
-    public static final String RULE_VERSION = ID + "@0.2.0";
+    public static final String RULE_VERSION = ID + "@0.3.0";
     public static final String CALCULATION_POLICY_VERSION = "c7-exact-score@2";
     static final Bands BANDS = Bands.QUALIDADE_C2_C7;
 
@@ -63,8 +64,8 @@ public final class C7Pack implements IndicatorRule {
 
     /**
      * Limitações permanentes, cada uma com código estável e o texto final de divulgação de
-     * docs/indicadores/decisoes/c7-prevencao-cancer.md. C7-LIM-04 é a única lacuna bloqueante (tipo de
-     * equipe, até a capacidade {@code team} estar VALIDATED); C7-LIM-15 só existe depois dela.
+     * docs/indicadores/decisoes/c7-prevencao-cancer.md. Nenhuma é lacuna bloqueante: a regra de tipo de
+     * equipe (C7-LIM-15) fechou a lacuna L1 e substituiu C7-LIM-04.
      */
     private static final List<Limitation> STANDING_LIMITATIONS = List.of(
             Limitation.outOfReach(
@@ -80,8 +81,6 @@ public final class C7Pack implements IndicatorRule {
                     "C7-LIM-03",
                     "Exames, atendimentos e doses de outros estabelecimentos, municípios ou só do RIA/RNDS não "
                             + "estão no PEC local; as práticas, sobretudo B, podem sair subestimadas."),
-            Limitation.blockingGap(
-                    "C7-LIM-04", "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 (item 24 b) não é feita."),
             Limitation.convention(
                     "C7-LIM-05",
                     "Contam em A, C e D só médicos (2251, 2252, 2253, 2231) e enfermeiros (2235), como nos Quadros "
@@ -123,7 +122,11 @@ public final class C7Pack implements IndicatorRule {
                     "C7-LIM-14",
                     "Subgrupo sem denominador sai da soma e do divisor: o escore é reescalado sobre os pesos dos "
                             + "subgrupos presentes. Com os quatro vazios, o mês não tem valor e fica fora da média "
-                            + "quadrimestral. n e d de cada subgrupo estão publicados."));
+                            + "quadrimestral. n e d de cada subgrupo estão publicados."),
+            Limitation.convention(
+                    "C7-LIM-15",
+                    "Só equipes com tipo 70 ou 76 vigente no fim da competência entram. Equipes de outro tipo, com "
+                            + "tipo conflitante ou sem tipo registrado ficam fora, com motivo e contagem."));
 
     /**
      * Registration versions read to resolve the link: the "Dimensão Cadastro, Últimos 24 meses" of
@@ -152,7 +155,8 @@ public final class C7Pack implements IndicatorRule {
                     Capabilities.PROCEDURE_PERFORMED,
                     Capabilities.EXAM_REQUEST_EVALUATION,
                     Capabilities.IMMUNIZATION_HISTORY,
-                    Capabilities.CONDITION_LIST),
+                    Capabilities.CONDITION_LIST,
+                    Capabilities.TEAM),
             COMPONENTS,
             STANDING_LIMITATIONS,
             MonthlyEligibility.ALL_MONTHS,
@@ -220,7 +224,8 @@ public final class C7Pack implements IndicatorRule {
                         Capabilities.IMMUNIZATION_HISTORY,
                         doses,
                         births(end, C7Subgroup.B.minAge(), C7Subgroup.B.maxAge()),
-                        codes(Capabilities.IMMUNOBIOLOGICAL_CODES, C7Codes.B_VACINAS_HPV)));
+                        codes(Capabilities.IMMUNOBIOLOGICAL_CODES, C7Codes.B_VACINAS_HPV)),
+                PackSupport.teamPart(competencia));
     }
 
     @Override

@@ -477,18 +477,37 @@ class C3ReviewCasesTest {
     }
 
     @Test
-    void teamTypeObservedWithoutDateProvesNothing() {
-        // integration review I5: an observation without a date does not prove the type
+    void aStateBeginningAfterTheLastDayIsNotYetTheTeamsType() {
         List<Record> records = pregnancy(P1, DUM);
-        records.add(team(INE, "76", null));
+        records.add(CanonicalFixtures.teamState(INE, CNES, "70", "2025-01-01", "2025-12-01"));
+        records.add(CanonicalFixtures.teamState(INE, CNES, "76", "2025-12-01", null));
         assertNotMet(practice(compute(records), EP1, "E"));
     }
 
     @Test
-    void teamTypeObservedAfterTheCutoffDoesNotCount() {
+    void validToIsExclusiveSoAStateEndingOnTheLastDayDoesNotCoverIt() {
         List<Record> records = pregnancy(P1, DUM);
-        records.add(team(INE, "76", "2025-12-15"));
+        records.add(CanonicalFixtures.teamState(INE, CNES, "76", "2025-01-01", "2025-11-30"));
+        records.add(CanonicalFixtures.teamState(INE, CNES, "70", "2025-11-30", null));
         assertNotMet(practice(compute(records), EP1, "E"));
+    }
+
+    @Test
+    void aTeamWithoutTypeOrWithTwoTypesLeavesTheEpisodeOutWithItsReasonAndACount() {
+        List<Record> none = pregnancy(P1, DUM);
+        none.add(team(INE, null));
+        List<Record> conflict = pregnancy(P1, DUM);
+        conflict.add(team(INE, "70"));
+        conflict.add(team(INE, "76"));
+
+        RuleOutcome without = compute(none);
+        RuleOutcome both = compute(conflict);
+
+        assertThat(episodeRow(without, EP1).reasonCode()).isEqualTo("EXCLUIDO_EQUIPE_SEM_TIPO");
+        assertThat(episodeRow(both, EP1).reasonCode()).isEqualTo("EXCLUIDO_TIPO_EQUIPE_CONFLITANTE");
+        assertThat(without.result().limitations())
+                .anyMatch(l -> l.startsWith("C3-LIM-10/contagem: 1 registro(s)") && l.contains("1 de equipe sem tipo"));
+        assertThat(both.result().limitations()).anyMatch(l -> l.contains("1 de tipo conflitante"));
     }
 
     @Test

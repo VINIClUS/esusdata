@@ -10,7 +10,12 @@ import java.util.Map;
  * {@code episode} is {@code null} for a subject without a DUM.
  */
 record Subject(
-        String key, RegistrationLink link, Verdict verdict, Episode episode, Map<Practice, PracticeOutcome> practices) {
+        String key,
+        RegistrationLink link,
+        Verdict verdict,
+        Episode episode,
+        Map<Practice, PracticeOutcome> practices,
+        boolean eap76) {
     Subject {
         practices = practices.isEmpty() ? Map.of() : Collections.unmodifiableMap(new EnumMap<>(practices));
     }
