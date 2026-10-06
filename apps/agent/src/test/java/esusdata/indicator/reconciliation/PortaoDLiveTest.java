@@ -224,7 +224,8 @@ class PortaoDLiveTest {
                 SensitivityExtracts.acquire(extracts, month, missing, pec.environment(), pec.envFile(), pec.binary());
             }
             for (PackInput input : SensitivityExtracts.fromDirectory(extracts, month)) {
-                List<TeamResult> teams = UngatedTeams.of(input.rule(), input.data(), input.context());
+                List<TeamResult> teams =
+                        input.rule().evaluate(input.data(), input.context()).teams();
                 byPack.computeIfAbsent(input.rule().descriptor().id(), id -> new LinkedHashMap<>())
                         .put(month, teams);
             }
@@ -252,7 +253,7 @@ class PortaoDLiveTest {
                                         .replace('\\', '/'))
                         .orElse(null);
                 String sha = summary.isPresent() ? SummaryWriter.sha256(summary.get()) : null;
-                RegistryUpdater.record(Path.of(registry), verdict, today, ref, sha);
+                RegistryUpdater.record(Path.of(registry), root, verdict, today, ref, sha);
             }
         }
     }

@@ -104,3 +104,11 @@ ficam adiados: os portões não precisam deles e o produto não chama o SIAPS.
 A ferramenta também pode rodar contra um quadrimestre inelegível (por exemplo 2026Q1) em modo
 **informativo**. O documento gerado leva a marca "não é evidência do Portão D" e **nunca** é gravado
 no registro de portões. O modo informativo nunca produz PASSED nem FAILED no registro.
+
+## Como o D é gravado
+
+O registro de portões (ADR 0032, `contracts/indicators/release-gates.json`) já está em `main`. A
+ferramenta grava `gates.D` da entrada do pack e da `rule_version` com o check
+`siaps-distribuicao-por-classe@1`, a data e uma evidência (`kind`, `ref` do resumo no repositório e
+`sha256`); o carregador do registro e o teste de consistência conferem que o arquivo existe e que o
+hash confere. Enquanto não houver quadrimestre de referência elegível (2026Q2), o D segue PENDING.

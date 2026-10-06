@@ -57,12 +57,17 @@ A evidência de cada pack é o resumo: o registro guarda `ref` (caminho relativo
 
 ## O que ainda falta
 
-- O arquivo `contracts/indicators/release-gates.json` chega com o PR do registro de portões (ADR
-  0032). O atualizador (`RegistryUpdater`) foi testado contra um arquivo temporário de mesma forma
-  (raiz em lista, ou objeto com uma lista; nunca cria entrada, nunca grava modo informativo).
-- Quando esse PR entrar, `evaluate()` passa a devolver valores sem o bloqueio e as classes
-  `C2Ungated` a `C6Ungated` e `UngatedTeams` se reduzem a `rule.evaluate(...).teams()` (marcadas com
-  TODO(S1)).
+- O registro de portões (ADR 0032) já está em `main`. O `RegistryUpdater` escreve só `gates.D` da
+  entrada do pack e da `rule_version` em `contracts/indicators/release-gates.json`, na forma do
+  `release-gates.schema.json`: decidido (PASSED/FAILED) leva `check` (`siaps-distribuicao-por-classe@1`),
+  `checked_at` e `evidence` com `kind`, `ref` e `sha256` do resumo; PENDING leva só `status` e
+  `evidence` vazia. Recusa evidência que não exista no repositório ou cujo sha256 não confira (a mesma
+  checagem do `ReleaseGatesConsistencyTest`), nunca cria entrada e nunca grava o modo informativo.
+  Foi testado contra uma cópia temporária do arquivo real, e o resultado passa no `ReleaseGateRegistry`
+  e no schema. Este PR não altera o arquivo real: o D segue PENDING até existir o quadrimestre 2026Q2.
+- Com o PR do registro, `evaluate()` das regras devolve valores sem o bloqueio (o bloqueio fica no
+  `RunExecutor`); a ferramenta chama `rule.evaluate(...).teams()` e as classes `C2Ungated` a `C6Ungated`
+  e `UngatedTeams` foram removidas.
 - O leitor do CSV "Conceito por indicador" (`SiapsCsv`) só foi exercitado com texto sintético: antes
   de confiar nele, conferir com um arquivo baixado de verdade. O nome do indicador na coluna
   "Indicador por tipo de equipe" é aceito com ou sem o sufixo " - eSF"/" - eAP" e qualquer outro nome
