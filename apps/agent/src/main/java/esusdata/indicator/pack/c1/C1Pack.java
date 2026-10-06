@@ -13,6 +13,7 @@ import esusdata.indicator.model.EvidenceSubjectKind;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.Limitation;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
@@ -40,6 +41,35 @@ public final class C1Pack implements IndicatorRule {
     /** The frozen capability C1 has always read (contracts/compatibility, VALIDATED). */
     public static final String CAPABILITY = "individual_encounter_modality";
 
+    /**
+     * C1's standing limitations (decision record {@code docs/indicadores/decisoes/c1-mais-acesso.md}).
+     * The executor attaches them to each result; the rule only adds the counts of this run.
+     */
+    public static final List<Limitation> STANDING_LIMITATIONS = List.of(
+            Limitation.convention(
+                    "C1-LIM-01",
+                    "Entram só os atendimentos dos sete CBO do item 24-c da ficha (225142, 225170, 225130, "
+                            + "225125, 225250, 223565, 223505), em toda competência; CBO ausente ou fora da lista é "
+                            + "excluído e contado."),
+            Limitation.blockingGap(
+                    "C1-LIM-03", "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 (item 24-b) não é feita."),
+            Limitation.outOfReach(
+                    "C1-LIM-06",
+                    "O SIAPS extrai no 20º dia útil e só conta o enviado até o 10º dia do mês seguinte; "
+                            + "o valor local pode incluir registros enviados depois."),
+            Limitation.outOfReach(
+                    "C1-LIM-07", "A conformidade da identificação da pessoa com o CadSUS não é conferida."),
+            Limitation.convention(
+                    "C1-LIM-08", "O CNS profissional é presumido presente em registro do PEC; não é conferido."),
+            Limitation.convention(
+                    "C1-LIM-09",
+                    "Atendimento com dois participantes conta uma vez, pelo participante 1; o CNES não é "
+                            + "filtrado porque a ficha não lista CNES."),
+            Limitation.outOfReach(
+                    "C1-LIM-11",
+                    "A lotação do profissional na equipe (SCNES) não é conferida; vale o INE registrado no "
+                            + "atendimento."));
+
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             C1Rule.INDICATOR_PACK,
             C1Rule.RULE_VERSION,
@@ -53,7 +83,7 @@ public final class C1Pack implements IndicatorRule {
             C1Rule.CALCULATION_POLICY_VERSION,
             List.of(CAPABILITY),
             List.of(),
-            C1Rule.standingLimitations(),
+            STANDING_LIMITATIONS,
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.engineeringDefault(),
             List.of(

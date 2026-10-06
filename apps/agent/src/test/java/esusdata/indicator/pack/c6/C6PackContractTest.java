@@ -177,7 +177,7 @@ class C6PackContractTest {
         assertThat(pack.descriptor().components()).allMatch(c -> c.weight().equals(BigInteger.valueOf(25)));
         assertThat(pack.descriptor().valueKind()).isEqualTo(ValueKind.SCORE);
         assertThat(pack.descriptor().denominatorKind()).isEqualTo("PESSOAS_IDOSAS_VINCULADAS");
-        assertThat(pack.descriptor().standingLimitations()).noneMatch(l -> l.contains("Regra em implementação"));
+        assertThat(pack.descriptor().standingLimitationLines()).noneMatch(l -> l.contains("Regra em implementação"));
         assertThat(GateFixtures.shipped(pack.descriptor()).isComplete()).isFalse();
     }
 

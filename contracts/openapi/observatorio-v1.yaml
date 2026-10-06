@@ -1304,6 +1304,12 @@ components:
                 description: >-
                   The pack's standing limitations, so a screen can tell them from what the result adds
                   (an open ambiguity, a gate reason) in limitations.
+              standingLimitationDetails:
+                type: array
+                items: { $ref: "#/components/schemas/LimitationResponse" }
+                description: >-
+                  The same standing limitations with their kind (S2). Only BLOCKING_GAP blocks; the
+                  others are shown as declared limitations.
         history:
           type: array
           items:
@@ -1709,10 +1715,29 @@ components:
               window: { type: string, nullable: true }
         requiredCapabilities: { type: array, items: { type: string } }
         methodologySources: { type: array, items: { type: string } }
-        standingLimitations: { type: array, items: { type: string } }
+        standingLimitations:
+          type: array
+          items: { type: string }
+          description: "The published strings, code first (C4-LIM-01: text); unchanged for older clients."
+        standingLimitationDetails:
+          type: array
+          items: { $ref: "#/components/schemas/LimitationResponse" }
+          description: The same limitations, structured (S2).
         runnable:
           type: boolean
           description: False for a composite read from published results (the Nota Final); nothing enqueues it.
+
+    LimitationResponse:
+      type: object
+      description: >-
+        A standing limitation of a pack (S2). BLOCKING_GAP is the only kind that keeps a result from being
+        released (Portao B); DECLARED_CONVENTION is a decided reading and OUT_OF_REACH is what a local PEC
+        cannot see by construction; both travel with the result as disclosure.
+      required: [code, kind, text]
+      properties:
+        code: { type: string, example: C4-LIM-01 }
+        kind: { type: string, enum: [BLOCKING_GAP, DECLARED_CONVENTION, OUT_OF_REACH] }
+        text: { type: string, description: The disclosure text, without the code prefix. }
 
     GateResponse:
       type: object

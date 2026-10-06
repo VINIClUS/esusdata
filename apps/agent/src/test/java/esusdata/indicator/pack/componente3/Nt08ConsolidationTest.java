@@ -1045,7 +1045,7 @@ class Nt08ConsolidationTest {
                         .map(ComponentSpec::weight)
                         .reduce(BigInteger.ZERO, BigInteger::add))
                 .isEqualTo(BigInteger.TEN);
-        assertThat(ComponentIII.DESCRIPTOR.standingLimitations())
+        assertThat(ComponentIII.DESCRIPTOR.standingLimitationLines())
                 .noneMatch(l -> l.toLowerCase(Locale.ROOT).contains("em implementação"));
     }
 }

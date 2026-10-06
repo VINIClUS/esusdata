@@ -126,7 +126,7 @@ public final class C7Rule {
             status = IndicatorStatus.NO_DENOMINATOR;
             limitations.clear();
         }
-        limitations.addAll(C7Pack.STANDING_LIMITATIONS);
+        limitations.addAll(C7Pack.standingLimitationLines());
         ExactRatio exact = value.orElse(null);
         return new IndicatorResult(
                 status,
@@ -220,7 +220,7 @@ public final class C7Rule {
         List<String> limitations = new ArrayList<>();
         limitations.add("Capacidade não lida ou lida com janela menor que a pedida: " + String.join(", ", missing)
                 + " — sem valor, nunca zero.");
-        limitations.addAll(C7Pack.STANDING_LIMITATIONS);
+        limitations.addAll(C7Pack.standingLimitationLines());
         return new IndicatorResult(
                 IndicatorStatus.UNSUPPORTED_SOURCE,
                 null,

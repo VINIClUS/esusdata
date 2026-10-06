@@ -53,7 +53,7 @@ public final class RuleOutcomes {
             PackDescriptor descriptor, GateStatus gates, EvaluationContext context, String reason) {
         List<String> limitations = new ArrayList<>();
         limitations.add(reason);
-        limitations.addAll(descriptor.standingLimitations());
+        limitations.addAll(descriptor.standingLimitationLines());
         limitations.addAll(gates.incompleteReasons());
         IndicatorResult result = new IndicatorResult(
                 IndicatorStatus.BLOCKED,
@@ -73,6 +73,49 @@ public final class RuleOutcomes {
                 List.of(),
                 false);
         return new RuleOutcome(result, List.of(), List.of());
+    }
+
+    /**
+     * Attaches the pack's standing limitations to the result and to every team result — the
+     * executor's job, once, so a result carries each limitation a single time even when a rule
+     * also adds its own text for it. Blocking and disclosed limitations alike travel with the
+     * result; only the blocking ones keep it from being released (Portão B).
+     */
+    public static RuleOutcome disclose(PackDescriptor descriptor, RuleOutcome computed) {
+        List<String> standing = descriptor.standingLimitationLines();
+        List<TeamResult> teams = computed.teams().stream()
+                .map(t -> new TeamResult(t.ine(), t.cnes(), disclose(standing, t.result())))
+                .toList();
+        return new RuleOutcome(disclose(standing, computed.result()), teams, computed.evidence());
+    }
+
+    private static IndicatorResult disclose(List<String> standing, IndicatorResult result) {
+        List<String> limitations = new ArrayList<>(result.limitations());
+        for (String line : standing) {
+            if (!limitations.contains(line)) {
+                limitations.add(line);
+            }
+        }
+        if (limitations.size() == result.limitations().size()) {
+            return result;
+        }
+        return new IndicatorResult(
+                result.status(),
+                result.valueText(),
+                result.numerator(),
+                result.denominator(),
+                result.denominatorKind(),
+                result.classification(),
+                result.referencePeriod(),
+                result.ruleVersion(),
+                result.dataCutoff(),
+                result.municipalityIbge(),
+                limitations,
+                result.calculationPolicyVersion(),
+                result.valueKind(),
+                result.valueExact(),
+                result.components(),
+                result.consolidationEligible());
     }
 
     /** {@link #gate} applied to the municipal result and to every team result. */

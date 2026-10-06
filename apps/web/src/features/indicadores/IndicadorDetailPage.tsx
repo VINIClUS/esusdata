@@ -135,7 +135,7 @@ function Retencao({ data }: { data: IndicadorDetalhe }) {
   if (!data.resultado.motivo) return null
   const limitacoes = data.resultId
     ? data.limitacoes
-    : [...data.limitacoesPermanentes, ...data.portoes]
+    : [...data.limitacoesBloqueantes, ...data.portoes]
   return (
     <Callout
       variant={data.status === 'pendente' || data.status === 'na_leitura' ? 'info' : 'warning'}
@@ -263,9 +263,20 @@ function Metodologia({ data }: { data: IndicadorDetalhe }) {
               </Typography>
             )}
           </SectionCard>
-          <SectionCard title="Limitações permanentes">
-            {data.limitacoesPermanentes.length > 0 ? (
-              <Lista itens={data.limitacoesPermanentes} />
+          {data.limitacoesBloqueantes.length > 0 && (
+            <SectionCard
+              title="Lacunas bloqueantes"
+              subtitle="Enquanto alguma existir, o resultado sai bloqueado, com as contagens."
+            >
+              <Lista itens={data.limitacoesBloqueantes} />
+            </SectionCard>
+          )}
+          <SectionCard
+            title="Limitações declaradas"
+            subtitle="Viajam com o resultado e não o bloqueiam: leituras decididas e o que o PEC local não alcança."
+          >
+            {data.limitacoesDeclaradas.length > 0 ? (
+              <Lista itens={data.limitacoesDeclaradas} />
             ) : (
               <Typography sx={{ fontSize: 13.5, color: colors.textSecondary }}>
                 Nenhuma declarada no catálogo.

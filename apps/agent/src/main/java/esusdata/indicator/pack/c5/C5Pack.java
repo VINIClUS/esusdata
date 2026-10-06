@@ -13,6 +13,7 @@ import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.Limitation;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
@@ -55,51 +56,93 @@ public final class C5Pack implements IndicatorRule {
      */
     public static final AgeAt.AnniversaryRule ANNIVERSARY_RULE = AgeAt.AnniversaryRule.CLAMP_TO_MONTH_END;
 
-    private static final List<String> STANDING_LIMITATIONS = List.of(
-            "C5-LIM-01: Só entra o que foi registrado neste PEC; registros de outros estabelecimentos e municípios "
-                    + "e o histórico da condição em outra instalação não aparecem.",
-            "C5-LIM-02: Óbito no CadSUS não é visível: vale o óbito e a saída do cadastro registrados no PEC.",
-            "C5-LIM-03: O vínculo é reconstruído pela versão do cadastro individual vigente no corte (24 meses "
-                    + "lidos); a regra nacional é apurada no SIAPS.",
-            "C5-LIM-04: Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de D para eAP não "
-                    + "são aplicados.",
-            "C5-LIM-05: Cadastro individual lido nos 24 meses até a competência; pessoa cuja última versão é "
-                    + "anterior fica sem vínculo.",
-            "C5-LIM-06: Composição e carga horária da equipe (SCNES) não são conferidas; vale o tipo 70/76 da "
-                    + "capacidade `team`.",
-            "C5-LIM-07: A conformidade da identificação com o CadSUS não é conferida.",
-            "C5-LIM-08: O SIAPS extrai no 20º dia útil e só vê o que chegou até lá; a leitura local pode incluir "
-                    + "registros enviados depois.",
-            "C5-LIM-09: A situação vigente do problema é a última linha de cada código (maior sequência de "
-                    + "evolução com data até o corte).",
-            "C5-LIM-10: A pressão arterial aferida em visita domiciliar não é lida; B pode sair subestimada.",
-            "C5-LIM-11: O DW não tem PA de participante de atividade coletiva; B não conta esse registro.",
-            "C5-LIM-12: Atendimento odontológico (MIAO) não vale para PA, peso e altura: os Quadros 03 e 04 não o "
-                    + "citam.",
-            "C5-LIM-13: A ficha de procedimentos (MIP) só comprova B e C pelo código SIGTAP; medida da escuta "
-                    + "inicial sem código não conta.",
-            "C5-LIM-14: O MIAC vale para PA e para peso e altura, só para participante identificado (CPF/CNS) com "
-                    + "o campo preenchido; o quadro, mais específico, prevalece sobre o item 24 e.",
-            "C5-LIM-15: O CNS profissional é presumido presente em registro do PEC; não é conferido.",
-            "C5-LIM-16: A habilitação de CBO na tabela SIGTAP não é aplicada: vale o CBO do quadro da prática.",
-            "C5-LIM-17: As janelas de 6 e 12 meses são meses civis completos terminando no último dia da "
-                    + "competência, inclusive; nunca 180 ou 365 dias.",
-            "C5-LIM-18: As visitas da prática D cumprem com diferença de datas de 30 dias corridos ou mais entre "
-                    + "duas visitas na janela; no mesmo dia não formam par.",
-            "C5-LIM-19: Condição por correspondência exata com os 26 códigos CID-10 e os 2 CIAP-2 da ficha; "
-                    + "subcódigo não listado não entra por analogia, e os encontrados são contados. Entra a "
-                    + "condição avaliada na lista de problemas desde 2013 ou em atendimento dos últimos 12 meses; "
-                    + "sai quem tem todas as condições elegíveis resolvidas (latente é ativo; concluído vale só "
-                    + "como resolvido). A condição avaliada só em atendimento anterior a 12 meses, sem linha na "
-                    + "lista, não entra.",
-            "C5-LIM-20: A consulta (A) vale só pelo MIAI de médico ou enfermeiro; procedimento de consulta não "
-                    + "conta e não se exige hipertensão como problema avaliado.",
-            "C5-LIM-21: Peso e altura contam na mesma data civil, de qualquer combinação de registros aceitos, ou "
-                    + "pelo procedimento 01.01.04.002-4 por CBO habilitado.",
-            "C5-LIM-22: CBO de quatro dígitos casa pelo prefixo da família; com hífen, exato; 2239 prevalece "
-                    + "sobre a descrição «ortopedistas» do item 24 d.",
-            "C5-LIM-23: O desfecho da visita domiciliar não é filtrado; vale o motivo da visita preenchido por "
-                    + "ACS/TACS.");
+    private static final List<Limitation> STANDING_LIMITATIONS = List.of(
+            Limitation.outOfReach(
+                    "C5-LIM-01",
+                    "Só entra o que foi registrado neste PEC; registros de outros estabelecimentos e municípios "
+                            + "e o histórico da condição em outra instalação não aparecem."),
+            Limitation.outOfReach(
+                    "C5-LIM-02",
+                    "Óbito no CadSUS não é visível: vale o óbito e a saída do cadastro registrados no PEC."),
+            Limitation.outOfReach(
+                    "C5-LIM-03",
+                    "O vínculo é reconstruído pela versão do cadastro individual vigente no corte (24 meses "
+                            + "lidos); a regra nacional é apurada no SIAPS."),
+            Limitation.blockingGap(
+                    "C5-LIM-04",
+                    "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de D para eAP não "
+                            + "são aplicados."),
+            Limitation.convention(
+                    "C5-LIM-05",
+                    "Cadastro individual lido nos 24 meses até a competência; pessoa cuja última versão é "
+                            + "anterior fica sem vínculo."),
+            Limitation.outOfReach(
+                    "C5-LIM-06",
+                    "Composição e carga horária da equipe (SCNES) não são conferidas; vale o tipo 70/76 da "
+                            + "capacidade `team`."),
+            Limitation.outOfReach("C5-LIM-07", "A conformidade da identificação com o CadSUS não é conferida."),
+            Limitation.outOfReach(
+                    "C5-LIM-08",
+                    "O SIAPS extrai no 20º dia útil e só vê o que chegou até lá; a leitura local pode incluir "
+                            + "registros enviados depois."),
+            Limitation.convention(
+                    "C5-LIM-09",
+                    "A situação vigente do problema é a última linha de cada código (maior sequência de "
+                            + "evolução com data até o corte)."),
+            Limitation.outOfReach(
+                    "C5-LIM-10",
+                    "A pressão arterial da visita domiciliar não está registrada no DW desta instalação (PEC 5.5.28); B pode sair subestimada."),
+            Limitation.outOfReach(
+                    "C5-LIM-11", "O DW não tem PA de participante de atividade coletiva; B não conta esse registro."),
+            Limitation.convention(
+                    "C5-LIM-12",
+                    "Atendimento odontológico (MIAO) não vale para PA, peso e altura: os Quadros 03 e 04 não o "
+                            + "citam."),
+            Limitation.convention(
+                    "C5-LIM-13",
+                    "A ficha de procedimentos (MIP) só comprova B e C pelo código SIGTAP; medida da escuta "
+                            + "inicial sem código não conta."),
+            Limitation.convention(
+                    "C5-LIM-14",
+                    "O MIAC vale para PA e para peso e altura, só para participante identificado (CPF/CNS) com "
+                            + "o campo preenchido; o quadro, mais específico, prevalece sobre o item 24 e."),
+            Limitation.convention(
+                    "C5-LIM-15", "O CNS profissional é presumido presente em registro do PEC; não é conferido."),
+            Limitation.outOfReach(
+                    "C5-LIM-16",
+                    "A habilitação de CBO na tabela SIGTAP não é aplicada: vale o CBO do quadro da prática."),
+            Limitation.convention(
+                    "C5-LIM-17",
+                    "As janelas de 6 e 12 meses são meses civis completos terminando no último dia da "
+                            + "competência, inclusive; nunca 180 ou 365 dias."),
+            Limitation.convention(
+                    "C5-LIM-18",
+                    "As visitas da prática D cumprem com diferença de datas de 30 dias corridos ou mais entre "
+                            + "duas visitas na janela; no mesmo dia não formam par."),
+            Limitation.convention(
+                    "C5-LIM-19",
+                    "Condição por correspondência exata com os 26 códigos CID-10 e os 2 CIAP-2 da ficha; "
+                            + "subcódigo não listado não entra por analogia, e os encontrados são contados. Entra a "
+                            + "condição avaliada na lista de problemas desde 2013 ou em atendimento dos últimos 12 meses; "
+                            + "sai quem tem todas as condições elegíveis resolvidas (latente é ativo; concluído vale só "
+                            + "como resolvido). A condição avaliada só em atendimento anterior a 12 meses, sem linha na "
+                            + "lista, não entra."),
+            Limitation.convention(
+                    "C5-LIM-20",
+                    "A consulta (A) vale só pelo MIAI de médico ou enfermeiro; procedimento de consulta não "
+                            + "conta e não se exige hipertensão como problema avaliado."),
+            Limitation.convention(
+                    "C5-LIM-21",
+                    "Peso e altura contam na mesma data civil, de qualquer combinação de registros aceitos, ou "
+                            + "pelo procedimento 01.01.04.002-4 por CBO habilitado."),
+            Limitation.convention(
+                    "C5-LIM-22",
+                    "CBO de quatro dígitos casa pelo prefixo da família; com hífen, exato; 2239 prevalece "
+                            + "sobre a descrição «ortopedistas» do item 24 d."),
+            Limitation.convention(
+                    "C5-LIM-23",
+                    "O desfecho da visita domiciliar não é filtrado; vale o motivo da visita preenchido por "
+                            + "ACS/TACS."));
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -204,7 +247,7 @@ public final class C5Pack implements IndicatorRule {
         }
         return new RuleOutcome(
                 C5Results.of(scope, eligible, limitations(data, cutoff)),
-                teams(scope, eligible, STANDING_LIMITATIONS),
+                teams(scope, eligible, DESCRIPTOR.standingLimitationLines()),
                 evidence);
     }
 
@@ -268,7 +311,7 @@ public final class C5Pack implements IndicatorRule {
      * once, on the municipal result).
      */
     private static List<String> limitations(CanonicalDataset data, LocalDate cutoff) {
-        List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
+        List<String> limitations = new ArrayList<>(DESCRIPTOR.standingLimitationLines());
         long outOfList = C5Conditions.outOfListCount(data.conditions());
         if (outOfList > 0) {
             limitations.add("C5-LIM-19/diagnóstico: " + outOfList

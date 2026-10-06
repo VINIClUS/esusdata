@@ -50,8 +50,12 @@ código) e em `docs/metodologia/guia-preenchimento-equipe-aps.md`; o que o DW do
       contagens ficam.
 5. **`classify`**: `Bands.QUALIDADE_C2_C7.classify(valor)` — já pronto no esqueleto.
 6. **Limitações permanentes** do descritor: troque "Regra em implementação" pelas limitações reais
-   (dados fora do PEC local, ambiguidades `AMB-…` que afetam o valor). Ambiguidade que impede o
-   valor ⇒ `RULE_AMBIGUITY`, nunca uma escolha silenciosa.
+   (dados fora do PEC local, ambiguidades `AMB-…` que afetam o valor), cada uma como
+   `Limitation(código, texto, tipo)`: `OUT_OF_REACH` (o PEC local não alcança; nunca bloqueia),
+   `DECLARED_CONVENTION` (leitura decidida; viaja com o resultado) ou `BLOCKING_GAP` (dado que o
+   PEC tem e o pacote não lê; só ela falha o Portão B). O executor anexa as limitações permanentes
+   a cada resultado, uma vez; a regra só acrescenta o que é da execução (contagens). Ambiguidade
+   que impede o valor ⇒ `RULE_AMBIGUITY`, nunca uma escolha silenciosa.
 7. **`consolidationEligible`** (só C2 e C3): diga se a competência teve o evento de coorte da
    NT 8/2026 (criança completando dois anos; gestação chegando ao 42º dia de puerpério).
 

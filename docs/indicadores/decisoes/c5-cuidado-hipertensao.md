@@ -131,3 +131,5 @@ Totais: **2 BLOCKING_GAP** (LIM-04 até `team`; LIM-10 até C5-D4), 8 OUT_OF_REA
 | C5-D2 / L1 | Equipe sem tipo, conflitante ou fora de 70/76 não é considerada; consulta sem filtro de tipo | P1 | Sim após `team` (denominador) |
 | C5-D3 / AMB-C5-02 a 09, L12 e demais | Convenções adotadas como decididas (lista fechada de CID; MIAC; 30 dias cumpre) | P1/P5 | Não (já aplicadas) |
 | C5-D4 / L6 | PA da visita lida pelo padrão `\d{2,3}[/x]\d{2,3}`; BLOCKING_GAP até a leitura | P1 | Sim, sobe B |
+
+> **Nota de 2026-10-06 (S2, limitações tipadas).** C5-LIM-10 (PA da visita, L6) deixa de ser `BLOCKING_GAP` e passa a `OUT_OF_REACH` para o PEC 5.5.28, pelo mesmo inventário de C4-LIM-05 (`docs/discovery/2026-10-06-pec-5528-l6-exame-do-pe.md`). Texto: «A pressão arterial da visita domiciliar não está registrada no DW desta instalação (PEC 5.5.28); B pode sair subestimada.» Resta uma `BLOCKING_GAP` em C5: C5-LIM-04 (tipo de equipe).

@@ -13,6 +13,7 @@ import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.Limitation;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
@@ -74,41 +75,65 @@ public final class C6Pack implements IndicatorRule {
     static final String CONFLICTING_TYPE_LIMITATION = "Tipo de equipe divergente na observação mais recente até o "
             + "corte (§1.7.3: sem escolher um): a prática C dessas equipes fica sem decisão e o resultado sem valor.";
 
-    private static final List<String> STANDING_LIMITATIONS = List.of(
-            "C6-LIM-01: Doses só no RIA/RNDS, registros de outros municípios e o óbito no CadSUS não estão no PEC "
-                    + "local; D pode sair subestimada.",
-            "C6-LIM-02: O vínculo é a versão do cadastro individual local vigente no corte (24 meses lidos), "
-                    + "estimativa que não equivale ao vínculo do SIAPS.",
-            "C6-LIM-03: Só vale a versão completa do cadastro de maior data até o corte; cadastro simplificado e "
-                    + "pessoa sem INE não vinculam (EXCLUIDO_SEM_VINCULO) e versões do mesmo dia divergentes excluem "
-                    + "como conflito. Saída 136 (mudança de território) e 135 (óbito) são os códigos LEDI "
-                    + "reconhecidos; outro código de saída exclui (EXCLUIDO_SAIDA_CADASTRO_NAO_MAPEADA), com "
-                    + "contagem.",
-            "C6-LIM-04: Recusa de cadastro, ficha inativa, data de nascimento divergente e versões conflitantes "
-                    + "excluem a pessoa com motivo próprio; a semântica de ficha inativa no DW não é publicada e a "
-                    + "contagem por motivo é divulgada.",
-            "C6-LIM-05: Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de C para eAP não "
-                    + "são aplicados.",
-            "C6-LIM-06: Habilitação de CBO na tabela SIGTAP e estabelecimento de APS não são conferidos; o CNS "
-                    + "profissional é presumido presente em registro do PEC.",
-            "C6-LIM-07: A conformidade da identificação com o CadSUS não é conferida.",
-            "C6-LIM-08: O SIAPS extrai no 20º dia útil e só vê o que chegou até lá; a leitura local pode incluir "
-                    + "registros enviados depois.",
-            "C6-LIM-09: A janela é de 12 meses civis terminando no último dia da competência, nunca 365 dias. A "
-                    + "idade é em anos completos no último dia da competência; quem completa 60 anos em qualquer "
-                    + "dia do mês entra, e o aniversário de 29/02 cai em 01/03.",
-            "C6-LIM-10: A consulta (A) vale só pelo MIAI com CBO do Quadro 02, presencial ou remota, sem códigos "
-                    + "SIGTAP de consulta e sem exigir problema ou condição avaliada.",
-            "C6-LIM-11: Peso e altura (B) contam na mesma data civil, em qualquer combinação de MIAI, MIP, MIAC, "
-                    + "MIVDT e SIGTAP 0101040083/0101040075, ou 0101040024 sozinho (só de MIP ou MIAI), por CBO do "
-                    + "Quadro 03; MIAC só com participante identificado e MIVDT só de ACS/TACS com motivo "
-                    + "preenchido; 2239 vale por quatro dígitos.",
-            "C6-LIM-12: As visitas (C) são de ACS/TACS com motivo preenchido; a primeira e a última visita válida "
-                    + "na janela distam 30 dias corridos ou mais, no mesmo dia não formam par, e o desfecho não é "
-                    + "filtrado.",
-            "C6-LIM-13: Influenza (D): pelo menos uma dose de 33 ou 77 aplicada nos 12 meses da janela, "
-                    + "transcrição com data de aplicação incluída, sem filtro de CBO; a mesma vacina na mesma data "
-                    + "é uma dose, e doses distintas não somam nem anulam.");
+    private static final List<Limitation> STANDING_LIMITATIONS = List.of(
+            Limitation.outOfReach(
+                    "C6-LIM-01",
+                    "Doses só no RIA/RNDS, registros de outros municípios e o óbito no CadSUS não estão no PEC "
+                            + "local; D pode sair subestimada."),
+            Limitation.outOfReach(
+                    "C6-LIM-02",
+                    "O vínculo é a versão do cadastro individual local vigente no corte (24 meses lidos), "
+                            + "estimativa que não equivale ao vínculo do SIAPS."),
+            Limitation.convention(
+                    "C6-LIM-03",
+                    "Só vale a versão completa do cadastro de maior data até o corte; cadastro simplificado e "
+                            + "pessoa sem INE não vinculam (EXCLUIDO_SEM_VINCULO) e versões do mesmo dia divergentes excluem "
+                            + "como conflito. Saída 136 (mudança de território) e 135 (óbito) são os códigos LEDI "
+                            + "reconhecidos; outro código de saída exclui (EXCLUIDO_SAIDA_CADASTRO_NAO_MAPEADA), com "
+                            + "contagem."),
+            Limitation.convention(
+                    "C6-LIM-04",
+                    "Recusa de cadastro, ficha inativa, data de nascimento divergente e versões conflitantes "
+                            + "excluem a pessoa com motivo próprio; a semântica de ficha inativa no DW não é publicada e a "
+                            + "contagem por motivo é divulgada."),
+            Limitation.blockingGap(
+                    "C6-LIM-05",
+                    "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de C para eAP não "
+                            + "são aplicados."),
+            Limitation.outOfReach(
+                    "C6-LIM-06",
+                    "Habilitação de CBO na tabela SIGTAP e estabelecimento de APS não são conferidos; o CNS "
+                            + "profissional é presumido presente em registro do PEC."),
+            Limitation.outOfReach("C6-LIM-07", "A conformidade da identificação com o CadSUS não é conferida."),
+            Limitation.outOfReach(
+                    "C6-LIM-08",
+                    "O SIAPS extrai no 20º dia útil e só vê o que chegou até lá; a leitura local pode incluir "
+                            + "registros enviados depois."),
+            Limitation.convention(
+                    "C6-LIM-09",
+                    "A janela é de 12 meses civis terminando no último dia da competência, nunca 365 dias. A "
+                            + "idade é em anos completos no último dia da competência; quem completa 60 anos em qualquer "
+                            + "dia do mês entra, e o aniversário de 29/02 cai em 01/03."),
+            Limitation.convention(
+                    "C6-LIM-10",
+                    "A consulta (A) vale só pelo MIAI com CBO do Quadro 02, presencial ou remota, sem códigos "
+                            + "SIGTAP de consulta e sem exigir problema ou condição avaliada."),
+            Limitation.convention(
+                    "C6-LIM-11",
+                    "Peso e altura (B) contam na mesma data civil, em qualquer combinação de MIAI, MIP, MIAC, "
+                            + "MIVDT e SIGTAP 0101040083/0101040075, ou 0101040024 sozinho (só de MIP ou MIAI), por CBO do "
+                            + "Quadro 03; MIAC só com participante identificado e MIVDT só de ACS/TACS com motivo "
+                            + "preenchido; 2239 vale por quatro dígitos."),
+            Limitation.convention(
+                    "C6-LIM-12",
+                    "As visitas (C) são de ACS/TACS com motivo preenchido; a primeira e a última visita válida "
+                            + "na janela distam 30 dias corridos ou mais, no mesmo dia não formam par, e o desfecho não é "
+                            + "filtrado."),
+            Limitation.convention(
+                    "C6-LIM-13",
+                    "Influenza (D): pelo menos uma dose de 33 ou 77 aplicada nos 12 meses da janela, "
+                            + "transcrição com data de aplicação incluída, sem filtro de CBO; a mesma vacina na mesma data "
+                            + "é uma dose, e doses distintas não somam nem anulam."));
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -220,7 +245,7 @@ public final class C6Pack implements IndicatorRule {
             List<String> limitations = new ArrayList<>();
             limitations.add("Capacidade não lida ou lida com janela menor que a pedida: " + String.join(", ", uncovered)
                     + " — sem valor e sem contagens, nunca zero.");
-            limitations.addAll(STANDING_LIMITATIONS);
+            limitations.addAll(DESCRIPTOR.standingLimitationLines());
             return new RuleOutcome(
                     build(IndicatorStatus.UNSUPPORTED_SOURCE, null, null, null, List.of(), limitations, context),
                     List.of(),
@@ -321,7 +346,7 @@ public final class C6Pack implements IndicatorRule {
                             ? ambiguousComponent(met, subjects)
                             : ResultComponent.of(spec(p), met, subjects));
         }
-        List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
+        List<String> limitations = new ArrayList<>(DESCRIPTOR.standingLimitationLines());
         limitations.addAll(extra);
         if (ambiguous) {
             limitations.add(ambiguities.contains(C_REASON_EAP) ? EAP_LIMITATION : CONFLICTING_TYPE_LIMITATION);

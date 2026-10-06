@@ -1,5 +1,6 @@
 package esusdata.indicator;
 
+import esusdata.indicator.model.Limitation;
 import java.util.List;
 
 /**
@@ -8,7 +9,8 @@ import java.util.List;
  * the methodological package, what the value means, its practices or subgroups with their weights,
  * the capabilities it reads and the official sources it transcribes. ADR 0032: {@code gates} is
  * where Portões A–D stand (C is decided per source, not here) and {@code gateRegistryStale} says the
- * registry only knew another rule version; {@code blockedGates} stays for older clients.
+ * registry only knew another rule version; {@code standingLimitations} are the published strings
+ * (code first) and {@code standingLimitationDetails} the same limitations with their kind (S2); {@code blockedGates} stays for older clients.
  */
 public record IndicatorPackResponse(
         String id,
@@ -26,6 +28,7 @@ public record IndicatorPackResponse(
         List<String> requiredCapabilities,
         List<String> methodologySources,
         List<String> standingLimitations,
+        List<LimitationResponse> standingLimitationDetails,
         boolean runnable,
         List<GateResponse> gates,
         boolean gateRegistryStale) {
@@ -52,7 +55,8 @@ public record IndicatorPackResponse(
                         .toList(),
                 p.requiredCapabilities(),
                 p.methodologySources(),
-                p.standingLimitations(),
+                p.standingLimitations().stream().map(Limitation::display).toList(),
+                LimitationResponse.of(p.standingLimitations()),
                 p.runnable(),
                 GateResponse.of(p.gates()),
                 p.gates().stale());

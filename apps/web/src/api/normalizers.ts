@@ -16,6 +16,7 @@ import type {
   ExecucaoResumo,
   HistoricoPonto,
   IndicatorPack,
+  PackLimitation,
   IndicadorDetalhe,
   IndicadorResumo,
   IndicadoresLista,
@@ -1411,6 +1412,25 @@ function letras(componentes: readonly ComponenteResultado[]): string {
     : (codigos[0] ?? '')
 }
 
+/**
+ * The standing limitations split by what they do (S2): only a BLOCKING_GAP blocks, the rest are
+ * "limitações declaradas". An older API without the kinds lists strings only, and each of them
+ * blocked.
+ */
+function limitacoesPorTipo(pack: IndicatorPack): {
+  limitacoesBloqueantes: string[]
+  limitacoesDeclaradas: string[]
+} {
+  const detalhes = pack.standingLimitationDetails
+  if (!detalhes)
+    return { limitacoesBloqueantes: pack.standingLimitations ?? [], limitacoesDeclaradas: [] }
+  const linha = (l: PackLimitation) => `${l.code}: ${l.text}`
+  return {
+    limitacoesBloqueantes: detalhes.filter((l) => l.kind === 'BLOCKING_GAP').map(linha),
+    limitacoesDeclaradas: detalhes.filter((l) => l.kind !== 'BLOCKING_GAP').map(linha),
+  }
+}
+
 function metodologiaDoDetalhe(
   pack: IndicatorPack,
   valueKind: ValueKind,
@@ -1540,6 +1560,7 @@ export function normalizeIndicadorDetalhe(
     equipes: equipesDoResultado(result, valueKind),
     limitacoes: result?.limitations ?? [],
     limitacoesPermanentes: pack.standingLimitations ?? [],
+    ...limitacoesPorTipo(pack),
     portoes: gateChecklist(pack),
     capacidades: pack.requiredCapabilities ?? [],
     fontes: pack.methodologySources ?? [],

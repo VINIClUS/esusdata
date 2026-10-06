@@ -73,9 +73,25 @@ export interface IndicatorPack {
   components?: PackComponentSpec[]
   requiredCapabilities?: string[]
   methodologySources?: string[]
+  /** The published strings, code first; an older API lists only these, and each one blocked. */
   standingLimitations?: string[]
+  /** The same limitations with their kind (S2); absent from an older API. */
+  standingLimitationDetails?: PackLimitation[]
   /** False for the Nota Final, computed on read: nothing enqueues it. */
   runnable?: boolean
+}
+
+/**
+ * What a standing limitation is (S2). Only BLOCKING_GAP keeps a result from being released; the
+ * other two are disclosed with it: a decided reading, or what a local PEC cannot see.
+ */
+export type LimitationKind = 'BLOCKING_GAP' | 'DECLARED_CONVENTION' | 'OUT_OF_REACH'
+
+/** A standing limitation with its code and kind; `text` does not repeat the code. */
+export interface PackLimitation {
+  code: string
+  kind: LimitationKind
+  text: string
 }
 
 /** The exact counts behind one practice or subgroup of a result. */
@@ -302,6 +318,10 @@ export interface IndicadorDetalhe {
   limitacoes: string[]
   /** The catalog's: what holds for every result of the pack. */
   limitacoesPermanentes: string[]
+  /** Of those, the BLOCKING_GAP ones: the only standing limitations that block a result. */
+  limitacoesBloqueantes: string[]
+  /** The others (DECLARED_CONVENTION, OUT_OF_REACH): disclosed with the result, never blocking. */
+  limitacoesDeclaradas: string[]
   /** The release gates the pack has not passed. */
   portoes: string[]
   capacidades: string[]

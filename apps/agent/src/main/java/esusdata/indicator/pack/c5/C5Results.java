@@ -112,7 +112,7 @@ final class C5Results {
      */
     static IndicatorResult unsupported(Scope scope, List<String> unread) {
         List<String> limitations = new ArrayList<>(unread);
-        limitations.addAll(scope.descriptor().standingLimitations());
+        limitations.addAll(scope.descriptor().standingLimitationLines());
         return PackSupport.unsupportedSource(scope.descriptor(), scope.context(), limitations);
     }
 

@@ -3,6 +3,7 @@ package esusdata.indicator.pack.componente3;
 import esusdata.indicator.model.BudgetHint;
 import esusdata.indicator.model.ComponentKind;
 import esusdata.indicator.model.ComponentSpec;
+import esusdata.indicator.model.Limitation;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.ValueKind;
@@ -42,29 +43,49 @@ public final class ComponentIII {
                     indicator("c6-cuidado-pessoa-idosa", "C6 — Cuidado da pessoa idosa", 1),
                     indicator("c7-prevencao-cancer", "C7 — Cuidado da mulher na prevenção do câncer", 2)),
             List.of(
-                    "Dependência dos portões de C1–C7: a Nota Final só existe quando os resultados mensais dos sete"
-                            + " indicadores do quadrimestre estão publicados e calculados; um mês bloqueado, ausente ou"
-                            + " sem valor deixa a unidade sem nota, nunca zero nem peso redistribuído (MET-17).",
-                    "AMB-CIII-01: os meses dos quadrimestres (jan–abr, mai–ago, set–dez) seguem a convenção da"
-                            + " Tech Spec (MET-05); a NT 8/2026 não os define.",
-                    "AMB-CIII-02/03/04: a média quadrimestral é a média aritmética simples dos meses, classificada sobre"
-                            + " o valor exato, sem arredondar, pelas faixas da ficha de cada indicador, que prevalecem"
-                            + " sobre os exemplos do Quadro 1.",
-                    "AMB-CIII-05: \"A\" do Quadro 2 é lido como o fator do conceito, pelo exemplo do item 4.3.2,"
-                            + " não pelo rótulo da coluna.",
-                    "AMB-CIII-06/07: indicador sem mês elegível (C2/C3) ou com mês monitorado sem denominador (C1,"
-                            + " C4–C7) fica indisponível e a unidade fica sem Nota Final.",
-                    "AMB-CIII-08: a suspensão de pagamento (item 4.1.1) não é aplicada; os meses válidos para"
-                            + " pagamento são informação externa ao PEC.",
-                    "AMB-CIII-09/10: a classificação financeira da Portaria GM/MS nº 10.994/2026 lê"
-                            + " \"quadrimestre\" como o quadrimestre avaliado; o regime de Q3/2026 é derivado.",
-                    "AMB-CIII-12: o resultado mensal local não reproduz o prazo de envio ao Siaps nem a extração no"
-                            + " 20º dia útil e pode divergir do Siaps.",
-                    "AMB-CIII-13: equipes novas (item 2.6 e § 7º da Portaria) não são tratadas: a contagem do"
-                            + " \"segundo recálculo\" não está definida.",
-                    "Pesos do Quadro 2 (eSF/eAP) aplicados a toda equipe: o tipo de equipe não está na fonte (lacuna L1 de"
-                            + " docs/discovery/2026-10-02-dw-dicionario-c2-c7.md);"
-                            + " eSB e eMulti têm quadros próprios, fora do escopo."),
+                    Limitation.convention(
+                            "CIII-LIM-01",
+                            "Dependência dos portões de C1–C7: a Nota Final só existe quando os resultados mensais dos sete"
+                                    + " indicadores do quadrimestre estão publicados e calculados; um mês bloqueado, ausente ou"
+                                    + " sem valor deixa a unidade sem nota, nunca zero nem peso redistribuído (MET-17)."),
+                    Limitation.convention(
+                            "CIII-LIM-02",
+                            "AMB-CIII-01: os meses dos quadrimestres (jan–abr, mai–ago, set–dez) seguem a convenção da"
+                                    + " Tech Spec (MET-05); a NT 8/2026 não os define."),
+                    Limitation.convention(
+                            "CIII-LIM-03",
+                            "AMB-CIII-02/03/04: a média quadrimestral é a média aritmética simples dos meses, classificada sobre"
+                                    + " o valor exato, sem arredondar, pelas faixas da ficha de cada indicador, que prevalecem"
+                                    + " sobre os exemplos do Quadro 1."),
+                    Limitation.convention(
+                            "CIII-LIM-04",
+                            "AMB-CIII-05: \"A\" do Quadro 2 é lido como o fator do conceito, pelo exemplo do item 4.3.2,"
+                                    + " não pelo rótulo da coluna."),
+                    Limitation.convention(
+                            "CIII-LIM-05",
+                            "AMB-CIII-06/07: indicador sem mês elegível (C2/C3) ou com mês monitorado sem denominador (C1,"
+                                    + " C4–C7) fica indisponível e a unidade fica sem Nota Final."),
+                    Limitation.outOfReach(
+                            "CIII-LIM-06",
+                            "AMB-CIII-08: a suspensão de pagamento (item 4.1.1) não é aplicada; os meses válidos para"
+                                    + " pagamento são informação externa ao PEC."),
+                    Limitation.convention(
+                            "CIII-LIM-07",
+                            "AMB-CIII-09/10: a classificação financeira da Portaria GM/MS nº 10.994/2026 lê"
+                                    + " \"quadrimestre\" como o quadrimestre avaliado; o regime de Q3/2026 é derivado."),
+                    Limitation.outOfReach(
+                            "CIII-LIM-08",
+                            "AMB-CIII-12: o resultado mensal local não reproduz o prazo de envio ao Siaps nem a extração no"
+                                    + " 20º dia útil e pode divergir do Siaps."),
+                    Limitation.outOfReach(
+                            "CIII-LIM-09",
+                            "AMB-CIII-13: equipes novas (item 2.6 e § 7º da Portaria) não são tratadas: a contagem do"
+                                    + " \"segundo recálculo\" não está definida."),
+                    Limitation.convention(
+                            "CIII-LIM-10",
+                            "Pesos do Quadro 2 (eSF/eAP) aplicados a toda equipe: o tipo de equipe não está na fonte (lacuna L1 de"
+                                    + " docs/discovery/2026-10-02-dw-dicionario-c2-c7.md);"
+                                    + " eSB e eMulti têm quadros próprios, fora do escopo.")),
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.engineeringDefault(),
             List.of(

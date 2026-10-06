@@ -216,8 +216,8 @@ class C5ResultTest {
 
         assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
         assertExactValue(outcome.result().valueExact(), 75, 1);
-        assertThat(outcome.result().limitations()).containsAll(descriptor.standingLimitations());
-        assertThat(descriptor.standingLimitations()).anyMatch(limitation -> limitation.contains("76"));
+        assertThat(outcome.result().limitations()).containsAll(descriptor.standingLimitationLines());
+        assertThat(descriptor.standingLimitationLines()).anyMatch(limitation -> limitation.contains("76"));
     }
 
     // ---- T-C5-22 / ENG-25: exact bands ----
@@ -324,7 +324,7 @@ class C5ResultTest {
         assertComponents(result, 4, 2, 2, 2, 1);
         assertThat(result.limitations())
                 .containsAll(GateFixtures.shipped(descriptor).incompleteReasons())
-                .containsAll(descriptor.standingLimitations());
+                .containsAll(descriptor.standingLimitationLines());
         assertThat(result.referencePeriod()).isEqualTo("2026-03");
         assertThat(result.dataCutoff()).isEqualTo(CUTOFF_TEXT);
         assertThat(result.municipalityIbge()).isEqualTo(IBGE);

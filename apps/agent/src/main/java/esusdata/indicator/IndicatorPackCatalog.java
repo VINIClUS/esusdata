@@ -6,6 +6,7 @@ import esusdata.indicator.model.GateChecks;
 import esusdata.indicator.model.GateId;
 import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.Limitation;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.ValueKind;
 import esusdata.indicator.pack.componente3.ComponentIII;
@@ -42,7 +43,7 @@ public final class IndicatorPackCatalog {
             List<ComponentSpec> components,
             List<String> requiredCapabilities,
             List<String> methodologySources,
-            List<String> standingLimitations,
+            List<Limitation> standingLimitations,
             boolean runnable,
             GateStatus gates) {
         /**

@@ -69,7 +69,7 @@ final class C3Results {
         BigInteger denominator = BigInteger.valueOf(eligible.size());
         List<ResultComponent> components = components(eligible);
         boolean consolidation = consolidationEligible(subjects);
-        List<String> limitations = new ArrayList<>(descriptor.standingLimitations());
+        List<String> limitations = new ArrayList<>(descriptor.standingLimitationLines());
         if (eligible.isEmpty()) {
             return build(
                     IndicatorStatus.NO_DENOMINATOR,

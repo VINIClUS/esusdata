@@ -65,7 +65,7 @@ public interface PackSensitivity {
     private static List<ReadingRow> limitationRows(
             String pack, PackDescriptor descriptor, String unit, List<String> limitations) {
         return limitations.stream()
-                .filter(text -> !descriptor.standingLimitations().contains(text))
+                .filter(text -> !descriptor.standingLimitationLines().contains(text))
                 .flatMap(text -> EvidenceSubjects.codesIn(text).stream())
                 .distinct()
                 .map(code ->

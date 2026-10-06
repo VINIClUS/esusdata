@@ -395,7 +395,7 @@ class C6PackTest {
 
         assertThat(met(outcome, X, "D")).isFalse();
         assertThat(practiceRow(outcome, X, "D").reasonCode()).isEqualTo("D_SEM_DOSE_INFLUENZA_NO_PEC_LOCAL");
-        assertThat(new C6Pack().descriptor().standingLimitations()).anyMatch(l -> l.contains("RNDS"));
+        assertThat(new C6Pack().descriptor().standingLimitationLines()).anyMatch(l -> l.contains("RNDS"));
     }
 
     @Test

@@ -92,14 +92,14 @@ class C3PackTest {
                         BigInteger.TEN, nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine());
         assertThat(GateFixtures.shipped(d).isComplete()).isFalse();
         // the 34 limitations of the decision record, each prefixed with its stable code
-        assertThat(d.standingLimitations()).hasSize(34);
+        assertThat(d.standingLimitationLines()).hasSize(34);
         for (int i = 0; i < 34; i++) {
-            assertThat(d.standingLimitations().get(i)).startsWith(String.format("C3-LIM-%02d: ", i + 1));
+            assertThat(d.standingLimitationLines().get(i)).startsWith(String.format("C3-LIM-%02d: ", i + 1));
         }
-        assertThat(d.standingLimitations()).noneMatch(l -> l.contains("RULE_AMBIGUITY"));
+        assertThat(d.standingLimitationLines()).noneMatch(l -> l.contains("RULE_AMBIGUITY"));
         // L1: the team type (eAP 76) is absent (the only blocking gap); L2: the outcome date is absent.
-        assertThat(d.standingLimitations().get(4)).contains("tipo de equipe", "lacuna L1");
-        assertThat(d.standingLimitations().get(5)).contains("lacuna L2", "DUM+294");
+        assertThat(d.standingLimitationLines().get(4)).contains("tipo de equipe", "lacuna L1");
+        assertThat(d.standingLimitationLines().get(5)).contains("lacuna L2", "DUM+294");
     }
 
     @Test
@@ -386,7 +386,7 @@ class C3PackTest {
         assertThat(result.dataCutoff()).isEqualTo("2025-11-30");
         assertThat(result.limitations())
                 .contains("Portão A (fonte e vigência) incompleto")
-                .containsAll(pack.descriptor().standingLimitations());
+                .containsAll(pack.descriptor().standingLimitationLines());
         assertThat(result.components())
                 .extracting(ResultComponent::code)
                 .containsExactly("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K");

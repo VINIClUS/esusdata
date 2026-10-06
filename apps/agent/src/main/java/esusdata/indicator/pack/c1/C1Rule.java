@@ -48,29 +48,7 @@ public final class C1Rule {
     private static final CboGroups FICHA_CBO =
             CboGroups.of("225142", "225170", "225130", "225125", "225250", "223565", "223505");
 
-    private static final List<String> STANDING_LIMITATIONS = List.of(
-            "C1-LIM-01: Entram só os atendimentos dos sete CBO do item 24-c da ficha (225142, 225170, 225130, "
-                    + "225125, 225250, 223565, 223505), em toda competência; CBO ausente ou fora da lista é "
-                    + "excluído e contado.",
-            "C1-LIM-03: Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 (item 24-b) não é feita.",
-            "C1-LIM-06: O SIAPS extrai no 20º dia útil e só conta o enviado até o 10º dia do mês seguinte; "
-                    + "o valor local pode incluir registros enviados depois.",
-            "C1-LIM-07: A conformidade da identificação da pessoa com o CadSUS não é conferida.",
-            "C1-LIM-08: O CNS profissional é presumido presente em registro do PEC; não é conferido.",
-            "C1-LIM-09: Atendimento com dois participantes conta uma vez, pelo participante 1; o CNES não é "
-                    + "filtrado porque a ficha não lista CNES.",
-            "C1-LIM-11: A lotação do profissional na equipe (SCNES) não é conferida; vale o INE registrado no "
-                    + "atendimento.");
-
     private C1Rule() {}
-
-    /**
-     * Limitations every C1 result carries until Q01 is applied and reconciled. While any
-     * of these stands, Portão B fails and the executor keeps the result blocked (ADR 0032).
-     */
-    public static List<String> standingLimitations() {
-        return STANDING_LIMITATIONS;
-    }
 
     /**
      * Whether the encounter's CBO is one of the seven occupations of the ficha (item 24-c). A
@@ -159,7 +137,7 @@ public final class C1Rule {
 
         BigInteger denominator = programados.add(espontaneos);
 
-        List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
+        List<String> limitations = new ArrayList<>();
         if (outsideCbo.signum() > 0) {
             limitations.add(
                     "C1-LIM-04: " + outsideCbo + " atendimento(s) com CBO ausente ou fora dos sete CBO da ficha "

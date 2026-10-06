@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 /** §4.4: an unreleased pack keeps its exact counts but never shows a value or a band. */
 class RuleOutcomesTest {
 
-    private static PackDescriptor descriptor(List<String> standing) {
+    private static PackDescriptor descriptor(List<Limitation> standing) {
         return new PackDescriptor(
                 "c9-teste",
                 "c9-teste@0.1.0",
@@ -35,6 +35,10 @@ class RuleOutcomesTest {
     }
 
     private static IndicatorResult computed() {
+        return computedWith(List.of("limitação própria"));
+    }
+
+    private static IndicatorResult computedWith(List<String> limitations) {
         ResultComponent a =
                 ResultComponent.of(ComponentSpec.practice("A", "A", 100, "12 meses"), BigInteger.ONE, BigInteger.TWO);
         return new IndicatorResult(
@@ -48,7 +52,7 @@ class RuleOutcomesTest {
                 "c9-teste@0.1.0",
                 "2026-03-31",
                 "3541307",
-                List.of("limitação própria"),
+                limitations,
                 "c9-exact-score@1",
                 ValueKind.SCORE,
                 ExactRatio.of(50, 1),
@@ -76,7 +80,7 @@ class RuleOutcomesTest {
 
     @Test
     void aBlockingStandingLimitationFailsPortaoBEvenWithEveryRegisteredGatePassed() {
-        PackDescriptor withLimitation = descriptor(List.of("pendência"));
+        PackDescriptor withLimitation = descriptor(List.of(Limitation.blockingGap("C9-LIM-01", "pendência")));
         GateCheck registered = new GateCheck(GateCheck.State.PASSED, "x@1", "2026-10-06", List.of(), null);
         GateStatus status = GateStatus.pending(withLimitation)
                 .withEvaluated(
@@ -85,6 +89,30 @@ class RuleOutcomesTest {
         assertThat(status.check(GateId.B).state()).isEqualTo(GateCheck.State.FAILED);
         assertThat(RuleOutcomes.gate(status, computed()).status()).isEqualTo(IndicatorStatus.BLOCKED);
         assertThat(registered.isPassed()).isTrue();
+    }
+
+    @Test
+    void onlyABlockingGapFailsPortaoBWhileConventionsAndOutOfReachAreDisclosed() {
+        PackDescriptor descriptor = descriptor(List.of(
+                Limitation.convention("C9-LIM-01", "leitura decidida"),
+                Limitation.outOfReach("C9-LIM-02", "fora do alcance")));
+        assertThat(descriptor.blockingLimitations()).isEmpty();
+        assertThat(GateChecks.calculationModel(descriptor, LocalDate.of(2026, 10, 6))
+                        .state())
+                .isEqualTo(GateCheck.State.PASSED);
+        assertThat(descriptor.standingLimitationLines())
+                .containsExactly("C9-LIM-01: leitura decidida", "C9-LIM-02: fora do alcance");
+    }
+
+    @Test
+    void disclosingAttachesEachStandingLimitationOnceEvenWhenTheRuleAlreadyAddedIt() {
+        PackDescriptor descriptor = descriptor(List.of(Limitation.convention("C9-LIM-01", "leitura decidida")));
+        IndicatorResult withOwnText = computedWith(List.of("C9-LIM-01: leitura decidida", "1 caso excluído"));
+        RuleOutcome outcome = RuleOutcomes.disclose(descriptor, new RuleOutcome(withOwnText, List.of(), List.of()));
+        assertThat(outcome.result().limitations()).containsExactly("C9-LIM-01: leitura decidida", "1 caso excluído");
+        RuleOutcome bare =
+                RuleOutcomes.disclose(descriptor, new RuleOutcome(computedWith(List.of()), List.of(), List.of()));
+        assertThat(bare.result().limitations()).containsExactly("C9-LIM-01: leitura decidida");
     }
 
     private static GateStatus pending() {
@@ -128,14 +156,14 @@ class RuleOutcomesTest {
     @Test
     void aPendingPackSaysWhyAndNeverCounts() {
         RuleOutcome pending = RuleOutcomes.pending(
-                descriptor(List.of("pendente")),
+                descriptor(List.of(Limitation.blockingGap("C9-LIM-01", "pendente"))),
                 pending(),
                 EvaluationContext.endOfMonth("3541307", YearMonth.of(2026, 3)),
                 "em implementação");
         assertThat(pending.result().status()).isEqualTo(IndicatorStatus.BLOCKED);
         assertThat(pending.result().numerator()).isNull();
         assertThat(pending.result().consolidationEligible()).isFalse();
-        assertThat(pending.result().limitations()).startsWith("em implementação", "pendente");
+        assertThat(pending.result().limitations()).startsWith("em implementação", "C9-LIM-01: pendente");
         assertThat(pending.teams()).isEmpty();
     }
 }

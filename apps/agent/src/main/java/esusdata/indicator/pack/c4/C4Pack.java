@@ -13,6 +13,7 @@ import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.Limitation;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
@@ -51,44 +52,75 @@ public final class C4Pack implements IndicatorRule {
     public static final String RULE_VERSION = ID + "@0.2.0";
 
     /** What keeps the local value from being the Siaps value, whatever the gates say (ADR 0030). */
-    private static final List<String> STANDING_LIMITATIONS = List.of(
-            "C4-LIM-01: Só entra o que foi registrado neste PEC: registros de outros estabelecimentos e municípios, "
-                    + "e a condição avaliada em outra instalação, não aparecem.",
-            "C4-LIM-02: Óbito no CadSUS e vínculo nacional são apurados no SIAPS; aqui vale a última versão do "
-                    + "cadastro individual (24 meses lidos) no corte, estimativa local.",
-            "C4-LIM-03: Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de D para eAP não "
-                    + "são aplicados.",
-            "C4-LIM-04: Condição ativa: entra a condição avaliada por médico ou enfermeiro na lista de problemas "
-                    + "desde 2013 (T89, T90, E10, E11, E14) ou em atendimento individual dos últimos 12 meses; sai "
-                    + "quem tem todas as condições elegíveis com último estado resolvido até o corte. Latente conta "
-                    + "como ativa, concluído vale só como resolvido, e nova avaliação em atendimento não reabre a "
-                    + "lista. A condição avaliada só em atendimento anterior a 12 meses, sem linha na lista de "
-                    + "problemas, não entra.",
-            "C4-LIM-05: A pressão arterial aferida em visita domiciliar não é lida; B pode sair subestimada.",
-            "C4-LIM-06: O DW não tem PA de participante de atividade coletiva; B não conta esse registro.",
-            "C4-LIM-07: O campo de avaliação dos pés do atendimento individual não é lido; F é comprovada só por "
-                    + "03.01.04.009-5.",
-            "C4-LIM-08: A tabela SIGTAP de habilitação de CBO não é aplicada: vale o CBO do quadro da prática.",
-            "C4-LIM-09: A lotação do profissional em equipe 70/76 é do SCNES e não é conferida; vale o item 4.4 "
-                    + "(qualquer profissional habilitado).",
-            "C4-LIM-10: A consulta (A) vale só pelo atendimento individual (presencial, domiciliar ou remoto) de "
-                    + "médico ou enfermeiro com algum problema ou condição avaliado, sem exigir diabetes; consultas "
-                    + "da ficha de procedimentos (03.01.01.003-0, 03.01.01.006-4, 03.01.01.025-0) não comprovam A.",
-            "C4-LIM-11: SIGTAP/ABEX vêm só dos procedimentos do MIAI e do MIP, cada fato uma vez; a visita "
-                    + "domiciliar só conta por ACS/TACS com motivo preenchido (item 24 e).",
-            "C4-LIM-12: O SIAPS extrai no 20º dia útil e só vê o que chegou até lá; a leitura local pode incluir "
-                    + "registros enviados depois.",
-            "C4-LIM-13: As janelas de 6 e 12 meses são meses civis completos terminando no último dia da "
-                    + "competência, inclusive; nunca 180 ou 365 dias.",
-            "C4-LIM-14: As visitas da prática D cumprem com duas visitas válidas na janela e diferença de datas de "
-                    + "30 dias corridos ou mais; no mesmo dia não formam par.",
-            "C4-LIM-15: O CBO 2234 (farmacêutico) não vale na prática E; vale na prática F.",
-            "C4-LIM-16: Peso e altura (C) contam na mesma data civil, de qualquer combinação de registros aceitos "
-                    + "(MIAI, MIP, MIAC, MIVDT), ou pelo procedimento 01.01.04.002-4 sozinho por CBO do quadro; em "
-                    + "dias diferentes não cumprem.",
-            "C4-LIM-17: Atividade coletiva conta só pelo participante identificado (CPF/CNS) com peso e altura; a "
-                    + "prática E vale pelo quadro: solicitação ou avaliação de hemoglobina glicada na janela, por "
-                    + "CBO do Quadro 06, com a data do próprio registro.");
+    private static final List<Limitation> STANDING_LIMITATIONS = List.of(
+            Limitation.outOfReach(
+                    "C4-LIM-01",
+                    "Só entra o que foi registrado neste PEC: registros de outros estabelecimentos e municípios, "
+                            + "e a condição avaliada em outra instalação, não aparecem."),
+            Limitation.outOfReach(
+                    "C4-LIM-02",
+                    "Óbito no CadSUS e vínculo nacional são apurados no SIAPS; aqui vale a última versão do "
+                            + "cadastro individual (24 meses lidos) no corte, estimativa local."),
+            Limitation.blockingGap(
+                    "C4-LIM-03",
+                    "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de D para eAP não "
+                            + "são aplicados."),
+            Limitation.convention(
+                    "C4-LIM-04",
+                    "Condição ativa: entra a condição avaliada por médico ou enfermeiro na lista de problemas "
+                            + "desde 2013 (T89, T90, E10, E11, E14) ou em atendimento individual dos últimos 12 meses; sai "
+                            + "quem tem todas as condições elegíveis com último estado resolvido até o corte. Latente conta "
+                            + "como ativa, concluído vale só como resolvido, e nova avaliação em atendimento não reabre a "
+                            + "lista. A condição avaliada só em atendimento anterior a 12 meses, sem linha na lista de "
+                            + "problemas, não entra."),
+            Limitation.outOfReach(
+                    "C4-LIM-05",
+                    "A pressão arterial da visita domiciliar não está registrada no DW desta instalação (PEC 5.5.28); B pode sair subestimada."),
+            Limitation.outOfReach(
+                    "C4-LIM-06", "O DW não tem PA de participante de atividade coletiva; B não conta esse registro."),
+            Limitation.outOfReach(
+                    "C4-LIM-07",
+                    "O DW desta instalação (PEC 5.5.28) não tem campo de avaliação dos pés do atendimento individual; F é "
+                            + "comprovada só por 03.01.04.009-5."),
+            Limitation.outOfReach(
+                    "C4-LIM-08",
+                    "A tabela SIGTAP de habilitação de CBO não é aplicada: vale o CBO do quadro da prática."),
+            Limitation.outOfReach(
+                    "C4-LIM-09",
+                    "A lotação do profissional em equipe 70/76 é do SCNES e não é conferida; vale o item 4.4 "
+                            + "(qualquer profissional habilitado)."),
+            Limitation.convention(
+                    "C4-LIM-10",
+                    "A consulta (A) vale só pelo atendimento individual (presencial, domiciliar ou remoto) de "
+                            + "médico ou enfermeiro com algum problema ou condição avaliado, sem exigir diabetes; consultas "
+                            + "da ficha de procedimentos (03.01.01.003-0, 03.01.01.006-4, 03.01.01.025-0) não comprovam A."),
+            Limitation.convention(
+                    "C4-LIM-11",
+                    "SIGTAP/ABEX vêm só dos procedimentos do MIAI e do MIP, cada fato uma vez; a visita "
+                            + "domiciliar só conta por ACS/TACS com motivo preenchido (item 24 e)."),
+            Limitation.outOfReach(
+                    "C4-LIM-12",
+                    "O SIAPS extrai no 20º dia útil e só vê o que chegou até lá; a leitura local pode incluir "
+                            + "registros enviados depois."),
+            Limitation.convention(
+                    "C4-LIM-13",
+                    "As janelas de 6 e 12 meses são meses civis completos terminando no último dia da "
+                            + "competência, inclusive; nunca 180 ou 365 dias."),
+            Limitation.convention(
+                    "C4-LIM-14",
+                    "As visitas da prática D cumprem com duas visitas válidas na janela e diferença de datas de "
+                            + "30 dias corridos ou mais; no mesmo dia não formam par."),
+            Limitation.convention("C4-LIM-15", "O CBO 2234 (farmacêutico) não vale na prática E; vale na prática F."),
+            Limitation.convention(
+                    "C4-LIM-16",
+                    "Peso e altura (C) contam na mesma data civil, de qualquer combinação de registros aceitos "
+                            + "(MIAI, MIP, MIAC, MIVDT), ou pelo procedimento 01.01.04.002-4 sozinho por CBO do quadro; em "
+                            + "dias diferentes não cumprem."),
+            Limitation.convention(
+                    "C4-LIM-17",
+                    "Atividade coletiva conta só pelo participante identificado (CPF/CNS) com peso e altura; a "
+                            + "prática E vale pelo quadro: solicitação ou avaliação de hemoglobina glicada na janela, por "
+                            + "CBO do Quadro 06, com a data do próprio registro."));
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -206,7 +238,7 @@ public final class C4Pack implements IndicatorRule {
         List<String> limitations = new ArrayList<>();
         limitations.add("Fonte sem as partes exigidas pela regra (lidas com janela ausente ou menor): "
                 + String.join(", ", missing) + ".");
-        limitations.addAll(DESCRIPTOR.standingLimitations());
+        limitations.addAll(DESCRIPTOR.standingLimitationLines());
         IndicatorResult result = PackSupport.unsupportedSource(DESCRIPTOR, context, limitations);
         return new RuleOutcome(result, List.of(), List.of());
     }

@@ -127,6 +127,29 @@ class OpenApiContractTest extends SecuritySliceTestSupport {
         assertThat(overview).contains("gates=").contains("gateRegistryStale=");
     }
 
+    /** S2: the standing limitations are typed on the pack catalog and the Painel's indicators. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void standingLimitationsAreDocumentedWithTheirKind() throws Exception {
+        Map<String, Object> document;
+        try (InputStream in = Files.newInputStream(CONTRACT_PATH)) {
+            document = new Yaml().load(in);
+        }
+        Map<String, Object> schemas =
+                (Map<String, Object>) ((Map<String, Object>) document.get("components")).get("schemas");
+        Map<String, Object> pack =
+                (Map<String, Object>) ((Map<String, Object>) schemas.get("IndicatorPackResponse")).get("properties");
+        Map<String, Object> limitation =
+                (Map<String, Object>) ((Map<String, Object>) schemas.get("LimitationResponse")).get("properties");
+        String overview = String.valueOf(schemas.get("Overview"));
+
+        assertThat(pack).containsKeys("standingLimitations", "standingLimitationDetails");
+        assertThat(limitation).containsKeys("code", "kind", "text");
+        assertThat(String.valueOf(limitation.get("kind")))
+                .contains("BLOCKING_GAP", "DECLARED_CONVENTION", "OUT_OF_REACH");
+        assertThat(overview).contains("standingLimitationDetails");
+    }
+
     private static Set<ParamRef> handlerParams(HandlerMethod handlerMethod) {
         Set<ParamRef> params = new TreeSet<>();
         for (MethodParameter parameter : handlerMethod.getMethodParameters()) {

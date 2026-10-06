@@ -11,6 +11,7 @@ import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.Limitation;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
@@ -65,39 +66,64 @@ public final class C7Pack implements IndicatorRule {
      * docs/indicadores/decisoes/c7-prevencao-cancer.md. C7-LIM-04 é a única lacuna bloqueante (tipo de
      * equipe, até a capacidade {@code team} estar VALIDATED); C7-LIM-15 só existe depois dela.
      */
-    static final List<String> STANDING_LIMITATIONS = List.of(
-            "C7-LIM-01: O vínculo à equipe é estimado pela versão vigente do cadastro individual no último dia da "
-                    + "competência (24 meses lidos). A regra nacional da NT nº 30/2025 e o desempate da Portaria "
-                    + "SAPS/MS nº 161/2024 não são reproduzíveis num PEC local.",
-            "C7-LIM-02: Óbito no CadSUS não é visível: só óbito e saída registrados no PEC local interrompem o "
-                    + "acompanhamento.",
-            "C7-LIM-03: Exames, atendimentos e doses de outros estabelecimentos, municípios ou só do RIA/RNDS não "
-                    + "estão no PEC local; as práticas, sobretudo B, podem sair subestimadas.",
-            "C7-LIM-04: Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 (item 24 b) não é feita.",
-            "C7-LIM-05: Contam em A, C e D só médicos (2251, 2252, 2253, 2231) e enfermeiros (2235), como nos Quadros "
-                    + "02, 04 e 05; B aceita qualquer profissional. A lista maior do item 24 d e a habilitação de CBO "
-                    + "na tabela SIGTAP não são aplicadas.",
-            "C7-LIM-06: ABEX001 conta em A como exame; ABP022 (A) e ABP023 (D) contam como problema avaliado por "
-                    + "médico ou enfermeiro, com a data do registro tomada como data da avaliação; um atendimento pode "
-                    + "cumprir C e A ou D. O “registro rápido” não é definido pela ficha.",
-            "C7-LIM-07: O SIAPS extrai no 20º dia útil e só conta o enviado até o 10º dia do mês seguinte; o PEC "
-                    + "local pode conter registros enviados depois.",
-            "C7-LIM-08: Idade em anos completos no último dia da competência, limites inclusivos, 29/02 em 01/03; "
-                    + "janelas de N meses civis até o fim da competência.",
-            "C7-LIM-09: C conta todo atendimento individual (presencial, domiciliar ou remoto) com CIAP-2, CID-10 ou "
-                    + "ABP da alínea g, por casamento exato; consultas 03.01.01.* não cumprem C.",
-            "C7-LIM-10: Sexo e identidade de gênero pelos códigos LEDI (149 Homem transgênero, 150 Mulher "
-                    + "transgênero), como entregues pela capacidade `citizen`; outro sexo, outra combinação ou sem "
-                    + "registro fica fora, com motivo e contagem.",
-            "C7-LIM-11: Dose transcrita usa a data de aplicação para a idade de B.",
-            "C7-LIM-12: B conta dose de 67 ou 93 aplicada do 9º aniversário em diante, sem teto em meses; homem "
-                    + "transgênero não pertence a B; 02.02.10.025-1 conta de 2026-01 em diante com janela de 60 meses, "
-                    + "mesmo com data de 2025.",
-            "C7-LIM-13: Pessoa com nascimento, sexo ou identidade divergentes, ou versões do cadastro do mesmo dia "
-                    + "em conflito, fica fora, com motivo próprio; nenhuma versão é escolhida pela ordem.",
-            "C7-LIM-14: Subgrupo sem denominador sai da soma e do divisor: o escore é reescalado sobre os pesos dos "
-                    + "subgrupos presentes. Com os quatro vazios, o mês não tem valor e fica fora da média "
-                    + "quadrimestral. n e d de cada subgrupo estão publicados.");
+    private static final List<Limitation> STANDING_LIMITATIONS = List.of(
+            Limitation.outOfReach(
+                    "C7-LIM-01",
+                    "O vínculo à equipe é estimado pela versão vigente do cadastro individual no último dia da "
+                            + "competência (24 meses lidos). A regra nacional da NT nº 30/2025 e o desempate da Portaria "
+                            + "SAPS/MS nº 161/2024 não são reproduzíveis num PEC local."),
+            Limitation.outOfReach(
+                    "C7-LIM-02",
+                    "Óbito no CadSUS não é visível: só óbito e saída registrados no PEC local interrompem o "
+                            + "acompanhamento."),
+            Limitation.outOfReach(
+                    "C7-LIM-03",
+                    "Exames, atendimentos e doses de outros estabelecimentos, municípios ou só do RIA/RNDS não "
+                            + "estão no PEC local; as práticas, sobretudo B, podem sair subestimadas."),
+            Limitation.blockingGap(
+                    "C7-LIM-04", "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 (item 24 b) não é feita."),
+            Limitation.convention(
+                    "C7-LIM-05",
+                    "Contam em A, C e D só médicos (2251, 2252, 2253, 2231) e enfermeiros (2235), como nos Quadros "
+                            + "02, 04 e 05; B aceita qualquer profissional. A lista maior do item 24 d e a habilitação de CBO "
+                            + "na tabela SIGTAP não são aplicadas."),
+            Limitation.convention(
+                    "C7-LIM-06",
+                    "ABEX001 conta em A como exame; ABP022 (A) e ABP023 (D) contam como problema avaliado por "
+                            + "médico ou enfermeiro, com a data do registro tomada como data da avaliação; um atendimento pode "
+                            + "cumprir C e A ou D. O “registro rápido” não é definido pela ficha."),
+            Limitation.outOfReach(
+                    "C7-LIM-07",
+                    "O SIAPS extrai no 20º dia útil e só conta o enviado até o 10º dia do mês seguinte; o PEC "
+                            + "local pode conter registros enviados depois."),
+            Limitation.convention(
+                    "C7-LIM-08",
+                    "Idade em anos completos no último dia da competência, limites inclusivos, 29/02 em 01/03; "
+                            + "janelas de N meses civis até o fim da competência."),
+            Limitation.convention(
+                    "C7-LIM-09",
+                    "C conta todo atendimento individual (presencial, domiciliar ou remoto) com CIAP-2, CID-10 ou "
+                            + "ABP da alínea g, por casamento exato; consultas 03.01.01.* não cumprem C."),
+            Limitation.convention(
+                    "C7-LIM-10",
+                    "Sexo e identidade de gênero pelos códigos LEDI (149 Homem transgênero, 150 Mulher "
+                            + "transgênero), como entregues pela capacidade `citizen`; outro sexo, outra combinação ou sem "
+                            + "registro fica fora, com motivo e contagem."),
+            Limitation.convention("C7-LIM-11", "Dose transcrita usa a data de aplicação para a idade de B."),
+            Limitation.convention(
+                    "C7-LIM-12",
+                    "B conta dose de 67 ou 93 aplicada do 9º aniversário em diante, sem teto em meses; homem "
+                            + "transgênero não pertence a B; 02.02.10.025-1 conta de 2026-01 em diante com janela de 60 meses, "
+                            + "mesmo com data de 2025."),
+            Limitation.convention(
+                    "C7-LIM-13",
+                    "Pessoa com nascimento, sexo ou identidade divergentes, ou versões do cadastro do mesmo dia "
+                            + "em conflito, fica fora, com motivo próprio; nenhuma versão é escolhida pela ordem."),
+            Limitation.convention(
+                    "C7-LIM-14",
+                    "Subgrupo sem denominador sai da soma e do divisor: o escore é reescalado sobre os pesos dos "
+                            + "subgrupos presentes. Com os quatro vazios, o mês não tem valor e fica fora da média "
+                            + "quadrimestral. n e d de cada subgrupo estão publicados."));
 
     /**
      * Registration versions read to resolve the link: the "Dimensão Cadastro, Últimos 24 meses" of
@@ -135,6 +161,11 @@ public final class C7Pack implements IndicatorRule {
                     "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c7-cuidado-da-mulher-na-prevencao-do-cancer",
                     "docs/metodologia/c7-prevencao-cancer.md"),
             List.of());
+
+    /** The standing limitations as published strings. */
+    static List<String> standingLimitationLines() {
+        return STANDING_LIMITATIONS.stream().map(Limitation::display).toList();
+    }
 
     @Override
     public PackDescriptor descriptor() {
