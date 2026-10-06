@@ -1,5 +1,7 @@
 package esusdata.indicator.pack.c4;
 
+import esusdata.indicator.model.TeamScope;
+
 /** Stable reason codes of the C4 evidence rows (ENG-36): every exclusion says why. */
 @SuppressWarnings("PMD.DataClass") // a table of frozen identifiers
 public final class C4Reasons {
@@ -23,11 +25,17 @@ public final class C4Reasons {
     public static final String NO_LINK = "SEM_VINCULO";
 
     /**
-     * Linked to a team whose CNES type is known and is neither eSF 70 nor eAP 76 (item 24 b, p. 2:
-     * «Serão consideradas equipes de Saúde da Família (eSF), e equipes de Atenção Primária (eAP), tipo
-     * 70 e 76»).
+     * Linked to a team whose type, valid on the last day of the competência, is known and is neither
+     * eSF 70 nor eAP 76 (item 24 b, p. 2: «Serão consideradas equipes de Saúde da Família (eSF), e
+     * equipes de Atenção Primária (eAP), tipo 70 e 76»).
      */
-    public static final String TEAM_TYPE_OUT_OF_SCOPE = "EQUIPE_FORA_DO_ESCOPO";
+    public static final String TEAM_TYPE_OUT_OF_SCOPE = TeamScope.REASON_OUT_OF_SCOPE;
+
+    /** Linked to a team (INE) with no type in the source (C4-D2): not a considered team. */
+    public static final String TEAM_WITHOUT_TYPE = TeamScope.REASON_WITHOUT_TYPE;
+
+    /** Linked to a team (INE) with two different types on the same day (C4-D2). */
+    public static final String TEAM_TYPE_CONFLICT = TeamScope.REASON_CONFLICT;
 
     /** «todas as condições ou problemas marcados como "resolvidos" no PEC» (item 15, p. 2). */
     public static final String CONDITIONS_RESOLVED = "INTERROMPIDO_CONDICOES_RESOLVIDAS";
@@ -36,10 +44,10 @@ public final class C4Reasons {
     public static final String PRACTICE_NOT_MET = "PRATICA_NAO_CUMPRIDA";
 
     /**
-     * Practice D of a person linked to an eAP tipo 76 team: the ficha does not decide it (AMB-C4-01),
-     * so it is {@code PRACTICE_AMBIGUOUS}, without points.
+     * Practice D of a person of an eAP 76 team who had no two valid visits: the ficha does not make D
+     * a condition of the eAP's score (item 24 b), so it is credited in full (C4-D1).
      */
-    public static final String PRACTICE_INFORMATIVE_EAP = "AMB-C4-01_PRATICA_D_EAP76";
+    public static final String PRACTICE_CREDITED_EAP = TeamScope.REASON_CREDITED_EAP76;
 
     private C4Reasons() {}
 }

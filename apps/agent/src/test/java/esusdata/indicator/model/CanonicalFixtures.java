@@ -31,6 +31,16 @@ public final class CanonicalFixtures {
                 ref("tb_fat_cad_individual"), IBGE, key, birth.toString(), sex, genderIdentity, null);
     }
 
+    /** A team whose {@code type} (70 eSF, 76 eAP...) holds on every day: no validity bounds. */
+    public static CanonicalTeam team(String ine, String cnes, String type) {
+        return new CanonicalTeam(ref("tb_equipe"), IBGE, ine, cnes, type, null, null, null, CanonicalTeam.AUDIT);
+    }
+
+    /** One state of a team's type, valid from {@code from} (inclusive) until {@code to} (exclusive). */
+    public static CanonicalTeam teamState(String ine, String cnes, String type, String from, String to) {
+        return new CanonicalTeam(ref("ta_equipe"), IBGE, ine, cnes, type, null, from, to, CanonicalTeam.AUDIT);
+    }
+
     /** A registration version linking {@code key} to team {@code ine} on {@code date}. */
     public static CanonicalRegistration registration(String key, LocalDate date, String cnes, String ine) {
         return new CanonicalRegistration(

@@ -1,6 +1,7 @@
 package esusdata.indicator.model;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -72,6 +73,32 @@ public record IndicatorResult(
                 null,
                 List.of(),
                 true);
+    }
+
+    /** The same result with one more limitation (a disclosure of this run), once. */
+    public IndicatorResult withLimitation(String limitation) {
+        if (limitations.contains(limitation)) {
+            return this;
+        }
+        List<String> more = new ArrayList<>(limitations);
+        more.add(limitation);
+        return new IndicatorResult(
+                status,
+                valueText,
+                numerator,
+                denominator,
+                denominatorKind,
+                classification,
+                referencePeriod,
+                ruleVersion,
+                dataCutoff,
+                municipalityIbge,
+                more,
+                calculationPolicyVersion,
+                valueKind,
+                valueExact,
+                components,
+                consolidationEligible);
     }
 
     public enum IndicatorStatus {

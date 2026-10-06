@@ -5,8 +5,8 @@ import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalRegistration;
-import esusdata.indicator.model.CanonicalTeam;
 import esusdata.indicator.model.SourceRef;
+import esusdata.indicator.model.TeamScope;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -53,20 +53,16 @@ final class C4Cohort {
                     (CanonicalCondition c) -> LocalDate.parse(c.recordedDate()))
             .thenComparing(CanonicalCondition::sourceRef, RECORD_ORDER);
 
-    private static final Comparator<CanonicalTeam> TEAM_ORDER = Comparator.comparing(
-                    (CanonicalTeam t) -> observedDate(t))
-            .thenComparing(CanonicalTeam::sourceRef, RECORD_ORDER);
-
     private final LocalDate cutoff;
+    private final TeamScope teams;
     private final SortedSet<String> candidates = new TreeSet<>();
     private final Set<String> evaluated = new HashSet<>();
     private final Set<String> dead = new HashSet<>();
     private final Map<String, CanonicalRegistration> latestRegistration = new HashMap<>();
     private final Map<String, Map<String, CanonicalCondition>> latestCondition = new HashMap<>();
-    private final Map<String, CanonicalTeam> latestTeam = new HashMap<>();
 
-    /** The team a person is linked to on the cutoff, with its CNES type when the source has it. */
-    record Link(String ine, String cnes, String teamType) {}
+    /** The team a person is linked to on the cutoff, with what the team-type rule says about it. */
+    record Link(String ine, String cnes, TeamScope.Decision team) {}
 
     /**
      * A candidate: eligible when {@code exclusion} is {@code null}. {@code link} is the team of a
@@ -78,27 +74,31 @@ final class C4Cohort {
             return exclusion == null;
         }
 
-        /** The team this candidate is counted under: a usable link of type 70, 76 or unknown. */
+        /** The team this candidate is counted under: a usable link to a considered team (70 or 76). */
         boolean countsForTeam() {
-            return link != null && !C4Reasons.TEAM_TYPE_OUT_OF_SCOPE.equals(exclusion);
+            return link != null && link.team().considered();
         }
 
         boolean eap76() {
-            return link != null && C4Codes.EAP_TEAM_TYPE.equals(link.teamType());
+            return link != null && link.team().eap76();
         }
     }
 
-    private C4Cohort(LocalDate cutoff) {
+    private C4Cohort(LocalDate cutoff, TeamScope teams) {
         this.cutoff = cutoff;
+        this.teams = teams;
     }
 
-    static List<Subject> resolve(CanonicalDataset data, LocalDate cutoff) {
-        C4Cohort cohort = new C4Cohort(cutoff);
+    /**
+     * The candidates. {@code teamsOn} is the last day of the competência: the team type is the one
+     * valid then (C4-D2), whatever the care cutoff.
+     */
+    static List<Subject> resolve(CanonicalDataset data, LocalDate cutoff, LocalDate teamsOn) {
+        C4Cohort cohort = new C4Cohort(cutoff, TeamScope.of(data.teams(), teamsOn));
         data.conditions().forEach(cohort::readCondition);
         data.careEvents().forEach(cohort::readCareEvent);
         data.registrations().forEach(cohort::readRegistration);
         data.persons().forEach(cohort::readPerson);
-        data.teams().forEach(cohort::readTeam);
         List<Subject> subjects = new ArrayList<>(cohort.candidates.size());
         for (String key : cohort.candidates) {
             CanonicalRegistration registration = cohort.latestRegistration.get(key);
@@ -122,15 +122,14 @@ final class C4Cohort {
         if (!linksToTeam(registration)) {
             return C4Reasons.NO_LINK;
         }
-        if (link.teamType() != null && !C4Codes.TEAM_TYPES.contains(link.teamType())) {
-            return C4Reasons.TEAM_TYPE_OUT_OF_SCOPE;
+        if (!link.team().considered()) {
+            return link.team().exclusionReason();
         }
         return allResolved(key) ? C4Reasons.CONDITIONS_RESOLVED : null;
     }
 
     private Link link(CanonicalRegistration registration) {
-        CanonicalTeam team = registration.ine() == null ? null : latestTeam.get(registration.ine());
-        return new Link(registration.ine(), registration.cnes(), team == null ? null : team.teamTypeCode());
+        return new Link(registration.ine(), registration.cnes(), teams.decide(registration.ine()));
     }
 
     private void readCondition(CanonicalCondition condition) {
@@ -183,20 +182,6 @@ final class C4Cohort {
         if (person.deathDate() != null && !LocalDate.parse(person.deathDate()).isAfter(cutoff)) {
             dead.add(person.personKey());
         }
-    }
-
-    /** A team type counts only when observed on or before the cutoff (§1.7.3); undated types never. */
-    private void readTeam(CanonicalTeam team) {
-        LocalDate observed = observedDate(team);
-        if (team.ine() != null && team.teamTypeCode() != null && observed != null && !observed.isAfter(cutoff)) {
-            latestTeam.merge(team.ine(), team, (a, b) -> TEAM_ORDER.compare(a, b) >= 0 ? a : b);
-        }
-    }
-
-    /** The date part of {@code observedAt} (a date or a timestamp), or {@code null}. */
-    private static LocalDate observedDate(CanonicalTeam team) {
-        String at = team.observedAt();
-        return at == null || at.length() < 10 ? null : LocalDate.parse(at.substring(0, 10));
     }
 
     private static boolean linksToTeam(CanonicalRegistration registration) {

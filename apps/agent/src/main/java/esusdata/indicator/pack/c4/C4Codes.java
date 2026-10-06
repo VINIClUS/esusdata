@@ -139,14 +139,6 @@ public final class C4Codes {
     /** LEDI {@code MotivoSaida} 136 Mudança de território (item 15, p. 2). */
     public static final String EXIT_TERRITORY_CHANGE = "136";
 
-    /** «equipes de Saúde da Família (eSF), e equipes de Atenção Primária (eAP), tipo 70 e 76» (item 24 b, p. 2). */
-    public static final String ESF_TEAM_TYPE = "70";
-
-    public static final String EAP_TEAM_TYPE = "76";
-
-    /** The team types the ficha considers (item 24 b, p. 2), checked only when the source has the type. */
-    public static final List<String> TEAM_TYPES = List.of(ESF_TEAM_TYPE, EAP_TEAM_TYPE);
-
     private static final Pattern SEPARATORS = Pattern.compile("[-.\\s]");
 
     /** Code systems as {@code condition_list} writes them (S-C4-02). */

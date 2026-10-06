@@ -12,6 +12,7 @@ import esusdata.indicator.model.CanonicalPregnancyOutcome;
 import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.model.CanonicalRegistration;
 import esusdata.indicator.model.CanonicalTeam;
+import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.CboGroups;
 import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
@@ -20,6 +21,7 @@ import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
 import java.math.BigDecimal;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -95,6 +97,23 @@ public final class PackSupport {
             }
         }
         return missing;
+    }
+
+    /**
+     * The {@code team} part every pack of the Componente de Qualidade reads (ADR 0031): the states of
+     * the team types, whose validity is looked up on the last day of the competência. The capability
+     * has no scope date, so the period only places the part inside the competência.
+     */
+    public static PartRequirement teamPart(YearMonth competencia) {
+        return PartRequirement.of(
+                Capabilities.TEAM,
+                competencia.atDay(1),
+                competencia.plusMonths(1).atDay(1));
+    }
+
+    /** Adds a disclosure of this run to a result, once. */
+    public static IndicatorResult withLimitation(IndicatorResult result, String limitation) {
+        return result.withLimitation(limitation);
     }
 
     /** A measured value is present when it is a positive decimal; blank, zero or garbage is absent. */
