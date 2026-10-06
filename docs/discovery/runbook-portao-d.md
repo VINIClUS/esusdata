@@ -1,0 +1,73 @@
+# Runbook: conferência do Portão D com o SIAPS público
+
+Regra, elegibilidade e limiar: `docs/indicadores/portoes/portao-d-conciliacao-siaps.md`
+(`siaps-distribuicao-por-classe@1`). Este texto só diz como rodar.
+
+O produto nunca chama o SIAPS. A conferência é ferramenta de desenvolvimento na árvore de testes
+(`apps/agent/src/test/java/esusdata/indicator/reconciliation`). Ela só roda com
+`-Dobservatorio.gate.d.live=true`; o CI nunca toca a rede (os testes comuns só usam dados sintéticos).
+
+## Quando rodar
+
+Nas versões finais das regras de C1–C7, depois que o quadrimestre elegível estiver publicado no
+SIAPS (hoje 2026Q2; sem ele o resultado é PENDING, "aguardando 2026Q2 no SIAPS"). Não rodar contra o
+PEC de produção antes disso, a não ser para o modo informativo combinado.
+
+## Como rodar
+
+Pré-requisitos iguais aos dos outros testes vivos: túnel para o PEC no ar, arquivo de segredos
+(`~/.config/observatorio-aps/pec.env`) e o binário do plano de execução.
+
+```
+mvn -f apps/agent/pom.xml test -Dtest=PortaoDLiveTest -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dobservatorio.gate.d.live=true \
+  -Dobservatorio.execution-plane.binary=<caminho do binário>
+```
+
+Propriedades opcionais:
+
+| Propriedade | Efeito |
+|---|---|
+| `observatorio.gate.d.snapshot=<arquivo>` | Lê o SIAPS de um arquivo em vez de chamar a API (formato abaixo). |
+| `observatorio.gate.d.quadrimestre=2026Q1` | Compara esse quadrimestre. Se não for elegível para o pack, a rodada é informativa. |
+| `observatorio.gate.d.uf=SP` | UF para o SIAPS (padrão: deduzida do código IBGE do PEC). |
+| `observatorio.gate.d.registry=<release-gates.json>` | Grava o D decidido (modo de portão) de cada pack nesse arquivo. Sem ela, nada é gravado. |
+| `observatorio.gate.d.repo-root=<dir>` | Raiz do repositório (padrão: achada a partir do diretório de trabalho). |
+
+Chamadas ao SIAPS (só leitura, anônimas): 9 por quadrimestre (competências, resultado do município,
+lista de equipes de cada um dos 7 indicadores). O snapshot fica em
+`apps/agent/target/portao-d/snapshot-<quadrimestre>.json` e pode ser reaproveitado com
+`observatorio.gate.d.snapshot`. Formato do arquivo: `{"competencias": [...], "filtro": {...},
+"equipes": {"110": [...], ...}}`, cada parte exatamente como o SIAPS respondeu.
+
+Os extratos dos quatro meses de cada pack são adquiridos pelo mesmo caminho do teste de
+sensibilidade e reaproveitados em `apps/agent/target/portao-d/extratos` numa segunda rodada.
+
+## Onde saem os arquivos
+
+| O quê | Onde | No controle de versão? |
+|---|---|---|
+| Resumo do portão (evidência): `portao-d-<pack>-<quadrimestre>.md` | `docs/indicadores/portoes/` | sim, mascarado (`<10`) |
+| Resumo informativo: `informativo-portao-d-...md` | `apps/agent/target/portao-d/informativo/` | não |
+| Contagens por classe e classes por INE (`*-contagens.csv`, `*-equipes.csv`) | `apps/agent/target/portao-d/` | não |
+| Snapshot do SIAPS, extratos | `apps/agent/target/portao-d/` | não |
+
+A evidência de cada pack é o resumo: o registro guarda `ref` (caminho relativo ao repositório) e o
+`sha256` do arquivo. Rodar um pack de novo reescreve só o resumo dele.
+
+## O que ainda falta
+
+- O arquivo `contracts/indicators/release-gates.json` chega com o PR do registro de portões (ADR
+  0032). O atualizador (`RegistryUpdater`) foi testado contra um arquivo temporário de mesma forma
+  (raiz em lista, ou objeto com uma lista; nunca cria entrada, nunca grava modo informativo).
+- Quando esse PR entrar, `evaluate()` passa a devolver valores sem o bloqueio e as classes
+  `C2Ungated` a `C6Ungated` e `UngatedTeams` se reduzem a `rule.evaluate(...).teams()` (marcadas com
+  TODO(S1)).
+- O leitor do CSV "Conceito por indicador" (`SiapsCsv`) só foi exercitado com texto sintético: antes
+  de confiar nele, conferir com um arquivo baixado de verdade. O nome do indicador na coluna
+  "Indicador por tipo de equipe" é aceito com ou sem o sufixo " - eSF"/" - eAP" e qualquer outro nome
+  é recusado. A conferência por JSON não depende dele.
+- C1 usa o caminho de aquisição v1 (encontros). A conferência o cobre: os encontros são agrupados por
+  INE e contados com `C1Rule.computeEvidenceOnly`; o valor exato vem de `ResultJson.exactValue`,
+  como o produto armazena. Esse caminho tem teste unitário com dados sintéticos, mas ainda não foi
+  exercitado ao vivo contra o PEC.
