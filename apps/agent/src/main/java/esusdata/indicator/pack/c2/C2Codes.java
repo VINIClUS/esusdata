@@ -118,33 +118,10 @@ public final class C2Codes {
     /** Tipo de equipe eAP (24 b, p.2): "A boa prática (D) considera a pontuação integral para eAP, tipo 76." */
     public static final String TEAM_TYPE_EAP = "76";
 
-    /** Ambiguity codes of the transcription (AMB-C2-xx) and the DW gap L3, as evidence reports them. */
-    static final String AMB_C2_01 = "AMB-C2-01";
+    /** Puericultura (Quadro 02, AMB-C2-05): CIAP-2 A98 and CID-10 Z001, the codes the PEC writes with its field. */
+    static final String PUERICULTURE_CIAP = "A98";
 
-    static final String AMB_C2_02 = "AMB-C2-02";
-
-    static final String AMB_C2_03 = "AMB-C2-03";
-
-    static final String AMB_C2_04 = "AMB-C2-04";
-
-    static final String AMB_C2_06 = "AMB-C2-06";
-
-    static final String AMB_C2_07 = "AMB-C2-07";
-
-    static final String AMB_C2_08 = "AMB-C2-08";
-
-    static final String AMB_C2_09 = "AMB-C2-09";
-
-    static final String AMB_C2_10 = "AMB-C2-10";
-
-    static final String AMB_C2_11 = "AMB-C2-11";
-
-    static final String AMB_C2_15 = "AMB-C2-15";
-
-    static final String LACUNA_L3 = "LACUNA-L3";
-
-    /** Prefix of a source gap (not a ficha ambiguity) among the reasons a practice is undecided. */
-    static final String SOURCE_GAP_PREFIX = "LACUNA-";
+    static final String PUERICULTURE_CID = "Z001";
 
     /** The individual-encounter model (MIAI), also when it happens at home ({@code careLocationCode} 4). */
     static final String INDIVIDUAL_FORM = "INDIVIDUAL";

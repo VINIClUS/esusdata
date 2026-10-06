@@ -5,13 +5,10 @@ import esusdata.indicator.model.CanonicalHomeVisit;
 import esusdata.indicator.model.CanonicalMeasurement;
 import esusdata.indicator.model.CanonicalProcedureEvent;
 import esusdata.indicator.pack.c2.PracticeOutcome.Support;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -29,70 +26,41 @@ final class AnthropometryPractice {
     private static final String MIAC = C2Codes.MIAC;
     private static final String MIVDT = C2Codes.MIVDT;
 
-    private static final List<Reading> READINGS = List.of(
-            Reading.ANNIVERSARY_DAY_INSIDE,
-            Reading.ANNIVERSARY_NEXT_DAY,
-            Reading.LONE_ANTHROPOMETRY_CODE,
-            Reading.SAME_DAY_PAIRS);
-
     private AnthropometryPractice() {}
 
     /**
-     * What one record says about a day: a weight, a height, both ({@code pairKey} is the pair's
-     * values, so the same measure recorded twice or in two models is one pair — MET-32), or only an anthropometry
-     * code without values ({@code loneCode}, AMB-C2-07 i).
+     * What one record says about a day: a weight, a height, both, or only an anthropometry code
+     * without values ({@code loneCode}, AMB-C2-07 i). A day counts once whatever the number of records
+     * (AMB-C2-07 ii), so the same measure recorded in two models is one pair (MET-32).
      */
-    private record Measure(
-            LocalDate date, boolean weight, boolean height, String pairKey, boolean loneCode, Support support) {}
+    private record Measure(LocalDate date, boolean weight, boolean height, boolean loneCode, Support support) {}
 
     /** What all records of one day add up to. */
     private static final class DayTally {
         private boolean weight;
         private boolean height;
         private boolean loneCode;
-        private final Set<String> pairs = new HashSet<>();
 
-        int count(Set<Reading> readings) {
-            if (weight && height) {
-                return readings.contains(Reading.SAME_DAY_PAIRS) ? Math.max(1, pairs.size()) : 1;
-            }
-            return loneCode && readings.contains(Reading.LONE_ANTHROPOMETRY_CODE) ? 1 : 0;
+        boolean counts() {
+            return (weight && height) || loneCode;
         }
     }
 
     static PracticeOutcome evaluate(ChildRecords child) {
-        List<Measure> measures = measures(child);
         ChildClock clock = child.clock();
-        Readings.Verdict verdict =
-                Readings.decide(READINGS, readings -> pairDays(clock, measures, readings) >= REQUIRED_DAYS);
-        Set<Reading> widest = Set.of(Reading.ANNIVERSARY_DAY_INSIDE, Reading.ANNIVERSARY_NEXT_DAY);
-        List<Support> support = new ArrayList<>();
-        for (Measure m : measures) {
-            if (clock.upToMonths(m.date(), TWO_YEARS_IN_MONTHS, widest)) {
-                support.add(m.support());
-            }
-        }
-        return PracticeOutcome.of("C", verdict, support);
-    }
-
-    private static int pairDays(ChildClock clock, List<Measure> measures, Set<Reading> readings) {
         Map<LocalDate, DayTally> days = new TreeMap<>();
-        for (Measure m : measures) {
-            if (clock.upToMonths(m.date(), TWO_YEARS_IN_MONTHS, readings)) {
+        List<Support> support = new ArrayList<>();
+        for (Measure m : measures(child)) {
+            if (clock.upToMonths(m.date(), TWO_YEARS_IN_MONTHS)) {
+                support.add(m.support());
                 DayTally day = days.computeIfAbsent(m.date(), d -> new DayTally());
                 day.weight |= m.weight();
                 day.height |= m.height();
                 day.loneCode |= m.loneCode();
-                if (m.pairKey() != null) {
-                    day.pairs.add(m.pairKey());
-                }
             }
         }
-        int count = 0;
-        for (DayTally day : days.values()) {
-            count += day.count(readings);
-        }
-        return count;
+        long pairDays = days.values().stream().filter(DayTally::counts).count();
+        return PracticeOutcome.of("C", pairDays >= REQUIRED_DAYS, support);
     }
 
     private static List<Measure> measures(ChildRecords child) {
@@ -152,7 +120,7 @@ final class AnthropometryPractice {
                 MIAC.equals(m.origin()) && m.healthPracticeCodes().contains(C2Codes.MIAC_ANTHROPOMETRY_PRACTICE);
         boolean pair = ChildRecords.present(m.weightKg()) && ChildRecords.present(m.heightCm());
         if (field && !pair && child.inScope(support.date())) {
-            measures.add(new Measure(support.date(), false, false, null, true, support));
+            measures.add(new Measure(support.date(), false, false, true, support));
         }
     }
 
@@ -162,17 +130,8 @@ final class AnthropometryPractice {
         boolean weight = ChildRecords.present(weightKg);
         boolean height = ChildRecords.present(heightCm);
         if ((weight || height) && child.inScope(support.date())) {
-            String pairKey = weight && height ? decimal(weightKg) + "|" + decimal(heightCm) : null;
-            measures.add(new Measure(support.date(), weight, height, pairKey, false, support));
+            measures.add(new Measure(support.date(), weight, height, false, support));
         }
-    }
-
-    /**
-     * The value as a number, so the same measure copied into another model (the DW writes the PEC
-     * encounter's weight and height also as a procedure, dictionary finding 7) is one pair, not two.
-     */
-    private static String decimal(String value) {
-        return new BigDecimal(value.trim()).stripTrailingZeros().toPlainString();
     }
 
     /**
@@ -194,7 +153,7 @@ final class AnthropometryPractice {
                 byCbo && (C2Codes.ANTHROPOMETRIC_EVALUATION.equals(code) || C2Codes.GROWTH_EVALUATION.equals(code));
         if (weight || height || lone) {
             Support support = new Support(p.sourceRef(), date, p.cbo(), p.cnes(), p.ine(), p.origin());
-            measures.add(new Measure(date, weight, height, null, lone, support));
+            measures.add(new Measure(date, weight, height, lone, support));
         }
     }
 }

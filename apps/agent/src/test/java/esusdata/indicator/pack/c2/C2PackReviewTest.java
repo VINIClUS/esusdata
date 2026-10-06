@@ -32,7 +32,7 @@ class C2PackReviewTest {
 
     private static final YearMonth MARCH = YearMonth.of(2026, 3);
     private static final EvaluationContext CONTEXT = EvaluationContext.endOfMonth(IBGE, MARCH);
-    private static final LocalDate BIRTH = LocalDate.of(2024, 4, 10);
+    private static final LocalDate BIRTH = LocalDate.of(2024, 3, 10);
     private static final String KEY = "k1";
     private static final String INE = "0000000001";
     private static final String NURSE = "223505";
@@ -73,7 +73,7 @@ class C2PackReviewTest {
                 null,
                 location,
                 remote,
-                List.of(),
+                List.of("A98"),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -97,24 +97,26 @@ class C2PackReviewTest {
                 code,
                 "PERFORMED",
                 NURSE,
-                null,
-                null,
+                "1234567",
+                INE,
                 "MIP");
     }
 
     @Test
-    void a_mipNoMesmoDiaDeConsultaRemotaContinuaAmbiguo() {
+    void a_mipNoMesmoDiaDeConsultaRemotaMarcaOMiaiComoRemotoEAContinuaNaoCumprida() {
         LocalDate day = BIRTH.plusDays(10);
         RuleOutcome outcome = C2Pack.compute(
                 child().add(encounter(day, NURSE, true, "INDIVIDUAL", null))
                         .add(mip(day, C2Codes.CHILD_DEVELOPMENT_SIGTAP))
                         .build(),
                 CONTEXT);
-        assertThat(practice(outcome, "A").reasonCode()).isEqualTo("AMBIGUIDADE:AMB-C2-06");
+        // AMB-C2-06: o procedimento isolado não é consulta; o MIAI remoto não cumpre A.
+        assertThat(practice(outcome, "A").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+        assertThat(practice(outcome, "A").reasonCode()).isEqualTo(PracticeOutcome.NOT_MET);
     }
 
     @Test
-    void a_registroDeOutroModeloDomiciliarNaoContaEMiaiNoDomicilioEAmbiguo() {
+    void a_miaiNoDomicilioContaEOutroModeloDomiciliarNaoConta() {
         LocalDate day = BIRTH.plusDays(10);
         RuleOutcome otherModel = C2Pack.compute(
                 child().add(encounter(day, NURSE, false, "HOME", null)).build(), CONTEXT);
@@ -123,7 +125,8 @@ class C2PackReviewTest {
 
         RuleOutcome miaiAtHome = C2Pack.compute(
                 child().add(encounter(day, NURSE, false, "INDIVIDUAL", "4")).build(), CONTEXT);
-        assertThat(practice(miaiAtHome, "A").reasonCode()).isEqualTo("AMBIGUIDADE:AMB-C2-04");
+        assertThat(practice(miaiAtHome, "A").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(practice(miaiAtHome, "A").reasonCode()).isEqualTo(PracticeOutcome.MET);
     }
 
     @Test
@@ -148,7 +151,7 @@ class C2PackReviewTest {
                     .add(CanonicalFixtures.measurement(KEY, day, "7.2", "65.0", "MIP"));
         }
         RuleOutcome outcome = C2Pack.compute(data.build(), CONTEXT);
-        assertThat(practice(outcome, "C").reasonCode()).isEqualTo(PracticeOutcome.NOT_MET_WINDOW_OPEN);
+        assertThat(practice(outcome, "C").reasonCode()).isEqualTo(PracticeOutcome.NOT_MET);
         assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
@@ -320,7 +323,13 @@ class C2PackReviewTest {
     }
 
     @Test
-    void p3_p4_procedimentoDeConsultaPorCboForaDoQuadro02NaoCumpre() {
+    void p3_p4_procedimentoDeConsultaNuncaEConsultaSejaQualForOCbo() {
+        RuleOutcome sameCbo = C2Pack.compute(
+                child().add(procedure(BIRTH.plusDays(10), C2Codes.CHILD_DEVELOPMENT_SIGTAP, NURSE, "PERFORMED"))
+                        .build(),
+                CONTEXT);
+        assertThat(practice(sameCbo, "A").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+
         RuleOutcome first = C2Pack.compute(
                 child().add(procedure(BIRTH.plusDays(10), C2Codes.CHILD_DEVELOPMENT_SIGTAP, "515105", "PERFORMED"))
                         .build(),
@@ -368,7 +377,7 @@ class C2PackReviewTest {
 
     @Test
     void p9_doseDeRotinaRegistradaDepoisDoCorteContaPelaAplicacao() {
-        LocalDate birth = LocalDate.of(2024, 9, 15);
+        LocalDate birth = LocalDate.of(2024, 3, 20);
         CanonicalDataset.Builder data = extractWindows(MARCH)
                 .add(CanonicalFixtures.person(KEY, birth, "FEMININO"))
                 .add(CanonicalFixtures.registration(KEY, birth.plusDays(5), "1234567", INE));
@@ -397,13 +406,23 @@ class C2PackReviewTest {
 
     @Test
     void item9_praticaNaoCumpridaComJanelaAbertaDizPrazoAberto() {
-        RuleOutcome outcome = C2Pack.compute(child().build(), CONTEXT);
+        // Corte em 2026-03-05, antes do 2º aniversário (2026-03-10): as janelas de B, C, E seguem abertas.
+        EvaluationContext early = new EvaluationContext(IBGE, MARCH, LocalDate.of(2026, 3, 5));
+        RuleOutcome outcome = C2Pack.compute(child().build(), early);
         assertThat(practice(outcome, "A").reasonCode()).isEqualTo(PracticeOutcome.NOT_MET);
         assertThat(practice(outcome, "D").reasonCode()).isEqualTo(PracticeOutcome.NOT_MET);
         for (String open : List.of("B", "C", "E")) {
             EvidenceItem row = practice(outcome, open);
             assertThat(row.reasonCode()).isEqualTo(PracticeOutcome.NOT_MET_WINDOW_OPEN);
             assertThat(row.points()).isZero();
+        }
+    }
+
+    @Test
+    void item9_comOCorteDepoisDoSegundoAniversarioNenhumaJanelaFicaAberta() {
+        RuleOutcome outcome = C2Pack.compute(child().build(), CONTEXT);
+        for (String component : List.of("A", "B", "C", "D", "E")) {
+            assertThat(practice(outcome, component).reasonCode()).isEqualTo(PracticeOutcome.NOT_MET);
         }
     }
 
@@ -442,15 +461,15 @@ class C2PackReviewTest {
     }
 
     @Test
-    void item6_campoAntropometriaDoMiacSemValoresEAmbiguo() {
+    void item6_campoAntropometriaDoMiacSemValoresContaComoRegistroDoDia() {
         CanonicalDataset.Builder data = child();
         for (int i = 1; i <= 8; i++) {
             data.add(measured(BIRTH.plusDays(40L * i), NURSE, "7.0", "65.0"));
         }
         data.add(CanonicalFixtures.collectiveActivity(
                 KEY, BIRTH.plusDays(400), null, null, NURSE, "05", List.of(C2Codes.MIAC_ANTHROPOMETRY_PRACTICE)));
-        assertThat(practice(C2Pack.compute(data.build(), CONTEXT), "C").reasonCode())
-                .isEqualTo("AMBIGUIDADE:AMB-C2-07");
+        assertThat(practice(C2Pack.compute(data.build(), CONTEXT), "C").decision())
+                .isEqualTo(EvidenceDecision.PRACTICE_MET);
     }
 
     private static CanonicalImmunization dose(LocalDate day, String code) {

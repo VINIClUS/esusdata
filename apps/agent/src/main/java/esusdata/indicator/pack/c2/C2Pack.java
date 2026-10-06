@@ -42,7 +42,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Function;
@@ -51,11 +50,12 @@ import java.util.function.Function;
  * C2 — Cuidado no desenvolvimento infantil (Tech Spec §2.4; ficha transcrita em {@code docs/metodologia/c2-desenvolvimento-infantil.md}).
  *
  * <p>Escore = soma dos pontos das práticas A–E (20 cada) ÷ crianças elegíveis, na escala 0–100 da
- * ficha, nunca ×100 de novo. As leituras que a ficha deixa abertas (AMB-C2-xx) são todas avaliadas
- * por criança: se divergem, a prática fica {@code RULE_AMBIGUITY} para ela, e o resultado da
- * unidade também, com as contagens certas. As convenções declaradas (dia do nascimento = dia 0,
- * aniversário da coorte pela Lei 810/1949, denominador mensal literal) estão nas limitações
- * permanentes, que mantêm o pacote fora da execução publicada junto com os portões.
+ * ficha, nunca ×100 de novo. As leituras que a ficha deixa abertas (AMB-C2-xx) estão todas decididas
+ * em {@code docs/indicadores/decisoes/c2-desenvolvimento-infantil.md}: a regra não devolve
+ * {@code RULE_AMBIGUITY} por leitura da ficha. A coorte do mês é a das crianças vinculadas que
+ * completam 2 anos na competência (NT 8/2026); equipe sem essas crianças não tem linha no mês. As
+ * convenções declaradas estão nas limitações permanentes (C2-LIM-xx), que mantêm o pacote fora da
+ * execução publicada junto com os portões.
  */
 public final class C2Pack implements IndicatorRule {
 
@@ -65,40 +65,65 @@ public final class C2Pack implements IndicatorRule {
     static final Bands BANDS = Bands.QUALIDADE_C2_C7;
 
     private static final List<String> STANDING_LIMITATIONS = List.of(
-            "Fora do PEC local (4.4 p.5; Quadro 05 p.6): registros de outros municípios ou serviços e doses só"
-                    + " na RNDS/RIA (lacuna L4) não são vistos; o resultado local pode ficar abaixo do Siaps.",
-            "Óbito no CadSUS (item 15) não está no PEC local: só óbito ou saída registrados no cadastro local"
-                    + " interrompem o acompanhamento.",
-            "Vínculo local aproximado (lacuna L8): versão mais recente do cadastro individual completo até o"
-                    + " corte; as regras da NT 30/2025 e o desempate da Portaria SAPS 161/2024 não são reproduzidos"
-                    + " (AMB-C2-12).",
-            "Tipo de equipe eSF 70/eAP 76 ausente no DW (lacuna L1): a pontuação integral da prática D para eAP"
-                    + " 76 só é aplicada com o tipo comprovado, e a alocação 70/76 do profissional (AMB-C2-11) não é"
-                    + " verificada.",
-            "Puericultura (Quadro 02) não é identificável no DW (lacuna L7, AMB-C2-05): as consultas de A e B"
-                    + " são contadas sem esse filtro e podem superestimar o resultado local.",
-            "Denominador mensal (AMB-C2-03): entram as crianças vinculadas com até 2 anos no mês; mês com"
-                    + " criança completando 2 anos na competência fica RULE_AMBIGUITY (CT-C2-65) até a reconciliação"
-                    + " com a lista nominal do Siaps.",
-            "Datas (AMB-C2-01, AMB-C2-02): o dia do nascimento é o dia 0 (N+29 cumpre o 30º dia, N+30 é"
-                    + " ambíguo); datas exatas de aniversário e aniversários inexistentes no mês tornam a prática, ou"
-                    + " a inclusão na coorte, ambígua.",
-            "Prática E (AMB-C2-09 iv, AMB-C2-10 ii/iii): doses são aplicações em datas distintas; a leitura pelo"
-                    + " campo dose não é avaliada (domínio LEDI de dose não congelado); SCR sem intervalo mínimo; só"
-                    + " o Esquema Primário do 24 g; transcrição registrada depois do corte não é conhecida no corte.",
-            "Prática C: só valores numéricos maiores que zero comprovam peso ou altura; o campo"
-                    + " \"Antropometria\" do MIAC (Quadro 03, prática LEDI 20) sem os valores conta como registro"
-                    + " isolado, ambíguo como o 01.01.04.002-4 (AMB-C2-07 i); linha do MIAC sem CBO é aceita.",
-            "Cadastros não unificados (AMB-C2-14) contam como pessoas distintas; o corte local não reproduz o"
-                    + " 20º dia útil do Siaps (AMB-C2-16).",
-            "Leituras declaradas: CBO de quatro dígitos é família (AMB-C2-13); visitas com motivo diferente de"
-                    + " recém-nascido ou criança não contam (AMB-C2-08 iii); a coorte vai até o 2º aniversário, não até"
-                    + " 'anos completos ≤ 2' (AMB-C2-02); sem o filtro de Puericultura, A e B divergem do tratamento"
-                    + " proposto na transcrição (AMB-C2-05); equipe de tipo conhecido fora de 70/76 sai da coorte"
-                    + " (24 b); atendimento domiciliar só no MIAI com local 4 é ambíguo (AMB-C2-04), registro de outro"
-                    + " modelo não conta; recusa de cadastro (versão vigente) tira a criança da coorte; atendimentos"
-                    + " com mesma data, CBO, CNES e INE são tratados como o mesmo registrado duas vezes (MET-32), não"
-                    + " como dois atendimentos (AMB-C2-15).");
+            "C2-LIM-01: Registros de outros municípios ou serviços e doses só na RNDS/RIA (lacuna L4) não são"
+                    + " vistos (ficha C2, 4.4 e Quadro 05): o resultado local pode ficar abaixo do SIAPS.",
+            "C2-LIM-02: O óbito no CadSUS (item 15) não está no PEC local: só óbito ou saída registrados no"
+                    + " cadastro local interrompem o acompanhamento.",
+            "C2-LIM-03: O vínculo da criança com a equipe é aproximado pela versão mais recente do cadastro"
+                    + " individual completo até o corte (lacuna L8). As regras da NT 30/2025 e o desempate da"
+                    + " Portaria SAPS 161/2024 não são reproduzidos.",
+            "C2-LIM-04: Interrupção do acompanhamento (item 15, AMB-C2-12): a criança sai da coorte quando a versão"
+                    + " cadastral mais recente até o corte registra saída por mudança de território ou óbito.",
+            "C2-LIM-05: O tipo de equipe (eSF 70, eAP 76) não está no extrato (lacuna L1): a pontuação integral da"
+                    + " prática D para eAP 76 (item 24 b) não pode ser aplicada. Fecha quando a capacidade `team`"
+                    + " estiver VALIDATED.",
+            "C2-LIM-06: A alocação do profissional em equipe 70/76 (Quadro 02) só é verificada quando o tipo da"
+                    + " equipe do atendimento é conhecido. Com tipo desconhecido a consulta é aceita; com tipo"
+                    + " conhecido fora de 70/76, não conta.",
+            "C2-LIM-07: Puericultura (Quadro 02) é reconhecida pelo CIAP-2 A98 ou CID-10 Z001 entre os problemas"
+                    + " avaliados do atendimento, os códigos que o PEC grava com o campo de puericultura. Não são"
+                    + " exclusivos desse campo (AMB-GUIA-01): consulta de puericultura sem essa linha não é contada.",
+            "C2-LIM-08: Coorte mensal (AMB-C2-03): o denominador do mês é o das crianças vinculadas que completam 2"
+                    + " anos na competência (NT 8/2026). Mês sem criança completando 2 anos não tem resultado e não"
+                    + " entra na média do quadrimestre.",
+            "C2-LIM-09: Datas (AMB-C2-01, AMB-C2-02): o dia do nascimento é o dia 0 e N+30 está dentro de 'até o"
+                    + " 30º dia'; a data do aniversário de 6 meses e de 2 anos está dentro de 'até'; aniversário"
+                    + " inexistente vale o dia seguinte (Código Civil, art. 132 § 3º). A coorte vai até o 2º"
+                    + " aniversário.",
+            "C2-LIM-10: Prática E: doses são aplicações em datas distintas (o campo dose não é lido); contagem por"
+                    + " componente, com a dose de hepatite B ao nascer incluída e doses com menos de 30 dias de"
+                    + " intervalo descartadas; SCR/SCRV sem intervalo mínimo; só o Esquema Primário do item 24 g; sem"
+                    + " janela de idade (conta dose aplicada até o fim da competência), o valor depende também do"
+                    + " corte da execução para registros tardios; transcrição registrada depois do corte não é"
+                    + " conhecida nele.",
+            "C2-LIM-11: Prática C: só valores numéricos maiores que zero comprovam peso ou altura; os códigos"
+                    + " 01.01.04.002-4 e 03.01.01.026-9 e o campo 'Antropometria' do MIAC contam como registro do dia"
+                    + " mesmo sem valores; cada dia conta uma vez; linha do MIAC sem CBO é aceita.",
+            "C2-LIM-12: Cadastros não unificados (AMB-C2-14) contam como pessoas distintas.",
+            "C2-LIM-13: O corte local não reproduz o 20º dia útil de extração do SIAPS (AMB-C2-16).",
+            "C2-LIM-14: CBO de quatro dígitos é família e o de seis dígitos é ocupação (AMB-C2-13).",
+            "C2-LIM-15: Prática D: só contam visitas de ACS/TACS com motivo 'recém-nascido' ou 'criança'"
+                    + " (AMB-C2-08 iii) e desfecho 'realizada'; a 2ª visita é posterior ao 30º dia.",
+            "C2-LIM-16: Criança vinculada a equipe de tipo conhecido diferente de 70 e 76 sai da coorte (item 24 b);"
+                    + " com tipo desconhecido ela permanece.",
+            "C2-LIM-17: Atendimento individual no domicílio (local 4) conta como presencial e como consulta"
+                    + " (AMB-C2-04). Outro modelo de atendimento domiciliar (MIAD) não é lido.",
+            "C2-LIM-18: Recusa de cadastro na versão vigente tira a criança da coorte.",
+            "C2-LIM-19: Atendimentos com mesma data, CBO, CNES e INE são o mesmo registro duplicado (MET-32);"
+                    + " atendimentos distintos no mesmo dia contam separadamente em B (AMB-C2-15).",
+            "C2-LIM-20: Modalidade (LACUNA-L3): atendimento sem marcador de remoto (tipo de participação 3 a 7 ou"
+                    + " procedimento 03.01.01.025-0 do mesmo dia e profissional) é contado como presencial na"
+                    + " prática A. Consulta remota sem marcador superestima A.",
+            "C2-LIM-21: Procedimento MIP isolado (03.01.01.025-0, 03.01.01.027-7) não é consulta de A nem de B"
+                    + " (AMB-C2-06); só o atendimento individual conta.",
+            "C2-LIM-22: A habilitação de CBO por procedimento da tabela SIGTAP (item 24 f) não é reproduzida; vale a"
+                    + " lista de CBO do Quadro 03.",
+            "C2-LIM-23: A validação das equipes no SCNES e as condições da Portaria GM/MS nº 3.493/2024 (item 24 b)"
+                    + " não são verificadas localmente.",
+            "C2-LIM-24: A validade do CPF/CNS e a identificação no CadSUS (item 24 a) não são verificadas"
+                    + " localmente.",
+            "C2-LIM-25: Registro qualificado e envio tardio de dados pelos profissionais e pela gestão local (item"
+                    + " 33) afetam o resultado e não são corrigíveis localmente.");
 
     /** Civil months read: the first that can hold a cohort birth through the competência (ADR 0030 §1.9.2). */
     private static final int MONTHS_READ = 26;
@@ -106,7 +131,7 @@ public final class C2Pack implements IndicatorRule {
     private static final long SIX_MONTHS = 6;
 
     public static final String ID = "c2-desenvolvimento-infantil";
-    public static final String RULE_VERSION = ID + "@0.1.0";
+    public static final String RULE_VERSION = ID + "@0.2.0";
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -152,7 +177,7 @@ public final class C2Pack implements IndicatorRule {
                             "E",
                             "Ter vacinas contra difteria, tétano, coqueluche, hepatite B, infecções causadas por Haemophilus influenzae tipo b, poliomielite, sarampo, caxumba e rubéola, pneumocócica, registradas com todas as doses recomendadas.",
                             20,
-                            "a ficha não fixa janela (AMB-C2-10)")),
+                            "sem janela de idade própria (AMB-C2-10)")),
             ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.MONTHS_WITH_COHORT_EVENT,
@@ -236,7 +261,8 @@ public final class C2Pack implements IndicatorRule {
                     procedures.getOrDefault(key, List.of()),
                     visits.getOrDefault(key, List.of()),
                     measurements.getOrDefault(key, List.of()),
-                    doses.getOrDefault(key, List.of()));
+                    doses.getOrDefault(key, List.of()),
+                    teamTypes);
             ScoredChild child = score(member, records, teamTypes.get(member.ine()));
             municipal.add(child);
             teams.computeIfAbsent(member.ine(), ine -> new C2Tally(DESCRIPTOR)).add(child);
@@ -268,10 +294,9 @@ public final class C2Pack implements IndicatorRule {
                 C2Codes.TEAM_TYPE_EAP.equals(teamType) ? PracticeOutcome.exempt("D") : VisitPractice.evaluate(records);
         ChildClock clock = member.clock();
         LocalDate cutoff = records.cutoff();
-        boolean firstMonthOpen = clock.day(cutoff) < ChildClock.LAST_DAY_BOTH_READINGS + 1;
-        boolean sixMonthsOpen = clock.anniversary(SIX_MONTHS, Set.of()).isAfter(cutoff);
-        boolean twoYearsOpen =
-                clock.anniversary(ChildClock.TWO_YEARS_IN_MONTHS, Set.of()).isAfter(cutoff);
+        boolean firstMonthOpen = clock.day(cutoff) <= ChildClock.LAST_DAY_OF_FIRST_30;
+        boolean sixMonthsOpen = clock.anniversary(SIX_MONTHS).isAfter(cutoff);
+        boolean twoYearsOpen = clock.anniversary(ChildClock.TWO_YEARS_IN_MONTHS).isAfter(cutoff);
         return new ScoredChild(
                 member,
                 List.of(
@@ -296,7 +321,7 @@ public final class C2Pack implements IndicatorRule {
     private static List<EvidenceItem> evidence(ScoredChild child, EvaluationContext context) {
         C2Cohort.Member member = child.member();
         List<EvidenceItem> rows = new ArrayList<>();
-        BigInteger points = child.ambiguous() ? null : child.certainPoints(DESCRIPTOR.components());
+        BigInteger points = child.points(DESCRIPTOR.components());
         rows.add(personRow(member, context, EvidenceDecision.ELIGIBLE, points));
         for (int i = 0; i < child.outcomes().size(); i++) {
             PracticeOutcome outcome = child.outcomes().get(i);
@@ -358,7 +383,6 @@ public final class C2Pack implements IndicatorRule {
             case MET -> EvidenceDecision.PRACTICE_MET;
             case EXEMPT -> EvidenceDecision.PRACTICE_EXEMPT;
             case NOT_MET -> EvidenceDecision.PRACTICE_NOT_MET;
-            case AMBIGUOUS -> EvidenceDecision.PRACTICE_AMBIGUOUS;
         };
     }
 
@@ -366,7 +390,6 @@ public final class C2Pack implements IndicatorRule {
         return switch (outcome.status()) {
             case MET, EXEMPT -> spec.weight();
             case NOT_MET -> BigInteger.ZERO;
-            case AMBIGUOUS -> null;
         };
     }
 
