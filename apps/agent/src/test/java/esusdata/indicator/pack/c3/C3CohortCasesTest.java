@@ -154,6 +154,33 @@ class C3CohortCasesTest {
     }
 
     @Test
+    void amb05_anIgnoredLateOutcomeDoesNotEndTheNextEpisode() {
+        // the outcome on DUM+300 is late for the first episode; the second one (DUM+296) must not take it
+        List<Record> records = new ArrayList<>(linked(P1, INE));
+        records.add(anchor(P1, dum(56), DUM));
+        records.add(anchor(P1, dum(300), dum(296)));
+        records.add(outcome(P1, dum(300)));
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
+        EvidenceItem first = episodeRow(outcome, EP1);
+        assertThat(first.reasonCode()).isEqualTo(SUBSTITUTE);
+        assertThat(first.eventDate()).isEqualTo(SUBSTITUTE_END.toString());
+        EvidenceItem second = episodeRow(outcome, episodeKey(P1, dum(296)));
+        assertThat(second.reasonCode()).isEqualTo(SUBSTITUTE);
+        assertThat(second.eventDate()).isEqualTo(dum(296 + 294).toString());
+    }
+
+    @Test
+    void l2_aDeliveryCodeDoesNotChangeTheEndOfThePregnancy() {
+        // a puerperal code (Z37.0, delivery) proves the birth but gives no date: D stays DUM+294
+        List<Record> records = new ArrayList<>(linked(P1, INE));
+        records.add(anchor(P1, dum(56), DUM));
+        records.add(care(P1, dum(200)).cid("Z37.0").build());
+        EvidenceItem row = episodeRow(computeNovember(new C3Pack(), records), EP1);
+        assertThat(row.reasonCode()).isEqualTo(SUBSTITUTE);
+        assertThat(row.eventDate()).isEqualTo(SUBSTITUTE_END.toString());
+    }
+
+    @Test
     void ct69_anEpisodePregnantAndPuerperalInTheSameMonthCountsOnce() {
         LocalDate lmp = LocalDate.of(2025, 2, 1);
         List<Record> records = new ArrayList<>(linked(P1, INE));

@@ -37,6 +37,7 @@ final class Episodes {
             Candidate first = candidates.get(0);
             GestationWindow window = ends.window(first.dum());
             episodes.add(new Episode(person.personKey() + "#" + first.dum(), window, first.ref()));
+            ends.discardLate(first.dum());
             candidates.removeIf(c -> !c.dum().isAfter(window.end()));
         }
         return episodes;
@@ -55,6 +56,17 @@ final class Episodes {
             return resolved == null
                     ? GestationWindow.substitute(dum)
                     : new GestationWindow(dum, resolved, GestationWindow.EndSource.LPC_RESOLUTION);
+        }
+
+        /**
+         * AMB-C3-05: an outcome or resolution in {@code (DUM + 294, DUM + 336]} was ignored by the
+         * episode of {@code dum}; it must not end another episode.
+         */
+        void discardLate(LocalDate dum) {
+            LocalDate from = dum.plusDays(GestationWindow.MAX_PREGNANCY_DAYS);
+            LocalDate through = from.plusDays(GestationWindow.PUERPERIUM_DAYS);
+            outcomes.subSet(from, false, through, true).clear();
+            resolutions.subSet(from, false, through, true).clear();
         }
     }
 

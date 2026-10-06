@@ -55,7 +55,7 @@ final class C3Limitations {
                     + " transmissão vertical do MS (AMB-C3-02).",
             "C3-LIM-16: Denominador mensal: gestantes e puérperas ativas na competência, cada gestação"
                     + " (episódio) uma vez, inclusive as em curso (4.1, p.5; AMB-C3-06).",
-            "C3-LIM-17: Semana gestacional por semanas completas: A até a IG 12s6d (DUM+90) e F a partir da"
+            "C3-LIM-17: Semana gestacional por semanas completas: A até IG 12s6d (DUM+90) e F a partir da"
                     + " IG 20s0d (DUM+140), como no FAQ do Previne Brasil (AMB-C3-01).",
             "C3-LIM-18: O corte local de extração é o último dia da competência e não reproduz o 20º dia"
                     + " útil do SIAPS (item 11, p.1; AMB-C3-21).",
