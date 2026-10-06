@@ -377,3 +377,24 @@ mvn -B -f apps/agent/pom.xml test -Djacoco.skip=true \
 Se algum objeto sair DIFFERENT, as `signature_fingerprint` da entrada `team` (hoje as da fixture
 sintética) são substituídas pelas capturadas; a entrada continua `NOT_TESTED` até a aprovação do
 usuário (ADR 0023).
+
+### Diferencial Rust x JDBC ao vivo para `team`
+
+As assinaturas da entrada `team` já são as reais (captura de 2026-10-06). Para rodar a aquisição v2
+pelo filho Rust e comparar com o JDBC (passo 4 de `runbook-validacao-capacidades.md`), só na cópia de
+trabalho, **sem commitar**, em `contracts/compatibility/pec-adapters.json`, na entrada `team`:
+`status` para `VALIDATED`, `test_result` para `PASS`, e `approved_by` e `approved_at` com qualquer
+valor provisório (o schema exige os quatro). Depois:
+
+```bash
+cargo build --release --locked --manifest-path apps/execplane/Cargo.toml
+mvn -B -f apps/agent/pom.xml test -Dsurefire.reuseForks=false \
+  -Dtest=ExecPlaneCapabilityLivePecTest \
+  -Dobservatorio.execution-plane.binary=$PWD/apps/execplane/target/release/observatorio-execplane \
+  -Dobservatorio.execution-plane.live-pec=true \
+  -Dobservatorio.execution-plane.live-pec.env-file=$HOME/.config/observatorio-aps/pec-253.env \
+  -Dobservatorio.capabilities.live.only=team
+```
+
+Reverta a entrada com `git checkout contracts/compatibility/pec-adapters.json` ao fim. O arquivo de
+ambiente precisa de `PEC_SOURCE_ID`, `PEC_VERSION` e `PEC_MUNICIPALITY_IBGE`.

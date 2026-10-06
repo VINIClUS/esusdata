@@ -181,23 +181,31 @@ class TeamCapabilityTest {
         assertThat(listed).isEqualTo(CapabilitySql.columnsRead(contract.queryText()));
     }
 
+    /**
+     * The matrix carries the real PEC's signatures (captured live on 2026-10-06), as the validated
+     * entries do; the fixture only mirrors the columns read. The two DW dimensions are the same on
+     * both, the four tables the fixture models from the inventory differ, and that is the documented
+     * state: the fixture proves rows, the signature is the real PEC's.
+     */
     @Test
-    void theSignaturesAreThoseOfTheFixtureRecomputedByTheProbe() throws Exception {
+    void theSignaturesAreTheRealPecOnesAndTheFixtureDiffersOnlyWhereDocumented() throws Exception {
         JdbcCompatibilityCatalog catalog = new JdbcCompatibilityCatalog();
-        List<String> mismatches = new ArrayList<>();
+        SortedSet<String> differing = new TreeSet<>();
         try (Connection connection = DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword())) {
             connection.setReadOnly(true);
             for (JsonNode object : entry().get("objects_used")) {
                 List<String> columns = new ArrayList<>();
                 object.get("columns_used").forEach(column -> columns.add(column.asString()));
-                String fingerprint = catalog.fingerprint(connection, text(object, "object"), columns);
-                if (!fingerprint.equals(text(object, "signature_fingerprint"))) {
-                    mismatches.add(text(object, "object") + " " + fingerprint);
+                String packaged = text(object, "signature_fingerprint");
+                assertThat(packaged).matches("sha256:[0-9a-f]{64}").isNotEqualTo("sha256:" + "0".repeat(64));
+                if (!catalog.fingerprint(connection, text(object, "object"), columns)
+                        .equals(packaged)) {
+                    differing.add(text(object, "object"));
                 }
             }
         }
 
-        assertThat(mismatches).isEmpty();
+        assertThat(differing).containsExactly("ta_equipe", "tb_equipe", "tb_tipo_equipe", "tb_unidade_saude");
     }
 
     // --- helpers ------------------------------------------------------------------------------

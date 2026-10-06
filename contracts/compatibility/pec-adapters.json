@@ -946,7 +946,7 @@
       "installation_role": "PRONTUARIO",
       "capability": "team",
       "status": "NOT_TESTED",
-      "status_reason": "Capacidade nova (ADR 0031), a única que lê o esquema transacional do PEC. Consulta escrita sobre o inventário de 2026-10-06 (docs/discovery/2026-10-06-pec-5528-equipe-transacional.md). As signature_fingerprint são as da fixture sintética PostgreSQL 9.6, com os tipos de coluna do PEC 5.5.28; a captura ao vivo no PEC de produção e a aprovação do usuário ainda faltam.",
+      "status_reason": "Capacidade nova (ADR 0031), a única que lê o esquema transacional do PEC. Consulta escrita sobre o inventário de 2026-10-06 (docs/discovery/2026-10-06-pec-5528-equipe-transacional.md). As signature_fingerprint são as do PEC 5.5.28 de produção, capturadas ao vivo em 2026-10-06 (somente leitura); as de tb_dim_equipe e tb_dim_municipio coincidem com as da fixture sintética e as das outras quatro tabelas diferem dela. Falta o diferencial Rust x JDBC ao vivo e a aprovação do usuário.",
       "objects_used": [
         {
           "object": "ta_equipe",
@@ -959,7 +959,7 @@
             "tp_equipe",
             "UNIQUE_KEY=co_seq_taequipe"
           ],
-          "signature_fingerprint": "sha256:72a9f64cc20766a9047958995d30d41f2344900ca0550ca2e1070df343c3fd95"
+          "signature_fingerprint": "sha256:879f0400e4bc8a233f9b17082a3f28b1365d8731e3d1ccf62f3e9e03520163bb"
         },
         {
           "object": "tb_dim_equipe",
@@ -984,7 +984,7 @@
             "tp_equipe",
             "UNIQUE_KEY=co_seq_equipe"
           ],
-          "signature_fingerprint": "sha256:4b7548a79f3f08d3d1edd44035d486d0dbb54596968517258ee199fafa9ef433"
+          "signature_fingerprint": "sha256:ca622ca80206842b55e7fdaa307aa03254e447f19a129021d8533f0cf62e2a21"
         },
         {
           "object": "tb_tipo_equipe",
@@ -993,7 +993,7 @@
             "nu_ms",
             "UNIQUE_KEY=co_seq_tipo_equipe"
           ],
-          "signature_fingerprint": "sha256:e5f35951b697ec6c83527cbd6c5a2457af718d3cf3b7388e8c82a3e830681ab7"
+          "signature_fingerprint": "sha256:32c69331af5cefd124177e36cd76a0be16cf62002980f3d2bd03bc56303fa66a"
         },
         {
           "object": "tb_unidade_saude",
@@ -1002,7 +1002,7 @@
             "nu_cnes",
             "UNIQUE_KEY=co_seq_unidade_saude"
           ],
-          "signature_fingerprint": "sha256:f4d7deb23f568463dba1410ff571a1c8df44c403d6c87421e77ff5477d39df4b"
+          "signature_fingerprint": "sha256:bdf1b3796dfe86ce379b2f1bfddd3687dde83f7a0f3cfe097f2b4a24abe2c722"
         }
       ],
       "municipal_isolation_evidence": {
