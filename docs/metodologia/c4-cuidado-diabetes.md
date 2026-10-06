@@ -408,3 +408,8 @@ Base para helpers compartilhados. Páginas: C4 = esta ficha; C5 = [`c5-cuidado-h
 15. **Modelos de informação** — MIAI, MIP e MIVDT definidos com o mesmo texto nas três; MIAC só é definido no item 24 e de C4, mas aparece nos quadros de PA/antropometria das três; MIV e RIA só em C6. Item 4.2 (site dos modelos de informação) e item 4.4 («registros de qualquer profissional habilitado em estabelecimento de saúde da APS, no país») idênticos.
 16. **Códigos de procedimento comuns** (item 24 g de C4/C5; 24 f de C6) — `01.01.04.002-4`, `01.01.04.008-3`, `01.01.04.007-5`, `03.01.01.003-0`, `03.01.01.006-4`, `03.01.01.025-0` nas três; `03.01.10.003-9` em C4 e C5.
 17. **Limitações** (item 33) — mesmo texto nas três (registro qualificado, envio tardio, lapso de óbitos no CadSUS).
+
+## Nota de 2026-10-06: tipo de equipe na regra
+
+A regra `c4-cuidado-diabetes@0.3.0` aplica o item 24 b da ficha: só equipes de tipo 70 (eSF) ou 76 (eAP), vigente no último dia da competência (`valid_from <= dia < valid_to`), entram. Equipe sem tipo, com dois tipos ou de outro tipo deixa a pessoa fora da coorte com o motivo (`EXCLUIDO_EQUIPE_SEM_TIPO`, `EXCLUIDO_TIPO_EQUIPE_CONFLITANTE`, `EXCLUIDO_EQUIPE_FORA_DO_ESCOPO`) e uma contagem divulgada. C4-D1 (D creditada à pessoa de equipe eAP 76 que não a cumpriu: `PRATICA_CREDITADA_EAP76`, `PRACTICE_MET`, 25 pontos, com a contagem `C4-LIM-18/contagem`) e C4-D2 (pessoa de equipe sem tipo, conflitante ou de outro tipo fora da coorte, com motivo e a contagem `C4-LIM-19/contagem`) estão implementadas; a regra não devolve mais `RULE_AMBIGUITY` por causa do eAP. `team` entrou nas capacidades exigidas e na leitura. Detalhe e fontes em `docs/indicadores/decisoes/c4-cuidado-diabetes.md`.
+

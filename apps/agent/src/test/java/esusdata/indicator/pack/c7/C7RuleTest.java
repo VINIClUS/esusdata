@@ -32,6 +32,7 @@ import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -635,7 +636,7 @@ class C7RuleTest {
         assertThat(result.classification()).isNull();
         assertThat(result.components()).isEqualTo(ungated.result().components());
         assertComponent(result, "C", 3, 4, IndicatorStatus.COMPUTED);
-        assertThat(result.limitations()).contains("Portão A (fonte e vigência) incompleto");
+        assertThat(result.limitations()).contains("Portão D (reconciliação) incompleto");
         assertThat(gated.teams()).extracting(TeamResult::ine).containsExactly(INE_1);
         assertThat(gated.teams()).allSatisfy(t -> {
             assertThat(t.result().status()).isEqualTo(IndicatorStatus.BLOCKED);
@@ -876,11 +877,7 @@ class C7RuleTest {
         assertThat(empty.status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
         for (IndicatorResult result : List.of(empty)) {
             assertThat(result.valueExact()).isNull();
-            assertThat(result.limitations())
-                    .contains(
-                            "Portão A (fonte e vigência) incompleto",
-                            "Portão B (modelo de cálculo) incompleto",
-                            "Portão D (reconciliação) incompleto");
+            assertThat(result.limitations()).contains("Portão D (reconciliação) incompleto");
         }
     }
 
@@ -1377,8 +1374,8 @@ class C7RuleTest {
     /** Linked people (every person gets a registration version on 2020-01-01) plus their records. */
     private static final class Scenario {
         private final CanonicalDataset.Builder builder = CanonicalDataset.builder();
-        private final java.util.Set<String> linkedInes = new java.util.TreeSet<>();
-        private final java.util.Set<String> typedInes = new java.util.HashSet<>();
+        private final Set<String> linkedInes = new TreeSet<>();
+        private final Set<String> typedInes = new HashSet<>();
 
         Scenario woman(String key, LocalDate birth) {
             return person(key, birth, FEMININO, null);
@@ -1401,7 +1398,7 @@ class C7RuleTest {
                 if (r instanceof esusdata.indicator.model.CanonicalTeam t) {
                     typedInes.add(t.ine());
                 }
-                if (r instanceof esusdata.indicator.model.CanonicalRegistration reg && reg.ine() != null) {
+                if (r instanceof CanonicalRegistration reg && reg.ine() != null) {
                     linkedInes.add(reg.ine());
                 }
             }

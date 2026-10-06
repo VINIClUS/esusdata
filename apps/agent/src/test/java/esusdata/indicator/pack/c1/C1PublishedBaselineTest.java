@@ -59,7 +59,8 @@ class C1PublishedBaselineTest {
         assertThat(result.classification()).isNull();
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(numerator));
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(denominator));
-        assertThat(result.limitations()).contains("Portão A (fonte e vigência) incompleto");
+        assertThat(result.limitations())
+                .contains("Portão B (modelo de cálculo) incompleto", "Portão D (reconciliação) incompleto");
     }
 
     @Test

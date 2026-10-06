@@ -656,3 +656,8 @@ subgrupos vazios, o mês não tem valor e fica fora da média quadrimestral.
 | 50 | Suficiente |
 | 25 | Regular |
 | 40 (CT01) | Suficiente |
+
+## Nota de 2026-10-06: tipo de equipe na regra
+
+A regra `c7-prevencao-cancer@0.3.0` aplica o item 24 b da ficha: só equipes de tipo 70 (eSF) ou 76 (eAP), vigente no último dia da competência (`valid_from <= dia < valid_to`), entram. Equipe sem tipo, com dois tipos ou de outro tipo deixa a pessoa fora da coorte com o motivo (`EXCLUIDO_EQUIPE_SEM_TIPO`, `EXCLUIDO_TIPO_EQUIPE_CONFLITANTE`, `EXCLUIDO_EQUIPE_FORA_DO_ESCOPO`) e uma contagem divulgada. C7-D2 (só pessoas de equipe com tipo 70 ou 76 vigente no último dia da competência entram; sem INE de equipe com tipo, de tipo conflitante ou de outro tipo, a pessoa sai com motivo e `C7-LIM-15/contagem`) está implementada; o C7 não tem crédito para eAP (a ficha não cita). `team` entrou nas capacidades exigidas e na leitura. Detalhe e fontes em `docs/indicadores/decisoes/c7-prevencao-cancer.md`.
+

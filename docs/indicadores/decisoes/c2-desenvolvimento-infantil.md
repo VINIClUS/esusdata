@@ -876,3 +876,13 @@ Não são ambiguidades abertas: são medidas e checagens que a regra decidida pe
 4. A fatia do Componente III implementa o tratamento da linha de equipe ausente (AMB-C2-03, parte (b)).
 5. A versão sobe para `c2-desenvolvimento-infantil@0.2.0`; `Nt08Consolidation.invalidMonth` recusa mês de outra versão
    (`:165-`), então os meses antigos de `@0.1.0` não se misturam com `@0.2.0` na média.
+
+> **Nota de 2026-10-06 (tipo de equipe nas regras).** Implementada na regra `c2-desenvolvimento-infantil@0.3.0` (política de cálculo `c2-exact-score@1 (inalterada: a decisão C2-D1 não muda o modelo de pontuação)`).
+>
+> C2-D1 (D creditada à criança de equipe eAP 76 que não a cumpriu: `PRATICA_CREDITADA_EAP76`, `PRACTICE_MET`, 20 pontos; a visita observada continua como evidência e o `observada em N` é divulgado) e C2-D2 (criança de equipe sem tipo, com dois tipos ou de outro tipo fica fora da coorte, com os motivos `EXCLUIDO_EQUIPE_SEM_TIPO`, `EXCLUIDO_TIPO_EQUIPE_CONFLITANTE` e `EXCLUIDO_EQUIPE_FORA_DO_ESCOPO` e a contagem `C2-LIM-16/contagem`) estão implementadas; `team` entrou nas capacidades exigidas. O filtro de consulta do AMB-C2-11 (2), que olha a equipe do atendimento, continua aceitando consulta de INE com tipo desconhecido ou conflitante e rejeitando a de tipo conhecido fora de 70/76.
+>
+> **Limitações:** C2-LIM-05 deixa de ser `BLOCKING_GAP` e passa a `DECLARED_CONVENTION` (crédito da D para eAP 76; id mantido, texto novo); C2-LIM-06 e C2-LIM-16 têm o texto reescrito (conflito de tipo; exclusões com motivo e contagem).
+>
+> **Vigência (`valid_to`).** O item 1 do cabeçalho diz `validTo` nulo ou `>= fim`. O contrato da capacidade `team` define `valid_to` como **exclusivo** (`[valid_from, valid_to)`; cabeçalho de `contracts/compatibility/queries/team@0.1.0.sql` e `CanonicalTeam.validOn`, ADR 0031): um estado cujo `valid_to` é o último dia da competência já foi substituído nesse dia. A regra aplica `validFrom <= fim < validTo`; sem estado que cubra o dia, vale o mais recente com `validFrom <= fim` (item 11 das fichas, "a última competência válida"). Razão: P1/P2 não dizem nada sobre a borda; o contrato de dados é a fonte do significado de `valid_to` e a leitura inclusiva contaria como vigente uma equipe que já mudou de tipo.
+>
+> **Cobertura.** Em 2026-08, todo INE com cadastro ativo tem tipo válido no último dia e nenhum tem dois (`docs/discovery/2026-10-06-cobertura-tipo-de-equipe.md`). Portão A: `PASSED` pela conferência das fichas (`docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md`); Portão D segue `PENDING`. `blocking_gaps_closed`: `C2-LIM-05`.

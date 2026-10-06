@@ -83,9 +83,9 @@ public final class ComponentIII {
                                     + " \"segundo recálculo\" não está definida."),
                     Limitation.convention(
                             "CIII-LIM-10",
-                            "Pesos do Quadro 2 (eSF/eAP) aplicados a toda equipe: o tipo de equipe não está na fonte (lacuna L1 de"
-                                    + " docs/discovery/2026-10-02-dw-dicionario-c2-c7.md);"
-                                    + " eSB e eMulti têm quadros próprios, fora do escopo.")),
+                            "Pesos do Quadro 2 (eSF/eAP, iguais) aplicados às equipes que as regras de C1 a C7 consideram"
+                                    + " (tipo 70 ou 76 vigente no fim da competência, capacidade team; C1 só filtra o INE"
+                                    + " quando o extrato traz team); eSB e eMulti têm quadros próprios, fora do escopo.")),
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.engineeringDefault(),
             List.of(

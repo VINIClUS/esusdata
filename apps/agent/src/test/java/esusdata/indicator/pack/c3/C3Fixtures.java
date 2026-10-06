@@ -27,6 +27,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -121,7 +122,7 @@ final class C3Fixtures {
                         Capabilities.TEAM,
                         new DateWindow(
                                 competencia.atDay(1), competencia.plusMonths(1).atDay(1)));
-        java.util.Set<String> typed = new java.util.HashSet<>();
+        Set<String> typed = new HashSet<>();
         for (Record r : records) {
             builder.add(r);
             if (r instanceof CanonicalTeam t) {
@@ -130,7 +131,7 @@ final class C3Fixtures {
         }
         // a link's team without a record has no type and leaves the cohort (C3-D2): default every linked INE to eSF 70
         for (Record r : records) {
-            if (r instanceof esusdata.indicator.model.CanonicalRegistration reg
+            if (r instanceof CanonicalRegistration reg
                     && reg.ine() != null
                     && !reg.ine().isBlank()
                     && typed.add(reg.ine())) {

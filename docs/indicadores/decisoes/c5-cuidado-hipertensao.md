@@ -133,3 +133,13 @@ Totais: **2 BLOCKING_GAP** (LIM-04 até `team`; LIM-10 até C5-D4), 8 OUT_OF_REA
 | C5-D4 / L6 | PA da visita lida pelo padrão `\d{2,3}[/x]\d{2,3}`; BLOCKING_GAP até a leitura | P1 | Sim, sobe B |
 
 > **Nota de 2026-10-06 (S2, limitações tipadas).** C5-LIM-10 (PA da visita, L6) deixa de ser `BLOCKING_GAP` e passa a `OUT_OF_REACH` para o PEC 5.5.28, pelo mesmo inventário de C4-LIM-05 (`docs/discovery/2026-10-06-pec-5528-l6-exame-do-pe.md`). Texto: «A pressão arterial da visita domiciliar não está registrada no DW desta instalação (PEC 5.5.28); B pode sair subestimada.» Resta uma `BLOCKING_GAP` em C5: C5-LIM-04 (tipo de equipe).
+
+> **Nota de 2026-10-06 (tipo de equipe nas regras).** Implementada na regra `c5-cuidado-hipertensao@0.3.0` (política de cálculo `c5-exact-score@2`).
+>
+> C5-D1 (D creditada à pessoa de equipe eAP 76 que não a cumpriu: `PRATICA_CREDITADA_EAP76`, `PRACTICE_MET`, 25 pontos, `C5-LIM-24/contagem`) e C5-D2 (pessoa de equipe sem tipo, conflitante ou de outro tipo fora da coorte, com motivo e `C5-LIM-25/contagem`) estão implementadas; a regra não devolve mais `RULE_AMBIGUITY` por causa do eAP. `team` entrou nas capacidades exigidas e na leitura.
+>
+> **Limitações:** C5-LIM-04 sai da lista (era `BLOCKING_GAP`, L1 fechada); entram C5-LIM-24 e C5-LIM-25 (`DECLARED_CONVENTION`).
+>
+> **Vigência (`valid_to`).** O item 1 do cabeçalho diz `validTo` nulo ou `>= fim`. O contrato da capacidade `team` define `valid_to` como **exclusivo** (`[valid_from, valid_to)`; cabeçalho de `contracts/compatibility/queries/team@0.1.0.sql` e `CanonicalTeam.validOn`, ADR 0031): um estado cujo `valid_to` é o último dia da competência já foi substituído nesse dia. A regra aplica `validFrom <= fim < validTo`; sem estado que cubra o dia, vale o mais recente com `validFrom <= fim` (item 11 das fichas, "a última competência válida"). Razão: P1/P2 não dizem nada sobre a borda; o contrato de dados é a fonte do significado de `valid_to` e a leitura inclusiva contaria como vigente uma equipe que já mudou de tipo.
+>
+> **Cobertura.** Em 2026-08, todo INE com cadastro ativo tem tipo válido no último dia e nenhum tem dois (`docs/discovery/2026-10-06-cobertura-tipo-de-equipe.md`). Portão A: `PASSED` pela conferência das fichas (`docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md`); Portão D segue `PENDING`. `blocking_gaps_closed`: `C5-LIM-04`.

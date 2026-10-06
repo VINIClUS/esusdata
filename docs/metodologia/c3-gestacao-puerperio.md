@@ -843,3 +843,8 @@ Salvo indicação, a pessoa é identificada (24 a) e vinculada a eSF tipo 70, e 
 | CT-C3-74 | Interrupção por "Mudança de território" / óbito só no CadSUS | interrompe o acompanhamento (item 15) / não detectável no PEC local → limitação declarada | item 15 p.2; item 33 p.4 |
 | CT-C3-75 | Consultas feitas em UBS de outro município, registradas só lá | invisíveis ao PEC local → limitação declarada | 4.4 p.5 |
 | CT-C3-76 | Quadrimestre com meses sem nenhuma gestação que atingiu o 42º dia de puerpério | esses meses não entram na média e não viram zero. Regra da NT 8/2026 via Tech Spec, não desta ficha | Tech Spec §2.4 (Q08) |
+
+## Nota de 2026-10-06: tipo de equipe na regra
+
+A regra `c3-gestacao-puerperio@0.3.0` aplica o item 24 b da ficha: só equipes de tipo 70 (eSF) ou 76 (eAP), vigente no último dia da competência (`valid_from <= dia < valid_to`), entram. Equipe sem tipo, com dois tipos ou de outro tipo deixa a pessoa fora da coorte com o motivo (`EXCLUIDO_EQUIPE_SEM_TIPO`, `EXCLUIDO_TIPO_EQUIPE_CONFLITANTE`, `EXCLUIDO_EQUIPE_FORA_DO_ESCOPO`) e uma contagem divulgada. C3-D1 (E e J creditadas ao episódio de equipe eAP 76 que não as cumpriu: `PRATICA_CREDITADA_EAP76`, `PRACTICE_MET`, 9 pontos cada; antes a regra substituía mesmo a visita observada pela isenção `PRACTICE_EXEMPT`/`EAP_TIPO_76_PONTUACAO_INTEGRAL`, hoje a visita observada é mantida como evidência) e C3-D2 (episódio de equipe sem tipo, de tipo conflitante ou de outro tipo sai, com motivo e a contagem `C3-LIM-10/contagem`) estão implementadas; `team` entrou nas capacidades exigidas e na leitura. Detalhe e fontes em `docs/indicadores/decisoes/c3-gestacao-puerperio.md`.
+

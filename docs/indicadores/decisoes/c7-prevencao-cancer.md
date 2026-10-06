@@ -216,3 +216,13 @@ Totais: **1 BLOCKING_GAP** (C7-LIM-04, temporária), 4 OUT_OF_REACH (01, 02, 03,
 | C7-D5 | Fim de todo `AMBIGUOUS_*`; C7 nunca devolve `RULE_AMBIGUITY` | decisão do mantenedor | Não (consequência de D1–D4) |
 | C7-D6 | Convenções de CBO, domiciliar, códigos, idade e janelas | P1/P5 | Não (já aplicadas) |
 | C7-LIM-04 | L1 é lacuna bloqueante até `team` VALIDATED; depois, regra de tipo comum | P1 (itens 11 e 24 b) | Sim após `team`: equipes sem tipo ou de outro tipo saem |
+
+> **Nota de 2026-10-06 (tipo de equipe nas regras).** Implementada na regra `c7-prevencao-cancer@0.3.0` (política de cálculo `c7-exact-score@2 (inalterada)`).
+>
+> C7-D2 (só pessoas de equipe com tipo 70 ou 76 vigente no último dia da competência entram; sem INE de equipe com tipo, de tipo conflitante ou de outro tipo, a pessoa sai com motivo e `C7-LIM-15/contagem`) está implementada; o C7 não tem crédito para eAP (a ficha não cita). `team` entrou nas capacidades exigidas e na leitura.
+>
+> **Limitações:** C7-LIM-04 sai da lista (era `BLOCKING_GAP`, L1 fechada); entra C7-LIM-15 (`DECLARED_CONVENTION`).
+>
+> **Vigência (`valid_to`).** O item 1 do cabeçalho diz `validTo` nulo ou `>= fim`. O contrato da capacidade `team` define `valid_to` como **exclusivo** (`[valid_from, valid_to)`; cabeçalho de `contracts/compatibility/queries/team@0.1.0.sql` e `CanonicalTeam.validOn`, ADR 0031): um estado cujo `valid_to` é o último dia da competência já foi substituído nesse dia. A regra aplica `validFrom <= fim < validTo`; sem estado que cubra o dia, vale o mais recente com `validFrom <= fim` (item 11 das fichas, "a última competência válida"). Razão: P1/P2 não dizem nada sobre a borda; o contrato de dados é a fonte do significado de `valid_to` e a leitura inclusiva contaria como vigente uma equipe que já mudou de tipo.
+>
+> **Cobertura.** Em 2026-08, todo INE com cadastro ativo tem tipo válido no último dia e nenhum tem dois (`docs/discovery/2026-10-06-cobertura-tipo-de-equipe.md`). Portão A: `PASSED` pela conferência das fichas (`docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md`); Portão D segue `PENDING`. `blocking_gaps_closed`: `C7-LIM-04`.

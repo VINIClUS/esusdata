@@ -312,3 +312,8 @@ Base comum (salvo indicação): competência 2026-03 (corte 2026-03-31; ADR 0004
 | T-C5-23 | Duas consultas e a mesma PA registrada duas vezes no mesmo dia | A = 25 e B = 25, cada uma uma vez; evidência duplicada não soma | MET-32 |
 | T-C5-24 | Pessoa com `E11` e `I10`, uma consulta médica no semestre | Entra em C4 e em C5; a mesma consulta comprova A nos dois (indicadores calculados de forma independente) | ficha C5 p. 2; ficha C4 p. 2 |
 | T-C5-25 | Nenhuma pessoa elegível | `NO_DENOMINATOR` | MET-04 |
+
+## Nota de 2026-10-06: tipo de equipe na regra
+
+A regra `c5-cuidado-hipertensao@0.3.0` aplica o item 24 b da ficha: só equipes de tipo 70 (eSF) ou 76 (eAP), vigente no último dia da competência (`valid_from <= dia < valid_to`), entram. Equipe sem tipo, com dois tipos ou de outro tipo deixa a pessoa fora da coorte com o motivo (`EXCLUIDO_EQUIPE_SEM_TIPO`, `EXCLUIDO_TIPO_EQUIPE_CONFLITANTE`, `EXCLUIDO_EQUIPE_FORA_DO_ESCOPO`) e uma contagem divulgada. C5-D1 (D creditada à pessoa de equipe eAP 76 que não a cumpriu: `PRATICA_CREDITADA_EAP76`, `PRACTICE_MET`, 25 pontos, `C5-LIM-24/contagem`) e C5-D2 (pessoa de equipe sem tipo, conflitante ou de outro tipo fora da coorte, com motivo e `C5-LIM-25/contagem`) estão implementadas; a regra não devolve mais `RULE_AMBIGUITY` por causa do eAP. `team` entrou nas capacidades exigidas e na leitura. Detalhe e fontes em `docs/indicadores/decisoes/c5-cuidado-hipertensao.md`.
+

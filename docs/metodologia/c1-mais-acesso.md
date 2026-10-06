@@ -174,7 +174,7 @@ competência a partir da qual os dois CBO incluídos passam a valer.
 
 Base de comparação:
 [`C1Rule.java`](../../apps/agent/src/main/java/esusdata/indicator/pack/c1/C1Rule.java)
-(`c1-mais-acesso@0.3.0`, `c1-exact-ratio@1`),
+(`c1-mais-acesso@0.4.0`, `c1-exact-ratio@2`),
 [`individual_encounter_modality@0.1.0.sql`](../../contracts/compatibility/queries/individual_encounter_modality@0.1.0.sql),
 o mapeamento de modalidade do plano de execução (`apps/execplane/src/stream.rs`) e as descobertas
 em `docs/discovery/2026-09-19-pec-ct133.md` e `docs/discovery/2026-09-24-pec-5528.md`. Esta seção
@@ -200,3 +200,8 @@ só descreve; não é proposta de mudança (a linha 1 já foi implementada em 0.
 Lacunas da própria ficha, registradas para referência: a ficha não traz regra de transição
 para os CBO 2251-25 e 2252-50 (nota de rodapé; decisão C1-D1: valem sempre), não lista CNES/INE ("descritos") e não define
 arredondamento.
+
+## Nota de 2026-10-06: tipo de equipe na regra
+
+A regra `c1-mais-acesso@0.4.0` aplica o item 24 b da ficha: só equipes de tipo 70 (eSF) ou 76 (eAP), vigente no último dia da competência (`valid_from <= dia < valid_to`), entram. Equipe sem tipo, com dois tipos ou de outro tipo deixa a pessoa fora da coorte com o motivo (`EXCLUIDO_EQUIPE_SEM_TIPO`, `EXCLUIDO_TIPO_EQUIPE_CONFLITANTE`, `EXCLUIDO_EQUIPE_FORA_DO_ESCOPO`) e uma contagem divulgada. C1-D2 está implementada em `C1Pack` (filtro de INE por `TeamScope`: 70 eSF e 76 eAP vigente no último dia da competência; atendimento sem INE, de equipe sem tipo, de tipo conflitante ou de outro tipo fica fora do numerador e do denominador, com a contagem `C1-LIM-10/contagem`). **O filtro só atua quando o extrato traz a parte `team`.** A leitura de C1 ainda é o extrato canônico v1 (`individual_encounter_modality`, `DataRequirements.V1`, sem contrato v2 nem entrada em `Capabilities.PACKAGED`); acrescentar `team` a ela exige um contrato v2 de C1 e a mudança correspondente no plano de execução (Rust), que ficam para uma fatia própria. Por isso, e conforme o cabeçalho ("L1 só fecha com `team` VALIDATED, cobertura comprovada e C1-D2 implementada"), **C1-LIM-03 continua `BLOCKING_GAP` em produção** e `blocking_gaps_closed` de C1 fica vazio. O texto de C1-LIM-03 passou a dizer isso. A cobertura do tipo de equipe já está comprovada (`docs/discovery/2026-10-06-cobertura-tipo-de-equipe.md`), de modo que o único passo que falta é a leitura v2. Detalhe e fontes em `docs/indicadores/decisoes/c1-mais-acesso.md`.
+

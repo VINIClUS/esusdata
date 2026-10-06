@@ -108,15 +108,19 @@ final class C7Cohort {
                 && C7Codes.IDENTIDADE_HOMEM_TRANSGENERO.equals(person.genderIdentity());
         Link link = link(versions, reference);
         String reason = conflicting(rows) ? EXCLUIDO_PESSOA_CONFLITANTE : exclusion(rows, age, link, reference);
-        if (reason == null && link.ine() != null) {
-            TeamScope.Decision team = teams.decide(link.ine());
-            reason = team.considered() ? null : team.exclusionReason();
+        if (reason == null) {
+            reason = teamExclusion(link, teams);
         }
         boolean eligible = reason == null;
         if (eligible) {
             reason = transMan ? ELEGIVEL_HOMEM_TRANSGENERO : ELEGIVEL_SEXO_FEMININO;
         }
         return new Member(person.personKey(), birth, age, transMan, eligible, reason, link.cnes(), link.ine());
+    }
+
+    /** The team-type rule's reason (C7-D2) when the link's team is not a considered one, else {@code null}. */
+    private static String teamExclusion(Link link, TeamScope teams) {
+        return link.ine() == null ? null : teams.decide(link.ine()).exclusionReason();
     }
 
     private static boolean conflicting(List<CanonicalPerson> rows) {

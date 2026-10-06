@@ -41,6 +41,12 @@ public final class TeamScope {
     /** Evidence reason of the practice a person of an eAP 76 team is credited with, without the event. */
     public static final String REASON_CREDITED_EAP76 = "PRATICA_CREDITADA_EAP76";
 
+    private static final Decision NO_INE = new Decision(Verdict.WITHOUT_TYPE, null);
+
+    private final LocalDate end;
+    private final Map<String, List<CanonicalTeam>> byIne = new HashMap<>();
+    private final Map<String, Decision> decided = new HashMap<>();
+
     /** What the rule says about one INE. */
     public enum Verdict {
         ESF,
@@ -76,12 +82,6 @@ public final class TeamScope {
             };
         }
     }
-
-    private static final Decision NO_INE = new Decision(Verdict.WITHOUT_TYPE, null);
-
-    private final LocalDate end;
-    private final Map<String, List<CanonicalTeam>> byIne = new HashMap<>();
-    private final Map<String, Decision> decided = new HashMap<>();
 
     private TeamScope(List<CanonicalTeam> teams, LocalDate end) {
         this.end = end;

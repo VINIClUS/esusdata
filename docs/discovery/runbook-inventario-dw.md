@@ -398,3 +398,22 @@ mvn -B -f apps/agent/pom.xml test -Dsurefire.reuseForks=false \
 
 Reverta a entrada com `git checkout contracts/compatibility/pec-adapters.json` ao fim. O arquivo de
 ambiente precisa de `PEC_SOURCE_ID`, `PEC_VERSION` e `PEC_MUNICIPALITY_IBGE`.
+
+## Cobertura do tipo de equipe sobre os vínculos de uma competência
+
+O `TeamCoverageLiveTest` roda a consulta congelada de `team@0.1.0` e um agregado por INE sobre os
+cadastros individuais ativos até o último dia da competência, aplica a regra de produção
+(`TeamScope`: 70 eSF, 76 eAP vigente no último dia) e escreve em
+`apps/agent/target/team-coverage/` só contagens (de 1 a 9, `<10`): INEs e pessoas por veredito (eSF,
+eAP, outro tipo, sem tipo, conflitante). Nenhum INE, CNES ou chave de pessoa sai. Sessão somente
+leitura desde o login, com o mesmo opt-in dos demais testes vivos. Resultado de 2026-08:
+[`2026-10-06-cobertura-tipo-de-equipe.md`](2026-10-06-cobertura-tipo-de-equipe.md).
+
+```bash
+mvn -B -f apps/agent/pom.xml test -Djacoco.skip=true -Dsurefire.reuseForks=false \
+  -Dtest=TeamCoverageLiveTest -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dobservatorio.execution-plane.live-pec=true \
+  -Dobservatorio.execution-plane.live-pec.env-file=$HOME/.config/observatorio-aps/pec-253.env \
+  -Dobservatorio.team-coverage.ibge=<IBGE de 7 dígitos> \
+  -Dobservatorio.team-coverage.competencia=<YYYY-MM>
+```

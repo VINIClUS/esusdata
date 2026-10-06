@@ -200,7 +200,7 @@ public final class C2Pack implements IndicatorRule {
             ValueKind.SCORE,
             "percentual",
             "CRIANCAS_ATE_2_ANOS_VINCULADAS",
-            "c2-exact-score@2",
+            "c2-exact-score@1",
             List.of(
                     Capabilities.CITIZEN,
                     Capabilities.INDIVIDUAL_REGISTRATION,

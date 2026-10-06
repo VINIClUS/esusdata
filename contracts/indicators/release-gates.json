@@ -3,11 +3,19 @@
   "packs": [
     {
       "pack": "c1-mais-acesso",
-      "rule_version": "c1-mais-acesso@0.3.0",
+      "rule_version": "c1-mais-acesso@0.4.0",
       "gates": {
         "A": {
-          "status": "PENDING",
-          "evidence": []
+          "status": "PASSED",
+          "check": "conferencia-fichas@1",
+          "checked_at": "2026-10-06",
+          "evidence": [
+            {
+              "kind": "conferencia-fichas",
+              "ref": "docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md",
+              "sha256": "a705354409772575a20b9814808f21d988df3641682b713f05862d0f06a2c492"
+            }
+          ]
         },
         "D": {
           "status": "PENDING",
@@ -18,93 +26,153 @@
     },
     {
       "pack": "c2-desenvolvimento-infantil",
-      "rule_version": "c2-desenvolvimento-infantil@0.2.0",
+      "rule_version": "c2-desenvolvimento-infantil@0.3.0",
       "gates": {
         "A": {
-          "status": "PENDING",
-          "evidence": []
+          "status": "PASSED",
+          "check": "conferencia-fichas@1",
+          "checked_at": "2026-10-06",
+          "evidence": [
+            {
+              "kind": "conferencia-fichas",
+              "ref": "docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md",
+              "sha256": "a705354409772575a20b9814808f21d988df3641682b713f05862d0f06a2c492"
+            }
+          ]
         },
         "D": {
           "status": "PENDING",
           "evidence": []
         }
       },
-      "blocking_gaps_closed": []
+      "blocking_gaps_closed": [
+        "C2-LIM-05"
+      ]
     },
     {
       "pack": "c3-gestacao-puerperio",
-      "rule_version": "c3-gestacao-puerperio@0.2.0",
+      "rule_version": "c3-gestacao-puerperio@0.3.0",
       "gates": {
         "A": {
-          "status": "PENDING",
-          "evidence": []
+          "status": "PASSED",
+          "check": "conferencia-fichas@1",
+          "checked_at": "2026-10-06",
+          "evidence": [
+            {
+              "kind": "conferencia-fichas",
+              "ref": "docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md",
+              "sha256": "a705354409772575a20b9814808f21d988df3641682b713f05862d0f06a2c492"
+            }
+          ]
         },
         "D": {
           "status": "PENDING",
           "evidence": []
         }
       },
-      "blocking_gaps_closed": []
+      "blocking_gaps_closed": [
+        "C3-LIM-05"
+      ]
     },
     {
       "pack": "c4-cuidado-diabetes",
-      "rule_version": "c4-cuidado-diabetes@0.2.0",
+      "rule_version": "c4-cuidado-diabetes@0.3.0",
       "gates": {
         "A": {
-          "status": "PENDING",
-          "evidence": []
+          "status": "PASSED",
+          "check": "conferencia-fichas@1",
+          "checked_at": "2026-10-06",
+          "evidence": [
+            {
+              "kind": "conferencia-fichas",
+              "ref": "docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md",
+              "sha256": "a705354409772575a20b9814808f21d988df3641682b713f05862d0f06a2c492"
+            }
+          ]
         },
         "D": {
           "status": "PENDING",
           "evidence": []
         }
       },
-      "blocking_gaps_closed": []
+      "blocking_gaps_closed": [
+        "C4-LIM-03"
+      ]
     },
     {
       "pack": "c5-cuidado-hipertensao",
-      "rule_version": "c5-cuidado-hipertensao@0.2.0",
+      "rule_version": "c5-cuidado-hipertensao@0.3.0",
       "gates": {
         "A": {
-          "status": "PENDING",
-          "evidence": []
+          "status": "PASSED",
+          "check": "conferencia-fichas@1",
+          "checked_at": "2026-10-06",
+          "evidence": [
+            {
+              "kind": "conferencia-fichas",
+              "ref": "docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md",
+              "sha256": "a705354409772575a20b9814808f21d988df3641682b713f05862d0f06a2c492"
+            }
+          ]
         },
         "D": {
           "status": "PENDING",
           "evidence": []
         }
       },
-      "blocking_gaps_closed": []
+      "blocking_gaps_closed": [
+        "C5-LIM-04"
+      ]
     },
     {
       "pack": "c6-cuidado-pessoa-idosa",
-      "rule_version": "c6-cuidado-pessoa-idosa@0.2.0",
+      "rule_version": "c6-cuidado-pessoa-idosa@0.3.0",
       "gates": {
         "A": {
-          "status": "PENDING",
-          "evidence": []
+          "status": "PASSED",
+          "check": "conferencia-fichas@1",
+          "checked_at": "2026-10-06",
+          "evidence": [
+            {
+              "kind": "conferencia-fichas",
+              "ref": "docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md",
+              "sha256": "a705354409772575a20b9814808f21d988df3641682b713f05862d0f06a2c492"
+            }
+          ]
         },
         "D": {
           "status": "PENDING",
           "evidence": []
         }
       },
-      "blocking_gaps_closed": []
+      "blocking_gaps_closed": [
+        "C6-LIM-05"
+      ]
     },
     {
       "pack": "c7-prevencao-cancer",
-      "rule_version": "c7-prevencao-cancer@0.2.0",
+      "rule_version": "c7-prevencao-cancer@0.3.0",
       "gates": {
         "A": {
-          "status": "PENDING",
-          "evidence": []
+          "status": "PASSED",
+          "check": "conferencia-fichas@1",
+          "checked_at": "2026-10-06",
+          "evidence": [
+            {
+              "kind": "conferencia-fichas",
+              "ref": "docs/metodologia/fontes/2026-10-06-conferencia-das-fichas.md",
+              "sha256": "a705354409772575a20b9814808f21d988df3641682b713f05862d0f06a2c492"
+            }
+          ]
         },
         "D": {
           "status": "PENDING",
           "evidence": []
         }
       },
-      "blocking_gaps_closed": []
+      "blocking_gaps_closed": [
+        "C7-LIM-04"
+      ]
     },
     {
       "pack": "componente-iii-nota-final",

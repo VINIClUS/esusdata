@@ -42,7 +42,7 @@ class C7PackTest {
                 .isEqualTo(BigInteger.valueOf(100));
         assertThat(d.components()).allMatch(c -> c.kind() == ComponentKind.SUBGROUP);
         assertThat(GateFixtures.shipped(d).isComplete()).isFalse();
-        assertThat(GateFixtures.shipped(d).incompleteReasons()).hasSize(3);
+        assertThat(GateFixtures.shipped(d).incompleteReasons()).hasSize(1); // only D: A passed, B has no blocking gap
         assertThat(d.standingLimitationLines())
                 .isNotEmpty()
                 .noneMatch(l -> l.contains("Regra em implementação"))

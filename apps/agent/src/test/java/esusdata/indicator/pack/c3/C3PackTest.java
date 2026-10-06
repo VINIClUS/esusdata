@@ -390,7 +390,7 @@ class C3PackTest {
         assertThat(result.referencePeriod()).isEqualTo("2025-11");
         assertThat(result.dataCutoff()).isEqualTo("2025-11-30");
         assertThat(result.limitations())
-                .contains("Portão A (fonte e vigência) incompleto")
+                .contains("Portão D (reconciliação) incompleto")
                 .containsAll(pack.descriptor().standingLimitationLines());
         assertThat(result.components())
                 .extracting(ResultComponent::code)
