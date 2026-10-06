@@ -183,14 +183,15 @@ class CapabilityMatrixConsistencyTest {
         List<String> others = new ArrayList<>();
         for (JsonNode entry : matrix().get("tested_with")) {
             String capability = text(entry, "capability");
-            if (!VALIDATED_ENTRIES.containsKey(capability) && !Capabilities.ALL.contains(capability)) {
+            if (!VALIDATED_ENTRIES.containsKey(capability) && !Capabilities.PACKAGED.contains(capability)) {
                 others.add(capability);
             }
         }
 
         assertThat(others).isEmpty();
         assertThat(FOUNDATION_APPROVALS.keySet()).containsExactlyInAnyOrderElementsOf(Capabilities.ALL);
-        assertThat(matrix().get("tested_with")).hasSize(VALIDATED_ENTRIES.size() + Capabilities.ALL.size());
+        // the foundation's approved entries, plus team's, which waits for its live capture (ADR 0031)
+        assertThat(matrix().get("tested_with")).hasSize(VALIDATED_ENTRIES.size() + Capabilities.PACKAGED.size());
     }
 
     private static List<JsonNode> entries(String capability) {

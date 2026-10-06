@@ -21,7 +21,7 @@ pub struct Packaged {
     pub query_text: &'static str,
 }
 
-/// `include_str!` needs a literal path; this keeps the ten entries below one line each.
+/// `include_str!` needs a literal path; this keeps the eleven entries below one line each.
 macro_rules! packaged {
     ($id:literal) => {
         Packaged {
@@ -41,7 +41,7 @@ macro_rules! packaged {
 }
 
 /// The foundation's capabilities, as `contracts/compatibility/capabilities/index.json` lists them.
-pub static REGISTRY: [Packaged; 10] = [
+pub static REGISTRY: [Packaged; 11] = [
     packaged!("care_encounter"),
     packaged!("citizen"),
     packaged!("condition_list"),
@@ -52,6 +52,7 @@ pub static REGISTRY: [Packaged; 10] = [
     packaged!("individual_registration"),
     packaged!("measurement_record"),
     packaged!("procedure_performed"),
+    packaged!("team"),
 ];
 
 /// A capability descriptor (`capabilities.schema.json`); `description` is for people, not read.
@@ -59,6 +60,10 @@ pub static REGISTRY: [Packaged; 10] = [
 pub struct Descriptor {
     pub capability: String,
     pub adapter_version: String,
+    /// The read model the capability's matrix entry is compared with (ADR 0031); absent means the
+    /// DW. A part is probed against its own capability's model, never the source's.
+    #[serde(default = "default_read_model")]
+    pub read_model: String,
     pub record_kind: String,
     pub entity_type_column: String,
     pub record_id_column: String,
@@ -67,6 +72,10 @@ pub struct Descriptor {
     pub query: String,
     pub binds: Vec<Bind>,
     pub columns: Vec<Column>,
+}
+
+fn default_read_model() -> String {
+    "PEC_DW".to_string()
 }
 
 /// One positional bind, in the order the query's `?` placeholders consume them.
@@ -378,6 +387,39 @@ mod tests {
                 .iter()
                 .any(|bind| bind.kind == BindKind::MunicipalityIbge));
         }
+    }
+
+    /// The model a capability's matrix entry is compared with is the descriptor's (ADR 0031): the
+    /// transactional `team` says `PEC_OLTP`, every DW capability says nothing and is `PEC_DW`.
+    #[test]
+    fn only_team_reads_the_transactional_model() {
+        for packaged in &REGISTRY {
+            let capability = packaged.load().unwrap();
+            let expected = if packaged.id == "team" {
+                "PEC_OLTP"
+            } else {
+                "PEC_DW"
+            };
+            assert_eq!(
+                capability.descriptor.read_model, expected,
+                "{}",
+                packaged.id
+            );
+        }
+    }
+
+    #[test]
+    fn team_takes_only_the_municipality_and_has_no_scope_date() {
+        let team = REGISTRY
+            .iter()
+            .find(|p| p.id == "team")
+            .unwrap()
+            .load()
+            .unwrap();
+        assert_eq!(team.descriptor.record_kind, "team");
+        assert!(team.descriptor.scope_date_column.is_none());
+        let binds: Vec<BindKind> = team.descriptor.binds.iter().map(|b| b.kind).collect();
+        assert_eq!(binds, [BindKind::MunicipalityIbge]);
     }
 
     #[test]

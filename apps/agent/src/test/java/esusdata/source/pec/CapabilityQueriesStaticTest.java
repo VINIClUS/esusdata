@@ -24,7 +24,7 @@ class CapabilityQueriesStaticTest {
 
     private static final Pattern TYPED_PLACEHOLDER = Pattern.compile("CAST\\(\\?\\s+AS\\s+(text\\[\\]|text|date)\\)");
     private static final Pattern IDENTIFIER = Pattern.compile("\\b[a-z_][a-z0-9_]*\\b");
-    private static final Pattern TABLE = Pattern.compile("\\b(\\w++\\.)?(tb_\\w++)");
+    private static final Pattern TABLE = Pattern.compile("\\b(\\w++\\.)?(t[abl]_\\w++)");
     private static final Map<String, String> BIND_SQL_TYPE = Map.of(
             "MUNICIPALITY_IBGE", "text",
             "PERIOD_START", "date",
@@ -107,7 +107,7 @@ class CapabilityQueriesStaticTest {
             "txid_current");
 
     static Stream<String> foundation() {
-        return Capabilities.ALL.stream();
+        return Capabilities.PACKAGED.stream();
     }
 
     @ParameterizedTest(name = "{0}")

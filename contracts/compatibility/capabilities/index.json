@@ -10,6 +10,7 @@
     "immunization_history@0.1.0.json",
     "individual_registration@0.1.0.json",
     "measurement_record@0.1.0.json",
-    "procedure_performed@0.1.0.json"
+    "procedure_performed@0.1.0.json",
+    "team@0.1.0.json"
   ]
 }

@@ -24,7 +24,7 @@ class CapabilityCatalogTest {
     void everyFoundationCapabilityIsPackagedOnce() {
         assertThat(CapabilityCatalog.packaged().all())
                 .extracting(CapabilityContract::capability)
-                .containsExactlyInAnyOrderElementsOf(Capabilities.ALL);
+                .containsExactlyInAnyOrderElementsOf(Capabilities.PACKAGED);
         assertThatThrownBy(() -> CapabilityCatalog.packaged().require("individual_encounter_modality"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
