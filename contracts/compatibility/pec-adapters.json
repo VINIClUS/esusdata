@@ -945,8 +945,8 @@
       "read_model": "PEC_OLTP",
       "installation_role": "PRONTUARIO",
       "capability": "team",
-      "status": "NOT_TESTED",
-      "status_reason": "Capacidade nova (ADR 0031), a única que lê o esquema transacional do PEC. Consulta escrita sobre o inventário de 2026-10-06 (docs/discovery/2026-10-06-pec-5528-equipe-transacional.md). As signature_fingerprint são as do PEC 5.5.28 de produção, capturadas ao vivo em 2026-10-06 (somente leitura); as de tb_dim_equipe e tb_dim_municipio coincidem com as da fixture sintética e as das outras quatro tabelas diferem dela. Falta o diferencial Rust x JDBC ao vivo e a aprovação do usuário.",
+      "status": "VALIDATED",
+      "status_reason": "Capacidade nova (ADR 0031), a única que lê o esquema transacional do PEC. Consulta escrita sobre o inventário de 2026-10-06 (docs/discovery/2026-10-06-pec-5528-equipe-transacional.md). As signature_fingerprint são as do PEC 5.5.28 de produção, capturadas ao vivo em 2026-10-06 (somente leitura); as de tb_dim_equipe e tb_dim_municipio coincidem com as da fixture sintética e as das outras quatro tabelas diferem dela. Validada ao vivo em 2026-10-06 pela receita da ADR 0023: captura dos fingerprints, consulta congelada para o município (29 INEs, tipos 70 e 76 presentes) e aquisição pelo execplane idêntica à JDBC (ExecPlaneCapabilityLivePecTest com observatorio.capabilities.live.only=team). Promovida por delegação do mantenedor (2026-10-06).",
       "objects_used": [
         {
           "object": "ta_equipe",
@@ -1012,8 +1012,11 @@
       },
       "query_checksum": "sha256:0890d74bff5a469992177b04a9bad351ac0d4801266b36ac7fa045ff78e1dbfe",
       "fixture_checksum": "sha256:8f9180796cc58cea3f3eb620e38381abde420609d6c562bedd59dc734cd8a214",
-      "test_result": "NOT_RUN",
-      "test_evidence_ref": "docs/discovery/2026-10-06-pec-5528-equipe-transacional.md"
+      "test_result": "PASS",
+      "test_evidence_ref": "docs/discovery/2026-10-06-pec-5528-equipe-transacional.md; apps/agent/src/test/java/esusdata/source/pec/TeamFingerprintCaptureLiveTest.java; apps/agent/src/test/java/esusdata/run/acquisition/ExecPlaneCapabilityLivePecTest.java; apps/agent/src/test/java/esusdata/source/pec/TeamCapabilityTest.java",
+      "test_notes": "Validada em 2026-10-06 ao vivo contra o PEC 5.5.28 / PostgreSQL 9.6.13 de produção do município, por túnel SSH e só leitura (receita da ADR 0023): TeamFingerprintCaptureLiveTest capturou os seis fingerprints (os das quatro tabelas transacionais estão nesta entrada) e rodou a consulta congelada para o IBGE do município (83 linhas, 29 INEs, tipos 70 e 76 presentes, estado por auditoria e recuo para o atual); com a entrada marcada VALIDATED localmente e o execution plane reconstruído, ExecPlaneCapabilityLivePecTest (observatorio.capabilities.live.only=team) adquiriu a parte team pelo Rust idêntica à mesma consulta via JDBC, com os fingerprints conferidos no handshake.",
+      "approved_at": "2026-10-06",
+      "approved_by": "agente Claude (delegação de vinicius0zero0@gmail.com, 2026-10-06)"
     }
   ]
 }

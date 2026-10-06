@@ -24,6 +24,7 @@ class CapabilityEligibilityTest {
         List<String> on5528 =
                 new ArrayList<>(List.of("individual_encounter_modality", "municipal_isolation", "period_coverage"));
         on5528.addAll(Capabilities.ALL);
+        on5528.add(Capabilities.TEAM);
 
         assertThat(packaged.validatedCapabilities(PEC_5_4_37)).containsExactly("individual_encounter_modality");
         assertThat(packaged.validatedCapabilities(PEC_5_5_28)).containsExactlyInAnyOrderElementsOf(on5528);
@@ -147,15 +148,15 @@ class CapabilityEligibilityTest {
     }
 
     @Test
-    void theTeamCapabilityIsNotValidatedUntilItsEntryIs() {
+    void theTeamCapabilityIsValidatedOnItsOwnModelForAPecDwSource() {
         PecCompatibilityMatrix packaged = PecCompatibilityMatrix.fromClasspathResource();
 
-        assertThat(packaged.validatedCapabilities(PEC_5_5_28)).doesNotContain(Capabilities.TEAM);
+        assertThat(packaged.validatedCapabilities(PEC_5_5_28)).contains(Capabilities.TEAM);
         assertThat(packaged.entries())
                 .filteredOn(entry -> Capabilities.TEAM.equals(entry.capability()))
                 .singleElement()
                 .satisfies(entry -> {
-                    assertThat(entry.status()).isEqualTo("NOT_TESTED");
+                    assertThat(entry.status()).isEqualTo("VALIDATED");
                     assertThat(entry.readModel()).isEqualTo("PEC_OLTP");
                 });
     }
