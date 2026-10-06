@@ -1,10 +1,12 @@
-# Runbook: sensibilidade das ambiguidades (RULE_AMBIGUITY de C3)
+# Runbook: sensibilidade e frequência por pack
 
 Ferramenta **local**, na árvore de testes (`apps/agent/src/test/java/esusdata/indicator/sensitivity/`),
 sem chave de produção. Dado um extrato canônico real, que fica só no disco local, mostra para cada
-código AMB quantos sujeitos afeta e qual seria o numerador, o denominador e a pontuação em cada
-leitura candidata, por INE e para o município. Serve de base numérica para as decisões do Portão
-B/D: veja o plano em `c1-c4-c5-e-rippling-riddle.md`, fatia S3.
+pack a linha de base (numerador, denominador e pontuação, por INE e para o município) e quantas vezes
+cada código de ambiguidade dispara nas evidências e nas limitações. Nenhum pack tem hoje leituras
+candidatas: as ambiguidades de C2, C3 e C7 foram decididas em `docs/indicadores/decisoes/`. A
+infraestrutura de leituras (`SubjectReadings`) fica para uma ambiguidade futura. Plano original em
+`c1-c4-c5-e-rippling-riddle.md`, fatia S3.
 
 ## O que ela calcula
 
@@ -15,8 +17,7 @@ execução para com erro: C3 confere denominador e pontos pelos componentes.
 | Pack | Código | Leituras |
 |---|---|---|
 | C2 | — | Sem leituras desde `c2-desenvolvimento-infantil@0.2.0`: as AMB-C2-01 a -15 e a LACUNA-L3 foram decididas em `docs/indicadores/decisoes/c2-desenvolvimento-infantil.md`. Os números das leituras de 2026-08 ficam em `docs/discovery/2026-10-06-sensibilidade-2026-08.md`. Hoje entra como as demais: só o que dispara. |
-| C3 | AMB-C3-02 | Uma execução por convenção, com `C3Pack.withTrimesterConvention`. Dias contados da DUM (dia 0), limites inclusivos: 13s6d/28s0d = (97, 196); 13s6d/27s0d = (97, 189); 12s6d/28s0d = (90, 196); 14s0d/28s0d = (98, 196). Mostra também o numerador e o denominador de G e H. |
-| C3 | demais AMB-C3-xx | Frequência; os que aparecem como ambiguidade de inclusão do episódio na coorte, com as três leituras de inclusão; os de prática, com limites. |
+| C3 | — | Sem leituras desde `c3-gestacao-puerperio@0.2.0`: as AMB-C3-01 a -21 e a L2 foram decididas em `docs/indicadores/decisoes/c3-gestacao-puerperio.md`. Os números das leituras de 2026-08 ficam em `docs/discovery/2026-10-06-sensibilidade-2026-08.md`. Hoje entra como as demais: só o que dispara. |
 | C7 | — | Sem leituras desde `c7-prevencao-cancer@0.2.0`: as AMB-C7-05, -06 e -08 foram decididas em `docs/indicadores/decisoes/c7-prevencao-cancer.md`. Os números das leituras de 2026-08 ficam em `docs/discovery/2026-10-06-sensibilidade-2026-08.md`. Hoje entra como as demais: só o que dispara. |
 | C1, C4, C5, C6 | todos | Só o que dispara: frequência nas evidências e códigos citados nas limitações dinâmicas do resultado. Os caminhos RULE_AMBIGUITY de C4–C6 são só de eAP e hoje inalcançáveis. |
 

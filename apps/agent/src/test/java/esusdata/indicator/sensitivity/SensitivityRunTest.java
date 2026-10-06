@@ -21,9 +21,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The local sensitivity tool: reports how the readings of the ambiguities of C2, C3 and C7 move
- * the numerator, the denominator and the score, and which ambiguity codes fire in every pack, by
- * INE and for the municipality. It never runs in CI: it is skipped unless an extract is named.
+ * The local sensitivity tool: reports which ambiguity codes fire in every pack and the baseline
+ * (numerator, denominator, score), by INE and for the municipality. No pack has candidate readings
+ * left: C2, C3 and C7 decided theirs at {@code @0.2.0}. It never runs in CI: it is skipped unless an extract is named.
  *
  * <p><b>Extract mode</b> — {@code ESUSDATA_SENSITIVITY_EXTRACT=<directory>} points at a directory of
  * finalized extracts ({@code <id>.manifest.json} + {@code <id>.jsonl.gz}, kept on the local disk,

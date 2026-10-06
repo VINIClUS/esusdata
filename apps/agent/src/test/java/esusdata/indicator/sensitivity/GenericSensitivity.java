@@ -8,8 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * What fires in a pack that has no candidate readings here — C1, and C4–C6 whose RULE_AMBIGUITY
- * paths (eAP only) are unreachable today: the frequency of every ambiguity code in the evidence
+ * What fires in a pack, none having candidate readings left — C4–C6 have RULE_AMBIGUITY paths
+ * (eAP only) unreachable today, and C1–C3 and C7 decided theirs: the frequency of every ambiguity code in the evidence
  * and in the result's limitations. The rule's {@code evaluate} is called only for its counts,
  * evidence and limitations; its value is never read.
  */
