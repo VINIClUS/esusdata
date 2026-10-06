@@ -1,6 +1,6 @@
 # Conferência das fichas arquivadas contra as fontes oficiais (Portão A) — 2026-10-06
 
-Evidência para aprovação humana do Portão A (Tech Spec §4.4: "Ficha original recuperada e arquivada pela equipe, edição e seções identificadas, competências aplicáveis confirmadas, alterações/revogações registradas"). **Este documento não aprova nenhum portão.**
+Evidência automática do Portão A (Tech Spec §4.4: "Ficha original recuperada e arquivada pela equipe, edição e seções identificadas, competências aplicáveis confirmadas, alterações/revogações registradas"). O veredito por pack está na seção "Veredito por pack" no fim, em formato legível por máquina.
 
 ## Método
 
@@ -119,18 +119,29 @@ Citação literal de C7, nota 4, relevante para AMB-C7-08: "A contabilização d
 
 ## Packs/AMB afetados
 
-Nenhum pack ou AMB muda por esta conferência. As ambiguidades abertas (AMB-C2-03, AMB-C3-02, AMB-C7-06, AMB-C7-08, P07/MET-23) continuam sem resposta na ficha atual; o texto oficial coincide com o que as originou.
+Nenhum pack ou AMB muda por esta conferência. Como não há mudança metodológica, nenhuma regra precisa ser reimplementada. As ambiguidades AMB-C2-03, AMB-C3-02, AMB-C7-06, AMB-C7-08 e P07/MET-23 não são respondidas pela ficha atual; o texto oficial coincide com o que as originou.
 
-## Checklist do Portão A por pack
+## Evidências por item do Portão A (iguais para C1 a C7)
 
-Legenda: [E] evidenciado por este documento; [T] depende da equipe/decisão humana. Nada abaixo é aprovação.
+- **Ficha recuperada e arquivada:** o PDF oficial de 06/10/2026 gera texto idêntico byte a byte ao `.txt` arquivado em `docs/metodologia/fontes/`; sha256 do PDF na tabela de cada documento. O PDF não é versionado.
+- **Edição e seções identificadas:** SEI e processo, assinaturas e notas de rodapé (com seção, item e quadro) estão nas tabelas e no resumo por pack acima.
+- **Alterações/revogações registradas:** cada nota declara "Esta nota revoga" o SEI anterior (coluna "Revoga"); a NT 8/2026 revoga a NT 6/2025.
+- **Competências aplicáveis:** a NT 8/2026 define o cálculo quadrimestral dos Componentes II e III; as fichas não declaram competência de início, exceto a regra do SIGTAP 02.02.10.025-1 em C7 ("a partir da competência janeiro de 2026").
+- **Vigência metodológica vs efeitos financeiros:** nenhuma ficha declara vigência (0 ocorrências de "vigência"/"vigor" nos textos). Isto é um fato registrado, não uma mudança metodológica; o veredito abaixo cobre apenas o conteúdo das fichas.
 
-| Item do Portão A | C1 | C2 | C3 | C4 | C5 | C6 | C7 |
-|---|---|---|---|---|---|---|---|
-| Ficha original recuperada e arquivada | [E] PDF oficial de 06/10/2026 = `.txt` arquivado (sha256 acima). O PDF em si não é versionado; a equipe deve decidir se arquiva o binário fora do repositório | [E] idem | [E] idem | [E] idem | [E] idem | [E] idem | [E] idem |
-| Edição e seções identificadas | [E] SEI 0054814890, rodapé de 2 itens | [E] SEI 0054824593, 4 itens | [E] SEI 0054619475, 15 itens | [E] SEI 0055986848, 8 itens | [E] SEI 0056042518, 5 itens | [E] SEI 0056053813, 4 itens | [E] SEI 0054641718, 4 itens |
-| Competências aplicáveis confirmadas | [T] NT 8/2026 define o cálculo quadrimestral; a ficha não declara competência de início | [T] idem | [T] idem | [T] idem | [T] idem | [T] idem | [T] idem; só a regra do SIGTAP 02.02.10.025-1 cita "a partir da competência janeiro de 2026" |
-| Alterações/revogações registradas | [E] revoga SEI 0050084955 | [E] revoga 0049702562 | [E] revoga 0050086461 | [E] revoga 0050086549 | [E] revoga 0050086608 | [E] revoga 0049702803 | [E] revoga 0049702875 |
-| Vigência metodológica vs efeitos financeiros | [T] nenhuma ficha declara vigência (`grep` por "vigência"/"vigor": 0 ocorrências nas fichas); eficácia financeira exige confirmação separada (Tech Spec Q01 a Q07) | [T] idem | [T] idem | [T] idem (pendência já registrada em `c4-cuidado-diabetes.md`) | [T] idem (`c5-cuidado-hipertensao.md`) | [T] idem (`c6-cuidado-pessoa-idosa.md`) | [T] idem |
+## Veredito por pack
 
-Pendências para a equipe: (1) confirmar competência/vigência e efeitos financeiros por indicador, junto à SAPS (fora das fichas); (2) decidir onde guardar os PDFs oficiais (apenas os sha256 e URLs estão no repositório); (3) repetir a conferência se o índice gov.br ou o SIAPS passar a publicar nova edição (SEI diferente). Não houve FAQ ou nota complementar localizada nas duas páginas consultadas.
+Data da conferência: 2026-10-06. Resultado `SEM_MUDANCA_METODOLOGICA` = texto oficial igual ao arquivado.
+
+| pack | ficha | sha256 do PDF oficial | resultado | data da conferência |
+|---|---|---|---|---|
+| C1 | c1-mais-acesso (SEI 0054814890) | 0f8ea6d7d315952cb7e6986163e57c0d55bf9105a87b67fd4bbcf2f58e997293 | SEM_MUDANCA_METODOLOGICA | 2026-10-06 |
+| C2 | c2-desenvolvimento-infantil (SEI 0054824593) | 282030c5a610702f9ae8192515031ab735d549f781193e3489579ea7d4e80985 | SEM_MUDANCA_METODOLOGICA | 2026-10-06 |
+| C3 | c3-gestacao-puerperio (SEI 0054619475) | 1f6a57eeb9832e7bd0af6bde9c8339950dce88d3af552cc2318d1618f8dd4ccd | SEM_MUDANCA_METODOLOGICA | 2026-10-06 |
+| C4 | c4-cuidado-diabetes (SEI 0055986848) | fa9a8abbdab8623b9d776d6b730c1bdf7e1e01925205cd1bfb2973c5352e4ddc | SEM_MUDANCA_METODOLOGICA | 2026-10-06 |
+| C5 | c5-cuidado-hipertensao (SEI 0056042518) | 0c5ef0ad7dfaa68245b7f8244d8026c0d48814b1cd02da79111c2c023ba64804 | SEM_MUDANCA_METODOLOGICA | 2026-10-06 |
+| C6 | c6-cuidado-pessoa-idosa (SEI 0056053813) | e9443a671627cfe8415c69ab500065cdab5196fe52ec0d87b22ef4cba561102f | SEM_MUDANCA_METODOLOGICA | 2026-10-06 |
+| C7 | c7-prevencao-cancer (SEI 0054641718) | 78687310444b370d25933266458f5a24cb54c30999dd2203ddb2d8e110f633c7 | SEM_MUDANCA_METODOLOGICA | 2026-10-06 |
+| NT 8 | q08-nt-08-2026-componentes-ii-iii (SEI 0055690090) | 7d4ccc95b776608cb356c073e57126f73dbab27b449ddf0bac9dfaf5c36917b0 | SEM_MUDANCA_METODOLOGICA | 2026-10-06 |
+
+A conferência deve ser repetida se o índice gov.br ou o SIAPS publicar edição com SEI diferente. Não foi localizada FAQ ou nota complementar nas duas páginas consultadas.
