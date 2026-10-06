@@ -174,7 +174,7 @@ class ScheduleApiTest extends ApiFixtureSupport {
                 .contains("{\"indicatorPack\":\"c1-mais-acesso\",\"ruleVersion\":\"c1-mais-acesso@0.3.0\","
                         + "\"availability\":\"AVAILABLE\",\"missingCapabilities\":[]}")
                 .contains("{\"indicatorPack\":\"c2-desenvolvimento-infantil\","
-                        + "\"ruleVersion\":\"c2-desenvolvimento-infantil@0.1.0\",\"availability\":\"UNSUPPORTED_SOURCE\","
+                        + "\"ruleVersion\":\"c2-desenvolvimento-infantil@0.2.0\",\"availability\":\"UNSUPPORTED_SOURCE\","
                         + "\"missingCapabilities\":[\"citizen\",\"individual_registration\",\"care_encounter\"")
                 .contains("\"indicatorPack\":\"c7-prevencao-cancer\"")
                 .doesNotContain("componente-iii-nota-final");

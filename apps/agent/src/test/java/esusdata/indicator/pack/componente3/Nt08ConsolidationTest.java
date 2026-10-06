@@ -586,7 +586,7 @@ class Nt08ConsolidationTest {
 
     // ---- AMB-CIII-07: an eligible NO_DENOMINATOR month is never zero and never skipped ----
     @Test
-    void ambCiii07_noDenominatorMonthInC4IsRuleAmbiguity() {
+    void ambCiii07_eligibleNoDenominatorMonthIsRuleAmbiguityAndNotEligibleOneIsADashMonthOutOfTheMean() {
         UnitResult unit = single(unit().status(C4, 2, IndicatorStatus.NO_DENOMINATOR));
         assertUnavailable(indicator(unit, C4), IndicatorStatus.RULE_AMBIGUITY);
         assertNoScore(unit, IndicatorStatus.RULE_AMBIGUITY, "C4", C4);

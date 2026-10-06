@@ -376,6 +376,8 @@ resultado afetado indisponível ou bloqueado e documentar a decisão quando houv
   ("Atenção", p. 1) só nomeia C2 e C3. Para C1 (mês sem atendimentos), C4–C6 (mês sem pessoas
   elegíveis) e C7 (subpopulação vazia, AMB-C7-01), a NT não diz se o mês sai da média. Não converter
   em zero; bloquear.
+  *Nota de 2026-10-06:* só o mês sem denominador **elegível** bloqueia; o não elegível é mês "-" fora da
+  média (`docs/indicadores/decisoes/componente3-nota-final.md`).
 - **AMB-CIII-08 — Suspensão de pagamento.** O item 4.1.1 depende de saber quais meses são "válidos
   para pagamento", informação externa ao PEC. Sem essa entrada, o resultado quadrimestral local não
   pode afirmar que aplicou o 4.1.1.
