@@ -29,7 +29,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +61,8 @@ class CoverageSchedulerPacksTest {
         fixture.registerSource(SOURCE, MUNICIPALITY);
         fixture.registerPrincipal("manager-1", MUNICIPALITY);
         schedules = new JdbcScheduleRepository(fixture.jdbc);
-        when(results.findPublishedPeriodsByPack(MUNICIPALITY)).thenReturn(Map.of("c1-mais-acesso", Set.of("2026-03")));
+        when(results.findPublishedCoverage(MUNICIPALITY))
+                .thenReturn(PublishedFixtures.current("c1-mais-acesso", "2026-03"));
     }
 
     @AfterEach

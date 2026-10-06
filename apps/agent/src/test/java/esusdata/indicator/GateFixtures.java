@@ -66,6 +66,17 @@ public final class GateFixtures {
         return ReleaseGateRegistry.snapshotJson(GateStatus.pending("test", "test@0.0.0", false));
     }
 
+    /**
+     * The snapshot the executor would store for a compiled pack under the shipped registry: what
+     * counts as coverage for the scheduler (ADR 0032). Any other pack gets {@link #snapshot()}.
+     */
+    public static String snapshot(String pack) {
+        return IndicatorRuleRegistry.find(pack)
+                .map(rule -> ReleaseGateRegistry.snapshotJson(
+                        ReleaseGateRegistry.bundled().statusOf(rule.descriptor())))
+                .orElseGet(GateFixtures::snapshot);
+    }
+
     /** Every gate A–D passed for {@code descriptor}. */
     public static GateStatus allPassed(PackDescriptor descriptor) {
         Map<GateId, GateCheck> gates = new EnumMap<>(GateId.class);

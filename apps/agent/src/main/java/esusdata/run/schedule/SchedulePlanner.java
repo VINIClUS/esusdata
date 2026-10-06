@@ -21,8 +21,11 @@ import java.util.Set;
  *       source without any, still has data for those packs;
  *   <li>it is closed and settled — at least {@code settleDays} into the following month, so the
  *       DW has had time to load the month's last fichas;
- *   <li>it has no published result of that pack yet — a published competência is never recomputed
- *       on its own (ADR 0030: "publicado" is per pack);
+ *   <li>it is not covered by a published result of that pack (ADR 0030: "publicado" is per pack).
+ *       Covered is decided by the caller, before this function: only a result of the compiled rule
+ *       version recorded under the registry's current gates A and D counts (ADR 0032, {@code
+ *       PublishedCoverage}), so a stale competência is due like a never-computed one, in the same
+ *       oldest-first order;
  *   <li>that pack did not fail on it recently — a definitive failure waits for a person, not a loop.
  * </ul>
  *

@@ -291,7 +291,7 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 "SOURCE_EVENT",
                 "sha256:" + "0".repeat(64),
                 teams,
-                GateFixtures.snapshot()));
+                GateFixtures.snapshot(indicatorPack)));
         resultStagingArea.writeEvidence(stagingId, evidence);
         resultStagingArea.seal(stagingId);
 

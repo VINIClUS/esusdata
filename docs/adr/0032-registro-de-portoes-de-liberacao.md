@@ -125,3 +125,15 @@ mostra a checklist inteira em vez de só o primeiro motivo.
   passados: a divisão em lacunas bloqueantes e divulgadas é a fatia S2.
 - A migração V12 reconstrói as tabelas de resultado. Recomenda-se backup antes da atualização
   (ENG-09/10).
+
+## Nota de 2026-10-06: cobertura do agendador
+
+Um resultado conta como cobertura só na versão compilada e no estado de portões vigente. O
+agendador (ADR 0028) e o Painel consideram uma competência de um pack publicada apenas quando existe
+um resultado cuja `rule_version` é a compilada e cujo `gate_snapshot_json` registra os portões A e D
+com o mesmo status que o registro tem agora para aquele pack e versão. Resultado sem snapshot (antes
+da V12), com `{"legacy":true}` ou ilegível não cobre. Assim, registrar o D como `PASSED` para a mesma
+`rule_version` recalcula sozinho os resultados que saíram `BLOCKED`. B e C não entram na comparação:
+são reavaliados em cada execução e o registro os guarda como `PENDING`, então um resultado preso por
+eles seria recalculado a cada tick. Competências nunca calculadas e obsoletas seguem a mesma ordem do
+planejador (mais antiga primeiro, um job por tick).

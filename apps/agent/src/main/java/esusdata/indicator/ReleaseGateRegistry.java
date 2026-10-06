@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -266,6 +267,31 @@ public final class ReleaseGateRegistry {
         snapshot.put("stale", status.stale());
         snapshot.put("gates", gates);
         return MAPPER.writeValueAsString(snapshot);
+    }
+
+    /**
+     * Whether a stored result was computed under the registry's current A and D for this compiled
+     * pack: both statuses in its {@code gate_snapshot_json} equal what {@link #statusOf} says now.
+     * A missing snapshot (before V12), the {@code {"legacy":true}} marker and anything unreadable
+     * never match. B and C are deliberately not compared: they are evaluated again on every run
+     * from the source and the adapter, the registry only holds them as {@code PENDING}, so a result
+     * blocked by them would never match and the scheduler would recompute it forever.
+     */
+    public boolean snapshotMatches(PackDescriptor descriptor, String snapshotJson) {
+        if (snapshotJson == null || snapshotJson.isBlank()) {
+            return false;
+        }
+        try {
+            JsonNode gates = MAPPER.readTree(snapshotJson).path("gates");
+            GateStatus now = statusOf(descriptor);
+            return statusInSnapshot(gates, GateId.A, now) && statusInSnapshot(gates, GateId.D, now);
+        } catch (JacksonException unreadable) {
+            return false;
+        }
+    }
+
+    private static boolean statusInSnapshot(JsonNode gates, GateId id, GateStatus now) {
+        return now.check(id).state().name().equals(text(gates.path(id.name()), "status"));
     }
 
     private static IllegalStateException invalid(String detail) {
