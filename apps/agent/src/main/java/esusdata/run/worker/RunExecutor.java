@@ -3,9 +3,12 @@ package esusdata.run.worker;
 import esusdata.auth.GrantRevalidator;
 import esusdata.auth.model.Permission;
 import esusdata.indicator.IndicatorRuleRegistry;
+import esusdata.indicator.ReleaseGateRegistry;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.EvidenceItem;
+import esusdata.indicator.model.GateChecks;
+import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.PackDescriptor;
@@ -37,10 +40,13 @@ import esusdata.source.pec.PecSourceIdentity;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -52,17 +58,23 @@ import java.util.UUID;
  * turns an unknown pack or rule version into {@code INVALID_REQUEST} before any I/O.
  *
  * <p>C1 is unchanged: the same v1 command and read budget, the same encounters, the same
- * per-encounter evidence and the same input fingerprint; its result now also carries the per-team
- * breakdown {@code C1Pack} computes. Its release gates are not complete (§4.4 Portões A/B/D/E), so
- * every C1 result is {@code status=BLOCKED} with exact counts, never a fabricated value.
+ * per-encounter evidence and the same input fingerprint; its result also carries the per-team
+ * breakdown {@code C1Pack} computes. Its release gates have not all passed (Portões A and D wait
+ * for their automated checks, B for the standing limitations), so every C1 result is
+ * {@code status=BLOCKED} with exact counts, never a fabricated value.
+ *
+ * <p>The release gates (ADR 0032) are applied here and nowhere else, to every pack and to the
+ * legacy C1 path alike: the rules return ungated outcomes, this class reads A and D from the
+ * {@link ReleaseGateRegistry}, evaluates B (no blocking standing limitation) and C (every required
+ * capability {@code VALIDATED} for the source), and stages the gate snapshot with the result — the
+ * V12 {@code CHECK} refuses a {@code COMPUTED} result staged without one.
  *
  * <p>A canonical v2 pack (C2–C7) is checked for eligibility first: every capability it reads needs
  * a {@code VALIDATED} compatibility entry for the source's PEC version, read model and installation
  * role, or the run fails with {@code UNSUPPORTED_SOURCE} before the acquisition guard and before
  * any child process — definitive, with no cooldown. The acquisition then reads every part the rule
- * requires in one transaction ({@link ReadPlan}); the result is gated again by the pack's release
- * gates ({@link RuleOutcomes#gate}, idempotent), staged with its practices, teams and generic
- * evidence, and published. Its input fingerprint also names every part read.
+ * requires in one transaction ({@link ReadPlan}); the result is gated ({@link RuleOutcomes#gate}),
+ * staged with its practices, teams and generic evidence, and published. Its input fingerprint also names every part read.
  *
  * <p>§1.9.4 L365 is checked at the start of BOTH {@link #runFromExtract} and {@link #runLive} —
  * against the principal's CURRENT grants, not whatever authorized the original HTTP request.
@@ -86,7 +98,7 @@ public final class RunExecutor {
     // imported from an official source with its own provenance, never earned by numeric
     // resemblance) and never SIMULATION.
     private static final String RESULT_NATURE = "LOCAL_ESTIMATE";
-    // No pack has its release gates complete (Portões A–E, §4.4) — see class javadoc.
+    // No pack has its release gates passed yet (ADR 0032) — see class javadoc.
     private static final String VALIDATION_STATUS = "NOT_VALIDATED";
     private static final String SOURCE_ZONE_ID = "America/Sao_Paulo";
 
@@ -103,6 +115,7 @@ public final class RunExecutor {
     private final Duration liveAcquisitionCooldownMargin;
     private final CapabilityEligibility eligibility;
     private final RuleLookup rules;
+    private final ReleaseGateRegistry gateRegistry;
     private final CapabilityCatalog catalog = CapabilityCatalog.packaged();
 
     /** How a job's pack and rule version resolve to a compiled rule (ADR 0030). */
@@ -158,6 +171,39 @@ public final class RunExecutor {
             Duration liveAcquisitionCooldownMargin,
             CapabilityEligibility eligibility,
             RuleLookup rules) {
+        this(
+                extractStore,
+                jobRepository,
+                stagingArea,
+                publicationService,
+                appBuild,
+                clock,
+                grantRevalidator,
+                sourceRepository,
+                acquisitionPort,
+                acquisitionGuard,
+                liveAcquisitionCooldownMargin,
+                eligibility,
+                rules,
+                ReleaseGateRegistry.bundled());
+    }
+
+    /** As above, with the release-gate registry the results are gated by (ADR 0032). */
+    public RunExecutor(
+            ExtractStore extractStore,
+            JobRepository jobRepository,
+            ResultStagingArea stagingArea,
+            PublicationService publicationService,
+            String appBuild,
+            Clock clock,
+            GrantRevalidator grantRevalidator,
+            SourceRepository sourceRepository,
+            Acquisition acquisitionPort,
+            AcquisitionGuard acquisitionGuard,
+            Duration liveAcquisitionCooldownMargin,
+            CapabilityEligibility eligibility,
+            RuleLookup rules,
+            ReleaseGateRegistry gateRegistry) {
         this.extractStore = extractStore;
         this.jobRepository = jobRepository;
         this.stagingArea = stagingArea;
@@ -171,6 +217,7 @@ public final class RunExecutor {
         this.liveAcquisitionCooldownMargin = liveAcquisitionCooldownMargin;
         this.eligibility = eligibility;
         this.rules = rules;
+        this.gateRegistry = gateRegistry;
     }
 
     public record RunContext(
@@ -199,7 +246,11 @@ public final class RunExecutor {
         CanonicalDataset data = plan.read(extractStore, manifest);
         cancellation.checkCancelled();
 
-        return computeStageAndPublish(context, rule, plan, manifest, data, cancellation);
+        PecSourceIdentity identity = sourceRepository
+                .findById(manifest.sourceId())
+                .flatMap(RunExecutor::identityOf)
+                .orElse(null);
+        return computeStageAndPublish(context, rule, plan, manifest, data, identity, cancellation);
     }
 
     /**
@@ -268,7 +319,8 @@ public final class RunExecutor {
             plan.requireCovers(manifest, context);
         }
         CanonicalDataset data = plan.read(extractStore, manifest);
-        return computeStageAndPublish(context, rule, plan, manifest, data, cancellation);
+        PecSourceIdentity identity = identityOf(source).orElse(null);
+        return computeStageAndPublish(context, rule, plan, manifest, data, identity, cancellation);
     }
 
     private RunOutcome computeStageAndPublish(
@@ -277,14 +329,13 @@ public final class RunExecutor {
             ReadPlan plan,
             ExtractionManifest manifest,
             CanonicalDataset data,
+            PecSourceIdentity identity,
             CancellationSignal cancellation) {
         PackDescriptor descriptor = rule.descriptor();
         EvaluationContext evaluation =
                 EvaluationContext.endOfMonth(context.municipalityIbge(), YearMonth.parse(context.referencePeriod()));
-        RuleOutcome outcome = rule.evaluate(data, evaluation);
-        if (plan.isCanonicalV2()) {
-            outcome = RuleOutcomes.gate(descriptor, outcome);
-        }
+        GateStatus gates = gatesOf(descriptor, identity);
+        RuleOutcome outcome = gate(plan, gates, rule.evaluate(data, evaluation));
         IndicatorResult result = outcome.result();
         requireJobScope(descriptor, result, context);
         cancellation.checkCancelled();
@@ -304,7 +355,8 @@ public final class RunExecutor {
                 manifest.adapterVersion(),
                 plan.isCanonicalV2() ? SUBJECT_EVIDENCE_GRAIN : EVENT_EVIDENCE_GRAIN,
                 inputFingerprint,
-                outcome.teams()));
+                outcome.teams(),
+                ReleaseGateRegistry.snapshotJson(gates)));
         stagingArea.writeEvidence(stagingId, toEvidence(outcome.evidence(), result.ruleVersion()));
         cancellation.checkCancelled();
         stagingArea.seal(stagingId);
@@ -333,6 +385,36 @@ public final class RunExecutor {
                 context.municipalityIbge()));
 
         return new RunOutcome(stagingId, published.resultId(), result);
+    }
+
+    /** A source's declared identity, empty when it is incomplete: such a source validates nothing. */
+    private static Optional<PecSourceIdentity> identityOf(SourceRecord source) {
+        return CapabilityEligibility.identityOf(
+                source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole());
+    }
+
+    /**
+     * Where the gates stand for this run: A and D as the registry records them for the compiled rule
+     * version, B from the pack's blocking limitations, C from the source's {@code VALIDATED}
+     * capabilities. Evaluated on every run, so a result never carries a stale verdict.
+     */
+    private GateStatus gatesOf(PackDescriptor descriptor, PecSourceIdentity identity) {
+        LocalDate today = LocalDate.now(clock.withZone(ZoneId.of(SOURCE_ZONE_ID)));
+        return gateRegistry
+                .statusOf(descriptor)
+                .withEvaluated(
+                        GateChecks.calculationModel(descriptor, today),
+                        GateChecks.adapter(eligibility.missing(descriptor.requiredCapabilities(), identity), today));
+    }
+
+    /**
+     * The one place a rule's outcome meets the release gates (ADR 0032). C1's legacy path keeps its
+     * v0.1.9 status for a result without a denominator: {@code BLOCKED} while a gate has not
+     * passed, where C2-C7 have always passed {@code NO_DENOMINATOR} through. S2 revisits it.
+     */
+    private static RuleOutcome gate(ReadPlan plan, GateStatus gates, RuleOutcome ungated) {
+        RuleOutcome gated = RuleOutcomes.gate(gates, ungated);
+        return plan.isCanonicalV2() || gates.isComplete() ? gated : RuleOutcomes.blockEmptyDenominators(gated);
     }
 
     /**

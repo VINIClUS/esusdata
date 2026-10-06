@@ -16,9 +16,7 @@ import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.RuleOutcome;
-import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
 import esusdata.indicator.pack.PackSupport;
@@ -143,7 +141,6 @@ public final class C4Pack implements IndicatorRule {
                             "Ter pelo menos 01 (um) registro de avaliação dos pés, realizado nos últimos 12 meses",
                             15,
                             TWELVE_MONTHS)),
-            ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.practicesPack(),
@@ -188,7 +185,7 @@ public final class C4Pack implements IndicatorRule {
 
     @Override
     public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
-        return RuleOutcomes.gate(DESCRIPTOR, evaluateUngated(data, context));
+        return evaluateUngated(data, context);
     }
 
     /**

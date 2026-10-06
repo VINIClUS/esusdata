@@ -25,6 +25,28 @@ const semSuporte: Readonly<Record<string, string[]>> = {
 const indicators: OverviewIndicator[] = catalogoFixture.map((pack) => {
   const result = resultadosFixture[pack.id]
   const faltam = semSuporte[pack.id] ?? []
+  // Como a API: o Portão C vem das fontes do município (PASSED, ou FAILED com o que falta); A, B e D
+  // são os do catálogo.
+  const gates = pack.gates?.map((g) =>
+    g.gate === 'C'
+      ? faltam.length > 0
+        ? {
+            ...g,
+            status: 'FAILED' as const,
+            note: `capacidades sem validação: ${faltam.join(', ')}`,
+          }
+        : {
+            ...g,
+            status: 'PASSED' as const,
+            check: 'capacidades-validadas@1',
+            checkedAt: '2026-09-30',
+            note: null,
+          }
+      : g,
+  )
+  const blockedGates = gates
+    ? gates.filter((g) => g.status !== 'PASSED').map((g) => `${g.label} incompleto`)
+    : pack.blockedGates
   return {
     indicatorPack: pack.id,
     ruleVersion: pack.ruleVersion,
@@ -36,13 +58,16 @@ const indicators: OverviewIndicator[] = catalogoFixture.map((pack) => {
     runnable: pack.runnable,
     availability: faltam.length > 0 ? 'UNSUPPORTED_SOURCE' : 'AVAILABLE',
     missingCapabilities: faltam,
-    executionEnabled: pack.executionEnabled,
-    blockedGates: pack.blockedGates,
+    executionEnabled: blockedGates.length === 0,
+    blockedGates,
+    gates,
+    gateRegistryStale: pack.gateRegistryStale,
     resultId: result?.resultId ?? null,
     status: result?.status ?? null,
     value: result?.value ?? null,
     limitations: result?.limitations ?? [],
     publishedAt: result?.publishedAt ?? null,
+    standingLimitations: pack.standingLimitations ?? [],
   }
 })
 

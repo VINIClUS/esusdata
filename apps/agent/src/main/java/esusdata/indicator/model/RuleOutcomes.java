@@ -10,17 +10,17 @@ public final class RuleOutcomes {
     private RuleOutcomes() {}
 
     /**
-     * Applies the release gates (§4.4): while the pack's execution is not enabled, a computed
-     * result keeps its exact counts and components but loses its value and classification, and
+     * Applies the release gates (§4.4, ADR 0032) — the executor's job, in one place, for every pack:
+     * while any gate has not passed, a computed result keeps its exact counts and components but loses its value and classification, and
      * says why. A result that was not computed ({@code NO_DENOMINATOR}, {@code RULE_AMBIGUITY},
      * {@code UNSUPPORTED_SOURCE}) keeps its own status — the gate is added to its limitations.
      */
-    public static IndicatorResult gate(PackDescriptor descriptor, IndicatorResult computed) {
-        if (descriptor.executionEnabled()) {
+    public static IndicatorResult gate(GateStatus gates, IndicatorResult computed) {
+        if (gates.isComplete()) {
             return computed;
         }
         List<String> limitations = new ArrayList<>(computed.limitations());
-        for (String reason : descriptor.blockedGates()) {
+        for (String reason : gates.incompleteReasons()) {
             if (!limitations.contains(reason)) {
                 limitations.add(reason);
             }
@@ -49,11 +49,12 @@ public final class RuleOutcomes {
      * What a pack returns while its rule is still being written: no counts, the reason and the
      * gates in the limitations, and {@code BLOCKED} — never a zero (ADR 0030).
      */
-    public static RuleOutcome pending(PackDescriptor descriptor, EvaluationContext context, String reason) {
+    public static RuleOutcome pending(
+            PackDescriptor descriptor, GateStatus gates, EvaluationContext context, String reason) {
         List<String> limitations = new ArrayList<>();
         limitations.add(reason);
         limitations.addAll(descriptor.standingLimitations());
-        limitations.addAll(descriptor.blockedGates());
+        limitations.addAll(gates.incompleteReasons());
         IndicatorResult result = new IndicatorResult(
                 IndicatorStatus.BLOCKED,
                 null,
@@ -75,10 +76,45 @@ public final class RuleOutcomes {
     }
 
     /** {@link #gate} applied to the municipal result and to every team result. */
-    public static RuleOutcome gate(PackDescriptor descriptor, RuleOutcome computed) {
+    public static RuleOutcome gate(GateStatus gates, RuleOutcome computed) {
         List<TeamResult> teams = computed.teams().stream()
-                .map(t -> new TeamResult(t.ine(), t.cnes(), gate(descriptor, t.result())))
+                .map(t -> new TeamResult(t.ine(), t.cnes(), gate(gates, t.result())))
                 .toList();
-        return new RuleOutcome(gate(descriptor, computed.result()), teams, computed.evidence());
+        return new RuleOutcome(gate(gates, computed.result()), teams, computed.evidence());
+    }
+
+    /**
+     * C1's v0.1.9 compatibility for a result without a denominator: while the gates have not passed
+     * it publishes {@code BLOCKED} (with its counts and reasons), never {@code NO_DENOMINATOR}. Only
+     * the executor's legacy path asks for it; the split of limitations (S2) is where it is revisited.
+     */
+    public static RuleOutcome blockEmptyDenominators(RuleOutcome gated) {
+        List<TeamResult> teams = gated.teams().stream()
+                .map(t -> new TeamResult(t.ine(), t.cnes(), blockIfEmpty(t.result())))
+                .toList();
+        return new RuleOutcome(blockIfEmpty(gated.result()), teams, gated.evidence());
+    }
+
+    private static IndicatorResult blockIfEmpty(IndicatorResult result) {
+        if (result.status() != IndicatorStatus.NO_DENOMINATOR) {
+            return result;
+        }
+        return new IndicatorResult(
+                IndicatorStatus.BLOCKED,
+                result.valueText(),
+                result.numerator(),
+                result.denominator(),
+                result.denominatorKind(),
+                result.classification(),
+                result.referencePeriod(),
+                result.ruleVersion(),
+                result.dataCutoff(),
+                result.municipalityIbge(),
+                result.limitations(),
+                result.calculationPolicyVersion(),
+                result.valueKind(),
+                result.valueExact(),
+                result.components(),
+                result.consolidationEligible());
     }
 }

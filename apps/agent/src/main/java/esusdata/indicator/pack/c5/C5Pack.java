@@ -16,9 +16,7 @@ import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.RuleOutcome;
-import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
 import esusdata.indicator.pack.PackSupport;
@@ -39,9 +37,8 @@ import java.util.TreeMap;
  * of their points (item 23, p. 2), per municipality and per team (INE).
  *
  * <p>The cohort is {@link C5Cohort}, the practices {@link C5Practices}, the arithmetic {@link
- * C5Results} and the evidence {@link C5Evidence}; the code tables are {@link C5Codes}. While the
- * release gates are incomplete ({@link ReleaseGates#noneComplete()}) a computed result is published
- * {@code BLOCKED}, with its counts, practices and evidence.
+ * C5Results} and the evidence {@link C5Evidence}; the code tables are {@link C5Codes}. The result
+ * is ungated: the executor applies the release gates (ADR 0032).
  */
 public final class C5Pack implements IndicatorRule {
 
@@ -144,7 +141,6 @@ public final class C5Pack implements IndicatorRule {
                             "Ter pelo menos 02 (duas) visitas domiciliares realizadas por ACS/TACS, com intervalo mínimo de 30 (trinta) dias, nos últimos 12 (doze) meses.",
                             25,
                             TWELVE_MONTHS)),
-            ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.practicesPack(),
@@ -178,7 +174,7 @@ public final class C5Pack implements IndicatorRule {
 
     @Override
     public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
-        return RuleOutcomes.gate(DESCRIPTOR, evaluateUngated(data, context));
+        return evaluateUngated(data, context);
     }
 
     /** The computed outcome before the release gates, so tests can see the value the gate hides. */

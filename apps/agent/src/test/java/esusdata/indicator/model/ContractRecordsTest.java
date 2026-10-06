@@ -18,11 +18,25 @@ class ContractRecordsTest {
     private static final ComponentSpec PRACTICE = ComponentSpec.practice("A", "Consulta", 25, "12 meses");
 
     @Test
-    void releaseGatesListEveryMissingGate() {
-        assertThat(ReleaseGates.allComplete().isComplete()).isTrue();
-        assertThat(ReleaseGates.allComplete().incompleteReasons()).isEmpty();
-        assertThat(ReleaseGates.adapterOnly().incompleteReasons()).hasSize(4).noneMatch(r -> r.startsWith("Portão C"));
-        assertThat(ReleaseGates.noneComplete().incompleteReasons()).hasSize(5);
+    void releaseGatesListEveryGateThatHasNotPassed() {
+        GateStatus pending = GateStatus.pending("p", "p@1.0.0", false);
+        assertThat(pending.isComplete()).isFalse();
+        assertThat(pending.incompleteReasons())
+                .containsExactly(
+                        "Portão A (fonte e vigência) incompleto",
+                        "Portão B (modelo de cálculo) incompleto",
+                        "Portão C (adaptador) incompleto",
+                        "Portão D (reconciliação) incompleto");
+        GateCheck passed = new GateCheck(GateCheck.State.PASSED, "x@1", "2026-10-06", List.of(), null);
+        GateStatus partly = pending.withEvaluated(passed, passed);
+        assertThat(partly.incompleteReasons())
+                .containsExactly("Portão A (fonte e vigência) incompleto", "Portão D (reconciliação) incompleto");
+    }
+
+    @Test
+    void aGateStatusAlwaysCarriesEveryGate() {
+        assertThatThrownBy(() -> new GateStatus("p", "p@1.0.0", java.util.Map.of(), false))
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test

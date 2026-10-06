@@ -3,6 +3,7 @@ package esusdata.result;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.result.model.ExtractionManifestRepository;
@@ -162,7 +163,9 @@ class PublicationServiceTest {
                 manifest.extractionId(),
                 manifest.adapterVersion(),
                 "SOURCE_EVENT",
-                "sha256:" + "0".repeat(64)));
+                "sha256:" + "0".repeat(64),
+                List.of(),
+                GateFixtures.snapshot()));
         stagingArea.seal(stagingId);
         return stagingId;
     }
@@ -338,7 +341,9 @@ class PublicationServiceTest {
                 manifest.extractionId(),
                 manifest.adapterVersion(),
                 "SOURCE_EVENT",
-                "sha256:" + "0".repeat(64)));
+                "sha256:" + "0".repeat(64),
+                List.of(),
+                GateFixtures.snapshot()));
         // Never sealed.
 
         assertThatThrownBy(() -> publicationService.publish(new PublicationRequest(

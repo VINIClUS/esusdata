@@ -40,8 +40,8 @@ class IndicatorRuleRegistryTest {
         assertThat(d.ruleVersion()).startsWith(d.id() + "@");
         assertThat(d.packageId()).isEqualTo("qualidade-esf-eap-2026-06");
         assertThat(d.family()).isEqualTo("QUALIDADE_ESF_EAP");
-        assertThat(d.executionEnabled()).isFalse();
-        assertThat(d.blockedGates()).isNotEmpty();
+        assertThat(GateFixtures.shipped(d).isComplete()).isFalse();
+        assertThat(GateFixtures.shipped(d).incompleteReasons()).isNotEmpty();
         assertThat(d.methodologySources()).isNotEmpty();
         assertThat(d.requiredCapabilities()).isNotEmpty();
     }

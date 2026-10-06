@@ -1,5 +1,6 @@
 package esusdata.overview;
 
+import esusdata.indicator.GateResponse;
 import java.util.List;
 
 /**
@@ -48,11 +49,14 @@ public record OverviewResponse(
             List<String> missingCapabilities,
             boolean executionEnabled,
             List<String> blockedGates,
+            List<GateResponse> gates,
+            boolean gateRegistryStale,
             String resultId,
             String status,
             String value,
             List<String> limitations,
-            String publishedAt) {}
+            String publishedAt,
+            List<String> standingLimitations) {}
 
     /** {@code value} is null unless the result is COMPUTED: a blocked result never reads as 0. */
     public record HistoryPoint(String referencePeriod, String indicatorPack, String status, String value) {}

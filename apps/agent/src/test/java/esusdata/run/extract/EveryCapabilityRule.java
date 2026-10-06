@@ -8,11 +8,11 @@ import esusdata.indicator.model.DataRequirements;
 import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.ValueKind;
@@ -50,7 +50,6 @@ final class EveryCapabilityRule implements IndicatorRule {
             "teste@1",
             CONTRACTS.stream().map(CapabilityContract::capability).toList(),
             List.of(),
-            ReleaseGates.noneComplete(),
             List.of("Regra de teste: não calcula."),
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.engineeringDefault(),
@@ -80,7 +79,8 @@ final class EveryCapabilityRule implements IndicatorRule {
 
     @Override
     public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
-        return RuleOutcomes.pending(DESCRIPTOR, context, "Regra de teste: não calcula.");
+        return RuleOutcomes.pending(
+                DESCRIPTOR, GateStatus.pending(DESCRIPTOR), context, "Regra de teste: não calcula.");
     }
 
     @Override

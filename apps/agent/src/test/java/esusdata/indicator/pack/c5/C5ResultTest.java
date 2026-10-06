@@ -28,6 +28,7 @@ import static esusdata.indicator.pack.c5.C5TestData.team;
 import static esusdata.indicator.pack.c5.C5TestData.teamOf;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.DateWindow;
@@ -38,7 +39,6 @@ import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamResult;
@@ -323,7 +323,7 @@ class C5ResultTest {
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(4));
         assertComponents(result, 4, 2, 2, 2, 1);
         assertThat(result.limitations())
-                .containsAll(ReleaseGates.noneComplete().incompleteReasons())
+                .containsAll(GateFixtures.shipped(descriptor).incompleteReasons())
                 .containsAll(descriptor.standingLimitations());
         assertThat(result.referencePeriod()).isEqualTo("2026-03");
         assertThat(result.dataCutoff()).isEqualTo(CUTOFF_TEXT);

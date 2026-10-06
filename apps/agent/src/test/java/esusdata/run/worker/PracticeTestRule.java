@@ -24,10 +24,8 @@ import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
-import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.Scores;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
@@ -80,7 +78,6 @@ public final class PracticeTestRule implements IndicatorRule {
             "teste-exact-score@1",
             CAPABILITIES,
             List.of(PRESENTIAL, MEASURES),
-            ReleaseGates.allComplete(),
             List.of(),
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.engineeringDefault(),
@@ -171,7 +168,7 @@ public final class PracticeTestRule implements IndicatorRule {
         }
         List<TeamResult> teamResults = new ArrayList<>();
         teams.forEach((ine, tally) -> teamResults.add(new TeamResult(ine, teamCnes.get(ine), tally.result(context))));
-        return RuleOutcomes.gate(DESCRIPTOR, new RuleOutcome(municipal.result(context), teamResults, evidence));
+        return new RuleOutcome(municipal.result(context), teamResults, evidence);
     }
 
     @Override

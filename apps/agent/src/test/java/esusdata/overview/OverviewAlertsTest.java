@@ -75,11 +75,14 @@ class OverviewAlertsTest {
                 List.of(),
                 true,
                 List.of(),
+                List.of(),
+                false,
                 "r",
                 status,
                 null,
                 List.of(),
-                null);
+                null,
+                List.of());
     }
 
     private static RecentRun run(String state, String finishedAt) {

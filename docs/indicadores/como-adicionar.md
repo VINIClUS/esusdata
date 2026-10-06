@@ -18,7 +18,7 @@ código) e em `docs/metodologia/guia-preenchimento-equipe-aps.md`; o que o DW do
 | Aritmética | `ExactRatio`, `Scores`, `Bands.QUALIDADE_C2_C7` | média de pontos, soma ponderada, faixas |
 | Calendário | `DateWindow`, `AgeAt` (+ `AnniversaryRule`), `Quadrimestre` | meses civis, idades, quadrimestres |
 | Profissionais | `CboGroups` | famílias de 4 dígitos e ocupações de 6 |
-| Portões | `ReleaseGates`, `RuleOutcomes.gate` | `BLOCKED` com contagens enquanto falta portão |
+| Portões | `GateStatus`, `ReleaseGateRegistry`; aplicados só pelo `RunExecutor` (`RuleOutcomes.gate`, ADR 0032) | `BLOCKED` com contagens enquanto falta portão; a regra devolve o resultado sem portão |
 | Esqueleto | `indicator/pack/<código>/C<n>Pack.java` | descritor, faixas e partes já preenchidos |
 
 ## Passo a passo

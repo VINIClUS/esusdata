@@ -10,6 +10,7 @@ import esusdata.auth.model.UserAccount;
 import esusdata.auth.model.UserRepository;
 import esusdata.auth.model.UserState;
 import esusdata.auth.security.SessionCookie;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.TeamResult;
 import esusdata.result.PublicationService;
@@ -284,7 +285,8 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 manifest.adapterVersion(),
                 "SOURCE_EVENT",
                 "sha256:" + "0".repeat(64),
-                teams));
+                teams,
+                GateFixtures.snapshot()));
         resultStagingArea.writeEvidence(stagingId, evidence);
         resultStagingArea.seal(stagingId);
 

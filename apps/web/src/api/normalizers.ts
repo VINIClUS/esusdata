@@ -28,6 +28,7 @@ import type {
   OverviewPendingPeriod,
   OverviewResponse,
   PackComponentSpec,
+  PackGate,
   PainelResumo,
   QualityComponent,
   QualityComponentIndicator,
@@ -620,17 +621,56 @@ const runStatus: Record<RunResponse['state'], ExecucaoResumo['status']> = {
   FAILED: 'falha',
 }
 
+const GATES_VOIDED = 'Verificações dos portões anuladas por nova versão da regra.'
+
+/**
+ * Every release gate that has not passed, one line each (ADR 0032): the checklist a blocked result
+ * waits on. Built from `gates[]` — with its note, e.g. the capabilities a source lacks — and, for an
+ * older API without it, from `blockedGates`. A registry that only knows an older rule version says so
+ * first: the checks it holds no longer count.
+ */
+export function gateChecklist(pack: {
+  gates?: PackGate[]
+  gateRegistryStale?: boolean
+  blockedGates: string[]
+}): string[] {
+  if (!pack.gates) return pack.blockedGates
+  const reasons = pack.gates
+    .filter((gate) => gate.status !== 'PASSED')
+    .map((gate) =>
+      gate.note ? `${gate.label} incompleto: ${gate.note}` : `${gate.label} incompleto`,
+    )
+  return pack.gateRegistryStale ? [GATES_VOIDED, ...reasons] : reasons
+}
+
+/**
+ * The limitation a RULE_AMBIGUITY result adds to its pack's own. The packs list standing limitations
+ * (which may cite AMB codes in passing) before or after it, so position says nothing: it is the first
+ * limitation that is neither one of the pack's standing limitations nor a gate reason. An older API
+ * without `standingLimitations` falls back to the first that is not a gate reason.
+ */
+function ambiguityLimitation(indicator: OverviewIndicator): string {
+  const standing = new Set(indicator.standingLimitations ?? [])
+  return (
+    indicator.limitations.find((l) => !standing.has(l) && !l.startsWith('Portão ')) ??
+    indicator.limitations[0] ??
+    'A ficha não decide um caso que afeta o valor.'
+  )
+}
+
+/** One reason per line: the Painel shows them stacked. */
 function pendingReason(indicator: OverviewIndicator): string {
+  const checklist = gateChecklist(indicator)
   switch (indicator.status) {
     case 'BLOCKED':
-      // The gate that holds it back says more than a standing limitation listed before it.
       return (
-        indicator.blockedGates[0] ??
-        indicator.limitations[0] ??
-        'Retido pelos portões de liberação.'
-      )
+        checklist.length > 0
+          ? checklist
+          : [indicator.limitations[0] ?? 'Retido pelos portões de liberação.']
+      ).join('\n')
     case 'RULE_AMBIGUITY':
-      return indicator.limitations[0] ?? 'A ficha não decide um caso que afeta o valor.'
+      // The ambiguity comes first: it is what the ficha owes, the gates come after it.
+      return [ambiguityLimitation(indicator), ...checklist].join('\n')
     case 'UNSUPPORTED_SOURCE':
       return faltam(indicator.missingCapabilities ?? [])
     case null:
@@ -642,7 +682,9 @@ function pendingReason(indicator: OverviewIndicator): string {
   if (indicator.availability === 'UNSUPPORTED_SOURCE') {
     return faltam(indicator.missingCapabilities ?? [])
   }
-  if (!indicator.executionEnabled) return indicator.blockedGates[0] ?? 'Execução desabilitada.'
+  if (!indicator.executionEnabled) {
+    return checklist.length > 0 ? checklist.join('\n') : 'Execução desabilitada.'
+  }
   return 'Sem resultado publicado na competência.'
 }
 
@@ -1498,7 +1540,7 @@ export function normalizeIndicadorDetalhe(
     equipes: equipesDoResultado(result, valueKind),
     limitacoes: result?.limitations ?? [],
     limitacoesPermanentes: pack.standingLimitations ?? [],
-    portoes: pack.blockedGates,
+    portoes: gateChecklist(pack),
     capacidades: pack.requiredCapabilities ?? [],
     fontes: pack.methodologySources ?? [],
     metodologia: metodologiaDoDetalhe(pack, valueKind, componentes, denominadorTipo),

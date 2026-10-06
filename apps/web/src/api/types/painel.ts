@@ -1,6 +1,6 @@
 import type { Severity, StatusKey } from './common'
 import type { RunState } from './execucao'
-import type { Availability, ValueKind } from './indicadores'
+import type { Availability, PackGate, ValueKind } from './indicadores'
 
 export interface Kpi {
   id: string
@@ -88,11 +88,16 @@ export interface OverviewIndicator {
   missingCapabilities?: string[]
   executionEnabled: boolean
   blockedGates: string[]
+  /** ADR 0032: Portões A–D for the municipality (C from its sources); absent from an older API. */
+  gates?: PackGate[]
+  gateRegistryStale?: boolean
   resultId: string | null
   status: string | null
   value: string | null
   limitations: string[]
   publishedAt: string | null
+  /** The pack's standing limitations: what `limitations` carries beyond them is the result's own. */
+  standingLimitations?: string[]
 }
 
 export interface OverviewHistoryPoint {

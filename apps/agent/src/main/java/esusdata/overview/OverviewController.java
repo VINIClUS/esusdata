@@ -3,7 +3,12 @@ package esusdata.overview;
 import esusdata.auth.ApiAuthorization;
 import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.Permission;
+import esusdata.indicator.GateResponse;
 import esusdata.indicator.IndicatorPackCatalog;
+import esusdata.indicator.model.GateCheck;
+import esusdata.indicator.model.GateChecks;
+import esusdata.indicator.model.GateId;
+import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.overview.OverviewResponse.Check;
 import esusdata.overview.OverviewResponse.HistoryPoint;
@@ -221,6 +226,14 @@ public class OverviewController {
         return new Availability(UnsupportedSourceException.CODE, missing);
     }
 
+    /** Portão C for this municipality: what its sources can serve, or pending while it has none. */
+    private static GateCheck sourceGate(Availability availability) {
+        if (NO_SOURCE.equals(availability.status())) {
+            return GateCheck.pending("nenhuma fonte do PEC cadastrada");
+        }
+        return GateChecks.adapter(availability.missingCapabilities(), null);
+    }
+
     private static List<String> readCapabilities(IndicatorPackCatalog.PackEntry pack) {
         if (pack.runnable() || pack.dependsOn().isEmpty()) {
             return pack.requiredCapabilities();
@@ -251,6 +264,7 @@ public class OverviewController {
     private Indicator indicator(
             IndicatorPackCatalog.PackEntry pack, PublishedResult result, List<SourceRecord> sources) {
         Availability availability = availability(pack, sources);
+        GateStatus gates = pack.gates().withEvaluated(pack.gates().check(GateId.B), sourceGate(availability));
         return new Indicator(
                 pack.id(),
                 pack.ruleVersion(),
@@ -262,13 +276,16 @@ public class OverviewController {
                 pack.runnable(),
                 availability.status(),
                 availability.missingCapabilities(),
-                pack.executionEnabled(),
-                pack.blockedGates(),
+                gates.isComplete(),
+                gates.incompleteReasons(),
+                GateResponse.of(gates),
+                gates.stale(),
                 result == null ? null : result.resultId(),
                 result == null ? null : result.status(),
                 result == null ? null : result.valueText(),
                 result == null ? List.of() : limitations(result.limitationsJson()),
-                result == null ? null : result.publishedAt());
+                result == null ? null : result.publishedAt(),
+                pack.standingLimitations());
     }
 
     private List<String> limitations(String json) {

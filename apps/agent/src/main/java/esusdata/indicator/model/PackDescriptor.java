@@ -6,9 +6,9 @@ import java.util.Objects;
 /**
  * What the catalog says about a pack (§1.10 L385, §4.7): identity and version, the methodological
  * package it belongs to, what its value means, which capabilities it reads, its practices or
- * subgroups, its release gates and standing limitations, and the official sources it transcribes.
- * Being described here never enables execution (ENG-34): {@link #executionEnabled()} is true only
- * with every gate complete and no standing limitation.
+ * subgroups, its standing limitations, and the official sources it transcribes. Being described
+ * here never enables execution (ENG-34): a result is released only when its release gates pass
+ * (ADR 0032), and the executor — not the pack — applies them.
  *
  * @param packageId the methodological package (§2.2), e.g. {@code qualidade-esf-eap-2026-06}
  * @param family the grouping screens use, e.g. {@code QUALIDADE_ESF_EAP}
@@ -28,7 +28,6 @@ public record PackDescriptor(
         String calculationPolicyVersion,
         List<String> requiredCapabilities,
         List<ComponentSpec> components,
-        ReleaseGates gates,
         List<String> standingLimitations,
         MonthlyEligibility monthlyEligibility,
         BudgetHint budget,
@@ -42,7 +41,6 @@ public record PackDescriptor(
         Objects.requireNonNull(code, "code");
         Objects.requireNonNull(title, "title");
         Objects.requireNonNull(valueKind, "valueKind");
-        Objects.requireNonNull(gates, "gates");
         Objects.requireNonNull(monthlyEligibility, "monthlyEligibility");
         Objects.requireNonNull(budget, "budget");
         if (!ruleVersion.startsWith(id + "@")) {
@@ -55,13 +53,11 @@ public record PackDescriptor(
         dependsOn = List.copyOf(dependsOn);
     }
 
-    /** True only when every gate is complete and the pack declares no standing limitation. */
-    public boolean executionEnabled() {
-        return gates.isComplete() && standingLimitations.isEmpty();
-    }
-
-    /** The gate reasons a published result carries while execution is not enabled. */
-    public List<String> blockedGates() {
-        return gates.incompleteReasons();
+    /**
+     * The standing limitations that keep a result from being released (Portão B). Today every one
+     * does: the split into blocking and merely disclosed limitations changes this method alone.
+     */
+    public List<String> blockingLimitations() {
+        return standingLimitations;
     }
 }

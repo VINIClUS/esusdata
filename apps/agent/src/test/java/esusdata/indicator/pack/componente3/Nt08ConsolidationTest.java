@@ -3,6 +3,7 @@ package esusdata.indicator.pack.componente3;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.IndicatorRuleRegistry;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ComponentSpec;
@@ -10,7 +11,6 @@ import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.Quadrimestre;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.pack.componente3.ComponentIIIInput.Monthly;
 import esusdata.indicator.pack.componente3.ComponentIIIInput.Unit;
 import esusdata.indicator.pack.componente3.ComponentIIIResult.IndicatorQuadrimestral;
@@ -1033,7 +1033,7 @@ class Nt08ConsolidationTest {
 
     @Test
     void descriptorKeepsGatesClosedWeightsSumTo10AndNoLongerSaysInImplementation() {
-        assertThat(ComponentIII.DESCRIPTOR.gates()).isEqualTo(ReleaseGates.noneComplete());
+        assertThat(GateFixtures.shipped(ComponentIII.DESCRIPTOR).isComplete()).isFalse();
         assertThat(ComponentIII.DESCRIPTOR.components())
                 .extracting(ComponentSpec::code)
                 .containsExactlyElementsOf(PACKS);

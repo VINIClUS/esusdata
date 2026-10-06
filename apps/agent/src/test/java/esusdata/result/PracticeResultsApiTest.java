@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.auth.GrantRevalidator;
 import esusdata.auth.model.Role;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.CanonicalFixtures;
+import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.ComponentKind;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
@@ -23,6 +25,7 @@ import esusdata.run.worker.AcquisitionGuard;
 import esusdata.run.worker.PracticeTestRule;
 import esusdata.run.worker.RunExecutor;
 import esusdata.source.pec.CapabilityEligibility;
+import esusdata.source.pec.CompatibilityMatrices;
 import esusdata.web.ApiFixtureSupport;
 import java.math.BigInteger;
 import java.net.URI;
@@ -106,8 +109,14 @@ class PracticeResultsApiTest extends ApiFixtureSupport {
                 acquisitionPort,
                 acquisitionGuard,
                 liveAcquisitionCooldownMargin,
-                capabilityEligibility,
-                (pack, version) -> new PracticeTestRule());
+                new CapabilityEligibility(CompatibilityMatrices.validated(
+                        List.of("5.4.37"),
+                        List.of(
+                                Capabilities.CITIZEN,
+                                Capabilities.INDIVIDUAL_REGISTRATION,
+                                Capabilities.CARE_ENCOUNTER))),
+                (pack, version) -> new PracticeTestRule(),
+                GateFixtures.registryPassing(new PracticeTestRule().descriptor()));
 
         RunExecutor.RunOutcome run = executor.runFromExtract(
                 new RunExecutor.RunContext(

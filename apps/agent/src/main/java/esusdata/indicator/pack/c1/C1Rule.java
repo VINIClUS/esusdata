@@ -6,7 +6,6 @@ import esusdata.indicator.model.CboGroups;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
-import esusdata.indicator.model.ReleaseGates;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -18,16 +17,17 @@ import java.util.List;
  * C1 — Mais acesso (Tech Spec §2.4, verbatim formula): {@code 100 × programados /
  * (programados + espontâneos)}. Counts encounters, not people. Monthly apportionment.
  *
- * <p>Gate status (§4.4 Portões A–E), recorded honestly rather than collapsed into "works":
- * Portão C (adaptador) is what this class and its adapter query actually prove —
- * {@code VALIDATED_AGAINST_PEC} for PEC 5.4.37/PostgreSQL 9.6.13. The ficha (Q01,
- * {@code docs/metodologia/c1-mais-acesso.md}) is now applied for the CBO filter: item 24-c lists
- * seven six-digit occupations, valid for numerator and denominator alike; encounters with a
- * missing CBO or one outside the list are excluded from both and counted
+ * <p>The ficha (Q01, {@code docs/metodologia/c1-mais-acesso.md}) is applied for the CBO filter:
+ * item 24-c lists seven six-digit occupations, valid for numerator and denominator alike;
+ * encounters with a missing CBO or one outside the list are excluded from both and counted
  * ({@code cbo_policy=FICHA_24C}). The ficha has a single list with no transition rule, so 225125
- * and 225250 (footnote additions) are valid in every competência (decision C1-D1). Team type, professional CNS and the other ficha fields are still not checked.
- * Portão D (reconciliation against Siaps/SISAB) and Portão E are gate states kept by the release
- * workflow, not limitations of the rule (decision C1-D4).
+ * and 225250 (footnote additions) are valid in every competência (decision C1-D1). Team type,
+ * professional CNS and the other ficha fields are still not checked. Portão D (reconciliation
+ * against Siaps/SISAB) is a gate state kept by the release workflow, not a limitation of the
+ * rule (decision C1-D4).
+ *
+ * <p>The rule is pure and ungated: whether its value may be released (Portões A–D, ADR 0032) is
+ * decided by the executor, never here.
  */
 public final class C1Rule {
 
@@ -65,9 +65,8 @@ public final class C1Rule {
     private C1Rule() {}
 
     /**
-     * Limitations every C1 result carries until Q01 is applied and reconciled. Release gates
-     * are supplied by the release workflow ({@link ReleaseGates}); a result also stays blocked
-     * while any of these stands, even with every gate complete.
+     * Limitations every C1 result carries until Q01 is applied and reconciled. While any
+     * of these stands, Portão B fails and the executor keeps the result blocked (ADR 0032).
      */
     public static List<String> standingLimitations() {
         return STANDING_LIMITATIONS;
@@ -86,52 +85,10 @@ public final class C1Rule {
      * missing or outside the ficha list, and those whose modality is
      * {@link CanonicalModality#UNMAPPED}, are excluded from both numerator and denominator and
      * counted, never silently folded into an arm (§2.4: "Filtros de modalidade devem ser mutuamente
-     * exclusivos após a normalização").
+     * exclusivos após a normalização"). The result is ungated: the executor applies the release
+     * gates (ADR 0032).
      */
     public static IndicatorResult compute(
-            List<CanonicalEncounter> encounters, String municipalityIbge, String referencePeriod, String dataCutoff) {
-        return compute(encounters, municipalityIbge, referencePeriod, dataCutoff, ReleaseGates.adapterOnly());
-    }
-
-    /**
-     * Computes a publishable C1 result only when the release workflow has completed every gate.
-     * Counts are still returned exactly as diagnostic evidence, but the value and classification
-     * stay unavailable while a gate is incomplete.
-     */
-    public static IndicatorResult compute(
-            List<CanonicalEncounter> encounters,
-            String municipalityIbge,
-            String referencePeriod,
-            String dataCutoff,
-            ReleaseGates releaseGates) {
-        validateRequestedScope(encounters, municipalityIbge, referencePeriod);
-        Computation computation = count(encounters);
-        if (!releaseGates.isComplete() || !STANDING_LIMITATIONS.isEmpty()) {
-            List<String> limitations = new ArrayList<>(computation.limitations());
-            limitations.addAll(releaseGates.incompleteReasons());
-            return new IndicatorResult(
-                    IndicatorResult.IndicatorStatus.BLOCKED,
-                    null,
-                    computation.numerator(),
-                    computation.denominator(),
-                    DENOMINATOR_KIND,
-                    null,
-                    referencePeriod,
-                    RULE_VERSION,
-                    dataCutoff,
-                    municipalityIbge,
-                    limitations,
-                    CALCULATION_POLICY_VERSION);
-        }
-        return toResult(computation, municipalityIbge, referencePeriod, dataCutoff);
-    }
-
-    /**
-     * Exact calculation over evidence that has already been validated by the acquisition layer.
-     * This method is intentionally named so callers cannot mistake a reproducibility calculation
-     * for a release-approved indicator.
-     */
-    public static IndicatorResult computeEvidenceOnly(
             List<CanonicalEncounter> encounters, String municipalityIbge, String referencePeriod, String dataCutoff) {
         validateRequestedScope(encounters, municipalityIbge, referencePeriod);
         return toResult(count(encounters), municipalityIbge, referencePeriod, dataCutoff);

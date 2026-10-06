@@ -14,9 +14,7 @@ import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.RuleOutcome;
-import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.ValueKind;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -130,7 +128,6 @@ public final class C7Pack implements IndicatorRule {
                     Capabilities.IMMUNIZATION_HISTORY,
                     Capabilities.CONDITION_LIST),
             COMPONENTS,
-            ReleaseGates.noneComplete(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.practicesPack(),
@@ -197,7 +194,7 @@ public final class C7Pack implements IndicatorRule {
 
     @Override
     public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
-        return RuleOutcomes.gate(DESCRIPTOR, C7Rule.compute(data, context));
+        return C7Rule.compute(data, context);
     }
 
     @Override

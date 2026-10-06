@@ -66,7 +66,8 @@ public final class PublicationService {
             rs.getString("value_exact_denominator"),
             rs.getString("components_json"),
             rs.getString("team_results_json"),
-            rs.getInt("consolidation_eligible"));
+            rs.getInt("consolidation_eligible"),
+            rs.getString("gate_snapshot_json"));
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactionTemplate;
@@ -126,8 +127,8 @@ public final class PublicationService {
                         reproducibility_level, canonical_schema_version, evidence_grain,
                         app_build, published_at, value_kind, value_exact_numerator,
                         value_exact_denominator, components_json, team_results_json,
-                        consolidation_eligible)
-                    VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?,?,?,?,?)
+                        consolidation_eligible, gate_snapshot_json)
+                    VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?,?,?,?,?,?)
                     """,
                     resultId,
                     staging.jobId(),
@@ -164,7 +165,8 @@ public final class PublicationService {
                     staging.valueExactDenominator(),
                     staging.componentsJson(),
                     staging.teamResultsJson(),
-                    staging.consolidationEligible());
+                    staging.consolidationEligible(),
+                    staging.gateSnapshotJson());
 
             int stagingUpdated = jdbc.update(
                     "update result_staging set state = 'PUBLISHED' where staging_id = ? and state = 'SEALED'",
@@ -257,5 +259,6 @@ public final class PublicationService {
             String valueExactDenominator,
             String componentsJson,
             String teamResultsJson,
-            int consolidationEligible) {}
+            int consolidationEligible,
+            String gateSnapshotJson) {}
 }

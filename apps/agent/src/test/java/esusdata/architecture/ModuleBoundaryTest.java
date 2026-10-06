@@ -1,12 +1,25 @@
 package esusdata.architecture;
 
+import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import esusdata.indicator.ReleaseGateRegistry;
 import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.model.GateChecks;
+import esusdata.indicator.model.GateStatus;
+import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.model.RuleOutcomes;
+import esusdata.indicator.pack.c1.C1Rule;
+import esusdata.run.worker.RunExecutor;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -59,6 +72,49 @@ class ModuleBoundaryTest {
                         BASE + ".indicator.pack.componente3..")
                 .should()
                 .callMethod(ExactRatio.class, "asPercentage")
+                .check(CLASSES);
+    }
+
+    /**
+     * ADR 0032: the release gates are applied in one place, the executor. A pack returns its outcome
+     * ungated, and neither applies the gates nor reads the registry (the Nota Final receives its
+     * {@code GateStatus} from the service, as data).
+     */
+    @Test
+    void packsNeitherApplyTheReleaseGatesNorDependOnTheRegistry() {
+        noClasses()
+                .that()
+                .resideInAPackage(BASE + ".indicator.pack..")
+                .should()
+                .callMethod(RuleOutcomes.class, "gate", GateStatus.class, IndicatorResult.class)
+                .orShould()
+                .callMethod(RuleOutcomes.class, "gate", GateStatus.class, RuleOutcome.class)
+                .orShould()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName(ReleaseGateRegistry.class.getName())
+                .orShould()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName(GateChecks.class.getName())
+                .check(CLASSES);
+    }
+
+    /**
+     * ADR 0032: only the executor may ask a rule for an outcome; what a rule returns is not
+     * publishable. Covers a call through any type that is an {@code IndicatorRule} (a concrete pack
+     * included) and C1's public static {@code compute}, which the legacy path used to call directly.
+     */
+    @Test
+    void onlyTheExecutorEvaluatesARule() {
+        noClasses()
+                .that()
+                .doNotHaveFullyQualifiedName(RunExecutor.class.getName())
+                .and()
+                .resideOutsideOfPackage(BASE + ".indicator.pack..")
+                .should()
+                .callMethodWhere(
+                        target(owner(assignableTo(IndicatorRule.class))).and(target(name("evaluate"))))
+                .orShould()
+                .callMethodWhere(target(owner(assignableTo(C1Rule.class))).and(target(name("compute"))))
                 .check(CLASSES);
     }
 

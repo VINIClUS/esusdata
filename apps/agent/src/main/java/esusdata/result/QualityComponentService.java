@@ -1,7 +1,10 @@
 package esusdata.result;
 
 import esusdata.indicator.IndicatorRuleRegistry;
+import esusdata.indicator.ReleaseGateRegistry;
 import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.model.GateChecks;
+import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.Quadrimestre;
@@ -15,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,10 +54,16 @@ public final class QualityComponentService {
 
     private final ResultRepository resultRepository;
     private final Clock clock;
+    private final ReleaseGateRegistry gateRegistry;
 
     public QualityComponentService(ResultRepository resultRepository, Clock clock) {
+        this(resultRepository, clock, ReleaseGateRegistry.bundled());
+    }
+
+    public QualityComponentService(ResultRepository resultRepository, Clock clock, ReleaseGateRegistry gateRegistry) {
         this.resultRepository = resultRepository;
         this.clock = clock;
+        this.gateRegistry = gateRegistry;
     }
 
     /** The consolidated quadrimestre and the fingerprint of the published results it read. */
@@ -61,8 +71,21 @@ public final class QualityComponentService {
 
     public Consolidated consolidate(String municipalityIbge, Quadrimestre quadrimestre) {
         List<PublishedResult> read = read(municipalityIbge, quadrimestre);
-        ComponentIIIInput input = new ComponentIIIInput(municipalityIbge, quadrimestre, units(read));
+        ComponentIIIInput input = new ComponentIIIInput(municipalityIbge, quadrimestre, units(read), gates());
         return new Consolidated(ComponentIII.consolidation().consolidate(input, RULES), fingerprint(read));
+    }
+
+    /**
+     * The Nota Final's gates: A and D from the registry; B from its own limitations; C passes, as
+     * the note reads no capability of its own — the packs it consolidates carry theirs (ADR 0032).
+     */
+    private GateStatus gates() {
+        LocalDate today = LocalDate.now(clock.withZone(SourceCoverageService.ZONE));
+        return gateRegistry
+                .statusOf(ComponentIII.DESCRIPTOR)
+                .withEvaluated(
+                        GateChecks.calculationModel(ComponentIII.DESCRIPTOR, today),
+                        GateChecks.adapter(List.of(), today));
     }
 
     /**

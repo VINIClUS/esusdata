@@ -3,6 +3,7 @@ package esusdata.run.worker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.BudgetHint;
 import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.Capabilities;
@@ -65,6 +66,7 @@ class RunExecutorPacksTest {
     void setUp() {
         clock = Clock.fixed(Instant.parse("2026-09-20T12:00:00Z"), ZoneOffset.UTC);
         fixture = new JobRunnerTestFixture(dataDir, clock);
+        fixture.gateRegistry = GateFixtures.registryPassing(new PracticeTestRule().descriptor());
         fixture.registerSource(SOURCE, IBGE);
         fixture.registerPrincipal("gestor", IBGE);
     }

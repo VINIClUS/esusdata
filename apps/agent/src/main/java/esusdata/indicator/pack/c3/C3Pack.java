@@ -15,9 +15,7 @@ import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
-import esusdata.indicator.model.ReleaseGates;
 import esusdata.indicator.model.RuleOutcome;
-import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.ValueKind;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -35,9 +33,8 @@ import java.util.TreeMap;
  * competência (gestantes e puérperas ativas, vínculo no corte, óbito, aborto); onze práticas
  * (cumpre / não cumpre); escore {@code Σ pontos ÷ episódios elegíveis} na escala 0–100. Cada
  * ambiguidade da ficha tem leitura decidida e registrada em {@code docs/indicadores/decisoes/
- * c3-gestacao-puerperio.md}: a regra nunca devolve {@code RULE_AMBIGUITY}. Enquanto houver
- * portão incompleto, {@link #evaluate} devolve {@code BLOCKED} com as contagens ({@link
- * RuleOutcomes#gate}).
+ * c3-gestacao-puerperio.md}: a regra nunca devolve {@code RULE_AMBIGUITY}. O resultado sai sem
+ * portão: quem aplica os portões de liberação (ADR 0032) é o executor.
  */
 public final class C3Pack implements IndicatorRule {
 
@@ -125,7 +122,6 @@ public final class C3Pack implements IndicatorRule {
                             "Ter pelo menos 01 atividade em saúde bucal realizada por cirurgiã(ão) dentista ou técnica(o) de saúde bucal durante o período da gestação.",
                             9,
                             PREGNANCY)),
-            ReleaseGates.noneComplete(),
             C3Limitations.STANDING,
             MonthlyEligibility.MONTHS_WITH_COHORT_EVENT,
             BudgetHint.practicesPack(),
@@ -180,10 +176,10 @@ public final class C3Pack implements IndicatorRule {
 
     @Override
     public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
-        return RuleOutcomes.gate(DESCRIPTOR, compute(data, context));
+        return compute(data, context);
     }
 
-    /** The exact outcome before the release gates (§4.4): what {@link #evaluate} gates. */
+    /** The exact outcome, ungated (§4.4): the executor applies the release gates (ADR 0032). */
     RuleOutcome compute(CanonicalDataset data, EvaluationContext context) {
         List<String> gaps = SourceCoverage.gaps(requirements(context.competencia()), data);
         if (!gaps.isEmpty()) {

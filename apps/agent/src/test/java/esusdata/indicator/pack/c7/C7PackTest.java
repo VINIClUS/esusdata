@@ -2,6 +2,7 @@ package esusdata.indicator.pack.c7;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.ComponentKind;
 import esusdata.indicator.model.ComponentSpec;
@@ -40,8 +41,8 @@ class C7PackTest {
         assertThat(d.components().stream().map(ComponentSpec::weight).reduce(BigInteger.ZERO, BigInteger::add))
                 .isEqualTo(BigInteger.valueOf(100));
         assertThat(d.components()).allMatch(c -> c.kind() == ComponentKind.SUBGROUP);
-        assertThat(d.executionEnabled()).isFalse();
-        assertThat(d.blockedGates()).hasSize(5);
+        assertThat(GateFixtures.shipped(d).isComplete()).isFalse();
+        assertThat(GateFixtures.shipped(d).incompleteReasons()).hasSize(3);
         assertThat(d.standingLimitations())
                 .isNotEmpty()
                 .noneMatch(l -> l.contains("Regra em implementação"))

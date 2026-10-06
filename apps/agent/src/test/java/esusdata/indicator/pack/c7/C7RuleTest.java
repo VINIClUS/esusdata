@@ -3,6 +3,7 @@ package esusdata.indicator.pack.c7;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalDataset;
@@ -624,7 +625,8 @@ class C7RuleTest {
         EvaluationContext context = context(JUN_2026);
         RuleOutcome ungated = C7Rule.compute(data, context);
 
-        RuleOutcome gated = new C7Pack().evaluate(data, context);
+        C7Pack pack = new C7Pack();
+        RuleOutcome gated = GateFixtures.published(pack.descriptor(), pack.evaluate(data, context));
 
         IndicatorResult result = gated.result();
         assertThat(result.status()).isEqualTo(IndicatorStatus.BLOCKED);
@@ -866,7 +868,9 @@ class C7RuleTest {
     @Test
     void gate_noDenominatorPassesThroughWithEveryGate() {
         C7Pack pack = new C7Pack();
-        IndicatorResult empty = pack.evaluate(CanonicalDataset.builder().build(), context(JUN_2026))
+        IndicatorResult empty = GateFixtures.published(
+                        pack.descriptor(),
+                        pack.evaluate(CanonicalDataset.builder().build(), context(JUN_2026)))
                 .result();
 
         assertThat(empty.status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
@@ -876,9 +880,7 @@ class C7RuleTest {
                     .contains(
                             "Portão A (fonte e vigência) incompleto",
                             "Portão B (modelo de cálculo) incompleto",
-                            "Portão C (adaptador) incompleto",
-                            "Portão D (reconciliação) incompleto",
-                            "Portão E (piloto e operação) incompleto");
+                            "Portão D (reconciliação) incompleto");
         }
     }
 

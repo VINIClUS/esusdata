@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.auth.model.Role;
 import esusdata.indicator.model.EvaluationContext;
+import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.pack.c2.C2Pack;
@@ -157,6 +158,7 @@ class ScheduleApiTest extends ApiFixtureSupport {
                 "c2-desenvolvimento-infantil",
                 RuleOutcomes.pending(
                                 new C2Pack().descriptor(),
+                                GateStatus.pending(new C2Pack().descriptor()),
                                 EvaluationContext.endOfMonth(municipality, YearMonth.of(2026, 2)),
                                 "Regra em implementação (ADR 0030).")
                         .result(),
