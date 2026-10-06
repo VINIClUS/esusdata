@@ -19,6 +19,7 @@ import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.Scores;
 import esusdata.indicator.model.TeamResult;
+import esusdata.indicator.model.TeamScope;
 import esusdata.indicator.model.ValueKind;
 import esusdata.indicator.pack.PackSupport;
 import esusdata.indicator.pack.c7.C7Cohort.Member;
@@ -26,6 +27,7 @@ import esusdata.indicator.pack.c7.C7Practices.Decision;
 import esusdata.indicator.pack.c7.C7Practices.Fact;
 import esusdata.indicator.pack.c7.C7Practices.Outcome;
 import java.math.BigInteger;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -47,6 +49,11 @@ public final class C7Rule {
 
     static final String EVENTO_SUSTENTA_PRATICA = "EVENTO_SUSTENTA_PRATICA";
 
+    /** C7-LIM-15: the people left out because their team is not a considered one. */
+    static final String TEAM_EXCLUSIONS = "C7-LIM-15/contagem: %d pessoa(s) vinculada(s) a equipe fora da regra de tipo"
+            + " (70 ou 76 vigente no fim da competência) ficaram fora: %d de equipe sem tipo, %d de tipo conflitante e"
+            + " %d de outro tipo.";
+
     private C7Rule() {}
 
     /** The ungated outcome: municipal result, one per team (INE) and the evidence. */
@@ -58,8 +65,9 @@ public final class C7Rule {
         if (!missing.isEmpty()) {
             return new RuleOutcome(unsupported(missing, context), List.of(), List.of());
         }
-        List<Member> members = C7Cohort.resolve(
-                data.persons(), data.registrations(), context.competencia().atEndOfMonth());
+        LocalDate end = context.competencia().atEndOfMonth();
+        List<Member> members =
+                C7Cohort.resolve(data.persons(), data.registrations(), TeamScope.of(data.teams(), end), end);
         C7Practices practices = new C7Practices(data, context.competencia());
         List<Evaluated> evaluated = new ArrayList<>(members.size());
         for (Member m : members) {
@@ -77,7 +85,27 @@ public final class C7Rule {
             List<Evaluated> group = team.getValue();
             teams.add(new TeamResult(team.getKey(), commonCnes(group), result(group, context)));
         }
-        return new RuleOutcome(result(eligible, context), teams, evidence(evaluated));
+        IndicatorResult municipal = result(eligible, context);
+        String left = teamExclusions(evaluated);
+        if (left != null) {
+            municipal = municipal.withLimitation(left);
+        }
+        return new RuleOutcome(municipal, teams, evidence(evaluated));
+    }
+
+    /** C7-LIM-15: the people the team-type rule left out, by reason. */
+    private static String teamExclusions(List<Evaluated> evaluated) {
+        long without = count(evaluated, TeamScope.REASON_WITHOUT_TYPE);
+        long conflict = count(evaluated, TeamScope.REASON_CONFLICT);
+        long other = count(evaluated, TeamScope.REASON_OUT_OF_SCOPE);
+        long all = without + conflict + other;
+        return all == 0 ? null : TEAM_EXCLUSIONS.formatted(all, without, conflict, other);
+    }
+
+    private static long count(List<Evaluated> evaluated, String reason) {
+        return evaluated.stream()
+                .filter(e -> reason.equals(e.member().reason()))
+                .count();
     }
 
     /** The CNES of the team's links, or null when they disagree — never the first one by order. */

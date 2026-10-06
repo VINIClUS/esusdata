@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalEncounter;
+import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.CanonicalModality;
+import esusdata.indicator.model.CanonicalTeam;
+import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.DataRequirements;
 import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
@@ -122,6 +125,63 @@ class C1PackTest {
         assertThat(outcome.teams())
                 .singleElement()
                 .satisfies(team -> assertThat(team.cnes()).isNull());
+    }
+
+    /** The v1 read plus the team part (C1-D2): a dataset the production read does not yet produce. */
+    private static CanonicalDataset withTeams(List<CanonicalEncounter> encounters, CanonicalTeam... teams) {
+        CanonicalDataset.Builder builder = CanonicalDataset.builder();
+        encounters.forEach(builder::encounter);
+        for (CanonicalTeam team : teams) {
+            builder.add(team);
+        }
+        builder.window(C1Pack.CAPABILITY, MARCH_WINDOW);
+        builder.window(Capabilities.TEAM, MARCH_WINDOW);
+        return builder.build();
+    }
+
+    @Test
+    void c1_d2_withTheTeamPartOnlyEncountersOfEsfAndEapTeamsCountAndTheOthersAreCounted() {
+        List<CanonicalEncounter> encounters = new ArrayList<>(sample());
+        encounters.add(encounter(5, CanonicalModality.ESPONTANEO, "0000000003")); // eMulti
+        encounters.add(encounter(6, CanonicalModality.ESPONTANEO, "0000000004")); // two types
+        RuleOutcome outcome = new C1Pack()
+                .evaluate(
+                        withTeams(
+                                encounters,
+                                CanonicalFixtures.team("0000000001", "1234567", "70"),
+                                CanonicalFixtures.team("0000000002", "1234567", "76"),
+                                CanonicalFixtures.team("0000000003", "1234567", "72"),
+                                CanonicalFixtures.team("0000000004", "1234567", "70"),
+                                CanonicalFixtures.team("0000000004", "1234567", "76")),
+                        EvaluationContext.endOfMonth("3541307", MARCH));
+
+        assertThat(outcome.result().numerator()).isEqualTo(BigInteger.TWO);
+        assertThat(outcome.result().denominator()).isEqualTo(BigInteger.valueOf(3));
+        assertThat(outcome.teams()).extracting(TeamResult::ine).containsExactly("0000000001", "0000000002");
+        assertThat(outcome.result().limitations())
+                .anyMatch(l -> l.startsWith("C1-LIM-10/contagem: 3 atendimento(s)")
+                        && l.contains("1 sem INE ou de equipe sem tipo, 1 de tipo conflitante e 1 de outro tipo"));
+        assertThat(outcome.evidence())
+                .filteredOn(e -> e.decision() == EvidenceDecision.EXCLUDED)
+                .extracting(EvidenceItem::reasonCode)
+                .containsExactlyInAnyOrder(
+                        "EXCLUIDO_EQUIPE_SEM_TIPO",
+                        "EXCLUIDO_EQUIPE_FORA_DO_ESCOPO",
+                        "EXCLUIDO_TIPO_EQUIPE_CONFLITANTE");
+    }
+
+    @Test
+    void c1_d2_withoutTheTeamPartNothingIsFilteredAndTheGapStaysBlocking() {
+        RuleOutcome outcome = new C1Pack()
+                .evaluate(
+                        CanonicalDataset.ofEncounters(C1Pack.CAPABILITY, MARCH_WINDOW, sample()),
+                        EvaluationContext.endOfMonth("3541307", MARCH));
+
+        assertThat(outcome.result().denominator()).isEqualTo(BigInteger.valueOf(3));
+        assertThat(outcome.result().limitations()).noneMatch(l -> l.startsWith("C1-LIM-10"));
+        assertThat(new C1Pack().descriptor().blockingLimitations())
+                .singleElement()
+                .satisfies(l -> assertThat(l.code()).isEqualTo("C1-LIM-03"));
     }
 
     @Test

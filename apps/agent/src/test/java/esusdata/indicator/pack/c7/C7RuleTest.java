@@ -1377,6 +1377,8 @@ class C7RuleTest {
     /** Linked people (every person gets a registration version on 2020-01-01) plus their records. */
     private static final class Scenario {
         private final CanonicalDataset.Builder builder = CanonicalDataset.builder();
+        private final java.util.Set<String> linkedInes = new java.util.TreeSet<>();
+        private final java.util.Set<String> typedInes = new java.util.HashSet<>();
 
         Scenario woman(String key, LocalDate birth) {
             return person(key, birth, FEMININO, null);
@@ -1389,12 +1391,19 @@ class C7RuleTest {
         Scenario linked(CanonicalPerson person, String ine) {
             builder.add(person);
             builder.add(CanonicalFixtures.registration(person.personKey(), LINK_DATE, cnes(ine), ine));
+            linkedInes.add(ine);
             return this;
         }
 
         Scenario add(Record... records) {
             for (Record r : records) {
                 builder.add(Objects.requireNonNull(r));
+                if (r instanceof esusdata.indicator.model.CanonicalTeam t) {
+                    typedInes.add(t.ine());
+                }
+                if (r instanceof esusdata.indicator.model.CanonicalRegistration reg && reg.ine() != null) {
+                    linkedInes.add(reg.ine());
+                }
             }
             return this;
         }
@@ -1404,7 +1413,13 @@ class C7RuleTest {
             return this;
         }
 
+        /** A linked INE without a team record has no type and its people leave the cohort (C7-LIM-15): default eSF 70. */
         CanonicalDataset build() {
+            for (String ine : linkedInes) {
+                if (typedInes.add(ine)) {
+                    builder.add(CanonicalFixtures.team(ine, cnes(ine), "70"));
+                }
+            }
             return builder.build();
         }
 
