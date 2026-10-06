@@ -10,3 +10,8 @@ contracts/** text eol=lf
 # package job: sources are LF everywhere.
 *.java text eol=lf
 *.rs text eol=lf
+
+# Release-gate evidence (contracts/indicators/release-gates.json, ADR 0032) is pinned by the
+# sha256 of a document under docs/: a CRLF checkout on Windows changed every hash and failed
+# ReleaseGatesConsistencyTest in the Windows package job.
+docs/**/*.md text eol=lf
