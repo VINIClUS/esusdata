@@ -21,12 +21,12 @@ import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.Scores;
 import esusdata.indicator.model.TeamResult;
+import esusdata.indicator.model.TeamScope;
 import esusdata.indicator.model.ValueKind;
 import esusdata.indicator.pack.PackSupport;
 import esusdata.indicator.pack.c6.C6Cohort.Subject;
 import esusdata.indicator.pack.c6.C6Practices.Practice;
 import esusdata.indicator.pack.c6.C6Practices.Support;
-import esusdata.indicator.pack.c6.C6Teams.TeamType;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -59,21 +59,22 @@ public final class C6Pack implements IndicatorRule {
     private static final int OLDEST_AGE_READ = 130;
 
     public static final String ID = "c6-cuidado-pessoa-idosa";
-    public static final String RULE_VERSION = ID + "@0.2.0";
+    public static final String RULE_VERSION = ID + "@0.3.0";
 
-    /** Reason code of practice C for a person of an eAP tipo 76 team while P07 is open. */
-    static final String C_REASON_EAP = "C_AMBIGUA_EAP76_AMB_C6_01";
+    /** Reason code of practice C for a person of an eAP 76 team without the visits: credited in full (C6-D1). */
+    static final String C_REASON_CREDITED_EAP = TeamScope.REASON_CREDITED_EAP76;
 
-    /** Reason code of practice C for a person whose team has two types at the same latest instant. */
-    static final String C_REASON_CONFLICTING_TYPE = "C_AMBIGUA_TIPO_EQUIPE_CONFLITANTE";
+    /**
+     * C6-LIM-14 (P07, C6-D1): practice C is credited in full to the people of eAP 76 teams, observed
+     * or not (item 24 b).
+     */
+    static final String EAP_CREDIT = "C6-LIM-14/contagem: C creditada integralmente (%d pontos) para %d pessoa(s) de"
+            + " equipes eAP 76, conforme o item 24 b; observada em %d.";
 
-    static final String EAP_LIMITATION = "AMB-C6-01: a boa prática (C) «não será condicionante de pontuação para eAP, "
-            + "tipo 76» (item 24 b, p. 2) admite três leituras (crédito integral, renormalização sobre 75 ou só não "
-            + "exigir); resultado sem valor até a P07 (MET-23). A, B e D seguem nos componentes; o componente C "
-            + "fica RULE_AMBIGUITY com as contagens exatas e a prática C da pessoa, PRACTICE_AMBIGUOUS.";
-
-    static final String CONFLICTING_TYPE_LIMITATION = "Tipo de equipe divergente na observação mais recente até o "
-            + "corte (§1.7.3: sem escolher um): a prática C dessas equipes fica sem decisão e o resultado sem valor.";
+    /** C6-LIM-15 (C6-D2): the people left out because their team is not a considered one. */
+    static final String TEAM_EXCLUSIONS = "C6-LIM-15/contagem: %d pessoa(s) vinculada(s) a equipe fora da regra de tipo"
+            + " (70 ou 76 vigente no fim da competência) ficaram fora: %d de equipe sem tipo, %d de tipo conflitante e"
+            + " %d de outro tipo.";
 
     private static final List<Limitation> STANDING_LIMITATIONS = List.of(
             Limitation.outOfReach(
@@ -96,10 +97,6 @@ public final class C6Pack implements IndicatorRule {
                     "Recusa de cadastro, ficha inativa, data de nascimento divergente e versões conflitantes "
                             + "excluem a pessoa com motivo próprio; a semântica de ficha inativa no DW não é publicada e a "
                             + "contagem por motivo é divulgada."),
-            Limitation.blockingGap(
-                    "C6-LIM-05",
-                    "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de C para eAP não "
-                            + "são aplicados."),
             Limitation.outOfReach(
                     "C6-LIM-06",
                     "Habilitação de CBO na tabela SIGTAP e estabelecimento de APS não são conferidos; o CNS "
@@ -133,7 +130,15 @@ public final class C6Pack implements IndicatorRule {
                     "C6-LIM-13",
                     "Influenza (D): pelo menos uma dose de 33 ou 77 aplicada nos 12 meses da janela, "
                             + "transcrição com data de aplicação incluída, sem filtro de CBO; a mesma vacina na mesma data "
-                            + "é uma dose, e doses distintas não somam nem anulam."));
+                            + "é uma dose, e doses distintas não somam nem anulam."),
+            Limitation.convention(
+                    "C6-LIM-14",
+                    "C creditada integralmente (25 pontos) para as pessoas de equipes eAP 76, conforme o item 24 b; "
+                            + "a contagem creditada e a observada de cada resultado estão nas limitações dele."),
+            Limitation.convention(
+                    "C6-LIM-15",
+                    "Só equipes de tipo 70 ou 76 vigente no fim da competência entram; equipes de outro tipo, "
+                            + "conflitantes ou sem tipo ficam fora, com motivo e contagem."));
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -145,7 +150,7 @@ public final class C6Pack implements IndicatorRule {
             ValueKind.SCORE,
             "percentual",
             "PESSOAS_IDOSAS_VINCULADAS",
-            "c6-exact-score@1",
+            "c6-exact-score@2",
             List.of(
                     Capabilities.CITIZEN,
                     Capabilities.INDIVIDUAL_REGISTRATION,
@@ -153,7 +158,8 @@ public final class C6Pack implements IndicatorRule {
                     Capabilities.PROCEDURE_PERFORMED,
                     Capabilities.HOME_VISIT,
                     Capabilities.MEASUREMENT_RECORD,
-                    Capabilities.IMMUNIZATION_HISTORY),
+                    Capabilities.IMMUNIZATION_HISTORY,
+                    Capabilities.TEAM),
             List.of(
                     ComponentSpec.practice(
                             "A",
@@ -218,6 +224,7 @@ public final class C6Pack implements IndicatorRule {
                 Capabilities.MEASUREMENT_RECORD, period, births, codes(Capabilities.MEASUREMENT_RECORD)));
         parts.add(PartRequirement.personScoped(
                 Capabilities.IMMUNIZATION_HISTORY, period, births, codes(Capabilities.IMMUNIZATION_HISTORY)));
+        parts.add(PackSupport.teamPart(competencia));
         return new DataRequirements(DataRequirements.V2, parts);
     }
 
@@ -252,55 +259,70 @@ public final class C6Pack implements IndicatorRule {
                     List.of());
         }
         LocalDate lastDay = context.competencia().atEndOfMonth();
-        C6Teams teamTypes = C6Teams.resolve(data.teams(), context.dataCutoff());
+        TeamScope teamTypes = TeamScope.of(data.teams(), lastDay);
         List<Subject> subjects = C6Cohort.resolve(data, lastDay, context.dataCutoff(), teamTypes);
         C6Practices practices = C6Practices.index(data, practiceWindow(context));
         List<Assessment> assessed = new ArrayList<>();
         for (Subject s : subjects) {
             if (s.eligible()) {
-                assessed.add(Assessment.of(s, practices.assess(s.personKey()), visitsReason(s.teamType())));
+                assessed.add(Assessment.of(s, practices.assess(s.personKey())));
             }
         }
         List<String> extra = new ArrayList<>();
-        if (teamTypes.undated() > 0) {
-            extra.add(teamTypes.undated() + " observação(ões) de tipo de equipe sem data ignorada(s) (§1.7.3).");
-        }
         IndicatorResult municipal = result(assessed, extra, context);
+        String left = teamExclusions(subjects);
+        if (left != null) {
+            municipal = municipal.withLimitation(left);
+        }
         return new RuleOutcome(municipal, teams(assessed, extra, context), C6Evidence.of(subjects, assessed, lastDay));
     }
 
-    /** Practice C cannot be decided for eAP tipo 76 (AMB-C6-01) or for a team of conflicting type. */
-    private static String visitsReason(TeamType type) {
-        if (type == TeamType.EAP) {
-            return C_REASON_EAP;
-        }
-        return type == TeamType.CONFLICTING ? C_REASON_CONFLICTING_TYPE : null;
+    /** The people the team-type rule left out, by reason: a disclosure for the municipal result (C6-LIM-15). */
+    private static String teamExclusions(List<Subject> subjects) {
+        long without = count(subjects, TeamScope.REASON_WITHOUT_TYPE);
+        long conflict = count(subjects, TeamScope.REASON_CONFLICT);
+        long other = count(subjects, TeamScope.REASON_OUT_OF_SCOPE);
+        long all = without + conflict + other;
+        return all == 0 ? null : TEAM_EXCLUSIONS.formatted(all, without, conflict, other);
+    }
+
+    private static long count(List<Subject> subjects, String reason) {
+        return subjects.stream().filter(s -> reason.equals(s.reasonCode())).count();
     }
 
     /** One eligible person with the events behind each practice and the points they earn. */
-    record Assessment(
-            Subject subject, Map<Practice, List<Support>> practices, String visitsAmbiguity, BigInteger points) {
+    record Assessment(Subject subject, Map<Practice, List<Support>> practices, BigInteger points) {
         Assessment {
             practices = Collections.unmodifiableMap(new EnumMap<>(practices));
         }
 
-        static Assessment of(Subject subject, Map<Practice, List<Support>> practices, String visitsAmbiguity) {
-            List<ComponentSpec> satisfied = new ArrayList<>();
+        static Assessment of(Subject subject, Map<Practice, List<Support>> practices) {
+            List<ComponentSpec> counted = new ArrayList<>();
             for (Practice p : Practice.values()) {
-                if (!practices.get(p).isEmpty()) {
-                    satisfied.add(spec(p));
+                if (!practices.get(p).isEmpty() || isCredited(subject, practices, p)) {
+                    counted.add(spec(p));
                 }
             }
-            return new Assessment(subject, practices, visitsAmbiguity, Scores.points(satisfied));
+            return new Assessment(subject, practices, Scores.points(counted));
         }
 
-        /** Practice C is undecided for this person: no points for C, none for the person. */
-        boolean ambiguous() {
-            return visitsAmbiguity != null;
+        private static boolean isCredited(Subject subject, Map<Practice, List<Support>> practices, Practice p) {
+            return p == Practice.C && subject.eap76() && practices.get(p).isEmpty();
         }
 
+        /** The practice was observed in the source. */
         boolean met(Practice practice) {
             return !practices.get(practice).isEmpty();
+        }
+
+        /** C of an eAP 76 person without the visits: credited in full (C6-D1). */
+        boolean credited(Practice practice) {
+            return isCredited(subject, practices, practice);
+        }
+
+        /** The practice counts: observed, or credited. */
+        boolean counts(Practice practice) {
+            return met(practice) || credited(practice);
         }
     }
 
@@ -329,41 +351,27 @@ public final class C6Pack implements IndicatorRule {
     private static IndicatorResult result(List<Assessment> group, List<String> extra, EvaluationContext context) {
         BigInteger subjects = BigInteger.valueOf(group.size());
         BigInteger total = BigInteger.ZERO;
-        Set<String> ambiguities = new TreeSet<>();
         for (Assessment a : group) {
             total = total.add(a.points());
-            if (a.ambiguous()) {
-                ambiguities.add(a.visitsAmbiguity());
-            }
         }
-        boolean ambiguous = !ambiguities.isEmpty();
         List<ResultComponent> components = new ArrayList<>();
         for (Practice p : Practice.values()) {
             BigInteger met =
-                    BigInteger.valueOf(group.stream().filter(a -> a.met(p)).count());
-            components.add(
-                    ambiguous && p == Practice.C
-                            ? ambiguousComponent(met, subjects)
-                            : ResultComponent.of(spec(p), met, subjects));
+                    BigInteger.valueOf(group.stream().filter(a -> a.counts(p)).count());
+            components.add(ResultComponent.of(spec(p), met, subjects));
         }
         List<String> limitations = new ArrayList<>(DESCRIPTOR.standingLimitationLines());
         limitations.addAll(extra);
-        if (ambiguous) {
-            limitations.add(ambiguities.contains(C_REASON_EAP) ? EAP_LIMITATION : CONFLICTING_TYPE_LIMITATION);
-            if (ambiguities.size() > 1) {
-                limitations.add(CONFLICTING_TYPE_LIMITATION);
-            }
-            return build(IndicatorStatus.RULE_AMBIGUITY, null, null, subjects, components, limitations, context);
+        long eap = group.stream().filter(a -> a.subject().eap76()).count();
+        if (eap > 0) {
+            long observed = group.stream()
+                    .filter(a -> a.subject().eap76() && a.met(Practice.C))
+                    .count();
+            limitations.add(EAP_CREDIT.formatted(spec(Practice.C).weight(), eap, observed));
         }
         Optional<ExactRatio> value = Scores.meanPoints(total, subjects);
         IndicatorStatus status = value.isPresent() ? IndicatorStatus.COMPUTED : IndicatorStatus.NO_DENOMINATOR;
         return build(status, value.orElse(null), total, subjects, components, limitations, context);
-    }
-
-    /** C of a group with eAP tipo 76 people (AMB-C6-01): exact counts, no value. */
-    private static ResultComponent ambiguousComponent(BigInteger met, BigInteger subjects) {
-        ComponentSpec c = spec(Practice.C);
-        return new ResultComponent(c.code(), c.kind(), c.weight(), met, subjects, null, IndicatorStatus.RULE_AMBIGUITY);
     }
 
     private static IndicatorResult build(

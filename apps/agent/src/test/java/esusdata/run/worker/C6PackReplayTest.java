@@ -141,6 +141,7 @@ class C6PackReplayTest {
         LocalDate linked = LocalDate.of(2025, 9, 1);
         LocalDate dose = LocalDate.of(2025, 5, 10);
         return ExtractFixturesV2.forRule(new C6Pack(), COMPETENCIA)
+                .add(CanonicalFixtures.team(INE, CNES, "70"))
                 .add(CanonicalFixtures.person("p1", LocalDate.of(1956, 3, 10), "FEMININO"))
                 .add(CanonicalFixtures.registration("p1", linked, CNES, INE))
                 .add(CanonicalFixtures.encounter("p1", LocalDate.of(2026, 2, 10), "225142", false))
