@@ -27,7 +27,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -72,7 +72,8 @@ class CoverageSchedulerPacksTest {
 
     /** C1 and C2 are eligible for the source: every capability they read is VALIDATED for 5.4.37. */
     private static PecCompatibilityMatrix c1AndC2() {
-        List<String> capabilities = new ArrayList<>(List.of(C1));
+        Set<String> capabilities = new LinkedHashSet<>(new C1Pack().descriptor().requiredCapabilities());
+        capabilities.add(C1);
         capabilities.addAll(new C2Pack().descriptor().requiredCapabilities());
         return CompatibilityMatrices.validated(List.of("5.4.37"), capabilities);
     }

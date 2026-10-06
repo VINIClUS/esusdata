@@ -38,7 +38,7 @@ class ErrorTaxonomyTest extends ApiFixtureSupport {
         // No observatorio.source.allowed-destinations configured anywhere in this test slice —
         // every destination is refused by construction (RunConfig: "a fresh install
         // authorizes no destination").
-        registerSource(sourceId, MUNICIPALITY);
+        registerSource(sourceId, MUNICIPALITY, "5.5.28"); // C1 needs the team type, validated on 5.5.28
 
         HttpResponse<String> created = authenticatedPostWithIdempotency(
                 cookie,

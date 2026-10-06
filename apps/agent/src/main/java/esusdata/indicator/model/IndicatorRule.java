@@ -1,6 +1,7 @@
 package esusdata.indicator.model;
 
 import java.time.YearMonth;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -20,6 +21,16 @@ public interface IndicatorRule {
 
     /** The capabilities, windows and parameters one competência needs. */
     DataRequirements requirements(YearMonth competencia);
+
+    /**
+     * Canonical v2 parts read <em>in addition to</em> a canonical v1 extract, from their own
+     * extract in the same run: the way a rule still on the v1 read (C1) receives a capability such
+     * as {@code team} without moving its frozen v1 query. Empty for every rule on the v2 read, which
+     * lists all its parts in {@link #requirements}.
+     */
+    default List<PartRequirement> supplements(YearMonth competencia) {
+        return List.of();
+    }
 
     /** Computes the competência from records already validated against {@link #requirements}. */
     RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context);

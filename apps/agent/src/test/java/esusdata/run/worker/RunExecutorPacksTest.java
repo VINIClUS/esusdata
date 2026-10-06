@@ -18,6 +18,8 @@ import esusdata.run.acquisition.AcquisitionPart;
 import esusdata.run.extract.ExtractFixtures;
 import esusdata.run.extract.ExtractFixturesV2;
 import esusdata.run.extract.ExtractionManifest;
+import esusdata.run.extract.FileExtractStore;
+import esusdata.run.extract.ManifestPart;
 import esusdata.run.job.CancellationToken;
 import esusdata.run.job.EnqueueRequest;
 import esusdata.run.job.Job;
@@ -108,6 +110,14 @@ class RunExecutorPacksTest {
                 throw new UncheckedIOException(e);
             }
         };
+    }
+
+    /** C1's two acquisitions: its v1 encounters and, first, the supplementary extract of the teams. */
+    private Acquisition c1Acquisition() {
+        return acquisition(command -> command.isCanonicalV2()
+                ? ExtractFixtures.writeTeams(
+                        fixture.extractsDir, command.extractionId(), SOURCE, IBGE, COMPETENCIA, "0000346268")
+                : ExtractFixtures.write(fixture.extractsDir, command.extractionId(), SOURCE, IBGE, "2026-03", 7, 3, 2));
     }
 
     @FunctionalInterface
@@ -248,16 +258,41 @@ class RunExecutorPacksTest {
     }
 
     @Test
-    void c1KeepsItsV1CommandBudgetEvidenceAndInputFingerprint() throws Exception {
+    void c1WithoutAValidatedTeamCapabilityIsUnsupportedBeforeTheGuardAndWithoutAChild() {
+        // the packaged matrix validates team for PEC 5.5.28 only; this source is 5.4.37
         RunExecutor executor = fixture.executor(
                 PecCompatibilityMatrix.fromClasspathResource(),
-                acquisition(command -> ExtractFixtures.write(
-                        fixture.extractsDir, command.extractionId(), SOURCE, IBGE, "2026-03", 7, 3, 2)));
+                acquisition(command -> {
+                    throw new AssertionError("no acquisition for an unsupported source");
+                }),
+                new esusdata.indicator.pack.c1.C1Pack());
+        Job job = enqueueLive(new esusdata.indicator.pack.c1.C1Pack());
+        fixture.acquisitionGuard().block(SOURCE, clock.instant().plusSeconds(60), "test cooldown");
+
+        assertThatThrownBy(() -> executor.runLive(JobRunnerTestFixture.context(job), new CancellationToken()))
+                .isInstanceOfSatisfying(
+                        UnsupportedSourceException.class,
+                        e -> assertThat(e.missingCapabilities()).containsExactly(Capabilities.TEAM));
+        assertThat(commands).isEmpty();
+    }
+
+    @Test
+    void c1KeepsItsV1CommandAndReadsTheTeamsFirstInAnExtractOfTheirOwn() throws Exception {
+        RunExecutor executor = fixture.executor(
+                CompatibilityMatrices.validated(List.of("5.4.37"), List.of(Capabilities.TEAM)), c1Acquisition());
         Job job = enqueueLive(new esusdata.indicator.pack.c1.C1Pack());
 
         RunExecutor.RunOutcome outcome = executor.runLive(JobRunnerTestFixture.context(job), new CancellationToken());
 
-        AcquisitionCommand command = commands.getFirst();
+        // ADR 0033: the small transactional read first, then C1's own v1 read, unchanged
+        assertThat(commands).hasSize(2);
+        AcquisitionCommand teams = commands.getFirst();
+        assertThat(teams.isCanonicalV2()).isTrue();
+        assertThat(teams.parts())
+                .extracting(AcquisitionPart::capability, AcquisitionPart::recordKind)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(Capabilities.TEAM, "team"));
+        assertThat(teams.extractionId()).isEqualTo(commands.getLast().extractionId() + "-team");
+        AcquisitionCommand command = commands.getLast();
         assertThat(command.isCanonicalV2()).isFalse();
         assertThat(command.budget()).isEqualTo(ReadBudget.initialEngineeringProposal());
         assertThat(command.periodStart()).isEqualTo(LocalDate.of(2026, 3, 1));
@@ -271,10 +306,12 @@ class RunExecutorPacksTest {
         assertThat(published.evidenceGrain()).isEqualTo("SOURCE_EVENT");
         assertThat(published.canonicalSchemaVersion()).isEqualTo("1");
         assertThat(published.inputFingerprint())
-                .isEqualTo(c1Fingerprint(fixture.extractionManifestRepository
-                        .findById(command.extractionId())
-                        .orElseThrow()
-                        .manifest()));
+                .isEqualTo(c1Fingerprint(
+                        fixture.extractionManifestRepository
+                                .findById(command.extractionId())
+                                .orElseThrow()
+                                .manifest(),
+                        new FileExtractStore(fixture.extractsDir).readManifest(teams.extractionId())));
         // C1 now also carries the result per team (ADR 0030) — evidence stays one EVENT per encounter.
         assertThat(published.teamResultsJson()).contains("\"ine\":\"0000346268\"");
         assertThat(fixture.evidence(outcome.resultId(), IBGE)).hasSize(12).allSatisfy(row -> {
@@ -286,8 +323,8 @@ class RunExecutorPacksTest {
         });
     }
 
-    /** The fingerprint C1 has always published: these eleven fields, nothing else. */
-    private static String c1Fingerprint(ExtractionManifest manifest) {
+    /** C1's fingerprint: the eleven fields it has always had, plus the supplementary extract and its parts (ADR 0033). */
+    private static String c1Fingerprint(ExtractionManifest manifest, ExtractionManifest teams) {
         Map<String, String> fields = new TreeMap<>();
         fields.put("source_id", manifest.sourceId());
         fields.put("municipality_ibge", manifest.municipalityIbge());
@@ -300,6 +337,14 @@ class RunExecutorPacksTest {
         fields.put("data_cutoff", "2026-03-31");
         fields.put("calculation_policy_version", C1Rule.CALCULATION_POLICY_VERSION);
         fields.put("adapter_version", manifest.adapterVersion());
+        fields.put("supplement_extraction_id", teams.extractionId());
+        fields.put("supplement_extraction_checksum", teams.checksum());
+        ManifestPart part = teams.parts().getFirst();
+        fields.put(
+                "supplement_parts",
+                part.index() + ":" + part.capability() + "@" + part.adapterVersion() + ":" + part.recordKind() + ":"
+                        + part.queryChecksum() + ":[" + part.periodStart() + "," + part.periodEndExclusive() + "):"
+                        + part.paramsChecksum() + ":" + part.rowCount());
         return InputFingerprint.compute(fields);
     }
 }

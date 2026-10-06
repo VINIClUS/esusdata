@@ -30,7 +30,9 @@ import java.util.TreeSet;
 
 /**
  * What one run of a rule reads (ADR 0030), resolved before any I/O: a canonical v1 read (C1, one
- * compiled-in capability over the competência, exactly as before) or a canonical v2 read — one
+ * compiled-in capability over the competência, exactly as before), which may carry a
+ * <em>supplement</em> — canonical v2 parts of the rule's {@code supplements} (C1's {@code team}, ADR
+ * 0033) read as an extract of their own and checked like a v2 extract — or a canonical v2 read — one
  * {@link AcquisitionPart} per {@link PartRequirement}, with the version, query checksum and record
  * kind of the packaged {@link CapabilityContract}, and the period of the command as the span of
  * every part. A requirement whose binds are not the ones its contract declares is a pack error and
@@ -51,12 +53,22 @@ final class ReadPlan {
     private final DataRequirements requirements;
     private final List<AcquisitionPart> parts;
     private final DateWindow span;
+    private final List<AcquisitionPart> supplement;
+    private final DateWindow supplementSpan;
 
-    private ReadPlan(IndicatorRule rule, DataRequirements requirements, List<AcquisitionPart> parts, DateWindow span) {
+    private ReadPlan(
+            IndicatorRule rule,
+            DataRequirements requirements,
+            List<AcquisitionPart> parts,
+            DateWindow span,
+            List<AcquisitionPart> supplement,
+            DateWindow supplementSpan) {
         this.rule = rule;
         this.requirements = requirements;
         this.parts = List.copyOf(parts);
         this.span = span;
+        this.supplement = List.copyOf(supplement);
+        this.supplementSpan = supplementSpan;
     }
 
     /**
@@ -72,27 +84,44 @@ final class ReadPlan {
             DateWindow window = new DateWindow(requirement.periodStart(), requirement.periodEndExclusive());
             span = span == null ? window : span.span(window);
         }
+        List<PartRequirement> supplements = rule.supplements(competencia);
+        List<AcquisitionPart> supplement = new ArrayList<>();
+        DateWindow supplementSpan = null;
+        for (PartRequirement requirement : supplements) {
+            DateWindow window = new DateWindow(requirement.periodStart(), requirement.periodEndExclusive());
+            supplementSpan = supplementSpan == null ? window : supplementSpan.span(window);
+            supplement.add(acquisitionPart(rule, requirement, catalog));
+        }
         if (requirements.canonicalSchemaVersion() == DataRequirements.V1) {
-            return new ReadPlan(rule, requirements, List.of(), span);
+            return new ReadPlan(rule, requirements, List.of(), span, supplement, supplementSpan);
+        }
+        if (!supplement.isEmpty()) {
+            throw new IllegalArgumentException(rule.descriptor().id()
+                    + " reads canonical v2: it lists every part in requirements, not as supplements");
         }
         List<AcquisitionPart> parts = new ArrayList<>();
         for (PartRequirement requirement : requirements.parts()) {
-            CapabilityContract contract = catalog.find(requirement.capability())
-                    .orElseThrow(
-                            () -> new IllegalArgumentException(rule.descriptor().id() + " reads capability "
-                                    + requirement.capability() + ", which this release does not package"));
-            requireDeclaredBinds(rule, requirement, contract);
-            parts.add(new AcquisitionPart(
-                    contract.capability(),
-                    contract.adapterVersion(),
-                    contract.queryChecksum(),
-                    contract.recordKind(),
-                    requirement.periodStart(),
-                    requirement.periodEndExclusive(),
-                    requirement.arrayParams(),
-                    requirement.dateParams()));
+            parts.add(acquisitionPart(rule, requirement, catalog));
         }
-        return new ReadPlan(rule, requirements, parts, span);
+        return new ReadPlan(rule, requirements, parts, span, List.of(), null);
+    }
+
+    private static AcquisitionPart acquisitionPart(
+            IndicatorRule rule, PartRequirement requirement, CapabilityCatalog catalog) {
+        CapabilityContract contract = catalog.find(requirement.capability())
+                .orElseThrow(
+                        () -> new IllegalArgumentException(rule.descriptor().id() + " reads capability "
+                                + requirement.capability() + ", which this release does not package"));
+        requireDeclaredBinds(rule, requirement, contract);
+        return new AcquisitionPart(
+                contract.capability(),
+                contract.adapterVersion(),
+                contract.queryChecksum(),
+                contract.recordKind(),
+                requirement.periodStart(),
+                requirement.periodEndExclusive(),
+                requirement.arrayParams(),
+                requirement.dateParams());
     }
 
     boolean isCanonicalV2() {
@@ -108,6 +137,40 @@ final class ReadPlan {
 
     List<AcquisitionPart> parts() {
         return parts;
+    }
+
+    /** True when the run also reads a canonical v2 extract of its own beside the v1 one (C1's {@code team}). */
+    boolean hasSupplement() {
+        return !supplement.isEmpty();
+    }
+
+    /** The capabilities of the supplementary extract, which the source must have {@code VALIDATED}. */
+    Set<String> supplementCapabilities() {
+        Set<String> capabilities = new LinkedHashSet<>();
+        supplement.forEach(part -> capabilities.add(part.capability()));
+        return capabilities;
+    }
+
+    /** The id of the supplementary extract that goes with {@code extractionId}: read and replayed as a pair. */
+    static String supplementExtractionId(String extractionId) {
+        return extractionId + "-team";
+    }
+
+    /**
+     * The supplementary acquisition: a canonical v2 command over the supplement's parts with the
+     * pack's budget ceilings, read in its own read-only transaction before the v1 one.
+     */
+    AcquisitionCommand supplementCommand(
+            PecConnectionProperties properties, PecSourceIdentity identity, String extractionId, String sourceZoneId) {
+        return new AcquisitionCommand(
+                properties,
+                identity,
+                budget(),
+                supplementExtractionId(extractionId),
+                supplementSpan.start(),
+                supplementSpan.endExclusive(),
+                sourceZoneId,
+                supplement);
     }
 
     DateWindow span() {
@@ -181,8 +244,24 @@ final class ReadPlan {
                     + context.referencePeriod());
         }
         if (isCanonicalV2()) {
-            requireSameParts(manifest);
+            requireSameParts(manifest, parts);
         }
+    }
+
+    /** Refuses a supplementary extract that is not the one this plan asked for, as {@link #requireCovers} does. */
+    void requireSupplementCovers(ExtractionManifest primary, ExtractionManifest manifest) {
+        if (!manifest.isCanonicalV2()
+                || !manifest.extractionId().equals(supplementExtractionId(primary.extractionId()))
+                || !manifest.sourceId().equals(primary.sourceId())
+                || !manifest.municipalityIbge().equals(primary.municipalityIbge())
+                || !manifest.periodStart().equals(supplementSpan.start().toString())
+                || !manifest.periodEndExclusive()
+                        .equals(supplementSpan.endExclusive().toString())) {
+            throw new IllegalStateException(EXTRACT + manifest.extractionId() + " is not the supplementary extract of "
+                    + primary.extractionId() + " that " + rule.descriptor().ruleVersion()
+                    + " reads: schema, source, municipality or period differ (ADR 0033)");
+        }
+        requireSameParts(manifest, supplement);
     }
 
     /** Reads the extract this plan covers: C1's encounters, or every part of a v2 extract. */
@@ -194,7 +273,17 @@ final class ReadPlan {
         return CanonicalDataset.ofEncounters(part.capability(), span, extractStore.readEncounters(manifest));
     }
 
-    private void requireSameParts(ExtractionManifest manifest) {
+    /**
+     * The v1 extract together with its supplementary extract, which must be read as the plan asks
+     * (ADR 0033): without it the rule would run without the capability it requires.
+     */
+    CanonicalDataset read(ExtractStore extractStore, ExtractionManifest manifest, ExtractionManifest supplementManifest)
+            throws IOException {
+        requireSupplementCovers(manifest, supplementManifest);
+        return read(extractStore, manifest).with(extractStore.readDataset(supplementManifest, null));
+    }
+
+    private void requireSameParts(ExtractionManifest manifest, List<AcquisitionPart> parts) {
         Map<String, ManifestPart> listed = new HashMap<>();
         manifest.parts().forEach(part -> listed.put(part.capability(), part));
         Set<String> expected = new TreeSet<>();

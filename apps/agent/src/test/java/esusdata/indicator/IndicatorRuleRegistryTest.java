@@ -73,8 +73,10 @@ class IndicatorRuleRegistryTest {
     @MethodSource("rules")
     void readsOnlyTheCapabilitiesItDeclares(IndicatorRule rule) {
         DataRequirements requirements = rule.requirements(MARCH);
-        List<String> read =
-                requirements.parts().stream().map(PartRequirement::capability).toList();
+        // a rule on the v1 read lists the v2 parts it reads beside it as supplements (ADR 0033)
+        List<String> read = Stream.concat(requirements.parts().stream(), rule.supplements(MARCH).stream())
+                .map(PartRequirement::capability)
+                .toList();
         assertThat(new HashSet<>(rule.descriptor().requiredCapabilities())).isEqualTo(new HashSet<>(read));
         for (PartRequirement part : requirements.parts()) {
             assertThat(part.periodEndExclusive())
@@ -111,7 +113,7 @@ class IndicatorRuleRegistryTest {
 
     @Test
     void requireRefusesUnknownPacksAndOtherVersions() {
-        assertThat(IndicatorRuleRegistry.require("c1-mais-acesso", "c1-mais-acesso@0.4.0")
+        assertThat(IndicatorRuleRegistry.require("c1-mais-acesso", "c1-mais-acesso@0.5.0")
                         .descriptor()
                         .code())
                 .isEqualTo("C1");

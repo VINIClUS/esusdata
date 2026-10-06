@@ -22,6 +22,7 @@ import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.TeamScope;
 import esusdata.indicator.model.ValueKind;
+import esusdata.indicator.pack.PackSupport;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -53,11 +54,6 @@ public final class C1Pack implements IndicatorRule {
                     "Entram só os atendimentos dos sete CBO do item 24-c da ficha (225142, 225170, 225130, "
                             + "225125, 225250, 223565, 223505), em toda competência; CBO ausente ou fora da lista é "
                             + "excluído e contado."),
-            Limitation.blockingGap(
-                    "C1-LIM-03",
-                    "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 (item 24-b) não é feita: a leitura"
-                            + " v1 do C1 ainda não traz a capacidade `team`; o filtro de INE (C1-LIM-10) só atua quando"
-                            + " o extrato a traz."),
             Limitation.outOfReach(
                     "C1-LIM-06",
                     "O SIAPS extrai no 20º dia útil e só conta o enviado até o 10º dia do mês seguinte; "
@@ -73,7 +69,12 @@ public final class C1Pack implements IndicatorRule {
             Limitation.outOfReach(
                     "C1-LIM-11",
                     "A lotação do profissional na equipe (SCNES) não é conferida; vale o INE registrado no "
-                            + "atendimento."));
+                            + "atendimento."),
+            Limitation.convention(
+                    "C1-LIM-10",
+                    "Só atendimentos de INE com tipo 70 ou 76 vigente no fim da competência entram; atendimentos sem "
+                            + "INE ou de equipe de outro tipo, conflitante ou sem tipo ficam fora, com motivo e "
+                            + "contagem."));
 
     /** C1-LIM-10 (C1-D2): the encounters left out because their team is not a considered one. */
     static final String TEAM_EXCLUSIONS = "C1-LIM-10/contagem: %d atendimento(s) de INE fora da regra de tipo (70 ou 76"
@@ -91,7 +92,7 @@ public final class C1Pack implements IndicatorRule {
             "percentual",
             C1Rule.DENOMINATOR_KIND,
             C1Rule.CALCULATION_POLICY_VERSION,
-            List.of(CAPABILITY),
+            List.of(CAPABILITY, Capabilities.TEAM),
             List.of(),
             STANDING_LIMITATIONS,
             MonthlyEligibility.ALL_MONTHS,
@@ -117,12 +118,22 @@ public final class C1Pack implements IndicatorRule {
                         competencia.plusMonths(1).atDay(1))));
     }
 
+    /**
+     * The team states, read as an extract of their own beside the v1 one (ADR 0033): the INE filter
+     * (C1-D2) needs the type of every team, and C1's frozen v1 query is not touched.
+     */
+    @Override
+    public List<PartRequirement> supplements(YearMonth competencia) {
+        return List.of(PackSupport.teamPart(competencia));
+    }
+
     @Override
     public RuleOutcome evaluate(CanonicalDataset data, EvaluationContext context) {
         List<CanonicalEncounter> all = data.encounters();
         String period = context.referencePeriod();
         String cutoff = context.dataCutoff().toString();
-        // C1-D2: the INE filter acts only when the extract carries the team part (the v1 read does not yet)
+        // C1-D2: the INE filter acts when the run read the team part; the executor always reads it (ADR 0033),
+        // a bare dataset (a unit test of the rule) without it is judged by CBO and modality only
         TeamScope scope = data.windowOf(Capabilities.TEAM).isPresent()
                 ? TeamScope.of(data.teams(), context.competencia().atEndOfMonth())
                 : null;

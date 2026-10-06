@@ -40,6 +40,26 @@ public final class CanonicalDataset {
         return new CanonicalDataset(encounters, new EnumMap<>(RecordKind.class), windows);
     }
 
+    /**
+     * This dataset together with the records and windows of {@code other}, which must read other
+     * capabilities: C1's v1 encounters with the part of a supplementary v2 extract.
+     */
+    public CanonicalDataset with(CanonicalDataset other) {
+        SortedMap<String, DateWindow> merged = new TreeMap<>(windows);
+        other.windows.forEach((capability, window) -> {
+            if (merged.put(capability, window) != null) {
+                throw new IllegalArgumentException("capability " + capability + " is read by both datasets");
+            }
+        });
+        List<CanonicalEncounter> allEncounters = new ArrayList<>(encounters);
+        allEncounters.addAll(other.encounters);
+        Map<RecordKind, List<Record>> allRecords = new EnumMap<>(RecordKind.class);
+        records.forEach((kind, list) -> allRecords.put(kind, new ArrayList<>(list)));
+        other.records.forEach((kind, list) ->
+                allRecords.computeIfAbsent(kind, k -> new ArrayList<>()).addAll(list));
+        return new CanonicalDataset(allEncounters, allRecords, merged);
+    }
+
     public static Builder builder() {
         return new Builder();
     }

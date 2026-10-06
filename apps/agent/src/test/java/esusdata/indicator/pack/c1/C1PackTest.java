@@ -15,6 +15,7 @@ import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.EvidenceSubjectKind;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.SourceRef;
 import esusdata.indicator.model.TeamResult;
@@ -171,7 +172,7 @@ class C1PackTest {
     }
 
     @Test
-    void c1_d2_withoutTheTeamPartNothingIsFilteredAndTheGapStaysBlocking() {
+    void c1_d2_aBareDatasetWithoutTheTeamPartIsNotFilteredAndTheGapIsClosed() {
         RuleOutcome outcome = new C1Pack()
                 .evaluate(
                         CanonicalDataset.ofEncounters(C1Pack.CAPABILITY, MARCH_WINDOW, sample()),
@@ -179,9 +180,12 @@ class C1PackTest {
 
         assertThat(outcome.result().denominator()).isEqualTo(BigInteger.valueOf(3));
         assertThat(outcome.result().limitations()).noneMatch(l -> l.startsWith("C1-LIM-10"));
-        assertThat(new C1Pack().descriptor().blockingLimitations())
-                .singleElement()
-                .satisfies(l -> assertThat(l.code()).isEqualTo("C1-LIM-03"));
+        // the executor always reads the teams (ADR 0033), so no blocking gap is left in the pack
+        assertThat(new C1Pack().descriptor().blockingLimitations()).isEmpty();
+        assertThat(new C1Pack().descriptor().requiredCapabilities()).contains(Capabilities.TEAM);
+        assertThat(new C1Pack().supplements(MARCH))
+                .extracting(PartRequirement::capability)
+                .containsExactly(Capabilities.TEAM);
     }
 
     @Test

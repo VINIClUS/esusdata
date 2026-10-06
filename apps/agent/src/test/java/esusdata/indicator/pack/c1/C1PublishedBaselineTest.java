@@ -60,7 +60,8 @@ class C1PublishedBaselineTest {
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(numerator));
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(denominator));
         assertThat(result.limitations())
-                .contains("Portão B (modelo de cálculo) incompleto", "Portão D (reconciliação) incompleto");
+                .contains("Portão D (reconciliação) incompleto")
+                .doesNotContain("Portão B");
     }
 
     @Test

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import esusdata.auth.ScopeResolver;
+import esusdata.indicator.model.Capabilities;
 import esusdata.result.model.ResultRepository;
 import esusdata.run.job.ActiveJobExistsException;
 import esusdata.run.job.Job;
@@ -18,6 +19,9 @@ import esusdata.source.SourceCoverageCheck;
 import esusdata.source.SourceCoverageService;
 import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
+import esusdata.source.pec.CapabilityEligibility;
+import esusdata.source.pec.CompatibilityMatrices;
+import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.SourceAcquisitionLimiter;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -55,6 +59,10 @@ class CoverageSchedulerTest {
     private final AtomicInteger coverageReads = new AtomicInteger();
     private final ResultRepository results = mock(ResultRepository.class);
     private JdbcScheduleRepository schedules;
+
+    /** Only C1 is computable for these PEC 5.4.37 sources: its v1 capability and the team type it now reads. */
+    private static final PecCompatibilityMatrix C1_ONLY = CompatibilityMatrices.validated(
+            List.of("5.4.37"), List.of("individual_encounter_modality", Capabilities.TEAM));
 
     @BeforeEach
     void setUp() {
@@ -94,7 +102,8 @@ class CoverageSchedulerTest {
                 new ScopeResolver(fixture.jdbc),
                 schedules,
                 clock,
-                settings);
+                settings,
+                new SourcePacks(new CapabilityEligibility(C1_ONLY)));
     }
 
     private static AllowedDestinations loopback() {

@@ -3,6 +3,8 @@ package esusdata.run.worker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import esusdata.indicator.model.Capabilities;
+import esusdata.indicator.pack.c1.C1Pack;
 import esusdata.indicator.pack.c1.C1Rule;
 import esusdata.run.extract.ExtractFixtures;
 import esusdata.run.extract.ExtractionManifest;
@@ -10,10 +12,12 @@ import esusdata.run.job.CancellationToken;
 import esusdata.run.job.EnqueueRequest;
 import esusdata.run.job.Job;
 import esusdata.run.job.SourceAcquisitionBlockedException;
+import esusdata.source.pec.CompatibilityMatrices;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,7 +86,14 @@ class RunExecutorLiveGuardTest {
                 acquired.ruleVersion(),
                 acquired.idempotencyPrincipal());
 
-        assertThatThrownBy(() -> fixture.executor.runLive(context, new CancellationToken()))
+        // the source's team capability is VALIDATED, so the answer is about the guard, not the pack
+        RunExecutor executor = fixture.executor(
+                CompatibilityMatrices.validated(List.of("5.4.37"), List.of(Capabilities.TEAM)),
+                (command, cancellation, listener) -> {
+                    throw new AssertionError("a blocked source is never acquired from");
+                },
+                new C1Pack());
+        assertThatThrownBy(() -> executor.runLive(context, new CancellationToken()))
                 .isInstanceOf(SourceAcquisitionBlockedException.class);
 
         // Never reached a PEC connection, never wrote an extract, never staged or published.

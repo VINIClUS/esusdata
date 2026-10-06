@@ -101,7 +101,15 @@ public final class ExtractFixturesV2 {
      * binds and their checksum.
      */
     public static List<ManifestPart> parts(IndicatorRule rule, YearMonth competencia) {
-        List<PartRequirement> requirements = rule.requirements(competencia).parts();
+        return parts(rule.requirements(competencia).parts());
+    }
+
+    /** A builder of the supplementary extract {@code rule} reads beside its v1 one (ADR 0033). */
+    public static Builder forSupplement(IndicatorRule rule, YearMonth competencia) {
+        return new Builder(rule, parts(rule.supplements(competencia)));
+    }
+
+    private static List<ManifestPart> parts(List<PartRequirement> requirements) {
         List<ManifestPart> parts = new ArrayList<>(requirements.size());
         for (int index = 0; index < requirements.size(); index++) {
             parts.add(part(index, requirements.get(index), 0));
@@ -182,8 +190,12 @@ public final class ExtractFixturesV2 {
         private String municipalityIbge = CanonicalFixtures.IBGE;
 
         private Builder(IndicatorRule rule, YearMonth competencia) {
+            this(rule, parts(rule, competencia));
+        }
+
+        private Builder(IndicatorRule rule, List<ManifestPart> parts) {
             this.rule = rule;
-            this.parts = parts(rule, competencia);
+            this.parts = parts;
             parts.forEach(part -> lines.put(part.capability(), new ArrayList<>()));
         }
 

@@ -3,7 +3,7 @@
   "packs": [
     {
       "pack": "c1-mais-acesso",
-      "rule_version": "c1-mais-acesso@0.4.0",
+      "rule_version": "c1-mais-acesso@0.5.0",
       "gates": {
         "A": {
           "status": "PASSED",
@@ -22,7 +22,9 @@
           "evidence": []
         }
       },
-      "blocking_gaps_closed": []
+      "blocking_gaps_closed": [
+        "C1-LIM-03"
+      ]
     },
     {
       "pack": "c2-desenvolvimento-infantil",

@@ -172,6 +172,11 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
     }
 
     public void registerSource(String sourceId, String municipalityIbge) {
+        registerSource(sourceId, municipalityIbge, "5.4.37");
+    }
+
+    /** A source of PEC {@code pecVersion}: C1 now needs the team type, validated on PEC 5.5.28 only. */
+    public void registerSource(String sourceId, String municipalityIbge, String pecVersion) {
         sourceRepository.upsert(new SourceRecord(
                 sourceId,
                 1,
@@ -184,7 +189,7 @@ public abstract class ApiFixtureSupport extends SecuritySliceTestSupport {
                 "esus_leitura",
                 "PEC_DB_PASSWORD",
                 municipalityIbge,
-                "5.4.37",
+                pecVersion,
                 "PEC_DW",
                 Instant.EPOCH.toString()));
     }
