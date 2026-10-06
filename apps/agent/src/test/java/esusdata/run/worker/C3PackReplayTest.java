@@ -164,6 +164,7 @@ class C3PackReplayTest {
 
     private ExtractionManifest extract(String extractionId) throws Exception {
         return ExtractFixturesV2.forRule(new C3Pack(), COMPETENCIA)
+                .add(CanonicalFixtures.team(INE, CNES, "70"))
                 .add(CanonicalFixtures.person("p1", LocalDate.of(1995, 3, 10), "FEMININO"))
                 .add(CanonicalFixtures.person("p2", LocalDate.of(1998, 7, 2), "FEMININO"))
                 .add(CanonicalFixtures.registration("p1", LocalDate.of(2025, 1, 15), CNES, INE))

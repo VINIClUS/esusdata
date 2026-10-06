@@ -79,7 +79,7 @@ class C3PackTest {
     void descriptor_declaresElevenPracticesTheLimitationsAndNoCompleteGate() {
         PackDescriptor d = new C3Pack().descriptor();
         assertThat(d.id()).isEqualTo(C3Pack.ID).isEqualTo("c3-gestacao-puerperio");
-        assertThat(d.ruleVersion()).isEqualTo("c3-gestacao-puerperio@0.2.0");
+        assertThat(d.ruleVersion()).isEqualTo("c3-gestacao-puerperio@0.3.0");
         assertThat(d.code()).isEqualTo("C3");
         assertThat(d.valueKind()).isEqualTo(ValueKind.SCORE);
         assertThat(d.monthlyEligibility()).isEqualTo(MonthlyEligibility.MONTHS_WITH_COHORT_EVENT);
@@ -97,13 +97,14 @@ class C3PackTest {
             assertThat(d.standingLimitationLines().get(i)).startsWith(String.format("C3-LIM-%02d: ", i + 1));
         }
         assertThat(d.standingLimitationLines()).noneMatch(l -> l.contains("RULE_AMBIGUITY"));
-        // L1: the team type (eAP 76) is absent (the only blocking gap); L2: the outcome date is absent.
-        assertThat(d.standingLimitationLines().get(4)).contains("tipo de equipe", "lacuna L1");
+        // L1 closed: E and J are credited to eAP 76 (C3-LIM-05); L2: the outcome date is absent.
+        assertThat(d.blockingLimitations()).isEmpty();
+        assertThat(d.standingLimitationLines().get(4)).contains("eAP 76", "creditadas integralmente");
         assertThat(d.standingLimitationLines().get(5)).contains("lacuna L2", "DUM+294");
     }
 
     @Test
-    void requirements_readTenCapabilitiesWithThePacksOwnCodeLists() {
+    void requirements_readElevenCapabilitiesWithThePacksOwnCodeLists() {
         DataRequirements r = new C3Pack().requirements(NOVEMBER);
         assertThat(r.canonicalSchemaVersion()).isEqualTo(DataRequirements.V2);
         assertThat(r.parts())
@@ -118,10 +119,11 @@ class C3PackTest {
                         Capabilities.EXAM_REQUEST_EVALUATION,
                         Capabilities.HOME_VISIT,
                         Capabilities.MEASUREMENT_RECORD,
-                        Capabilities.IMMUNIZATION_HISTORY);
+                        Capabilities.IMMUNIZATION_HISTORY,
+                        Capabilities.TEAM);
         // EMENDA 1: condition_list right after individual_registration
         assertThat(new C3Pack().descriptor().requiredCapabilities())
-                .hasSize(10)
+                .hasSize(11)
                 .containsSubsequence(Capabilities.INDIVIDUAL_REGISTRATION, Capabilities.CONDITION_LIST);
         PartRequirement conditions = part(r, Capabilities.CONDITION_LIST);
         assertThat(new HashSet<>(conditions.arrayParams().get(Capabilities.CIAP_CODES)))
@@ -166,6 +168,9 @@ class C3PackTest {
             assertThat(p.periodStart()).as(capability).isEqualTo(LocalDate.of(2024, 11, 1));
             assertThat(p.periodEndExclusive()).as(capability).isEqualTo(LocalDate.of(2025, 12, 1));
         }
+        PartRequirement team = part(r, Capabilities.TEAM);
+        assertThat(team.periodStart()).isEqualTo(LocalDate.of(2025, 11, 1));
+        assertThat(team.periodEndExclusive()).isEqualTo(LocalDate.of(2025, 12, 1));
         PartRequirement registration = part(r, Capabilities.INDIVIDUAL_REGISTRATION);
         assertThat(registration.periodStart()).isEqualTo(LocalDate.of(2023, 12, 1));
         assertThat(registration.periodEndExclusive()).isEqualTo(LocalDate.of(2025, 12, 1));

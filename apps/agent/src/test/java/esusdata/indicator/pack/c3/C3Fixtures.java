@@ -116,9 +116,26 @@ final class C3Fixtures {
                 .window(Capabilities.EXAM_REQUEST_EVALUATION, care)
                 .window(Capabilities.HOME_VISIT, care)
                 .window(Capabilities.MEASUREMENT_RECORD, care)
-                .window(Capabilities.IMMUNIZATION_HISTORY, care);
+                .window(Capabilities.IMMUNIZATION_HISTORY, care)
+                .window(
+                        Capabilities.TEAM,
+                        new DateWindow(
+                                competencia.atDay(1), competencia.plusMonths(1).atDay(1)));
+        java.util.Set<String> typed = new java.util.HashSet<>();
         for (Record r : records) {
             builder.add(r);
+            if (r instanceof CanonicalTeam t) {
+                typed.add(t.ine());
+            }
+        }
+        // a link's team without a record has no type and leaves the cohort (C3-D2): default every linked INE to eSF 70
+        for (Record r : records) {
+            if (r instanceof esusdata.indicator.model.CanonicalRegistration reg
+                    && reg.ine() != null
+                    && !reg.ine().isBlank()
+                    && typed.add(reg.ine())) {
+                builder.add(team(reg.ine(), "70"));
+            }
         }
         return builder.build();
     }

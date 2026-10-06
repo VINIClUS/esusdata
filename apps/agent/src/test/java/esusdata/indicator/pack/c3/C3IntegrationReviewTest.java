@@ -259,6 +259,7 @@ class C3IntegrationReviewTest {
                 null,
                 true));
         records.add(anchor(P2, dum(56), DUM));
+        records.add(CanonicalFixtures.teamState(INE, null, "70", null, null));
         TeamResult team = compute(records).teams().get(0);
         assertThat(team.ine()).isEqualTo(INE);
         assertThat(team.cnes()).isNull();

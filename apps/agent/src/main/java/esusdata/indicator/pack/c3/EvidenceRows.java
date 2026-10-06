@@ -3,6 +3,7 @@ package esusdata.indicator.pack.c3;
 import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.EvidenceSubjectKind;
+import esusdata.indicator.model.TeamScope;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,8 +61,7 @@ final class EvidenceRows {
         BigInteger weight = weights.spec(practice).weight();
         Decided decided = switch (outcome.decision()) {
             case MET -> new Decided(EvidenceDecision.PRACTICE_MET, C3Reasons.CUMPRIDA, weight);
-            case EXEMPT ->
-                new Decided(EvidenceDecision.PRACTICE_EXEMPT, C3Reasons.EAP_TIPO_76_PONTUACAO_INTEGRAL, weight);
+            case CREDITED -> new Decided(EvidenceDecision.PRACTICE_MET, TeamScope.REASON_CREDITED_EAP76, weight);
             case NOT_MET -> new Decided(EvidenceDecision.PRACTICE_NOT_MET, C3Reasons.NAO_CUMPRIDA, BigInteger.ZERO);
         };
         return new EvidenceItem(

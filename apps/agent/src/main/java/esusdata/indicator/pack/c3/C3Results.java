@@ -70,6 +70,7 @@ final class C3Results {
         List<ResultComponent> components = components(eligible);
         boolean consolidation = consolidationEligible(subjects);
         List<String> limitations = new ArrayList<>(descriptor.standingLimitationLines());
+        creditDisclosure(eligible).ifPresent(limitations::add);
         if (eligible.isEmpty()) {
             return build(
                     IndicatorStatus.NO_DENOMINATOR,
@@ -88,7 +89,23 @@ final class C3Results {
         return build(IndicatorStatus.COMPUTED, value, total, denominator, limitations, components, consolidation);
     }
 
-    /** Per practice: met or exempt over eligible. */
+    /** C3-LIM-05: how many eAP 76 episodes were credited E and J instead of observing them (24 b, C3-D1). */
+    private java.util.Optional<String> creditDisclosure(List<Subject> eligible) {
+        long eap = eligible.stream().filter(Subject::eap76).count();
+        if (eap == 0) {
+            return java.util.Optional.empty();
+        }
+        long e = eligible.stream().filter(s -> credited(s, Practice.E)).count();
+        long j = eligible.stream().filter(s -> credited(s, Practice.J)).count();
+        return java.util.Optional.of(
+                C3Pack.EAP_CREDIT.formatted(weights.spec(Practice.E).weight(), eap, e, j));
+    }
+
+    private static boolean credited(Subject subject, Practice practice) {
+        return subject.practice(practice).decision() == PracticeDecision.CREDITED;
+    }
+
+    /** Per practice: met or credited over eligible. */
     private List<ResultComponent> components(List<Subject> eligible) {
         List<ResultComponent> components = new ArrayList<>();
         BigInteger denominator = BigInteger.valueOf(eligible.size());

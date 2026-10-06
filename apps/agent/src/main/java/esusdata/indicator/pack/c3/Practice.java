@@ -15,7 +15,7 @@ enum Practice {
     K;
 
     /** E and J: "consideram a pontuação integral para eAP, tipo 76" (24 b, p.2). */
-    boolean exemptForEap76() {
+    boolean creditedForEap76() {
         return this == E || this == J;
     }
 }

@@ -41,15 +41,16 @@ final class Subjects {
                 continue;
             }
             Verdict verdict = cohort.decide(episode, person, link);
+            boolean eap76 = teamTypes.decide(link.ine()).eap76();
             Map<Practice, PracticeOutcome> practices =
-                    verdict.eligible() ? evaluator.evaluate(evidence, episode, teamTypes.eap76(link.ine())) : Map.of();
-            subjects.add(new Subject(episode.key(), link, verdict, episode, practices));
+                    verdict.eligible() ? evaluator.evaluate(evidence, episode, eap76) : Map.of();
+            subjects.add(new Subject(episode.key(), link, verdict, episode, practices, eap76));
         }
         LocalDate orphan = codeWithoutDum(person, episodes);
         if (orphan != null) {
             Verdict personal = cohort.personal(person, link, orphan);
             Verdict verdict = personal == null ? Verdict.excluded(C3Reasons.EXCLUIDO_SEM_DUM_NEM_IG, orphan) : personal;
-            subjects.add(new Subject(person.personKey() + WITHOUT_DUM, link, verdict, null, Map.of()));
+            subjects.add(new Subject(person.personKey() + WITHOUT_DUM, link, verdict, null, Map.of(), false));
         }
         return subjects;
     }
