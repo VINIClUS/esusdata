@@ -30,6 +30,7 @@ import esusdata.indicator.model.ValueKind;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -206,6 +207,26 @@ class C7RuleTest {
     }
 
     @Test
+    void ct06_onlyBWithDenominatorScoresTheFullRescaledValue() {
+        // three girls of 9, 11 and 13, one dose: B = 1/3 is the whole score, 30 * 1/3 * 100 / 30 = 100/3
+        IndicatorResult result = new Scenario()
+                .woman("g9", d("2017-01-15"))
+                .woman("g11", d("2015-01-15"))
+                .woman("g13", d("2013-01-15"))
+                .add(hpv("g9", d("2026-02-01")))
+                .compute(JUN_2026)
+                .result();
+
+        assertComponent(result, "B", 1, 3, IndicatorStatus.COMPUTED);
+        assertComponent(result, "A", 0, 0, IndicatorStatus.NO_DENOMINATOR);
+        assertComponent(result, "C", 0, 0, IndicatorStatus.NO_DENOMINATOR);
+        assertComponent(result, "D", 0, 0, IndicatorStatus.NO_DENOMINATOR);
+        assertThat(result.status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(result.valueExact()).isEqualByComparingTo(ExactRatio.of(100, 3));
+        assertThat(result.consolidationEligible()).isTrue();
+    }
+
+    @Test
     void ct06_allSubgroupsEmptyLeaveTheMonthWithoutValue() {
         // a 70-year-old and an 8-year-old belong to no subgroup
         IndicatorResult result = new Scenario()
@@ -255,8 +276,8 @@ class C7RuleTest {
         RuleOutcome outcome = new Scenario()
                 .person("trans09", d("2017-01-10"), MASCULINO, HOMEM_TRANS)
                 .person("trans12", d("2014-01-10"), MASCULINO, HOMEM_TRANS)
-                .person("trans13", d("2013-07-01"), MASCULINO, HOMEM_TRANS)
-                .person("trans14", d("2011-07-01"), MASCULINO, HOMEM_TRANS)
+                .person("trans13", d("2012-07-01"), MASCULINO, HOMEM_TRANS)
+                .person("trans14", d("2012-06-30"), MASCULINO, HOMEM_TRANS)
                 .person("trans25", d("2001-01-10"), MASCULINO, HOMEM_TRANS)
                 .woman("menina", d("2014-01-10"))
                 .compute(JUN_2026);
@@ -817,24 +838,27 @@ class C7RuleTest {
     // ---- C7-D5: no path returns RULE_AMBIGUITY ----
     @Test
     void c7NeverReturnsRuleAmbiguity() {
-        List<IndicatorResult> results = List.of(
-                met24().compute(JUN_2026).result(),
-                new Scenario().woman("p", d("1986-01-10")).compute(JUN_2026).result(),
+        List<RuleOutcome> outcomes = List.of(
+                met24().compute(JUN_2026),
+                new Scenario().woman("p", d("1986-01-10")).compute(JUN_2026),
                 new Scenario()
                         .person("t", d("2014-01-10"), MASCULINO, HOMEM_TRANS)
-                        .compute(JUN_2026)
-                        .result(),
+                        .compute(JUN_2026),
                 new Scenario()
                         .woman("p", d("1986-01-10"))
                         .add(exam("p", d("2023-01-15"), HPV_MOLECULAR))
-                        .compute(JUN_2026)
-                        .result(),
-                new Scenario().compute(JUN_2026).result());
-        for (IndicatorResult result : results) {
-            assertThat(result.status()).isNotEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-            assertThat(result.components())
-                    .extracting(ResultComponent::status)
-                    .doesNotContain(IndicatorStatus.RULE_AMBIGUITY);
+                        .compute(JUN_2026),
+                new Scenario().compute(JUN_2026));
+        for (RuleOutcome outcome : outcomes) {
+            List<IndicatorResult> results = new ArrayList<>();
+            results.add(outcome.result());
+            outcome.teams().forEach(t -> results.add(t.result()));
+            for (IndicatorResult result : results) {
+                assertThat(result.status()).isNotEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+                assertThat(result.components())
+                        .extracting(ResultComponent::status)
+                        .doesNotContain(IndicatorStatus.RULE_AMBIGUITY);
+            }
         }
     }
 

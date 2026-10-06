@@ -40,7 +40,8 @@ public final class C7Codes {
 
     /**
      * Nota de rodapé 4 (p. 7): "A contabilização desse SIGTAP passou a ser realizada a partir da
-     * competência janeiro de 2026". Whether earlier records count afterwards is AMB-C7-08.
+     * competência janeiro de 2026". From which competência the code counts; from then on records dated before
+     * 2026-01 count too, inside the 60 months (C7-D2).
      */
     public static final YearMonth HPV_MOLECULAR_DESDE = YearMonth.of(2026, 1);
 

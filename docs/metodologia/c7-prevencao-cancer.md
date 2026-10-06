@@ -4,9 +4,11 @@ Documento de referência da Fase 1a. Transcreve a nota metodológica oficial do 
 Componente III (Qualidade) para uso no pacote `c7`. Não contém decisão de implementação: onde a
 fonte é omissa ou contraditória, o ponto está registrado em [Ambiguidades](#ambiguidades-amb-c7-nn)
 e a regra conservadora da Tech Spec (§4.2: "Os resultados esperados de uma ambiguidade devem
-permanecer bloqueados até esclarecimento documentado") prevalece. As ambiguidades AMB-C7-01, 05, 06 e
-08 foram decididas em 2026-10-06 (`docs/indicadores/decisoes/c7-prevencao-cancer.md`, regra
-`c7-prevencao-cancer@0.2.0`): o pacote não devolve mais `RULE_AMBIGUITY`.
+permanecer bloqueados até esclarecimento documentado") prevalece. Todas as ambiguidades AMB-C7-NN foram
+decididas em 2026-10-06 (`docs/indicadores/decisoes/c7-prevencao-cancer.md`, regra
+`c7-prevencao-cancer@0.2.0`): 01, 05, 06 e 08 mudam o comportamento; as demais são convenções
+declaradas já aplicadas (C7-LIM-05 a 11) ou decisões sem mudança de código. O pacote não devolve mais
+`RULE_AMBIGUITY`.
 
 **Convenções de citação.** `p. N` = página N do PDF (= N-ésimo bloco separado por form-feed em
 [`fontes/c7-prevencao-cancer.txt`](fontes/c7-prevencao-cancer.txt)). Trechos entre aspas são
@@ -432,8 +434,8 @@ A nota revoga a versão SEI 0049702875 (p. 6). O texto dessa versão anterior n�
 
 Em todas as ambiguidades abaixo, o tratamento conservador é o mesmo: não inferir, manter o
 resultado afetado bloqueado ou indisponível e documentar a decisão quando houver regra oficial.
-As ambiguidades 01, 05, 06 e 08 têm decisão registrada (nota **Decisão** no fim de cada uma); o
-texto original da ambiguidade é mantido como transcrição.
+Todas têm decisão registrada no documento de decisão; as de 01, 05, 06 e 08 mudam o comportamento
+e levam a nota **Decisão** abaixo. O texto original de cada ambiguidade é mantido como transcrição.
 
 - **AMB-C7-01 — Subpopulação sem denominador.** Se b, d, f ou h for zero (por exemplo, uma equipe
   sem meninas de 9 a 14 anos vinculadas), a parcela correspondente (x/0) fica indefinida. A ficha
@@ -547,7 +549,7 @@ de uma instalação. O resultado local é uma aproximação rotulada (Tech Spec 
 
 Os números são sintéticos. Datas: convenção candidata (AMB-C7-03 e AMB-C7-04), com âncora no último
 dia da competência e janela de N meses civis terminando no mês da competência. Em datas com âncora
-no fim do mês, isso equivale a `(âncora − N meses, âncora]`. Linhas marcadas "bloqueado" dependem de
+no fim do mês, isso equivale a `(âncora − N meses, âncora]`. Linhas marcadas "bloqueado" (histórico; hoje decididas ou declaradas, C7-LIM-08) dependem de
 uma ambiguidade e não devem ter o resultado esperado fixado até o esclarecimento.
 
 ### CT01 — MET-24: escore por subpopulação = 40 pontos
@@ -581,12 +583,12 @@ Mulher de 40 anos, competência 2026-06 (âncora 2026-06-30). A janela de 36 mes
 | c | 02.01.02.007-6 (coleta para exame molecular) | 2023-01-15 | A não cumprida: os 60 meses valem só para 02.02.10.025-1 |
 | d | 02.02.10.025-1 | 2021-01-15 | A não cumprida (fora de 60 meses) |
 | e | 02.02.10.025-1, mas competência 2025-12 | 2024-01-15 | A não cumprida: o código não é contabilizado antes da competência janeiro de 2026 (nota de rodapé 4). O pacote precisa versionar a regra por competência |
-| f | 02.03.01.008-6 | 2023-07-01 | A cumprida (primeiro dia da janela civil de 36 meses). Fronteira exata: **bloqueado** (AMB-C7-04) |
+| f | 02.03.01.008-6 | 2023-07-01 | A cumprida (primeiro dia da janela civil de 36 meses). Fronteira exata: convenção declarada (AMB-C7-04, C7-LIM-08) |
 
 ### CT03 — Fronteiras de idade
 
 Competência 2026-06, âncora 2026-06-30, idade em anos completos, limites inclusivos (convenção
-candidata). Todos os pares de datas exatas ficam **bloqueados** pela AMB-C7-03. O par serve para
+candidata). Todos os pares de datas exatas seguem a convenção declarada (AMB-C7-03, C7-LIM-08). O par serve para
 distinguir *anos completos* de *ano de nascimento*.
 
 | Fronteira | Nascimento | Idade | Esperado |
@@ -613,7 +615,7 @@ decidida: sem teto em meses); só a dose antes do 9º aniversário não conta.
 
 Cada linha testa o último dia fora e o primeiro dia dentro da janela civil. Todas as janelas
 escolhidas atravessam um 29 de fevereiro, de modo que uma janela de 365×k dias com início exclusivo
-excluiria indevidamente o primeiro dia civil. A fronteira exata fica **bloqueada** (AMB-C7-04); o
+excluiria indevidamente o primeiro dia civil. A fronteira exata segue a convenção declarada (AMB-C7-04, C7-LIM-08); o
 teste contra *contar dias* não fica.
 
 | Prática | Competência (âncora) | Janela civil | Fora | Dentro | Âncora − 365×k dias |
