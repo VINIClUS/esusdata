@@ -82,7 +82,7 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
     }
 
     private static List<String> limitations(Quadrimestre quadrimestre, GateStatus gates) {
-        List<String> limitations = new ArrayList<>(ComponentIII.DESCRIPTOR.standingLimitations());
+        List<String> limitations = new ArrayList<>(ComponentIII.DESCRIPTOR.standingLimitationLines());
         limitations.addAll(gates.incompleteReasons());
         if (FinancialTransition.isDerived(quadrimestre)) {
             limitations.add("AMB-CIII-10: a classificação financeira de " + quadrimestre

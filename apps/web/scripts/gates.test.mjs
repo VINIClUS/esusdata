@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { overviewFixture } from '../src/api/fixtures/painel.ts'
 import { catalogoFixture } from '../src/api/fixtures/catalogo.ts'
-import { gateChecklist, normalizeOverview } from '../src/api/normalizers.ts'
+import {
+  gateChecklist,
+  normalizeIndicadorDetalhe,
+  normalizeOverview,
+} from '../src/api/normalizers.ts'
 
 // ADR 0032: the release gates reach the screens as a checklist, one line per gate not passed.
 
@@ -120,4 +124,32 @@ test('a checklist do catálogo lista os portões pendentes, com o C avaliado por
   const lista = gateChecklist(c4)
   assert.equal(lista.length, 4)
   assert.ok(lista.some((l) => l.startsWith(C) && l.includes('por fonte')))
+})
+
+test('só a lacuna bloqueante bloqueia: o resto vira limitação declarada (S2)', () => {
+  const c4 = catalogoFixture.find((p) => p.id === 'c4-cuidado-diabetes')
+  const detalhes = [
+    { code: 'C4-LIM-01', kind: 'OUT_OF_REACH', text: 'Só entra o que foi registrado neste PEC.' },
+    { code: 'C4-LIM-03', kind: 'BLOCKING_GAP', text: 'Sem tipo de equipe comprovado.' },
+    { code: 'C4-LIM-04', kind: 'DECLARED_CONVENTION', text: 'Condição ativa.' },
+  ]
+  const detalhe = normalizeIndicadorDetalhe(
+    { ...c4, standingLimitationDetails: detalhes },
+    undefined,
+  )
+  assert.deepEqual(detalhe.limitacoesBloqueantes, ['C4-LIM-03: Sem tipo de equipe comprovado.'])
+  assert.deepEqual(detalhe.limitacoesDeclaradas, [
+    'C4-LIM-01: Só entra o que foi registrado neste PEC.',
+    'C4-LIM-04: Condição ativa.',
+  ])
+})
+
+test('uma API sem os tipos trata toda limitação permanente como bloqueante, como antes', () => {
+  const c4 = catalogoFixture.find((p) => p.id === 'c4-cuidado-diabetes')
+  const detalhe = normalizeIndicadorDetalhe(
+    { ...c4, standingLimitations: ['Sem registros de outros municípios.'] },
+    undefined,
+  )
+  assert.deepEqual(detalhe.limitacoesBloqueantes, ['Sem registros de outros municípios.'])
+  assert.deepEqual(detalhe.limitacoesDeclaradas, [])
 })

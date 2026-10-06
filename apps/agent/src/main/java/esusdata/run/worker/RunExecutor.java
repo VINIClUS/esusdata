@@ -335,7 +335,7 @@ public final class RunExecutor {
         EvaluationContext evaluation =
                 EvaluationContext.endOfMonth(context.municipalityIbge(), YearMonth.parse(context.referencePeriod()));
         GateStatus gates = gatesOf(descriptor, identity);
-        RuleOutcome outcome = gate(plan, gates, rule.evaluate(data, evaluation));
+        RuleOutcome outcome = gate(plan, gates, RuleOutcomes.disclose(descriptor, rule.evaluate(data, evaluation)));
         IndicatorResult result = outcome.result();
         requireJobScope(descriptor, result, context);
         cancellation.checkCancelled();

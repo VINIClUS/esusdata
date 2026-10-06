@@ -423,7 +423,7 @@ class C2PackCasesTest {
         for (String chave : List.of("outro-ciap", "sem-problema", "cid-no-ciap")) {
             assertNaoCumpre(outcome, chave, "A");
         }
-        assertThat(new C2Pack().descriptor().standingLimitations()).anyMatch(menciona("C2-LIM-07", "A98"));
+        assertThat(new C2Pack().descriptor().standingLimitationLines()).anyMatch(menciona("C2-LIM-07", "A98"));
     }
 
     @Test
@@ -1517,7 +1517,7 @@ class C2PackCasesTest {
         });
         assertThat(GateFixtures.shipped(descritor).isComplete()).isFalse();
         assertThat(descritor.blockingLimitations()).isNotEmpty();
-        List<String> limitacoes = descritor.standingLimitations();
+        List<String> limitacoes = descritor.standingLimitationLines();
         assertThat(limitacoes).noneMatch(l -> l.contains("Regra em implementação"));
         assertThat(limitacoes).anyMatch(menciona("L1", "tipo de equipe"));
         assertThat(limitacoes).anyMatch(menciona("L7", "puericultura"));

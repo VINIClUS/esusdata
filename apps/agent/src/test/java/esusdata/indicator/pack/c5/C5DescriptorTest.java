@@ -69,7 +69,7 @@ class C5DescriptorTest {
         assertThat(descriptor.id()).isEqualTo("c5-cuidado-hipertensao");
         assertThat(descriptor.ruleVersion()).isEqualTo(C5Pack.RULE_VERSION).startsWith("c5-cuidado-hipertensao@");
         assertThat(descriptor.valueKind()).isEqualTo(ValueKind.SCORE);
-        assertThat(descriptor.standingLimitations())
+        assertThat(descriptor.standingLimitationLines())
                 .isNotEmpty()
                 .noneMatch(limitation -> limitation.contains("Regra em implementação"));
         assertThat(GateFixtures.shipped(descriptor).isComplete()).isFalse();
@@ -190,7 +190,7 @@ class C5DescriptorTest {
 
     @Test
     void limitations_declareWhatThePecCannotShowAndTheConventionsOfThePack() {
-        List<String> limitations = new C5Pack().descriptor().standingLimitations();
+        List<String> limitations = new C5Pack().descriptor().standingLimitationLines();
 
         assertThat(limitations)
                 .anySatisfy(text -> assertThat(text)

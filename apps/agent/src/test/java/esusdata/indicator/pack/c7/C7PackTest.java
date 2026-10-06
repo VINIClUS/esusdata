@@ -43,7 +43,7 @@ class C7PackTest {
         assertThat(d.components()).allMatch(c -> c.kind() == ComponentKind.SUBGROUP);
         assertThat(GateFixtures.shipped(d).isComplete()).isFalse();
         assertThat(GateFixtures.shipped(d).incompleteReasons()).hasSize(3);
-        assertThat(d.standingLimitations())
+        assertThat(d.standingLimitationLines())
                 .isNotEmpty()
                 .noneMatch(l -> l.contains("Regra em implementação"))
                 .anyMatch(l -> l.startsWith("C7-LIM-04: ") && l.contains("tipo de equipe"))
@@ -51,7 +51,7 @@ class C7PackTest {
                 .anyMatch(l -> l.startsWith("C7-LIM-05: "))
                 .anyMatch(l -> l.startsWith("C7-LIM-14: "))
                 .noneMatch(l -> l.contains("RULE_AMBIGUITY"));
-        assertThat(d.standingLimitations())
+        assertThat(d.standingLimitationLines())
                 .extracting(l -> l.substring(0, "C7-LIM-NN".length()))
                 .containsExactly(
                         "C7-LIM-01",

@@ -40,7 +40,7 @@ final class SourceCoverage {
     static RuleOutcome unsupported(PackDescriptor descriptor, EvaluationContext context, List<String> gaps) {
         List<String> limitations = new ArrayList<>();
         limitations.add("Fonte sem as partes exigidas, ou lidas com janela menor: " + String.join("; ", gaps) + ".");
-        limitations.addAll(descriptor.standingLimitations());
+        limitations.addAll(descriptor.standingLimitationLines());
         IndicatorResult result = new IndicatorResult(
                 IndicatorStatus.UNSUPPORTED_SOURCE,
                 null,

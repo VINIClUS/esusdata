@@ -28,7 +28,7 @@ public record PackDescriptor(
         String calculationPolicyVersion,
         List<String> requiredCapabilities,
         List<ComponentSpec> components,
-        List<String> standingLimitations,
+        List<Limitation> standingLimitations,
         MonthlyEligibility monthlyEligibility,
         BudgetHint budget,
         List<String> methodologySources,
@@ -54,10 +54,15 @@ public record PackDescriptor(
     }
 
     /**
-     * The standing limitations that keep a result from being released (Portão B). Today every one
-     * does: the split into blocking and merely disclosed limitations changes this method alone.
+     * The standing limitations that keep a result from being released (Portão B): only the {@link
+     * Limitation.Kind#BLOCKING_GAP} ones. The others are disclosed with the result and never block.
      */
-    public List<String> blockingLimitations() {
-        return standingLimitations;
+    public List<Limitation> blockingLimitations() {
+        return standingLimitations.stream().filter(Limitation::blocks).toList();
+    }
+
+    /** Every standing limitation as the string a result publishes, code included. */
+    public List<String> standingLimitationLines() {
+        return standingLimitations.stream().map(Limitation::display).toList();
     }
 }

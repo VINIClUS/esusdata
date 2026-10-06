@@ -18,3 +18,20 @@ Data: 2026-10-06. Código: `Nt08Consolidation` (`dashMonth`, `unpublished`), tes
 ## Efeito
 
 `AMB-CIII-07` passa a bloquear só o mês `NO_DENOMINATOR` elegível. A versão da regra do Componente III sobe de `0.2.0` para `0.3.0` (o resultado de uma competência já publicada pode mudar).
+
+## Limitações permanentes tipadas (S2, 2026-10-06)
+
+O descritor do Componente III tem dez limitações permanentes, agora com código `CIII-LIM-nn` e tipo. Nenhuma é `BLOCKING_GAP`: o Componente III não é executado nem enfileirado, é lido dos resultados publicados, e o que bloqueia é o portão de cada indicador.
+
+| Código | Origem | Tipo |
+|---|---|---|
+| CIII-LIM-01 | Dependência dos portões de C1–C7 | DECLARED_CONVENTION |
+| CIII-LIM-02 | AMB-CIII-01 (meses dos quadrimestres) | DECLARED_CONVENTION |
+| CIII-LIM-03 | AMB-CIII-02/03/04 (média simples, valor exato, faixas da ficha) | DECLARED_CONVENTION |
+| CIII-LIM-04 | AMB-CIII-05 (fator «A» do Quadro 2) | DECLARED_CONVENTION |
+| CIII-LIM-05 | AMB-CIII-06/07 (indicador sem mês elegível ou sem denominador) | DECLARED_CONVENTION |
+| CIII-LIM-06 | AMB-CIII-08 (suspensão de pagamento, meses válidos fora do PEC) | OUT_OF_REACH |
+| CIII-LIM-07 | AMB-CIII-09/10 (leitura de «quadrimestre» na Portaria 10.994/2026) | DECLARED_CONVENTION |
+| CIII-LIM-08 | AMB-CIII-12 (prazo de envio e 20º dia útil) | OUT_OF_REACH |
+| CIII-LIM-09 | AMB-CIII-13 (equipes novas, segundo recálculo) | OUT_OF_REACH |
+| CIII-LIM-10 | Pesos eSF/eAP aplicados a toda equipe (L1) | DECLARED_CONVENTION |

@@ -8,6 +8,8 @@ import esusdata.indicator.model.CanonicalModality;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.model.RuleOutcomes;
 import esusdata.indicator.model.SourceRef;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -104,13 +106,17 @@ class C1RuleTest {
     }
 
     @Test
-    void theRuleIsUngatedAndKeepsItsStandingLimitationsForPortaoB() {
+    void theRuleIsUngatedAndLeavesTheStandingLimitationsToTheExecutor() {
         IndicatorResult result = C1Rule.compute(encounters(60, 40, 0), "3541307", "2026-03", "2026-03-31");
 
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.COMPUTED);
         assertThat(result.valueText()).isEqualTo("60.0000");
         assertThat(result.classification()).isEqualTo(Classification.OTIMO);
-        assertThat(result.limitations()).anyMatch(l -> l.contains("C1-LIM-01"));
+        assertThat(result.limitations()).noneMatch(l -> l.contains("C1-LIM-01"));
+        assertThat(RuleOutcomes.disclose(new C1Pack().descriptor(), new RuleOutcome(result, List.of(), List.of()))
+                        .result()
+                        .limitations())
+                .anyMatch(l -> l.startsWith("C1-LIM-01:"));
     }
 
     @Test
@@ -179,7 +185,7 @@ class C1RuleTest {
     @Test
     void ruleVersionAndStandingLimitationsFollowTheRecordedDecisions() {
         assertThat(C1Rule.RULE_VERSION).isEqualTo("c1-mais-acesso@0.3.0");
-        assertThat(C1Rule.standingLimitations())
+        assertThat(new C1Pack().descriptor().standingLimitationLines())
                 .anyMatch(l -> l.startsWith("C1-LIM-01:") && l.contains("em toda competência"))
                 .anyMatch(l -> l.startsWith("C1-LIM-06:") && l.contains("20º dia útil"))
                 .noneMatch(l -> l.contains("vigência"))

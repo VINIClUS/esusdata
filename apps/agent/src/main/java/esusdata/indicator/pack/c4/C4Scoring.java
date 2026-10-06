@@ -120,7 +120,7 @@ final class C4Scoring {
         if (unknownStatus > 0) {
             limitations.add(UNKNOWN_STATUS.formatted(unknownStatus));
         }
-        limitations.addAll(descriptor.standingLimitations());
+        limitations.addAll(descriptor.standingLimitationLines());
         return limitations;
     }
 

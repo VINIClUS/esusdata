@@ -94,7 +94,7 @@ final class C2Tally {
     }
 
     private List<String> limitations() {
-        List<String> limitations = new ArrayList<>(descriptor.standingLimitations());
+        List<String> limitations = new ArrayList<>(descriptor.standingLimitationLines());
         if (teamTypeUnknown > 0) {
             limitations.add(teamTypeUnknown + " criança(s) de equipe sem tipo comprovado na fonte (C2-LIM-05):"
                     + " a pontuação integral da prática D para eAP tipo 76 não foi aplicada.");

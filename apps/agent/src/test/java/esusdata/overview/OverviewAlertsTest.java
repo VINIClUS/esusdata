@@ -82,6 +82,7 @@ class OverviewAlertsTest {
                 null,
                 List.of(),
                 null,
+                List.of(),
                 List.of());
     }
 

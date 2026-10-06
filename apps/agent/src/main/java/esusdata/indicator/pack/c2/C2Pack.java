@@ -24,6 +24,7 @@ import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.Limitation;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
@@ -62,66 +63,110 @@ public final class C2Pack implements IndicatorRule {
     /** Item 30 (p.4): Ótimo > 75 · Bom > 50 · Suficiente > 25 · Regular ≤ 25. */
     static final Bands BANDS = Bands.QUALIDADE_C2_C7;
 
-    private static final List<String> STANDING_LIMITATIONS = List.of(
-            "C2-LIM-01: Registros de outros municípios ou serviços e doses só na RNDS/RIA (lacuna L4) não são"
-                    + " vistos (ficha C2, 4.4 e Quadro 05): o resultado local pode ficar abaixo do SIAPS.",
-            "C2-LIM-02: O óbito no CadSUS (item 15) não está no PEC local: só óbito ou saída registrados no"
-                    + " cadastro local interrompem o acompanhamento.",
-            "C2-LIM-03: O vínculo da criança com a equipe é aproximado pela versão mais recente do cadastro"
-                    + " individual completo até o corte (lacuna L8). As regras da NT 30/2025 e o desempate da"
-                    + " Portaria SAPS 161/2024 não são reproduzidos.",
-            "C2-LIM-04: Interrupção do acompanhamento (item 15, AMB-C2-12): a criança sai da coorte quando a versão"
-                    + " cadastral mais recente até o corte registra saída por mudança de território ou óbito.",
-            "C2-LIM-05: O tipo de equipe (eSF 70, eAP 76) não está no extrato (lacuna L1): a pontuação integral da"
-                    + " prática D para eAP 76 (item 24 b) não pode ser aplicada. Fecha quando a capacidade `team`"
-                    + " estiver VALIDATED.",
-            "C2-LIM-06: A alocação do profissional em equipe 70/76 (Quadro 02) só é verificada quando o tipo da"
-                    + " equipe do atendimento é conhecido. Com tipo desconhecido a consulta é aceita; com tipo"
-                    + " conhecido fora de 70/76, não conta.",
-            "C2-LIM-07: Puericultura (Quadro 02) é reconhecida pelo CIAP-2 A98 ou CID-10 Z001 entre os problemas"
-                    + " avaliados do atendimento, os códigos que o PEC grava com o campo de puericultura. Não são"
-                    + " exclusivos desse campo (AMB-GUIA-01): consulta de puericultura sem essa linha não é contada.",
-            "C2-LIM-08: Coorte mensal (AMB-C2-03): o denominador do mês é o das crianças vinculadas que completam 2"
-                    + " anos na competência (NT 8/2026). Mês sem criança completando 2 anos não tem resultado e não"
-                    + " entra na média do quadrimestre.",
-            "C2-LIM-09: Datas (AMB-C2-01, AMB-C2-02): o dia do nascimento é o dia 0 e N+30 está dentro de 'até o"
-                    + " 30º dia'; a data do aniversário de 6 meses e de 2 anos está dentro de 'até'; aniversário"
-                    + " inexistente vale o dia seguinte (Código Civil, art. 132 § 3º). A coorte vai até o 2º"
-                    + " aniversário.",
-            "C2-LIM-10: Prática E: doses são aplicações em datas distintas (o campo dose não é lido); contagem por"
-                    + " componente, com a dose de hepatite B ao nascer incluída e doses com menos de 30 dias de"
-                    + " intervalo descartadas; SCR/SCRV sem intervalo mínimo; só o Esquema Primário do item 24 g; sem"
-                    + " janela de idade (conta dose aplicada até o fim da competência), o valor depende também do"
-                    + " corte da execução para registros tardios; transcrição registrada depois do corte não é"
-                    + " conhecida nele.",
-            "C2-LIM-11: Prática C: só valores numéricos maiores que zero comprovam peso ou altura; os códigos"
-                    + " 01.01.04.002-4 e 03.01.01.026-9 e o campo 'Antropometria' do MIAC contam como registro do dia"
-                    + " mesmo sem valores; cada dia conta uma vez; linha do MIAC sem CBO é aceita.",
-            "C2-LIM-12: Cadastros não unificados (AMB-C2-14) contam como pessoas distintas.",
-            "C2-LIM-13: O corte local não reproduz o 20º dia útil de extração do SIAPS (AMB-C2-16).",
-            "C2-LIM-14: CBO de quatro dígitos é família e o de seis dígitos é ocupação (AMB-C2-13).",
-            "C2-LIM-15: Prática D: só contam visitas de ACS/TACS com motivo 'recém-nascido' ou 'criança'"
-                    + " (AMB-C2-08 iii) e desfecho 'realizada'; a 2ª visita é posterior ao 30º dia.",
-            "C2-LIM-16: Criança vinculada a equipe de tipo conhecido diferente de 70 e 76 sai da coorte (item 24 b);"
-                    + " com tipo desconhecido ela permanece.",
-            "C2-LIM-17: Atendimento individual no domicílio (local 4) conta como presencial e como consulta"
-                    + " (AMB-C2-04). Outro modelo de atendimento domiciliar (MIAD) não é lido.",
-            "C2-LIM-18: Recusa de cadastro na versão vigente tira a criança da coorte.",
-            "C2-LIM-19: Atendimentos com mesma data, CBO, CNES e INE são o mesmo registro duplicado (MET-32);"
-                    + " atendimentos distintos no mesmo dia contam separadamente em B (AMB-C2-15).",
-            "C2-LIM-20: Modalidade (LACUNA-L3): atendimento sem marcador de remoto (tipo de participação 3 a 7 ou"
-                    + " procedimento 03.01.01.025-0 do mesmo dia e profissional) é contado como presencial na"
-                    + " prática A. Consulta remota sem marcador superestima A.",
-            "C2-LIM-21: Procedimento MIP isolado (03.01.01.025-0, 03.01.01.027-7) não é consulta de A nem de B"
-                    + " (AMB-C2-06); só o atendimento individual conta.",
-            "C2-LIM-22: A habilitação de CBO por procedimento da tabela SIGTAP (item 24 f) não é reproduzida; vale a"
-                    + " lista de CBO do Quadro 03.",
-            "C2-LIM-23: A validação das equipes no SCNES e as condições da Portaria GM/MS nº 3.493/2024 (item 24 b)"
-                    + " não são verificadas localmente.",
-            "C2-LIM-24: A validade do CPF/CNS e a identificação no CadSUS (item 24 a) não são verificadas"
-                    + " localmente.",
-            "C2-LIM-25: Registro qualificado e envio tardio de dados pelos profissionais e pela gestão local (item"
-                    + " 33) afetam o resultado e não são corrigíveis localmente.");
+    private static final List<Limitation> STANDING_LIMITATIONS = List.of(
+            Limitation.outOfReach(
+                    "C2-LIM-01",
+                    "Registros de outros municípios ou serviços e doses só na RNDS/RIA (lacuna L4) não são"
+                            + " vistos (ficha C2, 4.4 e Quadro 05): o resultado local pode ficar abaixo do SIAPS."),
+            Limitation.outOfReach(
+                    "C2-LIM-02",
+                    "O óbito no CadSUS (item 15) não está no PEC local: só óbito ou saída registrados no"
+                            + " cadastro local interrompem o acompanhamento."),
+            Limitation.outOfReach(
+                    "C2-LIM-03",
+                    "O vínculo da criança com a equipe é aproximado pela versão mais recente do cadastro"
+                            + " individual completo até o corte (lacuna L8). As regras da NT 30/2025 e o desempate da"
+                            + " Portaria SAPS 161/2024 não são reproduzidos."),
+            Limitation.convention(
+                    "C2-LIM-04",
+                    "Interrupção do acompanhamento (item 15, AMB-C2-12): a criança sai da coorte quando a versão"
+                            + " cadastral mais recente até o corte registra saída por mudança de território ou óbito."),
+            Limitation.blockingGap(
+                    "C2-LIM-05",
+                    "O tipo de equipe (eSF 70, eAP 76) não está no extrato (lacuna L1): a pontuação integral da"
+                            + " prática D para eAP 76 (item 24 b) não pode ser aplicada. Fecha quando a capacidade `team`"
+                            + " estiver VALIDATED."),
+            Limitation.convention(
+                    "C2-LIM-06",
+                    "A alocação do profissional em equipe 70/76 (Quadro 02) só é verificada quando o tipo da"
+                            + " equipe do atendimento é conhecido. Com tipo desconhecido a consulta é aceita; com tipo"
+                            + " conhecido fora de 70/76, não conta."),
+            Limitation.convention(
+                    "C2-LIM-07",
+                    "Puericultura (Quadro 02) é reconhecida pelo CIAP-2 A98 ou CID-10 Z001 entre os problemas"
+                            + " avaliados do atendimento, os códigos que o PEC grava com o campo de puericultura. Não são"
+                            + " exclusivos desse campo (AMB-GUIA-01): consulta de puericultura sem essa linha não é contada."),
+            Limitation.convention(
+                    "C2-LIM-08",
+                    "Coorte mensal (AMB-C2-03): o denominador do mês é o das crianças vinculadas que completam 2"
+                            + " anos na competência (NT 8/2026). Mês sem criança completando 2 anos não tem resultado e não"
+                            + " entra na média do quadrimestre."),
+            Limitation.convention(
+                    "C2-LIM-09",
+                    "Datas (AMB-C2-01, AMB-C2-02): o dia do nascimento é o dia 0 e N+30 está dentro de 'até o"
+                            + " 30º dia'; a data do aniversário de 6 meses e de 2 anos está dentro de 'até'; aniversário"
+                            + " inexistente vale o dia seguinte (Código Civil, art. 132 § 3º). A coorte vai até o 2º"
+                            + " aniversário."),
+            Limitation.convention(
+                    "C2-LIM-10",
+                    "Prática E: doses são aplicações em datas distintas (o campo dose não é lido); contagem por"
+                            + " componente, com a dose de hepatite B ao nascer incluída e doses com menos de 30 dias de"
+                            + " intervalo descartadas; SCR/SCRV sem intervalo mínimo; só o Esquema Primário do item 24 g; sem"
+                            + " janela de idade (conta dose aplicada até o fim da competência), o valor depende também do"
+                            + " corte da execução para registros tardios; transcrição registrada depois do corte não é"
+                            + " conhecida nele."),
+            Limitation.convention(
+                    "C2-LIM-11",
+                    "Prática C: só valores numéricos maiores que zero comprovam peso ou altura; os códigos"
+                            + " 01.01.04.002-4 e 03.01.01.026-9 e o campo 'Antropometria' do MIAC contam como registro do dia"
+                            + " mesmo sem valores; cada dia conta uma vez; linha do MIAC sem CBO é aceita."),
+            Limitation.convention("C2-LIM-12", "Cadastros não unificados (AMB-C2-14) contam como pessoas distintas."),
+            Limitation.outOfReach(
+                    "C2-LIM-13", "O corte local não reproduz o 20º dia útil de extração do SIAPS (AMB-C2-16)."),
+            Limitation.convention(
+                    "C2-LIM-14", "CBO de quatro dígitos é família e o de seis dígitos é ocupação (AMB-C2-13)."),
+            Limitation.convention(
+                    "C2-LIM-15",
+                    "Prática D: só contam visitas de ACS/TACS com motivo 'recém-nascido' ou 'criança'"
+                            + " (AMB-C2-08 iii) e desfecho 'realizada'; a 2ª visita é posterior ao 30º dia."),
+            Limitation.convention(
+                    "C2-LIM-16",
+                    "Criança vinculada a equipe de tipo conhecido diferente de 70 e 76 sai da coorte (item 24 b);"
+                            + " com tipo desconhecido ela permanece."),
+            Limitation.convention(
+                    "C2-LIM-17",
+                    "Atendimento individual no domicílio (local 4) conta como presencial e como consulta"
+                            + " (AMB-C2-04). Outro modelo de atendimento domiciliar (MIAD) não é lido."),
+            Limitation.convention("C2-LIM-18", "Recusa de cadastro na versão vigente tira a criança da coorte."),
+            Limitation.convention(
+                    "C2-LIM-19",
+                    "Atendimentos com mesma data, CBO, CNES e INE são o mesmo registro duplicado (MET-32);"
+                            + " atendimentos distintos no mesmo dia contam separadamente em B (AMB-C2-15)."),
+            Limitation.convention(
+                    "C2-LIM-20",
+                    "Modalidade (LACUNA-L3): atendimento sem marcador de remoto (tipo de participação 3 a 7 ou"
+                            + " procedimento 03.01.01.025-0 do mesmo dia e profissional) é contado como presencial na"
+                            + " prática A. Consulta remota sem marcador superestima A."),
+            Limitation.convention(
+                    "C2-LIM-21",
+                    "Procedimento MIP isolado (03.01.01.025-0, 03.01.01.027-7) não é consulta de A nem de B"
+                            + " (AMB-C2-06); só o atendimento individual conta."),
+            Limitation.outOfReach(
+                    "C2-LIM-22",
+                    "A habilitação de CBO por procedimento da tabela SIGTAP (item 24 f) não é reproduzida; vale a"
+                            + " lista de CBO do Quadro 03."),
+            Limitation.outOfReach(
+                    "C2-LIM-23",
+                    "A validação das equipes no SCNES e as condições da Portaria GM/MS nº 3.493/2024 (item 24 b)"
+                            + " não são verificadas localmente."),
+            Limitation.outOfReach(
+                    "C2-LIM-24",
+                    "A validade do CPF/CNS e a identificação no CadSUS (item 24 a) não são verificadas"
+                            + " localmente."),
+            Limitation.outOfReach(
+                    "C2-LIM-25",
+                    "Registro qualificado e envio tardio de dados pelos profissionais e pela gestão local (item"
+                            + " 33) afetam o resultado e não são corrigíveis localmente."));
 
     /** Civil months read: the first that can hold a cohort birth through the competência (ADR 0030 §1.9.2). */
     private static final int MONTHS_READ = 26;
@@ -438,7 +483,7 @@ public final class C2Pack implements IndicatorRule {
     }
 
     private static RuleOutcome unsupported(EvaluationContext context, String capability) {
-        List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
+        List<String> limitations = new ArrayList<>(DESCRIPTOR.standingLimitationLines());
         limitations.add("Capacidade " + capability
                 + " ausente do extrato ou com janela menor que a pedida: o C2 não é calculado sem ela.");
         IndicatorResult result = new IndicatorResult(

@@ -5,11 +5,13 @@ import esusdata.auth.model.AuthenticatedSession;
 import esusdata.auth.model.Permission;
 import esusdata.indicator.GateResponse;
 import esusdata.indicator.IndicatorPackCatalog;
+import esusdata.indicator.LimitationResponse;
 import esusdata.indicator.model.GateCheck;
 import esusdata.indicator.model.GateChecks;
 import esusdata.indicator.model.GateId;
 import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.Limitation;
 import esusdata.overview.OverviewResponse.Check;
 import esusdata.overview.OverviewResponse.HistoryPoint;
 import esusdata.overview.OverviewResponse.Indicator;
@@ -285,7 +287,8 @@ public class OverviewController {
                 result == null ? null : result.valueText(),
                 result == null ? List.of() : limitations(result.limitationsJson()),
                 result == null ? null : result.publishedAt(),
-                pack.standingLimitations());
+                pack.standingLimitations().stream().map(Limitation::display).toList(),
+                LimitationResponse.of(pack.standingLimitations()));
     }
 
     private List<String> limitations(String json) {

@@ -1,6 +1,6 @@
 import type { Severity, StatusKey } from './common'
 import type { RunState } from './execucao'
-import type { Availability, PackGate, ValueKind } from './indicadores'
+import type { Availability, PackGate, PackLimitation, ValueKind } from './indicadores'
 
 export interface Kpi {
   id: string
@@ -98,6 +98,8 @@ export interface OverviewIndicator {
   publishedAt: string | null
   /** The pack's standing limitations: what `limitations` carries beyond them is the result's own. */
   standingLimitations?: string[]
+  /** The same limitations with their kind (S2); absent from an older API. */
+  standingLimitationDetails?: PackLimitation[]
 }
 
 export interface OverviewHistoryPoint {

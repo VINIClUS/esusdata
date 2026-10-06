@@ -10,6 +10,7 @@ import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.IndicatorRule;
+import esusdata.indicator.model.Limitation;
 import esusdata.indicator.model.MonthlyEligibility;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
@@ -50,7 +51,7 @@ final class EveryCapabilityRule implements IndicatorRule {
             "teste@1",
             CONTRACTS.stream().map(CapabilityContract::capability).toList(),
             List.of(),
-            List.of("Regra de teste: não calcula."),
+            List.of(Limitation.convention("T0-LIM-01", "Regra de teste: não calcula.")),
             MonthlyEligibility.ALL_MONTHS,
             BudgetHint.engineeringDefault(),
             List.of(),
