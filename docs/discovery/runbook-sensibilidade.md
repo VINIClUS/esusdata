@@ -1,4 +1,4 @@
-# Runbook: sensibilidade das ambiguidades (RULE_AMBIGUITY de C2, C3 e C7)
+# Runbook: sensibilidade das ambiguidades (RULE_AMBIGUITY de C2 e C3)
 
 Ferramenta **local**, na árvore de testes (`apps/agent/src/test/java/esusdata/indicator/sensitivity/`),
 sem chave de produção. Dado um extrato canônico real, que fica só no disco local, mostra para cada
@@ -11,7 +11,7 @@ B/D: veja o plano em `c1-c4-c5-e-rippling-riddle.md`, fatia S3.
 A ferramenta avalia cada pack como a produção faz (`evaluate`, só para ler contagens, evidência e
 limitações; o valor publicado nunca é lido). A linha de base tem de reproduzir a produção, ou a
 execução para com erro: C2 confere denominador, pontos e crianças ambíguas; C3 confere
-denominador e pontos pelos componentes; C7 confere cada subgrupo, no município e em cada equipe.
+denominador e pontos pelos componentes.
 
 | Pack | Código | Leituras |
 |---|---|---|
@@ -19,9 +19,7 @@ denominador e pontos pelos componentes; C7 confere cada subgrupo, no município 
 | C2 | demais AMB-C2-xx e LACUNA-L3 | **Limites**, não leituras: pontuação com as práticas que dependem do código todas não cumpridas e todas cumpridas. Crianças diferentes viram em sentidos diferentes, então o limite não é o resultado de uma leitura. |
 | C3 | AMB-C3-02 | Uma execução por convenção, com `C3Pack.withTrimesterConvention`. Dias contados da DUM (dia 0), limites inclusivos: 13s6d/28s0d = (97, 196); 13s6d/27s0d = (97, 189); 12s6d/28s0d = (90, 196); 14s0d/28s0d = (98, 196). Mostra também o numerador e o denominador de G e H. |
 | C3 | demais AMB-C3-xx | Frequência; os que aparecem como ambiguidade de inclusão do episódio na coorte, com as três leituras de inclusão; os de prática, com limites. |
-| C7 | AMB-C7-06 (B), AMB-C7-08 (A) | "Conta" decide a prática como cumprida e "não conta" como não cumprida. É exato: a prática só é ambígua quando nenhum registro conta com certeza e algum conta numa leitura. |
-| C7 | AMB-C7-05 (B) | "Fora de B" é a produção. "Incluído em B" remarca como `FEMININO`, sem identidade de gênero, todas as linhas de cada homem trans, e roda a regra de novo. Só `hpvVaccine` lê a marca, então só o subgrupo B muda. |
-| C7 | combinadas | A pontuação ponderada nas oito combinações das três leituras. O "denominador" dessas linhas é o do menor subgrupo, só para o mascaramento. |
+| C7 | — | Sem leituras desde `c7-prevencao-cancer@0.2.0`: as AMB-C7-05, -06 e -08 foram decididas em `docs/indicadores/decisoes/c7-prevencao-cancer.md`. Os números das leituras de 2026-08 ficam em `docs/discovery/2026-10-06-sensibilidade-2026-08.md`. Hoje entra como as demais: só o que dispara. |
 | C1, C4, C5, C6 | todos | Só o que dispara: frequência nas evidências e códigos citados nas limitações dinâmicas do resultado. Os caminhos RULE_AMBIGUITY de C4–C6 são só de eAP e hoje inalcançáveis. |
 
 Uma linha com "ainda ambíguos" maior que zero tem valor que é só o limite inferior, com as práticas
@@ -53,7 +51,7 @@ em `<saída>/extratos`. Exige o opt-in explícito `ESUSDATA_SENSITIVITY_LIVE=tru
 binário do execplane e o arquivo de segredo dos outros testes ao vivo (o mesmo de
 [`runbook-validacao-capacidades.md`](runbook-validacao-capacidades.md): `PEC_DB_HOST/PORT/NAME/USER/PASSWORD`,
 `PEC_SOURCE_ID`, `PEC_VERSION`, `PEC_MUNICIPALITY_IBGE`; túnel no ar). Sem qualquer um deles o teste
-é ignorado. Opcional: `ESUSDATA_SENSITIVITY_PACKS=c2-desenvolvimento-infantil,c3-gestacao-puerperio,c7-prevencao-cancer`.
+é ignorado. Opcional: `ESUSDATA_SENSITIVITY_PACKS=c2-desenvolvimento-infantil,c3-gestacao-puerperio`.
 
 ```bash
 ESUSDATA_SENSITIVITY_LIVE=true \
