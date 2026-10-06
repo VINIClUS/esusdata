@@ -7,7 +7,7 @@ import static esusdata.indicator.pack.c6.C6Scenario.scenario;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.CanonicalImmunization;
 import esusdata.indicator.model.CanonicalPerson;
@@ -88,7 +88,7 @@ class C6PackContractTest {
         assertThat(result.status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
         assertThat(result.valueText()).isNull();
         assertThat(result.limitations())
-                .containsAll(TestGates.shipped(pack.descriptor()).incompleteReasons());
+                .containsAll(GateFixtures.shipped(pack.descriptor()).incompleteReasons());
     }
 
     // ---- municipal isolation ---------------------------------------------------------------------
@@ -178,7 +178,7 @@ class C6PackContractTest {
         assertThat(pack.descriptor().valueKind()).isEqualTo(ValueKind.SCORE);
         assertThat(pack.descriptor().denominatorKind()).isEqualTo("PESSOAS_IDOSAS_VINCULADAS");
         assertThat(pack.descriptor().standingLimitations()).noneMatch(l -> l.contains("Regra em implementação"));
-        assertThat(TestGates.shipped(pack.descriptor()).isComplete()).isFalse();
+        assertThat(GateFixtures.shipped(pack.descriptor()).isComplete()).isFalse();
     }
 
     private void assertBand(ExactRatio value, Classification expected) {
@@ -196,7 +196,7 @@ class C6PackContractTest {
         assertThat(gated.denominator()).isEqualTo(computed.denominator());
         assertThat(gated.components()).isEqualTo(computed.components());
         assertThat(gated.limitations())
-                .containsAll(TestGates.shipped(pack.descriptor()).incompleteReasons());
+                .containsAll(GateFixtures.shipped(pack.descriptor()).incompleteReasons());
     }
 
     private static PartRequirement part(DataRequirements requirements, String capability) {

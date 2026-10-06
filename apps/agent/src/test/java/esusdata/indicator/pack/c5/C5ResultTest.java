@@ -28,7 +28,7 @@ import static esusdata.indicator.pack.c5.C5TestData.team;
 import static esusdata.indicator.pack.c5.C5TestData.teamOf;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.DateWindow;
@@ -323,7 +323,7 @@ class C5ResultTest {
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(4));
         assertComponents(result, 4, 2, 2, 2, 1);
         assertThat(result.limitations())
-                .containsAll(TestGates.shipped(descriptor).incompleteReasons())
+                .containsAll(GateFixtures.shipped(descriptor).incompleteReasons())
                 .containsAll(descriptor.standingLimitations());
         assertThat(result.referencePeriod()).isEqualTo("2026-03");
         assertThat(result.dataCutoff()).isEqualTo(CUTOFF_TEXT);

@@ -2,7 +2,7 @@ package esusdata.indicator.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import java.math.BigInteger;
 import java.time.LocalDate;
@@ -92,7 +92,7 @@ class RuleOutcomesTest {
     }
 
     private static GateStatus passed() {
-        return TestGates.allPassed(descriptor(List.of()));
+        return GateFixtures.allPassed(descriptor(List.of()));
     }
 
     @Test

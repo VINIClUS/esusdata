@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.auth.GrantRevalidator;
 import esusdata.auth.model.Role;
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.ComponentKind;
@@ -116,7 +116,7 @@ class PracticeResultsApiTest extends ApiFixtureSupport {
                                 Capabilities.INDIVIDUAL_REGISTRATION,
                                 Capabilities.CARE_ENCOUNTER))),
                 (pack, version) -> new PracticeTestRule(),
-                TestGates.registryPassing(new PracticeTestRule().descriptor()));
+                GateFixtures.registryPassing(new PracticeTestRule().descriptor()));
 
         RunExecutor.RunOutcome run = executor.runFromExtract(
                 new RunExecutor.RunContext(

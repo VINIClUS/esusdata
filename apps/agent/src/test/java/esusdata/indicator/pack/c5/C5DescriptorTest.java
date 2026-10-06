@@ -8,7 +8,7 @@ import static esusdata.indicator.pack.c5.C5TestData.PRACTICE_POINTS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.ComponentKind;
 import esusdata.indicator.model.ComponentSpec;
@@ -72,7 +72,7 @@ class C5DescriptorTest {
         assertThat(descriptor.standingLimitations())
                 .isNotEmpty()
                 .noneMatch(limitation -> limitation.contains("Regra em implementação"));
-        assertThat(TestGates.shipped(descriptor).isComplete()).isFalse();
+        assertThat(GateFixtures.shipped(descriptor).isComplete()).isFalse();
         assertThat(descriptor.components()).extracting(ComponentSpec::code).containsExactlyElementsOf(PRACTICES);
         assertThat(descriptor.components()).allSatisfy(component -> {
             assertThat(component.kind()).isEqualTo(ComponentKind.PRACTICE);

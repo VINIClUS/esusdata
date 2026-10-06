@@ -3,7 +3,7 @@ package esusdata.indicator.pack.c2;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalFixtures;
@@ -1515,7 +1515,7 @@ class C2PackCasesTest {
             assertThat(c.kind()).isEqualTo(ComponentKind.PRACTICE);
             assertThat(c.weight()).isEqualTo(VINTE);
         });
-        assertThat(TestGates.shipped(descritor).isComplete()).isFalse();
+        assertThat(GateFixtures.shipped(descritor).isComplete()).isFalse();
         assertThat(descritor.blockingLimitations()).isNotEmpty();
         List<String> limitacoes = descritor.standingLimitations();
         assertThat(limitacoes).noneMatch(l -> l.contains("Regra em implementação"));
@@ -1614,7 +1614,7 @@ class C2PackCasesTest {
 
     private RuleOutcome avaliar() {
         C2Pack pack = new C2Pack();
-        return TestGates.published(pack.descriptor(), pack.evaluate(dados(), CONTEXTO));
+        return GateFixtures.published(pack.descriptor(), pack.evaluate(dados(), CONTEXTO));
     }
 
     /** Uma criança nascida em {@link #N} por item, cumprindo as práticas listadas (ex.: "AD"). */

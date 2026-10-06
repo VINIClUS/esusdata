@@ -22,7 +22,7 @@ public record GateStatus(String pack, String ruleVersion, Map<GateId, GateCheck>
     public GateStatus {
         Objects.requireNonNull(pack, "pack");
         Objects.requireNonNull(ruleVersion, "ruleVersion");
-        EnumMap<GateId, GateCheck> complete = new EnumMap<>(GateId.class);
+        Map<GateId, GateCheck> complete = new EnumMap<>(GateId.class);
         for (GateId id : GateId.values()) {
             complete.put(id, Objects.requireNonNull(gates.get(id), "gate " + id));
         }

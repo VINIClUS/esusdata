@@ -44,6 +44,7 @@ public final class ReleaseGateRegistry {
 
     public static final String RESOURCE = "/indicators/release-gates.json";
 
+    private static final String PREFIX = "Release-gate registry: ";
     private static final String SCHEMA_VERSION = "1";
     private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -78,11 +79,10 @@ public final class ReleaseGateRegistry {
     }
 
     static ReleaseGateRegistry fromClasspath() {
-        InputStream resource = ReleaseGateRegistry.class.getResourceAsStream(RESOURCE);
-        if (resource == null) {
-            throw new IllegalStateException("Packaged release-gate registry is missing: " + RESOURCE);
-        }
-        try (resource) {
+        try (InputStream resource = ReleaseGateRegistry.class.getResourceAsStream(RESOURCE)) {
+            if (resource == null) {
+                throw new IllegalStateException("Packaged release-gate registry is missing: " + RESOURCE);
+            }
             return fromJson(new String(resource.readAllBytes(), StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new IllegalStateException("Could not read packaged release-gate registry", e);
@@ -99,14 +99,14 @@ public final class ReleaseGateRegistry {
         try {
             root = MAPPER.readTree(json);
         } catch (RuntimeException e) { // NOPMD - any parse failure of the registry is fatal, with its cause
-            throw new IllegalStateException("Release-gate registry is not valid JSON", e);
+            throw invalid("is not valid JSON", e);
         }
         if (!root.isObject() || !SCHEMA_VERSION.equals(text(root, "schema_version"))) {
-            throw new IllegalStateException("Release-gate registry: unsupported schema_version");
+            throw invalid("unsupported schema_version");
         }
         JsonNode packs = root.get("packs");
         if (packs == null || !packs.isArray()) {
-            throw new IllegalStateException("Release-gate registry: packs must be an array");
+            throw invalid("packs must be an array");
         }
         Set<String> known = new HashSet<>();
         registered.forEach(d -> known.add(d.id()));
@@ -116,7 +116,7 @@ public final class ReleaseGateRegistry {
         }
         for (String id : known) {
             if (!entries.containsKey(id)) {
-                throw new IllegalStateException("Release-gate registry has no entry for registered pack " + id);
+                throw invalid("has no entry for registered pack " + id);
             }
         }
         return new ReleaseGateRegistry(entries);
@@ -126,29 +126,27 @@ public final class ReleaseGateRegistry {
         String pack = requireText(node, "pack", "entry");
         String ruleVersion = requireText(node, "rule_version", pack);
         if (!known.contains(pack)) {
-            throw new IllegalStateException("Release-gate registry names an unregistered pack " + pack);
+            throw invalid("names an unregistered pack " + pack);
         }
         if (!ruleVersion.startsWith(pack + "@")) {
-            throw new IllegalStateException(
-                    "Release-gate registry: rule_version " + ruleVersion + " must be " + pack + "@<version>");
+            throw invalid("rule_version " + ruleVersion + " must be " + pack + "@<version>");
         }
         JsonNode gates = node.get("gates");
         if (gates == null || !gates.isObject()) {
-            throw new IllegalStateException("Release-gate registry: " + ruleVersion + " has no gates object");
+            throw invalid(ruleVersion + " has no gates object");
         }
         for (String name : gates.propertyNames()) {
             if (!isRegisteredGate(name)) {
-                throw new IllegalStateException(
-                        "Release-gate registry: " + ruleVersion + " carries gate " + name + " (only A and D)");
+                throw invalid(ruleVersion + " carries gate " + name + " (only A and D)");
             }
         }
         JsonNode closed = node.get("blocking_gaps_closed");
         if (closed == null || !closed.isArray()) {
-            throw new IllegalStateException("Release-gate registry: " + ruleVersion + " needs blocking_gaps_closed");
+            throw invalid(ruleVersion + " needs blocking_gaps_closed");
         }
         Entry entry = new Entry(gate(gates, GateId.A, ruleVersion), gate(gates, GateId.D, ruleVersion));
         if (entries.computeIfAbsent(pack, k -> new HashMap<>()).putIfAbsent(ruleVersion, entry) != null) {
-            throw new IllegalStateException("Release-gate registry: duplicate entry for " + ruleVersion);
+            throw invalid("duplicate entry for " + ruleVersion);
         }
     }
 
@@ -165,7 +163,7 @@ public final class ReleaseGateRegistry {
         String where = ruleVersion + " gate " + id;
         JsonNode node = gates.get(id.name());
         if (node == null || !node.isObject()) {
-            throw new IllegalStateException("Release-gate registry: " + where + " is missing");
+            throw invalid(where + " is missing");
         }
         GateCheck.State state = state(requireText(node, "status", where), where);
         String check = text(node, "check");
@@ -173,16 +171,15 @@ public final class ReleaseGateRegistry {
         List<GateCheck.Evidence> evidence = evidence(node.get("evidence"), where);
         if (state == GateCheck.State.PENDING) {
             if (check != null || checkedAt != null) {
-                throw new IllegalStateException(
-                        "Release-gate registry: " + where + " is PENDING but names a check or a date");
+                throw invalid(where + " is PENDING but names a check or a date");
             }
         } else {
             requireDate(checkedAt, where);
             if (check == null || check.isBlank()) {
-                throw new IllegalStateException("Release-gate registry: " + where + " " + state + " needs a check");
+                throw invalid(where + " " + state + " needs a check");
             }
             if (state == GateCheck.State.PASSED && evidence.isEmpty()) {
-                throw new IllegalStateException("Release-gate registry: " + where + " PASSED needs evidence");
+                throw invalid(where + " PASSED needs evidence");
             }
         }
         return new GateCheck(state, check, checkedAt, evidence, text(node, "note"));
@@ -192,7 +189,7 @@ public final class ReleaseGateRegistry {
         try {
             return GateCheck.State.valueOf(status);
         } catch (IllegalArgumentException e) {
-            throw new IllegalStateException("Release-gate registry: " + where + " has unknown status " + status, e);
+            throw invalid(where + " has unknown status " + status, e);
         }
     }
 
@@ -200,20 +197,19 @@ public final class ReleaseGateRegistry {
         try {
             LocalDate.parse(checkedAt == null ? "" : checkedAt);
         } catch (DateTimeException e) {
-            throw new IllegalStateException("Release-gate registry: " + where + " needs checked_at as yyyy-MM-dd", e);
+            throw invalid(where + " needs checked_at as yyyy-MM-dd", e);
         }
     }
 
     private static List<GateCheck.Evidence> evidence(JsonNode node, String where) {
         if (node == null || !node.isArray()) {
-            throw new IllegalStateException("Release-gate registry: " + where + " needs an evidence array");
+            throw invalid(where + " needs an evidence array");
         }
         List<GateCheck.Evidence> items = new ArrayList<>();
         for (JsonNode item : node) {
             String sha = requireText(item, "sha256", where + " evidence");
             if (!SHA256.matcher(sha).matches()) {
-                throw new IllegalStateException(
-                        "Release-gate registry: " + where + " evidence sha256 must be 64 lowercase hex digits");
+                throw invalid(where + " evidence sha256 must be 64 lowercase hex digits");
             }
             items.add(new GateCheck.Evidence(
                     requireText(item, "kind", where + " evidence"),
@@ -271,6 +267,14 @@ public final class ReleaseGateRegistry {
         return MAPPER.writeValueAsString(snapshot);
     }
 
+    private static IllegalStateException invalid(String detail) {
+        return new IllegalStateException(PREFIX + detail);
+    }
+
+    private static IllegalStateException invalid(String detail, Throwable cause) {
+        return new IllegalStateException(PREFIX + detail, cause);
+    }
+
     private static String text(JsonNode node, String field) {
         JsonNode value = node.get(field);
         return value == null || value.isNull() ? null : value.asString();
@@ -279,7 +283,7 @@ public final class ReleaseGateRegistry {
     private static String requireText(JsonNode node, String field, String where) {
         String value = text(node, field);
         if (value == null || value.isBlank()) {
-            throw new IllegalStateException("Release-gate registry: " + where + " needs " + field);
+            throw invalid(where + " needs " + field);
         }
         return value;
     }

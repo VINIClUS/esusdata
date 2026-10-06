@@ -1,6 +1,6 @@
 package esusdata.indicator.pack.c1;
 
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.RuleOutcome;
@@ -18,6 +18,6 @@ final class PublishedC1 {
     static RuleOutcome of(CanonicalDataset data, EvaluationContext context) {
         C1Pack pack = new C1Pack();
         return RuleOutcomes.blockEmptyDenominators(
-                TestGates.published(pack.descriptor(), pack.evaluate(data, context)));
+                GateFixtures.published(pack.descriptor(), pack.evaluate(data, context)));
     }
 }

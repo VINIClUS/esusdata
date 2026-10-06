@@ -3,7 +3,7 @@ package esusdata.run.worker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.ExactRatio;
@@ -44,7 +44,7 @@ class ComputingRuleReplayTest {
     @BeforeEach
     void setUp() {
         fixture = new JobRunnerTestFixture(dataDir, Clock.fixed(Instant.parse("2026-09-20T12:00:00Z"), ZoneOffset.UTC));
-        fixture.gateRegistry = TestGates.registryPassing(new PracticeTestRule().descriptor());
+        fixture.gateRegistry = GateFixtures.registryPassing(new PracticeTestRule().descriptor());
         fixture.replayMatrix = CompatibilityMatrices.validated(
                 List.of("5.4.37"),
                 List.of(Capabilities.CITIZEN, Capabilities.INDIVIDUAL_REGISTRATION, Capabilities.CARE_ENCOUNTER));

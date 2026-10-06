@@ -90,6 +90,13 @@ public final class JobRunnerTestFixture implements AutoCloseable {
     public final ExtractionManifestRepository extractionManifestRepository;
     public final SourceRepository sourceRepository;
     public final ResultRepository resultRepository;
+
+    /** The registry the executors of this fixture gate by: the shipped one unless a test passes packs. */
+    public ReleaseGateRegistry gateRegistry = ReleaseGateRegistry.bundled();
+
+    /** The compatibility matrix {@link #replay} checks the source's capabilities against (Portão C). */
+    public PecCompatibilityMatrix replayMatrix = PecCompatibilityMatrix.fromClasspathResource();
+
     public final ReproducibilityCheck reproducibilityCheck;
     public final PublicationService publicationService;
     public final RunExecutor executor;
@@ -180,12 +187,6 @@ public final class JobRunnerTestFixture implements AutoCloseable {
                 acquisitionGuard(),
                 liveAcquisitionCooldownMargin);
     }
-
-    /** The registry the executors of this fixture gate by: the shipped one unless a test passes packs. */
-    public ReleaseGateRegistry gateRegistry = ReleaseGateRegistry.bundled();
-
-    /** The compatibility matrix {@link #replay} checks the source's capabilities against (Portão C). */
-    public PecCompatibilityMatrix replayMatrix = PecCompatibilityMatrix.fromClasspathResource();
 
     /**
      * An executor over this fixture's database and extracts that resolves {@code rules} — any

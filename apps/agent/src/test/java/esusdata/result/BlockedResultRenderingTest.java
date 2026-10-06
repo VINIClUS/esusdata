@@ -3,7 +3,7 @@ package esusdata.result;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.auth.model.Role;
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.CanonicalEncounter;
 import esusdata.indicator.model.CanonicalModality;
 import esusdata.indicator.model.IndicatorResult;
@@ -41,7 +41,7 @@ class BlockedResultRenderingTest extends ApiFixtureSupport {
                 encounter(2, CanonicalModality.ESPONTANEO));
         // The rule is ungated; the executor's gates, as this release ships them, block it (ADR 0032).
         IndicatorResult blocked = RuleOutcomes.gate(
-                TestGates.shipped(new C1Pack().descriptor()),
+                GateFixtures.shipped(new C1Pack().descriptor()),
                 C1Rule.compute(encounters, MUNICIPALITY, "2026-03", "2026-03-31"));
         assertThat(blocked.status()).isEqualTo(IndicatorResult.IndicatorStatus.BLOCKED);
 

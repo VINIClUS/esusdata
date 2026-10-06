@@ -3,8 +3,8 @@ package esusdata.indicator.pack.componente3;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.IndicatorRuleRegistry;
-import esusdata.indicator.TestGates;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ComponentSpec;
 import esusdata.indicator.model.ExactRatio;
@@ -1033,7 +1033,7 @@ class Nt08ConsolidationTest {
 
     @Test
     void descriptorKeepsGatesClosedWeightsSumTo10AndNoLongerSaysInImplementation() {
-        assertThat(TestGates.shipped(ComponentIII.DESCRIPTOR).isComplete()).isFalse();
+        assertThat(GateFixtures.shipped(ComponentIII.DESCRIPTOR).isComplete()).isFalse();
         assertThat(ComponentIII.DESCRIPTOR.components())
                 .extracting(ComponentSpec::code)
                 .containsExactlyElementsOf(PACKS);

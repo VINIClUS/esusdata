@@ -22,7 +22,7 @@ class ReleaseGateRegistryTest {
     private static final String PENDING = "{\"status\":\"PENDING\",\"evidence\":[]}";
     private static final String PASSED = "{\"status\":\"PASSED\",\"check\":\"conferencia-fichas@1\","
             + "\"checked_at\":\"2026-10-06\",\"evidence\":[{\"kind\":\"doc\",\"ref\":\"docs/x.md\",\"sha256\":\""
-            + TestGates.SHA + "\"}]}";
+            + GateFixtures.SHA + "\"}]}";
 
     private static String entry(PackDescriptor d, String gateA, String gateD) {
         return entry(d.id(), d.ruleVersion(), gateA, gateD);
@@ -90,9 +90,9 @@ class ReleaseGateRegistryTest {
     @Test
     void aPassedGateWithoutItsCheckOrDateIsRejected() {
         String noCheck = "{\"status\":\"PASSED\",\"checked_at\":\"2026-10-06\",\"evidence\":[{\"kind\":\"doc\","
-                + "\"ref\":\"docs/x.md\",\"sha256\":\"" + TestGates.SHA + "\"}]}";
+                + "\"ref\":\"docs/x.md\",\"sha256\":\"" + GateFixtures.SHA + "\"}]}";
         String noDate = "{\"status\":\"PASSED\",\"check\":\"conferencia-fichas@1\",\"evidence\":[{\"kind\":\"doc\","
-                + "\"ref\":\"docs/x.md\",\"sha256\":\"" + TestGates.SHA + "\"}]}";
+                + "\"ref\":\"docs/x.md\",\"sha256\":\"" + GateFixtures.SHA + "\"}]}";
         assertThatThrownBy(() -> load(file(entry(C1, noCheck, PENDING)), C1)).hasMessageContaining("needs a check");
         assertThatThrownBy(() -> load(file(entry(C1, noDate, PENDING)), C1)).hasMessageContaining("checked_at");
     }
@@ -105,7 +105,7 @@ class ReleaseGateRegistryTest {
 
     @Test
     void evidenceMustCarryAWellFormedSha256() {
-        String badSha = PASSED.replace(TestGates.SHA, "abc");
+        String badSha = PASSED.replace(GateFixtures.SHA, "abc");
         assertThatThrownBy(() -> load(file(entry(C1, badSha, PENDING)), C1)).hasMessageContaining("sha256");
     }
 

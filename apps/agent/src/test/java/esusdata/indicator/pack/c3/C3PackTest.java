@@ -31,7 +31,7 @@ import static esusdata.indicator.pack.c3.C3Fixtures.supporting;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ComponentSpec;
@@ -90,7 +90,7 @@ class C3PackTest {
                 .extracting(ComponentSpec::weight)
                 .containsExactly(
                         BigInteger.TEN, nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine(), nine());
-        assertThat(TestGates.shipped(d).isComplete()).isFalse();
+        assertThat(GateFixtures.shipped(d).isComplete()).isFalse();
         assertThat(d.executionEnabled()).isFalse();
         // the 34 limitations of the decision record, each prefixed with its stable code
         assertThat(d.standingLimitations()).hasSize(34);
@@ -330,7 +330,7 @@ class C3PackTest {
         assertThat(computed.valueText()).isEqualTo("0.0000");
         assertThat(computed.classification()).isEqualTo(Classification.REGULAR);
 
-        IndicatorResult gated = TestGates.published(
+        IndicatorResult gated = GateFixtures.published(
                         pack.descriptor(), pack.evaluate(dataset(NOVEMBER, records), context(NOVEMBER)))
                 .result();
         assertThat(gated.status()).isEqualTo(IndicatorStatus.BLOCKED);
@@ -374,7 +374,7 @@ class C3PackTest {
         assertThat(computed.result().classification()).isEqualTo(Classification.SUFICIENTE);
 
         RuleOutcome outcome =
-                TestGates.published(pack.descriptor(), pack.evaluate(dataset(NOVEMBER, records), context(NOVEMBER)));
+                GateFixtures.published(pack.descriptor(), pack.evaluate(dataset(NOVEMBER, records), context(NOVEMBER)));
         IndicatorResult result = outcome.result();
         assertThat(result.status()).isEqualTo(IndicatorStatus.BLOCKED);
         assertThat(result.numerator()).isEqualTo(HUNDRED);

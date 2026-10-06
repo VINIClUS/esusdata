@@ -3,7 +3,7 @@ package esusdata.result;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.result.model.EvidenceEntry;
@@ -144,7 +144,7 @@ class ResultScopeIsolationTest {
                 "SOURCE_EVENT",
                 "sha256:" + "0".repeat(64),
                 List.of(),
-                TestGates.snapshot()));
+                GateFixtures.snapshot()));
         stagingArea.writeEvidence(
                 stagingId,
                 List.of(

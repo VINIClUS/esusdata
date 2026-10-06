@@ -106,7 +106,7 @@ class ReleaseGatesSchemaTest {
         a.put("status", "PASSED").put("check", "conferencia-fichas@1").put("checked_at", "2026-10-06");
         a.set(
                 "evidence",
-                MAPPER.readTree("[{\"kind\":\"doc\",\"ref\":\"docs/x.md\",\"sha256\":\"" + TestGates.SHA + "\"}]"));
+                MAPPER.readTree("[{\"kind\":\"doc\",\"ref\":\"docs/x.md\",\"sha256\":\"" + GateFixtures.SHA + "\"}]"));
 
         assertThat(schema().validate(root)).isEmpty();
         assertThat(ReleaseGateRegistry.fromJson(root.toString())

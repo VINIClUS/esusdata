@@ -1,6 +1,6 @@
 package esusdata.indicator.pack.c4;
 
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.CanonicalCareEvent;
 import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalDataset;
@@ -456,7 +456,7 @@ final class C4Data {
 
     static RuleOutcome gated(CanonicalDataset data) {
         C4Pack pack = new C4Pack();
-        return TestGates.published(pack.descriptor(), pack.evaluate(data, CONTEXT));
+        return GateFixtures.published(pack.descriptor(), pack.evaluate(data, CONTEXT));
     }
 
     static List<EvidenceItem> rowsOf(RuleOutcome outcome, String key) {

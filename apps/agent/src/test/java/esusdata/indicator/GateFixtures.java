@@ -18,12 +18,12 @@ import java.util.stream.Collectors;
  * pending, so a test that wants a {@code COMPUTED} result builds its own (ADR 0032). Never used by
  * production code.
  */
-public final class TestGates {
+public final class GateFixtures {
 
     /** The SHA-256 of nothing in particular: the registry checks only the shape of evidence. */
     public static final String SHA = "0".repeat(64);
 
-    private TestGates() {}
+    private GateFixtures() {}
 
     /** A registry in which Portões A and D have passed for exactly these compiled packs. */
     public static ReleaseGateRegistry registryPassing(PackDescriptor... descriptors) {

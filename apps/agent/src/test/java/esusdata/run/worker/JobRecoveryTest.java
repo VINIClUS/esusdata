@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import esusdata.indicator.TestGates;
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.result.model.StagingRequest;
@@ -114,7 +114,7 @@ class JobRecoveryTest {
                 "SOURCE_EVENT",
                 "sha256:" + "0".repeat(64),
                 List.of(),
-                TestGates.snapshot()));
+                GateFixtures.snapshot()));
         return stagingId;
     }
 

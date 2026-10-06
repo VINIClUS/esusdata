@@ -2,8 +2,8 @@ package esusdata.run.worker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import esusdata.indicator.GateFixtures;
 import esusdata.indicator.ReleaseGateRegistry;
-import esusdata.indicator.TestGates;
 import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.Capabilities;
 import esusdata.result.model.PublishedResult;
@@ -87,7 +87,7 @@ class RunExecutorGatesTest {
 
     @Test
     void aCapabilityTheSourceDoesNotValidateKeepsPortaoCFailedEvenWithAAndDPassed() throws Exception {
-        fixture.gateRegistry = TestGates.registryPassing(new PracticeTestRule().descriptor());
+        fixture.gateRegistry = GateFixtures.registryPassing(new PracticeTestRule().descriptor());
         fixture.replayMatrix = CompatibilityMatrices.validated(List.of("5.4.37"), List.of(Capabilities.CITIZEN));
 
         PublishedResult published = replay("ext-gates-c");
@@ -104,7 +104,7 @@ class RunExecutorGatesTest {
         String json = "{\"schema_version\":\"1\",\"packs\":[{\"pack\":\"" + PracticeTestRule.ID
                 + "\",\"rule_version\":\"" + old + "\",\"blocking_gaps_closed\":[],\"gates\":{"
                 + "\"A\":{\"status\":\"PASSED\",\"check\":\"conferencia-fichas@1\",\"checked_at\":\"2026-10-06\","
-                + "\"evidence\":[{\"kind\":\"doc\",\"ref\":\"docs/x.md\",\"sha256\":\"" + TestGates.SHA + "\"}]},"
+                + "\"evidence\":[{\"kind\":\"doc\",\"ref\":\"docs/x.md\",\"sha256\":\"" + GateFixtures.SHA + "\"}]},"
                 + "\"D\":{\"status\":\"PENDING\",\"evidence\":[]}}}]}";
         fixture.gateRegistry = ReleaseGateRegistry.fromJson(json, List.of(new PracticeTestRule().descriptor()));
 
@@ -118,7 +118,7 @@ class RunExecutorGatesTest {
 
     @Test
     void withEveryGatePassedARuleWithoutStandingLimitationsPublishesItsValue() throws Exception {
-        fixture.gateRegistry = TestGates.registryPassing(new PracticeTestRule().descriptor());
+        fixture.gateRegistry = GateFixtures.registryPassing(new PracticeTestRule().descriptor());
 
         PublishedResult published = replay("ext-gates-all");
 
