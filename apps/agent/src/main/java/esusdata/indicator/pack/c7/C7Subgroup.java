@@ -8,8 +8,11 @@ package esusdata.indicator.pack.c7;
 enum C7Subgroup {
     /** "entre 25 e 64 anos", 36 meses (60 só para 02.02.10.025-1). */
     A(25, 64, 36),
-    /** "entre 09 e 14 anos"; sem janela na ficha — 60 meses da NT nº 8/2026 delimitam a AMB-C7-06. */
-    B(9, 14, 60),
+    /**
+     * "entre 09 e 14 anos"; sem janela na ficha (C7-D1): o 9º aniversário de quem tem 14 anos dista até 72 meses
+     * civis.
+     */
+    B(9, 14, 72),
     /** "entre 14 e 69 anos", 12 meses. */
     C(14, 69, 12),
     /** "entre 50 e 69 anos", 24 meses. */
@@ -40,7 +43,11 @@ enum C7Subgroup {
         return months;
     }
 
-    boolean includes(long age) {
+    /** A trans man is not in B: the ficha says "do sexo feminino" there and only there (C7-D3). */
+    boolean includes(long age, boolean transMan) {
+        if (this == B && transMan) {
+            return false;
+        }
         return age >= minAge && age <= maxAge;
     }
 }

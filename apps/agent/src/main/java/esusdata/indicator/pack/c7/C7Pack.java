@@ -35,8 +35,8 @@ import java.util.TreeMap;
 public final class C7Pack implements IndicatorRule {
 
     public static final String ID = "c7-prevencao-cancer";
-    public static final String RULE_VERSION = ID + "@0.1.0";
-    public static final String CALCULATION_POLICY_VERSION = "c7-exact-score@1";
+    public static final String RULE_VERSION = ID + "@0.2.0";
+    public static final String CALCULATION_POLICY_VERSION = "c7-exact-score@2";
     static final Bands BANDS = Bands.QUALIDADE_C2_C7;
 
     /** Quadro 01 (p. 5): as quatro boas práticas, cada uma um subgrupo com o seu denominador. */
@@ -63,36 +63,43 @@ public final class C7Pack implements IndicatorRule {
                     "24 meses"));
 
     /**
-     * O que o PEC local não reproduz da ficha e as convenções declaradas para as ambiguidades que
-     * mudam o valor (docs/metodologia/c7-prevencao-cancer.md, "Fora do alcance" e AMB-C7-NN).
+     * Limitações permanentes, cada uma com código estável e o texto final de divulgação de
+     * docs/indicadores/decisoes/c7-prevencao-cancer.md. C7-LIM-04 é a única lacuna bloqueante (tipo de
+     * equipe, até a capacidade {@code team} estar VALIDATED); C7-LIM-15 só existe depois dela.
      */
     static final List<String> STANDING_LIMITATIONS = List.of(
-            "Vínculo (item 14): a regra nacional da NT nº 30/2025 e o desempate da Portaria SAPS/MS nº 161/2024 "
-                    + "não são reproduzíveis no PEC local; o vínculo é a versão vigente do cadastro individual "
-                    + "(últimos 24 meses lidos) no último dia da competência — estimativa local (lacuna L8).",
-            "Óbito no CadSUS (item 15) fora do PEC: só óbito e saída registrados localmente interrompem o acompanhamento.",
-            "Registros de outros estabelecimentos ou municípios e doses do RIA/RNDS (item 4.5; Quadro 03) não estão "
-                    + "no PEC local: as práticas, sobretudo B, podem sair subestimadas (lacuna L4).",
-            "Tipo de equipe eSF 70 / eAP 76 e SCNES (item 24, b) sem fonte no DW (lacuna L1): a equipe não é validada.",
-            "AMB-C7-09: só médicos (2251, 2252, 2253, 2231) e enfermeiros (2235) dos Quadros 02, 04 e 05 contam em A, C "
-                    + "e D; a lista maior do item 24, d e a habilitação de CBO na tabela SIGTAP não são aplicadas.",
-            "AMB-C7-14/16: ABEX001 conta em A como exame (com os SIGTAP); ABP022 (A) e ABP023 (D) contam como problema "
-                    + "avaliado por médico ou enfermeiro na lista de problemas (data do registro tomada como data da "
-                    + "avaliação, a confirmar no Portão C); um mesmo atendimento pode cumprir C e A ou D; o registro "
-                    + "rápido não é definido pela ficha.",
-            "Calendário do Siaps (item 11; NT nº 8/2026, item 2.7): o PEC local contém registros não enviados ou "
-                    + "enviados fora do prazo, que o Siaps não contaria.",
-            "AMB-C7-03/04: idade em anos completos no último dia da competência, limites inclusivos, aniversário de "
-                    + "29/02 em 01/03 (Lei nº 810/1949); janelas de N meses civis terminando na competência.",
-            "AMB-C7-10/11/14/15: C conta todo atendimento individual (domiciliar não distinguido) com CIAP-2, CID-10 "
-                    + "ou ABP da alínea g por casamento exato; consultas 03.01.01.* não cumprem C.",
-            "AMB-C7-12: sexo e identidade de gênero pelos códigos LEDI (149 Homem transgênero, 150 Mulher "
-                    + "transgênero), correspondência com o PEC não verificada; outro sexo ou sem registro fica fora.",
-            "AMB-C7-07: dose transcrita usa a data de aplicação para a idade de B.",
-            "AMB-C7-05/06/08: quando ocorrem (homem transgênero de 9 a 14 anos; dose HPV além de 60 meses; "
-                    + "02.02.10.025-1 anterior a 2026-01), o subgrupo fica sem valor e o resultado RULE_AMBIGUITY.",
-            "Pessoa com registros divergentes (nascimento, sexo, identidade) ou com versões do cadastro do mesmo "
-                    + "dia em conflito fica fora, com motivo próprio — nenhuma versão é escolhida pela ordem.");
+            "C7-LIM-01: O vínculo à equipe é estimado pela versão vigente do cadastro individual no último dia da "
+                    + "competência (24 meses lidos). A regra nacional da NT nº 30/2025 e o desempate da Portaria "
+                    + "SAPS/MS nº 161/2024 não são reproduzíveis num PEC local.",
+            "C7-LIM-02: Óbito no CadSUS não é visível: só óbito e saída registrados no PEC local interrompem o "
+                    + "acompanhamento.",
+            "C7-LIM-03: Exames, atendimentos e doses de outros estabelecimentos, municípios ou só do RIA/RNDS não "
+                    + "estão no PEC local; as práticas, sobretudo B, podem sair subestimadas.",
+            "C7-LIM-04: Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 (item 24 b) não é feita.",
+            "C7-LIM-05: Contam em A, C e D só médicos (2251, 2252, 2253, 2231) e enfermeiros (2235), como nos Quadros "
+                    + "02, 04 e 05; B aceita qualquer profissional. A lista maior do item 24 d e a habilitação de CBO "
+                    + "na tabela SIGTAP não são aplicadas.",
+            "C7-LIM-06: ABEX001 conta em A como exame; ABP022 (A) e ABP023 (D) contam como problema avaliado por "
+                    + "médico ou enfermeiro, com a data do registro tomada como data da avaliação; um atendimento pode "
+                    + "cumprir C e A ou D. O “registro rápido” não é definido pela ficha.",
+            "C7-LIM-07: O SIAPS extrai no 20º dia útil e só conta o enviado até o 10º dia do mês seguinte; o PEC "
+                    + "local pode conter registros enviados depois.",
+            "C7-LIM-08: Idade em anos completos no último dia da competência, limites inclusivos, 29/02 em 01/03; "
+                    + "janelas de N meses civis até o fim da competência.",
+            "C7-LIM-09: C conta todo atendimento individual (presencial, domiciliar ou remoto) com CIAP-2, CID-10 ou "
+                    + "ABP da alínea g, por casamento exato; consultas 03.01.01.* não cumprem C.",
+            "C7-LIM-10: Sexo e identidade de gênero pelos códigos LEDI (149 Homem transgênero, 150 Mulher "
+                    + "transgênero), como entregues pela capacidade `citizen`; outro sexo, outra combinação ou sem "
+                    + "registro fica fora, com motivo e contagem.",
+            "C7-LIM-11: Dose transcrita usa a data de aplicação para a idade de B.",
+            "C7-LIM-12: B conta dose de 67 ou 93 aplicada do 9º aniversário em diante, sem teto em meses; homem "
+                    + "transgênero não pertence a B; 02.02.10.025-1 conta de 2026-01 em diante com janela de 60 meses, "
+                    + "mesmo com data de 2025.",
+            "C7-LIM-13: Pessoa com nascimento, sexo ou identidade divergentes, ou versões do cadastro do mesmo dia "
+                    + "em conflito, fica fora, com motivo próprio; nenhuma versão é escolhida pela ordem.",
+            "C7-LIM-14: Subgrupo sem denominador sai da soma e do divisor: o escore é reescalado sobre os pesos dos "
+                    + "subgrupos presentes. Com os quatro vazios, o mês não tem valor e fica fora da média "
+                    + "quadrimestral. n e d de cada subgrupo estão publicados.");
 
     /**
      * Registration versions read to resolve the link: the "Dimensão Cadastro, Últimos 24 meses" of
@@ -101,7 +108,7 @@ public final class C7Pack implements IndicatorRule {
     private static final int REGISTRATION_MONTHS = 24;
 
     /** B: a dose at 9 of whoever is 14 at the end of the competência — up to 72 civil months back. */
-    private static final int DOSE_MONTHS = 72;
+    static final int DOSE_MONTHS = 72;
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,

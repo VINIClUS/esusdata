@@ -21,17 +21,14 @@ import java.util.function.Predicate;
 
 /**
  * The four practices of the Quadro 01 (p. 5), each over its own subpopulation (item 23, pp. 2–3).
- * A practice is met by at least one qualifying record; repeated records count once (MET-32). Where
- * the ficha leaves a case open and the person's result depends on it, the decision is {@link
- * Outcome#AMBIGUOUS_PRACTICE} or {@link Outcome#AMBIGUOUS_DENOMINATOR} and the subgroup has no value.
+ * A practice is met by at least one qualifying record; repeated records count once (MET-32). Every
+ * open case of the ficha is decided (docs/indicadores/decisoes/c7-prevencao-cancer.md), so a person
+ * is either {@link Outcome#MET} or {@link Outcome#NOT_MET} in each subgroup of their age.
  */
 final class C7Practices {
 
     static final String PRATICA_CUMPRIDA = "PRATICA_CUMPRIDA";
     static final String PRATICA_NAO_CUMPRIDA = "PRATICA_NAO_CUMPRIDA";
-    static final String AMB_C7_08 = "AMB_C7_08_HPV_MOLECULAR_ANTES_2026";
-    static final String AMB_C7_06 = "AMB_C7_06_DOSE_HPV_ALEM_60_MESES";
-    static final String AMB_C7_05 = "AMB_C7_05_HOMEM_TRANSGENERO_9_14";
 
     private static final String PROFESSIONAL = "PROFESSIONAL";
 
@@ -46,11 +43,7 @@ final class C7Practices {
 
     enum Outcome {
         MET,
-        NOT_MET,
-        /** The ficha does not say whether the person's only evidence counts. */
-        AMBIGUOUS_PRACTICE,
-        /** The ficha does not say whether the person belongs to the subpopulation (AMB-C7-05). */
-        AMBIGUOUS_DENOMINATOR
+        NOT_MET
     }
 
     /**
@@ -71,10 +64,7 @@ final class C7Practices {
             String modality,
             String content) {}
 
-    /**
-     * A person's decision for one subgroup: the distinct records that support it, or — when the
-     * practice is ambiguous — the records that made it so.
-     */
+    /** A person's decision for one subgroup: the distinct records that support it, if any. */
     record Decision(Outcome outcome, String reason, List<Fact> support) {}
 
     C7Practices(CanonicalDataset data, YearMonth competencia) {
@@ -181,51 +171,38 @@ final class C7Practices {
     }
 
     /**
-     * A (Quadro 02): a listed exam, or "ABP022" evaluated, by a physician or nurse in 36 months; 02.02.10.025-1 in 60
-     * months only from the competência 2026-01 on. A record of it dated before 2026-01 counts in one
-     * reading of the footnote 4 and not in the other (AMB-C7-08).
+     * A (Quadro 02): a listed exam, or "ABP022" evaluated, by a physician or nurse in 36 months;
+     * 02.02.10.025-1 in 60 months only from the competência 2026-01 on. From then on a record of it dated
+     * before 2026-01 counts too: the footnote 4 sets the competência where counting starts, not the
+     * date of the record (C7-D2).
      */
     private Decision cervical(Member m) {
-        LocalDate since = C7Codes.HPV_MOLECULAR_DESDE.atDay(1);
         Predicate<Fact> professional = f -> C7Codes.MEDICOS_ENFERMEIROS.matches(f.cbo());
         Predicate<Fact> hpv = professional.and(f -> hpvMolecularCounts
                 && f.codes().contains(C7Codes.A_SIGTAP_HPV_MOLECULAR)
                 && hpvMolecularWindow.contains(f.date()));
         Predicate<Fact> listed = professional.and(f -> windows.get(C7Subgroup.A).contains(f.date())
                 && (hasAny(f, C7Codes.A_36_MESES) || f.codes().contains(C7Codes.A_ABP)));
-        return decide(
-                concat(procedures.get(m.personKey()), problems.get(m.personKey())),
-                listed.or(hpv.and(f -> !f.date().isBefore(since))),
-                hpv.and(f -> f.date().isBefore(since)),
-                AMB_C7_08);
+        return decide(concat(procedures.get(m.personKey()), problems.get(m.personKey())), listed.or(hpv));
     }
 
     /**
      * B (Quadro 03): a dose of 67 or 93 given from the 9th birthday on, by anyone. A member of B is
-     * at most 14 on the reference day, so every dose up to it was given at 14 or less. Only "do sexo
-     * feminino" (item 23, c/d); whether item 4.1.2 adds trans men is AMB-C7-05. The ficha has no
-     * window; a dose older than the 60 months of the NT 8/2026 is AMB-C7-06.
+     * at most 14 on the reference day, so every dose up to it was given at 14 or less. The ficha has no
+     * window, so there is no cap in months (C7-D1). Trans men are not in B ({@link C7Subgroup#includes}).
      */
     private Decision hpvVaccine(Member m) {
-        if (m.transMan()) {
-            return new Decision(Outcome.AMBIGUOUS_DENOMINATOR, AMB_C7_05, List.of());
-        }
-        DateWindow window = windows.get(C7Subgroup.B);
         Predicate<Fact> qualifying = f -> hasAny(f, C7Codes.B_VACINAS)
                 && !f.date().isAfter(reference)
                 && !f.date().isBefore(AgeAt.anniversaryYears(m.birth(), C7Subgroup.B.minAge(), C7Cohort.ANNIVERSARY));
-        return decide(
-                doses.get(m.personKey()),
-                qualifying.and(f -> window.contains(f.date())),
-                qualifying.and(f -> !window.contains(f.date())),
-                AMB_C7_06);
+        return decide(doses.get(m.personKey()), qualifying);
     }
 
     /** C (Quadro 04; item 24, g): a listed CIAP-2/ABP or CID-10 evaluated by a physician or nurse. */
     private Decision byProfessional(
             Map<String, List<Fact>> facts, Member m, C7Subgroup subgroup, Predicate<Fact> codes) {
         return decide(
-                facts.get(m.personKey()), professionalIn(windows.get(subgroup)).and(codes), f -> false, null);
+                facts.get(m.personKey()), professionalIn(windows.get(subgroup)).and(codes));
     }
 
     /**
@@ -236,9 +213,7 @@ final class C7Practices {
         Predicate<Fact> inWindow = professionalIn(windows.get(C7Subgroup.D));
         return decide(
                 concat(procedures.get(m.personKey()), problems.get(m.personKey())),
-                inWindow.and(f -> hasAny(f, C7Codes.D_CODIGOS) || f.codes().contains(C7Codes.D_ABP)),
-                f -> false,
-                null);
+                inWindow.and(f -> hasAny(f, C7Codes.D_CODIGOS) || f.codes().contains(C7Codes.D_ABP)));
     }
 
     private static Predicate<Fact> professionalIn(DateWindow window) {
@@ -268,24 +243,17 @@ final class C7Practices {
         return all;
     }
 
-    private static Decision decide(
-            List<Fact> facts, Predicate<Fact> certain, Predicate<Fact> ambiguous, String ambiguityReason) {
+    private static Decision decide(List<Fact> facts, Predicate<Fact> qualifying) {
         Map<String, Fact> support = new LinkedHashMap<>();
-        Map<String, Fact> undecided = new LinkedHashMap<>();
         for (Fact f : facts == null ? List.<Fact>of() : facts) {
-            if (certain.test(f)) {
+            if (qualifying.test(f)) {
                 support.putIfAbsent(f.content(), f);
-            } else if (ambiguous.test(f)) {
-                undecided.putIfAbsent(f.content(), f);
             }
         }
-        if (!support.isEmpty()) {
-            return new Decision(Outcome.MET, PRATICA_CUMPRIDA, List.copyOf(support.values()));
+        if (support.isEmpty()) {
+            return new Decision(Outcome.NOT_MET, PRATICA_NAO_CUMPRIDA, List.of());
         }
-        if (!undecided.isEmpty()) {
-            return new Decision(Outcome.AMBIGUOUS_PRACTICE, ambiguityReason, List.copyOf(undecided.values()));
-        }
-        return new Decision(Outcome.NOT_MET, PRATICA_NAO_CUMPRIDA, List.of());
+        return new Decision(Outcome.MET, PRATICA_CUMPRIDA, List.copyOf(support.values()));
     }
 
     private static boolean hasAny(Fact fact, Set<String> codes) {
