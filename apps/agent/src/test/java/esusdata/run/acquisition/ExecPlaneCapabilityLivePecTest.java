@@ -176,25 +176,25 @@ class ExecPlaneCapabilityLivePecTest {
         Assumptions.assumeTrue(canLogIn(), "Skipping: tunnel is up but the PEC's PostgreSQL is not answering");
     }
 
-    /** The validated foundation capabilities, narrowed by {@code only}; naming an unvalidated one fails. */
+    /** The validated packaged capabilities (the foundation and {@code team}), narrowed by {@code only}; naming an unvalidated one fails. */
     private List<String> capabilities() {
         Set<String> validated = PecCompatibilityMatrix.fromClasspathResource().validatedCapabilities(identity);
         String only = System.getProperty(PROPERTY_PREFIX + "only");
         if (only == null || only.isBlank()) {
-            return Capabilities.ALL.stream().filter(validated::contains).toList();
+            return Capabilities.PACKAGED.stream().filter(validated::contains).toList();
         }
         List<String> requested = Arrays.stream(only.split(","))
                 .map(String::strip)
                 .filter(name -> !name.isEmpty())
                 .toList();
         List<String> refused = requested.stream()
-                .filter(name -> !Capabilities.ALL.contains(name) || !validated.contains(name))
+                .filter(name -> !Capabilities.PACKAGED.contains(name) || !validated.contains(name))
                 .toList();
         assertThat(refused)
                 .as("capabilities named in " + PROPERTY_PREFIX
                         + "only that are not VALIDATED for this PEC version in the packaged matrix (ADR 0023)")
                 .isEmpty();
-        return Capabilities.ALL.stream().filter(requested::contains).toList();
+        return Capabilities.PACKAGED.stream().filter(requested::contains).toList();
     }
 
     @Test
