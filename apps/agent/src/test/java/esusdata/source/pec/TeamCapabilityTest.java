@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -166,7 +167,7 @@ class TeamCapabilityTest {
 
     @Test
     void objectsUsedAreExactlyTheTablesAndColumnsTheQueryReads() throws Exception {
-        TreeMap<String, SortedSet<String>> listed = new TreeMap<>();
+        SortedMap<String, SortedSet<String>> listed = new TreeMap<>();
         for (JsonNode object : entry().get("objects_used")) {
             SortedSet<String> columns = new TreeSet<>();
             object.get("columns_used").forEach(column -> {

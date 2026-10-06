@@ -20,6 +20,8 @@ import java.util.TreeSet;
  */
 public final class TeamTimeline {
 
+    private final Map<String, List<CanonicalTeam>> byIne = new HashMap<>();
+
     /** What is known about an INE's type on a day. */
     public enum Kind {
         /** Exactly one code is valid on the day. */
@@ -40,8 +42,6 @@ public final class TeamTimeline {
      *     {@code kind} is {@link Kind#TYPE} and the source says; otherwise {@code null}
      */
     public record Resolution(Kind kind, String code, SortedSet<String> codes, String typeSource) {}
-
-    private final Map<String, List<CanonicalTeam>> byIne = new HashMap<>();
 
     private TeamTimeline(List<CanonicalTeam> teams) {
         for (CanonicalTeam team : teams) {
