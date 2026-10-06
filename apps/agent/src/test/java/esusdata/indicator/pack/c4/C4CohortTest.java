@@ -109,7 +109,7 @@ class C4CohortTest {
 
     @Test
     void t_c4_25_newerActiveRecordAfterResolutionKeepsThePerson() {
-        // AMB-C4-04 (d), provisional: the latest record of each code decides.
+        // AMB-C4-04 (d), decided (C4-D3): the latest record of each code decides.
         RuleOutcome o = ungated(data().add(registration("p1", LINKED_ON, INE_ESF))
                 .add(resolvedCondition("p1", "CID10", "E11", d(2024, 6, 1), d(2024, 6, 1)))
                 .add(activeCondition("p1", "CID10", "E11", d(2026, 1, 15)))

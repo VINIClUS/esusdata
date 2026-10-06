@@ -24,19 +24,17 @@ import java.util.List;
  * {@code docs/metodologia/c1-mais-acesso.md}) is now applied for the CBO filter: item 24-c lists
  * seven six-digit occupations, valid for numerator and denominator alike; encounters with a
  * missing CBO or one outside the list are excluded from both and counted
- * ({@code cbo_policy=FICHA_24C}). The ficha does not say from which competency 225125 and 225250
- * (a footnote addition) apply, so they are applied to every month and that stays a standing
- * limitation. Team type, professional CNS and the other ficha fields are still not checked.
- * Portão D (reconciliation against Siaps/SISAB) has no reference data available in this
- * environment and is {@code NOT_IMPLEMENTED}. Portão E requires a human review and is out of
- * scope for code.
+ * ({@code cbo_policy=FICHA_24C}). The ficha has a single list with no transition rule, so 225125
+ * and 225250 (footnote additions) are valid in every competência (decision C1-D1). Team type, professional CNS and the other ficha fields are still not checked.
+ * Portão D (reconciliation against Siaps/SISAB) and Portão E are gate states kept by the release
+ * workflow, not limitations of the rule (decision C1-D4).
  */
 public final class C1Rule {
 
     /** Indicator pack identity — distinct from {@link #RULE_VERSION}, which versions the rule. */
     public static final String INDICATOR_PACK = "c1-mais-acesso";
 
-    public static final String RULE_VERSION = "c1-mais-acesso@0.2.0";
+    public static final String RULE_VERSION = "c1-mais-acesso@0.3.0";
     public static final String CALCULATION_POLICY_VERSION = "c1-exact-ratio@1";
     public static final String DENOMINATOR_KIND = "PROGRAMADOS_MAIS_ESPONTANEOS";
 
@@ -51,11 +49,18 @@ public final class C1Rule {
             CboGroups.of("225142", "225170", "225130", "225125", "225250", "223565", "223505");
 
     private static final List<String> STANDING_LIMITATIONS = List.of(
-            "cbo_policy=FICHA_24C — só entram no numerador e no denominador os atendimentos dos sete CBO do "
-                    + "item 24-c / Quadro 01 da ficha (225142, 225170, 225130, 225125, 225250, 223565, 223505); "
-                    + "CBO ausente ou fora da lista é excluído. 225125 e 225250 foram incluídos por nota de "
-                    + "rodapé da ficha, que não informa a competência de vigência: valem aqui para todos os meses.",
-            "Nenhuma reconciliação com Siaps/SISAB foi realizada (Portão D NOT_IMPLEMENTED).");
+            "C1-LIM-01: Entram só os atendimentos dos sete CBO do item 24-c da ficha (225142, 225170, 225130, "
+                    + "225125, 225250, 223565, 223505), em toda competência; CBO ausente ou fora da lista é "
+                    + "excluído e contado.",
+            "C1-LIM-03: Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 (item 24-b) não é feita.",
+            "C1-LIM-06: O SIAPS extrai no 20º dia útil e só conta o enviado até o 10º dia do mês seguinte; "
+                    + "o valor local pode incluir registros enviados depois.",
+            "C1-LIM-07: A conformidade da identificação da pessoa com o CadSUS não é conferida.",
+            "C1-LIM-08: O CNS profissional é presumido presente em registro do PEC; não é conferido.",
+            "C1-LIM-09: Atendimento com dois participantes conta uma vez, pelo participante 1; o CNES não é "
+                    + "filtrado porque a ficha não lista CNES.",
+            "C1-LIM-11: A lotação do profissional na equipe (SCNES) não é conferida; vale o INE registrado no "
+                    + "atendimento.");
 
     private C1Rule() {}
 
@@ -199,12 +204,13 @@ public final class C1Rule {
 
         List<String> limitations = new ArrayList<>(STANDING_LIMITATIONS);
         if (outsideCbo.signum() > 0) {
-            limitations.add(outsideCbo + " encontro(s) com CBO ausente ou fora dos sete CBO do item 24-c da ficha "
-                    + "foram excluídos do cálculo (numerador e denominador).");
+            limitations.add(
+                    "C1-LIM-04: " + outsideCbo + " atendimento(s) com CBO ausente ou fora dos sete CBO da ficha "
+                            + "foram excluídos do numerador e do denominador.");
         }
         if (unmapped.signum() > 0) {
-            limitations.add(unmapped + " encontro(s) com tipo de atendimento fora do mapeamento "
-                    + "congelado (ids 8/9/10/11 de tb_dim_tipo_atendimento) foram excluídos do cálculo.");
+            limitations.add("C1-LIM-05: " + unmapped + " atendimento(s) com tipo de atendimento fora dos seis tipos da "
+                    + "ficha foram excluídos do numerador e do denominador.");
         }
 
         return new Computation(programados, denominator, limitations);

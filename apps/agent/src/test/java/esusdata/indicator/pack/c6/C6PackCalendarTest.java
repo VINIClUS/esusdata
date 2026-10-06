@@ -72,6 +72,18 @@ class C6PackCalendarTest {
     }
 
     @Test
+    void c6D3_bornOnFebruary29TurnsSixtyOnMarchFirstWhenTheSixtiethYearIsNotLeap() {
+        C6Scenario bornOnLeapDay =
+                scenario().person(KEY, LocalDate.of(2040, 2, 29)).linked(KEY, INE_A);
+
+        // 2100 is not a leap year: the 60th anniversary falls on 01/03 (Lei 810/1949, art. 3º), not 28/02.
+        assertThat(exclusionReason(bornOnLeapDay.compute(YearMonth.of(2100, 2)), KEY))
+                .isEqualTo("EXCLUIDO_IDADE_MENOR_60");
+        assertThat(subjectRow(bornOnLeapDay.compute(YearMonth.of(2100, 3)), KEY).decision())
+                .isEqualTo(EvidenceDecision.ELIGIBLE);
+    }
+
+    @Test
     void eng27_visitsFromJanuary31ToMarch1AreThirtyDaysInALeapYear() {
         RuleOutcome outcome = scenario()
                 .elder(KEY)

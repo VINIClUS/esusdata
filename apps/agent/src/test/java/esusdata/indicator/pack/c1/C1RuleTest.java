@@ -89,7 +89,7 @@ class C1RuleTest {
 
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(6));
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(10)); // 6+4, not 13
-        assertThat(result.limitations()).anyMatch(l -> l.contains("3 encontro"));
+        assertThat(result.limitations()).anyMatch(l -> l.contains("3 atendimento"));
     }
 
     // ---- Real-data regression: 2026-03 baseline from docs/discovery, computed via ExactRatio ----
@@ -134,7 +134,7 @@ class C1RuleTest {
         assertThat(result.status()).isEqualTo(IndicatorResult.IndicatorStatus.BLOCKED);
         assertThat(result.valueText()).isNull();
         assertThat(result.classification()).isNull();
-        assertThat(result.limitations()).anyMatch(l -> l.contains("cbo_policy=FICHA_24C"));
+        assertThat(result.limitations()).anyMatch(l -> l.contains("C1-LIM-01"));
     }
 
     @Test
@@ -163,7 +163,7 @@ class C1RuleTest {
 
         assertThat(result.numerator()).isEqualTo(BigInteger.valueOf(2));
         assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(4));
-        assertThat(result.limitations()).anyMatch(l -> l.contains("3 encontro(s) com CBO ausente ou fora"));
+        assertThat(result.limitations()).anyMatch(l -> l.contains("3 atendimento(s) com CBO ausente ou fora"));
     }
 
     @Test
@@ -175,7 +175,7 @@ class C1RuleTest {
 
         assertThat(result.numerator()).isEqualTo(BigInteger.ONE);
         assertThat(result.denominator()).isEqualTo(BigInteger.TWO);
-        assertThat(result.limitations()).anyMatch(l -> l.contains("2 encontro(s) com CBO ausente ou fora"));
+        assertThat(result.limitations()).anyMatch(l -> l.contains("2 atendimento(s) com CBO ausente ou fora"));
     }
 
     @Test
@@ -196,16 +196,32 @@ class C1RuleTest {
                 encounterWithCbo("u2", CanonicalModality.UNMAPPED, "225142"));
         IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2026-03", "2026-03-31");
 
-        assertThat(result.limitations()).anyMatch(l -> l.contains("1 encontro(s) com CBO ausente ou fora"));
-        assertThat(result.limitations()).anyMatch(l -> l.contains("1 encontro(s) com tipo de atendimento"));
+        assertThat(result.limitations()).anyMatch(l -> l.contains("1 atendimento(s) com CBO ausente ou fora"));
+        assertThat(result.limitations()).anyMatch(l -> l.contains("1 atendimento(s) com tipo de atendimento"));
     }
 
     @Test
-    void ruleVersionAndStandingLimitationDescribeTheFichaCboFilter() {
-        assertThat(C1Rule.RULE_VERSION).isEqualTo("c1-mais-acesso@0.2.0");
+    void ruleVersionAndStandingLimitationsFollowTheRecordedDecisions() {
+        assertThat(C1Rule.RULE_VERSION).isEqualTo("c1-mais-acesso@0.3.0");
         assertThat(C1Rule.standingLimitations())
-                .anyMatch(l -> l.contains("cbo_policy=FICHA_24C") && l.contains("vigência"))
+                .anyMatch(l -> l.startsWith("C1-LIM-01:") && l.contains("em toda competência"))
+                .anyMatch(l -> l.startsWith("C1-LIM-06:") && l.contains("20º dia útil"))
+                .noneMatch(l -> l.contains("vigência"))
+                .noneMatch(l -> l.contains("Portão D"))
+                .noneMatch(l -> l.contains("Siaps/SISAB"))
                 .noneMatch(l -> l.contains("ALL_CBO"));
+    }
+
+    @Test
+    void occupationsAddedByTheFootnoteCountInCompetenciasBeforeTheFicha() {
+        List<CanonicalEncounter> encounters = List.of(
+                encounterWithCbo("f1", CanonicalModality.PROGRAMADO, "225125", "2025-12-10"),
+                encounterWithCbo("f2", CanonicalModality.ESPONTANEO, "225250", "2025-12-11"));
+        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2025-12", "2025-12-31");
+
+        assertThat(result.numerator()).isEqualTo(BigInteger.ONE);
+        assertThat(result.denominator()).isEqualTo(BigInteger.TWO);
+        assertThat(result.limitations()).noneMatch(l -> l.startsWith("C1-LIM-04"));
     }
 
     @Test
@@ -257,10 +273,15 @@ class C1RuleTest {
     }
 
     private static CanonicalEncounter encounterWithCbo(String recordId, CanonicalModality modality, String cbo) {
+        return encounterWithCbo(recordId, modality, cbo, "2026-03-15");
+    }
+
+    private static CanonicalEncounter encounterWithCbo(
+            String recordId, CanonicalModality modality, String cbo, String careDate) {
         return new CanonicalEncounter(
                 new SourceRef("pec-ct133-dev", "tb_fat_atendimento_individual", recordId),
                 "3541307",
-                "2026-03-15",
+                careDate,
                 modality,
                 "2750325",
                 "0000346268",

@@ -250,11 +250,11 @@ Item 33 (p. 3), literal: «Considerando que há necessidade de registro qualific
 
 ## Ambiguidades
 
-Tratamentos com o mesmo sentido de [C4](c4-cuidado-diabetes.md#ambiguidades): `RULE_AMBIGUITY` bloqueia o resultado afetado; "limitação" = convenção provisória declarada, exibida e confirmada na reconciliação (Portão D). Testes de fronteira afetados ficam com expectativa bloqueada para homologação.
+Tratamentos com o mesmo sentido de [C4](c4-cuidado-diabetes.md#ambiguidades): `RULE_AMBIGUITY` bloqueia o resultado afetado; "limitação" = convenção declarada e exibida. Desde `c5-cuidado-hipertensao@0.2.0` as convenções abaixo são leituras **decididas** (`docs/indicadores/decisoes/c5-cuidado-hipertensao.md`, `DECLARED_CONVENTION`, códigos `C5-LIM-nn`).
 
 **AMB-C5-01 — Exceção eAP tipo 76 na prática D.** p. 2 (item 24 b): «A boa prática (D) não será condicionante de pontuação para eAP, tipo 76, atendendo as condições previstas na PRC GM/MS nº 02/2017.» Mesma questão de AMB-C4-01 (C2 usa «considera a pontuação integral» e C3 «consideram a pontuação integral»). Leituras não adotadas: (i) creditar 25 pontos de D; (ii) excluir D e renormalizar sobre 75; (iii) só não exigir D, sem crédito. Impacto: até 25 pontos por pessoa nas equipes eAP 76. **Tratamento: `RULE_AMBIGUITY`** no resultado das equipes eAP 76 até P07 (MET-23): exibir A, B e C separadas e D como informativa; sem escore, sem faixa, sem atribuição ou redistribuição. eSF 70 sem efeito.
 
-**AMB-C5-02 — Âncora e fronteiras das janelas de 6 e 12 meses.** p. 2 e p. 4; item 17 «Não se aplica.»; item 11 «20º dia útil». Igual a AMB-C4-02. **Tratamento: limitação**, convenção provisória: N meses civis completos terminando no último dia da competência, inclusive; nunca 180/365 dias.
+**AMB-C5-02 — Âncora e fronteiras das janelas de 6 e 12 meses.** p. 2 e p. 4; item 17 «Não se aplica.»; item 11 «20º dia útil». Igual a AMB-C4-02. **Tratamento: limitação**, convenção decidida N meses civis completos terminando no último dia da competência, inclusive; nunca 180/365 dias.
 
 **AMB-C5-03 — Contagem do «intervalo mínimo de 30 (trinta) dias».** p. 2 e p. 4–5. Igual a AMB-C4-03. **Tratamento: limitação**: `data2 − data1 ≥ 30` dias corridos entre duas visitas na janela; 30 exatos com expectativa provisória.
 
@@ -288,20 +288,20 @@ Base comum (salvo indicação): competência 2026-03 (corte 2026-03-31; ADR 0004
 | id | cenário sintético | resultado esperado | origem |
 |---|---|---|---|
 | T-C5-01 | Consulta por enfermeiro (`2235`) em 2025-10-01 | A cumpre (com "180 dias" não cumpriria) | ficha p. 2/p. 4; Tech Spec §1.7.2; AMB-C5-02 |
-| T-C5-02 | Única consulta em 2025-09-30 | A não cumpre — provisório | AMB-C5-02 |
+| T-C5-02 | Única consulta em 2025-09-30 | A não cumpre — convenção decidida | AMB-C5-02 |
 | T-C5-03 | Consulta médica em 2026-01-20; PA por técnico de enfermagem (`3222`) em 2026-03-05 | A e B cumprem: 50 pontos (dias distintos valem) | ficha p. 4–5; MET-14 (analogia) |
 | T-C5-04 | Só peso e altura no mesmo dia, 2025-06-10 | 25 pontos (apenas C) | ficha p. 4; Tech Spec §2.4 (pontos parciais) |
 | T-C5-05 | A, B, C e D cumpridas | 100 pontos | ficha p. 4 |
 | T-C5-06 | Equipe com quatro pessoas: 100, 50, 25 e 0 | 43,75 → «Suficiente»; sem ×100 | ficha p. 2–4 |
 | T-C5-07 | PA na MIVDT por ACS (`5151-05`); variante por TACS (`3222-55`) | ACS: B não cumpre (nota 4). TACS: B cumpre (grupo `3222`) | ficha p. 4–6 |
-| T-C5-08 | PA em atividade coletiva (MIAC), participante identificado por CNS | B cumpre — provisório | AMB-C5-06 |
+| T-C5-08 | PA em atividade coletiva (MIAC), participante identificado por CNS | B cumpre — convenção decidida | AMB-C5-06 |
 | T-C5-09 | PA e consulta só em 2025-09-15 | A e B não cumprem (fora de 6 meses) | ficha p. 4; AMB-C5-02 |
 | T-C5-10 | Peso em 2026-02-10 e altura em 2026-02-11 | C não cumpre | ficha p. 2, p. 5 |
-| T-C5-11 | Peso+altura em 2025-04-01; variante em 2025-03-31 | 2025-04-01 cumpre; 2025-03-31 não cumpre — provisório (com "365 dias" inclusivo cumpriria) | AMB-C5-02 |
+| T-C5-11 | Peso+altura em 2025-04-01; variante em 2025-03-31 | 2025-04-01 cumpre; 2025-03-31 não cumpre — convenção decidida (com "365 dias" inclusivo cumpriria) | AMB-C5-02 |
 | T-C5-12 | Visitas ACS em 2026-01-01 e 2026-01-30 (29 dias) | D não cumpre | ficha p. 2, p. 5 |
-| T-C5-13 | Visitas em 2026-01-01 e 2026-01-31 (30 dias) | D cumpre — provisório | AMB-C5-03 |
+| T-C5-13 | Visitas em 2026-01-01 e 2026-01-31 (30 dias) | D cumpre — convenção decidida | AMB-C5-03 |
 | T-C5-14 | Visitas em 2026-01-01 e 2026-02-01 (31 dias) | D cumpre | ficha p. 2, p. 5 |
-| T-C5-15 | Duas visitas de ACS com 60 dias de intervalo e valores diferentes no campo de desfecho (campo citado na ficha C4) | D cumpre — provisório | AMB-C5-09 |
+| T-C5-15 | Duas visitas de ACS com 60 dias de intervalo e valores diferentes no campo de desfecho (campo citado na ficha C4) | D cumpre — convenção decidida | AMB-C5-09 |
 | T-C5-16 | Condição avaliada `I11.0`; variantes `O10.9`, `O11`, `K87` | Todas entram | ficha p. 3 |
 | T-C5-17 | Código CID-10 fora da lista literal | Não entra; contagem diagnosticada | ficha p. 3; AMB-C5-04 |
 | T-C5-18 | `K86` e `I10` ambos «resolvidos»; variante com `K86` ativo | Ambos resolvidos: interrompido. Variante: permanece | ficha p. 2, p. 4 |

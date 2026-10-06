@@ -127,9 +127,10 @@ class C5CohortTest {
         assertThat(rowsOf(outcome, P2)).isEmpty();
         assertThat(outcome.result().denominator()).isEqualTo(BigInteger.ONE);
         assertThat(outcome.result().limitations())
-                .filteredOn(limitation -> limitation.startsWith("AMB-C5-04:"))
-                .containsExactly("AMB-C5-04: 2 registro(s) de condição com código fora da lista literal da ficha"
-                        + " (diagnóstico, não entram).");
+                .filteredOn(limitation -> limitation.startsWith("C5-LIM-19/diagnóstico:"))
+                .containsExactly(
+                        "C5-LIM-19/diagnóstico: 2 registro(s) de condição com código fora da lista literal da ficha"
+                                + " (diagnóstico, não entram).");
     }
 
     // ---- resolved conditions (item 15, item 4.1, AMB-C5-04 a) ----
@@ -298,7 +299,8 @@ class C5CohortTest {
 
         assertExcluded(outcome, P1, NO_CONDITION_IN_PERIOD);
         assertThat(outcome.result().limitations())
-                .contains("AMB-C5-04: 1 linha(s) de condição com situação ou base fora do vocabulário (diagnóstico).");
+                .contains(
+                        "C5-LIM-19/diagnóstico: 1 linha(s) de condição com situação ou base fora do vocabulário (diagnóstico).");
     }
 
     @Test
@@ -313,7 +315,8 @@ class C5CohortTest {
         assertPractices(outcome, P1);
         assertPractices(outcome, P2);
         assertThat(outcome.result().limitations())
-                .contains("AMB-C5-04: 2 linha(s) de condição com situação ou base fora do vocabulário (diagnóstico).");
+                .contains(
+                        "C5-LIM-19/diagnóstico: 2 linha(s) de condição com situação ou base fora do vocabulário (diagnóstico).");
     }
 
     @Test
@@ -481,7 +484,8 @@ class C5CohortTest {
         assertPractices(outcome, P1, "A");
         assertThat(outcome.result().denominator()).isEqualTo(BigInteger.ONE);
         // E11 is not a neighbour of the list: no AMB-C5-04 diagnostic.
-        assertThat(outcome.result().limitations()).noneMatch(limitation -> limitation.startsWith("AMB-C5-04:"));
+        assertThat(outcome.result().limitations())
+                .noneMatch(limitation -> limitation.startsWith("C5-LIM-19/diagnóstico:"));
     }
 
     // ---- ENG-36: the evidence rebuilds the population ----

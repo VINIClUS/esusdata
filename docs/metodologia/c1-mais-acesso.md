@@ -2,7 +2,7 @@
 
 Documento de referência da Fase 1a. Transcreve a nota metodológica oficial do C1 (Tech Spec Q01),
 que não estava disponível quando o pacote `c1-mais-acesso@0.1.0` foi escrito. Desde
-`c1-mais-acesso@0.2.0` o filtro de CBO (item 24-c) está aplicado na regra; a última seção descreve
+`c1-mais-acesso@0.2.0` o filtro de CBO (item 24-c) está aplicado na regra e a `0.3.0` registra as decisões C1-D1, C1-D3 e C1-D4 (`docs/indicadores/decisoes/c1-mais-acesso.md`); a última seção descreve
 as demais diferenças entre a ficha e a implementação atual.
 
 **Convenções de citação.** `p. N` = página N do PDF (= N-ésimo bloco separado por form-feed em
@@ -174,7 +174,7 @@ competência a partir da qual os dois CBO incluídos passam a valer.
 
 Base de comparação:
 [`C1Rule.java`](../../apps/agent/src/main/java/esusdata/indicator/pack/c1/C1Rule.java)
-(`c1-mais-acesso@0.2.0`, `c1-exact-ratio@1`),
+(`c1-mais-acesso@0.3.0`, `c1-exact-ratio@1`),
 [`individual_encounter_modality@0.1.0.sql`](../../contracts/compatibility/queries/individual_encounter_modality@0.1.0.sql),
 o mapeamento de modalidade do plano de execução (`apps/execplane/src/stream.rs`) e as descobertas
 em `docs/discovery/2026-09-19-pec-ct133.md` e `docs/discovery/2026-09-24-pec-5528.md`. Esta seção
@@ -182,7 +182,7 @@ só descreve; não é proposta de mudança (a linha 1 já foi implementada em 0.
 
 | # | Tema | Ficha (Q01) | Implementação atual |
 |---|---|---|---|
-| 1 | Filtro de CBO | Sete ocupações (item 24-c; Quadro 01), valendo para numerador e denominador | Implementado em `c1-mais-acesso@0.2.0` (`cbo_policy=FICHA_24C`). `C1Rule.count` só considera atendimentos com `CanonicalEncounter.cbo` igual a um dos sete códigos de seis dígitos (225142, 225170, 225130, 225125, 225250, 223565, 223505; hífen e ponto são ignorados na comparação). CBO ausente, em branco ou fora da lista fica fora do numerador e do denominador e é contado numa limitação agregada; a linha de evidência do atendimento sai como `EXCLUDED` com o motivo `EXCLUIDO_CBO_FORA_DA_FICHA`. 225125 e 225250 vêm da nota de rodapé, cuja competência de vigência a ficha não informa: valem para todos os meses, e isso permanece como limitação permanente |
+| 1 | Filtro de CBO | Sete ocupações (item 24-c; Quadro 01), valendo para numerador e denominador | Implementado em `c1-mais-acesso@0.2.0` (`cbo_policy=FICHA_24C`). `C1Rule.count` só considera atendimentos com `CanonicalEncounter.cbo` igual a um dos sete códigos de seis dígitos (225142, 225170, 225130, 225125, 225250, 223565, 223505; hífen e ponto são ignorados na comparação). CBO ausente, em branco ou fora da lista fica fora do numerador e do denominador e é contado numa limitação agregada; a linha de evidência do atendimento sai como `EXCLUDED` com o motivo `EXCLUIDO_CBO_FORA_DA_FICHA`. 225125 e 225250 vêm da nota de rodapé; a ficha é uma só e não traz regra de transição, então os sete CBO valem em **toda** competência (decisão C1-D1, `C1-LIM-01`, convenção declarada) |
 | 2 | Formato do CBO | Com hífen: "2251-42" | O PEC grava seis dígitos sem hífen. Os três CBO mais frequentes em 2026-03 na descoberta CT 133 (`225142`, `223565`, `225125`) correspondem a 2251-42, 2235-65 e 2251-25 da ficha, sem o hífen. Não foi medida a fração de atendimentos com CBO fora da lista |
 | 3 | Tipo de equipe | Só eSF tipo 70 e eAP tipo 76 (item 24-b; Quadro 01), condições da Portaria GM/MS nº 3.493/2024; SCNES "última competência válida" | Não há filtro por tipo de equipe nem integração com o SCNES. A consulta lê `tb_dim_equipe.nu_ine` e `tb_dim_unidade_saude.nu_cnes` só como evidência |
 | 4 | Modalidades | Programada: "consulta agendada programada; cuidado continuado; e consulta agendada". Espontânea: "escuta inicial/ orientação; consulta no dia; e atendimento de urgência" | Mapeamento por id folha de `tb_dim_tipo_atendimento`. Programado: 2 "Consulta agendada programada / Cuidado continuado" e 3 "Consulta agendada". Espontâneo: 5 "Escuta inicial / Orientação", 6 "Consulta no dia" e 7 "Atendimento de urgência". Os ids 8 "Atendimento programado", 9 "Atendimento não programado", 10 "Visita domiciliar pós-óbito" e 11 "Não informado" são `UNMAPPED`: ficam fora do numerador e do denominador e são contados como limitação. Os rótulos dos ids 2, 3, 5, 6 e 7 correspondem aos seis tipos da ficha; os ids 8–11 não têm correspondente literal na ficha e não ocorreram nas duas instalações validadas |
@@ -195,8 +195,8 @@ só descreve; não é proposta de mudança (a linha 1 já foi implementada em 0.
 | 11 | Faixas | Item 30, literal | `C1Rule.classify` reproduz as quatro faixas da ficha, com comparação exata. Não há diferença |
 | 12 | Consolidação quadrimestral | NT nº 8/2026, 4.1: "média dos meses monitorados"; 4.1.1: suspensão | `classifyQuadrimestral` faz a média simples e exata das razões mensais e só depois aplica a faixa (MET-33 testado). Isso é coerente com 4.1 e com o exemplo C1 do Quadro 1 da NT (44,3425 → "Bom"). O método não é chamado pelo pipeline de execução, e não há tratamento de mês suspenso nem de mês sem denominador (este é rejeitado na construção do `ExactRatio`) |
 | 13 | Arredondamento e exibição | Não definido | Valor exibido com quatro casas (`toScaledBigDecimal(4)`); a classificação usa o valor exato |
-| 14 | Estado dos portões | — | `ReleaseGates.adapterOnly()` mantém os Portões A/B como incompletos. Desde 0.2.0 o texto de `STANDING_LIMITATIONS` registra a Q01 como aplicada ao filtro de CBO (`cbo_policy=FICHA_24C`), com a ressalva da vigência de 225125/225250; as demais exigências da ficha (linhas 3 a 7) seguem sem verificação, e o Portão D (reconciliação com o Siaps/SISAB) continua `NOT_IMPLEMENTED`, então o resultado segue `BLOCKED` |
+| 14 | Estado dos portões | — | `ReleaseGates.adapterOnly()` mantém os Portões A/B como incompletos. Desde 0.3.0 `STANDING_LIMITATIONS` traz textos com códigos estáveis (`C1-LIM-nn`): o filtro de CBO é convenção declarada (C1-LIM-01), o corte do 20º dia útil e o prazo de envio são `OUT_OF_REACH` (C1-LIM-06, decisão C1-D3) e o tipo de equipe segue lacuna bloqueante até a capacidade `team` (C1-LIM-03). O Portão D (reconciliação com o Siaps/SISAB) **não é limitação**, e sim estado de portão (decisão C1-D4): deixou de constar em `STANDING_LIMITATIONS`; o resultado segue `BLOCKED` pelos portões incompletos e pela lacuna do tipo de equipe |
 
-Lacunas da própria ficha, registradas para referência: a ficha não informa a competência de
-vigência dos CBO 2251-25 e 2252-50 (nota de rodapé), não lista CNES/INE ("descritos") e não define
+Lacunas da própria ficha, registradas para referência: a ficha não traz regra de transição
+para os CBO 2251-25 e 2252-50 (nota de rodapé; decisão C1-D1: valem sempre), não lista CNES/INE ("descritos") e não define
 arredondamento.
