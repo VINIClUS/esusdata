@@ -224,3 +224,103 @@ Feche o túnel no fim pelo socket de controle: `ssh -S ~/.ssh/pec-tunel.sock -O 
 | `invalid command \gexec` | psql anterior ao 9.6. |
 | Teste Java `Skipped: 1` | Falta o opt-in, o arquivo de segredo ou o túnel, ou o login falhou. O motivo está no relatório do Surefire. |
 | Teste Java falha com `refusing a statement ...` | O script foi editado e passou a ler algo fora de metadados e dimensões de códigos. Corrija o script, não o teste. |
+
+## Inventário transacional do tipo de equipe
+
+O DW não guarda o tipo da equipe (eSF 70, eAP 76, Portaria GM/MS 3.493/2024): `tb_dim_equipe` tem
+só `nu_ine`, `no_equipe`, `st_registro_valido` e `ds_filtro` (lacuna L1 do
+[dicionário C2–C7](2026-10-02-dw-dicionario-c2-c7.md)). Este segundo inventário procura o tipo no
+esquema **transacional** do PEC, o caminho dele até o INE do DW e ao município, e se o tipo tem
+histórico no tempo (ENG-42). Ele prepara o [ADR 0031](../adr/0031-leitura-transacional-do-pec.md) e
+não valida capacidade nenhuma.
+
+### O que roda
+
+[`contracts/compatibility/inventory/tx-team-inventory.sql`](../../contracts/compatibility/inventory/tx-team-inventory.sql),
+no mesmo molde do inventário do DW, em duas passadas:
+
+| Passada | Lê | Seções |
+|---|---|---|
+| 1. Estrutura | Só catálogo. Objetos candidatos por nome (`%equipe%`, `%tipo_equipe%`, `%tp_equipe%`, `ine`, `%cnes%`, `%unidade_saude%`, `%lotacao%`, `%hist%`, `%vinculo%`), colunas, colunas de equipe/INE/CNES/município em qualquer tabela fora do DW, tabelas com coluna de equipe e de data, FKs, caminhos de FK da equipe até município e unidade (até 4 saltos), PK/UNIQUE/índices e visões que citam equipe. | 1.1 a 1.10 |
+| 2. Agregados | Consultas geradas do catálogo (`\gexec`), só sobre tabelas de até 64 MiB: contagem de linhas, códigos distintos das colunas candidatas a tipo com contagem, rótulos das tabelas de domínio do tipo (até 200 linhas, tabelas de até 1 MiB), situação/validade, faixa de datas, cobertura do INE contra `tb_dim_equipe.nu_ine`, INEs com mais de um tipo, equipes por código IBGE. | 2.1 a 2.10 |
+
+Garantias: transação `READ ONLY` com `ROLLBACK`; `statement_timeout` de 30 s, `lock_timeout` de
+10 s e `idle_in_transaction_session_timeout` de 30 s (`ReadBudget.initialEngineeringProposal()`);
+nunca lê `tb_fat_*`, `tb_acomp_*` nem `mv_*`; nunca toca tabela cujo nome lembre cidadão, paciente,
+prontuário, pessoa, indivíduo, usuário, senha, credencial, certificado ou profissional; nunca
+escolhe coluna que lembre nome, CPF, CNS, telefone, e-mail ou endereço. O que sai das tabelas são
+agregados e as tabelas de domínio do tipo. O `TeamInventoryLiveTest` repete isso em Java: cada
+comando passa por `EXPLAIN` antes de rodar, e o teste recusa o que não for agregado (ou tabela de
+domínio de até 1 MiB com `LIMIT`) e qualquer leitura de fato do DW ou de tabela com nome de pessoa.
+Se uma seção sair vazia (por exemplo, 2.9 e 2.10 sem FK declarada), isso é resultado, não erro.
+
+### Comandos da janela supervisionada
+
+Rode da raiz do repositório, com o PEC de produção (.253) somente leitura e a senha só no arquivo
+`0600`:
+
+```bash
+# 1. Abrir o túnel (alias esus) com socket de controle
+ssh -f -N -M -S ~/.ssh/pec-tunel.sock -L 15434:127.0.0.1:5433 esus
+pg_isready -h 127.0.0.1 -p 15434          # esperado: accepting connections
+
+# 2. Rodar o inventário pelo teste Java (saída em apps/agent/target/inventario-equipe/)
+mvn -B -f apps/agent/pom.xml test -Djacoco.skip=true \
+  -Dsurefire.reuseForks=false \
+  -Dtest=TeamInventoryLiveTest -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dobservatorio.execution-plane.live-pec=true \
+  -Dobservatorio.execution-plane.live-pec.env-file=$HOME/.config/observatorio-aps/pec-253.env
+
+# 3. Guardar a saída fora do repositório e fechar o túnel
+umask 077 && mkdir -p ~/observatorio-aps-inventario
+cp apps/agent/target/inventario-equipe/tx-team-inventory-*.txt ~/observatorio-aps-inventario/
+ssh -S ~/.ssh/pec-tunel.sock -O exit esus
+```
+
+- **Senha:** o caminho Java lê `PEC_DB_PASSWORD` do arquivo `0600`. Se a senha só pode existir na
+  hora, crie o arquivo para a janela e apague-o ao fim (`shred -u`), ou use o psql com `-W`, que
+  pergunta a senha no terminal e não a guarda.
+- **Permissão:** o `esus_leitura` pode não ter `SELECT` em tabelas transacionais. O script não
+  falha por isso: a seção 1.3 mostra `pode_ler` e a 2.1b lista as candidatas "sem SELECT para este
+  papel". Conceder acesso é decisão do usuário (ADR 0002), nunca parte desta janela.
+- **Saída:** `apps/agent/target/inventario-equipe/tx-team-inventory-<PEC_SOURCE_ID>-<instante UTC>.txt`.
+  `target/` é ignorado pelo git e apagado pelo `mvn clean`. O cabeçalho traz o instante e o
+  `sha256` do script.
+- **Pulado por padrão:** sem `-Dobservatorio.execution-plane.live-pec=true`, sem o arquivo de
+  segredo, com o túnel caído ou com o login recusado, o teste aparece como `Skipped`. Um `mvn verify`
+  comum nunca toca o PEC. O motivo fica em
+  `apps/agent/target/surefire-reports/TEST-esusdata.source.pec.TeamInventoryLiveTest.xml`.
+- **Mesma coisa por psql** (alternativa): como no inventário do DW, com
+  `-f contracts/compatibility/inventory/tx-team-inventory.sql -o ~/observatorio-aps-inventario/tx-team-inventory-$(date +%Y%m%d-%H%M%S).txt`.
+- **Falha `refusing a statement ...`:** a barreira em Java barrou uma consulta gerada. Registre a
+  mensagem (só tem SQL, nunca valor), não afrouxe o teste: ajuste o script.
+- Não repita com senha errada: cada tentativa fica no log do PEC.
+
+### O que conferir na saída
+
+| Pergunta | Onde |
+|---|---|
+| Onde mora o tipo da equipe e que coluna o carrega? | 1.3 a 1.5 e, com os códigos, 2.2 |
+| Quais são os códigos e rótulos (70, 76 e outros)? | 2.2 (códigos e contagem) e 2.3 (rótulos da tabela de domínio) |
+| O tipo chega ao INE do DW? | 1.4/1.5 (coluna de INE), 2.6 e 2.7 (`ines_tambem_no_dw` contra `ines_distintos`) |
+| O tipo muda no tempo? | 1.6 (tabelas com equipe e data), 2.5 (faixa de datas), 2.8 (`ines_com_mais_de_um_tipo`), 2.4 (equipes inativas) |
+| Qual o caminho até o município? | 1.8 (trilha de FK), 2.9 e 2.10 (equipes por IBGE; deve sair o IBGE da fonte e, se houver, outros) |
+| Que índice sustenta a leitura? | 1.9 |
+| O que ficou sem ler? | 2.1b (grandes demais ou de nome negado) |
+
+### O que pode e o que não pode ir para o git
+
+Valem as regras do passo 4 do inventário do DW. O repositório é público e a saída crua nunca entra.
+
+| Pode ir, num documento de descoberta | Só em resumo | Nunca |
+|---|---|---|
+| Nomes de tabelas e colunas de equipe, tipo, tipos de dado, nulidade, PK/UNIQUE/FK e índices; **códigos de tipo de equipe e seus rótulos** (tabela de referência do e-SUS); cobertura do INE e do município em contagens; faixa de datas; o `sha256` do script. | Definições de visões do PEC (código do PEC): nome, colunas e, em palavras próprias, o que leem. Nunca o SQL. | INE ou CNES reais de equipes e unidades, nomes de equipe ou de unidade, qualquer dado de cidadão ou de profissional, o arquivo de segredo e a saída crua. |
+
+- Contagens abaixo de 10 entram como `<10` (por exemplo, "equipes com tipo 70: `<10`").
+- Códigos IBGE de município não são dado pessoal, mas só entra o do município da fonte e a
+  contagem dos demais ("outros códigos: N").
+- Antes do commit, revise o diff como no passo 4: `git diff --cached | grep -nE '[0-9]{7,15}'`
+  (CNES de 7 dígitos e INE de 10 também contam).
+
+O resumo vai em `docs/discovery/AAAA-MM-DD-pec-5528-equipe-transacional.md` e alimenta a seção
+"Pendências" do ADR 0031.
