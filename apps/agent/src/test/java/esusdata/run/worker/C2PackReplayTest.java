@@ -28,12 +28,14 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * ENG-19 for C2: a synthetic canonical v2 extract goes through {@code RunExecutor.runFromExtract}
  * and publishes {@code BLOCKED} (gates incomplete) with the exact counts, practices, teams and
- * evidence; replaying the same extract gives the same input fingerprint. No child completes two
- * years in 2026-03, so the month is outside AMB-C2-03 and the result is not {@code RULE_AMBIGUITY}.
+ * evidence; replaying the same extract gives the same input fingerprint. Rule {@code @0.2.0}: the
+ * month's cohort is the children who complete two years in 2026-03 (AMB-C2-03) and no practice is
+ * ambiguous.
  *
- * <p>p1 (team one, born 2025-12-01): first presential consultation on day 14 (A) and visits on
- * days 9 and 71 (D) — 40 points; B, C and E still open. p2 (team two, born 2025-06-10): nothing —
- * A and D closed unmet, B, C and E open. p3: no registration, excluded.
+ * <p>p1 (team one, born 2024-03-05): first presential puericultura consultation (CIAP A98) on day
+ * 14 (A) and visits on days 9 and 71 (D) — 40 points; B, C and E unmet. p2 (team two, born
+ * 2024-03-20): nothing — every practice unmet. p3 (born 2024-03-25): no registration, excluded. p4
+ * (team one, born 2025-01-20): does not complete two years in the month, excluded.
  */
 class C2PackReplayTest {
 
@@ -43,9 +45,10 @@ class C2PackReplayTest {
     private static final String TEAM_TWO = "0000346276";
     private static final String CNES_ONE = "2750325";
     private static final String CNES_TWO = "2750333";
-    private static final LocalDate P1_BIRTH = LocalDate.of(2025, 12, 1);
-    private static final LocalDate P2_BIRTH = LocalDate.of(2025, 6, 10);
-    private static final String OPEN = "NAO_CUMPRIDA_PRAZO_ABERTO";
+    private static final LocalDate P1_BIRTH = LocalDate.of(2024, 3, 5);
+    private static final LocalDate P2_BIRTH = LocalDate.of(2024, 3, 20);
+    private static final String UNMET = "NAO_CUMPRIDA";
+    private static final String ELIGIBLE = "COORTE_COMPLETA_2_ANOS_NA_COMPETENCIA";
 
     @TempDir
     Path dataDir;
@@ -85,12 +88,15 @@ class C2PackReplayTest {
                 .add(CanonicalFixtures.registration("p1", P1_BIRTH.plusDays(3), CNES_ONE, TEAM_ONE))
                 .add(
                         Capabilities.CARE_ENCOUNTER,
-                        CanonicalFixtures.encounter("p1", P1_BIRTH.plusDays(14), "225142", false))
+                        CanonicalFixtures.encounterWithProblems(
+                                "p1", P1_BIRTH.plusDays(14), "225142", List.of("A98"), List.of()))
                 .add(visit("p1", P1_BIRTH.plusDays(9)))
                 .add(visit("p1", P1_BIRTH.plusDays(71)))
                 .add(CanonicalFixtures.person("p2", P2_BIRTH, "MASCULINO"))
                 .add(CanonicalFixtures.registration("p2", P2_BIRTH.plusDays(5), CNES_TWO, TEAM_TWO))
-                .add(CanonicalFixtures.person("p3", LocalDate.of(2025, 1, 20), "FEMININO"))
+                .add(CanonicalFixtures.person("p3", LocalDate.of(2024, 3, 25), "FEMININO"))
+                .add(CanonicalFixtures.person("p4", LocalDate.of(2025, 1, 20), "FEMININO"))
+                .add(CanonicalFixtures.registration("p4", LocalDate.of(2025, 1, 25), CNES_ONE, TEAM_ONE))
                 .write(fixture.extractsDir, id, "src-1");
     }
 
@@ -105,7 +111,7 @@ class C2PackReplayTest {
         assertThat(published.valueKind()).isEqualTo("SCORE");
         assertThat(published.numeratorText()).isEqualTo("40");
         assertThat(published.denominatorText()).isEqualTo("2");
-        assertThat(published.consolidationEligible()).isFalse();
+        assertThat(published.consolidationEligible()).isTrue();
         assertThat(ResultJson.readComponents(published.componentsJson()))
                 .extracting(
                         ResultJson.StoredComponent::code,
@@ -131,23 +137,24 @@ class C2PackReplayTest {
                         EvidenceRecord::reasonCode,
                         EvidenceRecord::points)
                 .containsExactly(
-                        tuple("p1", null, "ELIGIBLE", "COORTE_ATE_2_ANOS", "40"),
+                        tuple("p1", null, "ELIGIBLE", ELIGIBLE, "40"),
                         tuple("p1", "A", "PRACTICE_MET", "CUMPRIDA", "20"),
                         tuple("p1", "A", "SUPPORTING_EVENT", null, null),
-                        tuple("p1", "B", "PRACTICE_NOT_MET", OPEN, "0"),
-                        tuple("p1", "C", "PRACTICE_NOT_MET", OPEN, "0"),
+                        tuple("p1", "B", "PRACTICE_NOT_MET", UNMET, "0"),
+                        tuple("p1", "C", "PRACTICE_NOT_MET", UNMET, "0"),
                         tuple("p1", "D", "PRACTICE_MET", "CUMPRIDA", "20"),
                         tuple("p1", "D", "SUPPORTING_EVENT", null, null),
                         tuple("p1", "D", "SUPPORTING_EVENT", null, null),
-                        tuple("p1", "E", "PRACTICE_NOT_MET", OPEN, "0"),
-                        tuple("p2", null, "ELIGIBLE", "COORTE_ATE_2_ANOS", "0"),
-                        tuple("p2", "A", "PRACTICE_NOT_MET", "NAO_CUMPRIDA", "0"),
-                        tuple("p2", "B", "PRACTICE_NOT_MET", OPEN, "0"),
-                        tuple("p2", "C", "PRACTICE_NOT_MET", OPEN, "0"),
-                        tuple("p2", "D", "PRACTICE_NOT_MET", "NAO_CUMPRIDA", "0"),
-                        tuple("p2", "E", "PRACTICE_NOT_MET", OPEN, "0"),
-                        tuple("p3", null, "EXCLUDED", "EXCLUIDO_SEM_VINCULO", null));
-        assertThat(evidence.get(2).careDate()).isEqualTo("2025-12-15");
+                        tuple("p1", "E", "PRACTICE_NOT_MET", UNMET, "0"),
+                        tuple("p2", null, "ELIGIBLE", ELIGIBLE, "0"),
+                        tuple("p2", "A", "PRACTICE_NOT_MET", UNMET, "0"),
+                        tuple("p2", "B", "PRACTICE_NOT_MET", UNMET, "0"),
+                        tuple("p2", "C", "PRACTICE_NOT_MET", UNMET, "0"),
+                        tuple("p2", "D", "PRACTICE_NOT_MET", UNMET, "0"),
+                        tuple("p2", "E", "PRACTICE_NOT_MET", UNMET, "0"),
+                        tuple("p3", null, "EXCLUDED", "EXCLUIDO_SEM_VINCULO", null),
+                        tuple("p4", null, "EXCLUDED", "EXCLUIDO_AINDA_NAO_COMPLETA_2_ANOS", null));
+        assertThat(evidence.get(2).careDate()).isEqualTo("2024-03-19");
         assertThat(evidence.get(2).cbo()).isEqualTo("225142");
         assertThat(evidence).allSatisfy(row -> assertThat(row.subjectKind()).isEqualTo("PERSON"));
     }

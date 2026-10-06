@@ -47,8 +47,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Casos da ficha C2 (docs/metodologia/c2-desenvolvimento-infantil.md, "Casos de teste derivados") e
  * da Tech Spec (MET-*, ENG-*), escritos só a partir da transcrição e do contrato de comportamento do
- * pacote. Competência 2026-03, corte em 2026-03-31; salvo indicação a criança nasce em 2024-03-10
- * (2º aniversário em 2026-03-10, dentro da competência), vinculada à equipe {@value #INE}.
+ * pacote, atualizados pelas decisões de docs/indicadores/decisoes/c2-desenvolvimento-infantil.md
+ * (regra @0.2.0: nenhuma ambiguidade de leitura). Competência 2026-03, corte em 2026-03-31; salvo
+ * indicação a criança nasce em 2024-03-10 (2º aniversário em 2026-03-10, dentro da competência),
+ * vinculada à equipe {@value #INE}.
  */
 class C2PackCasesTest {
 
@@ -59,12 +61,10 @@ class C2PackCasesTest {
     private static final EvaluationContext CONTEXTO = EvaluationContext.endOfMonth(IBGE, MARCO);
     private static final LocalDate CORTE = LocalDate.of(2026, 3, 31);
 
-    /** Nascimento padrão: 23 meses no corte, sem completar 2 anos na competência (fora da AMB-C2-03). */
-    private static final LocalDate N = LocalDate.of(2024, 4, 10);
-    /** Nascimento de quem completa 2 anos na competência (2026-03-10): o mês fica RULE_AMBIGUITY (CT-C2-65). */
-    private static final LocalDate N_MARCO = LocalDate.of(2024, 3, 10);
+    /** Nascimento padrão: completa 2 anos na competência (2026-03-10), a coorte decidida em AMB-C2-03. */
+    private static final LocalDate N = LocalDate.of(2024, 3, 10);
 
-    /** 2º aniversário de {@link #N_MARCO}. */
+    /** 2º aniversário de {@link #N}. */
     private static final LocalDate SEGUNDO_ANIVERSARIO = LocalDate.of(2026, 3, 10);
 
     private static final String CRIANCA = "crianca-1";
@@ -76,11 +76,8 @@ class C2PackCasesTest {
     private static final String ACS = "515105";
 
     private static final BigInteger VINTE = BigInteger.valueOf(20);
-    private static final Set<EvidenceDecision> DECISOES_DE_PRATICA = Set.of(
-            EvidenceDecision.PRACTICE_MET,
-            EvidenceDecision.PRACTICE_NOT_MET,
-            EvidenceDecision.PRACTICE_EXEMPT,
-            EvidenceDecision.PRACTICE_AMBIGUOUS);
+    private static final Set<EvidenceDecision> DECISOES_DE_PRATICA =
+            Set.of(EvidenceDecision.PRACTICE_MET, EvidenceDecision.PRACTICE_NOT_MET, EvidenceDecision.PRACTICE_EXEMPT);
 
     private final List<Record> registros = new ArrayList<>();
 
@@ -309,7 +306,7 @@ class C2PackCasesTest {
     // ================================================================ Prática A (MET-19, CT-10..16)
 
     @Test
-    void met19_primeiraConsultaNoDia29Cumpre_30Ambigua_31NaoCumpre_demaisPraticasIndependentes() {
+    void met19_primeiraConsultaNoDia29E30Cumprem_31NaoCumpre_demaisPraticasIndependentes() {
         for (int dia : List.of(29, 30, 31)) {
             String chave = "dia-" + dia;
             crianca(chave, N);
@@ -320,18 +317,18 @@ class C2PackCasesTest {
         RuleOutcome outcome = calcular();
 
         assertCumpre(outcome, "dia-29", "A");
-        assertAmbigua(outcome, "dia-30", "A", "AMB-C2-01");
+        assertCumpre(outcome, "dia-30", "A"); // AMB-C2-01: o dia do nascimento é o dia 0 e N+30 está dentro
         assertNaoCumpre(outcome, "dia-31", "A");
         for (String chave : List.of("dia-29", "dia-30", "dia-31")) {
             assertCumpre(outcome, chave, "D");
             assertNaoCumpre(outcome, chave, "B");
         }
         assertThat(pessoa(outcome, "dia-29").points()).isEqualTo(BigInteger.valueOf(40));
-        assertThat(pessoa(outcome, "dia-30").points()).isNull();
+        assertThat(pessoa(outcome, "dia-30").points()).isEqualTo(BigInteger.valueOf(40));
         assertThat(pessoa(outcome, "dia-31").points()).isEqualTo(VINTE);
-        // limite inferior: só os pontos certos (40 + 20 + 20)
-        assertThat(outcome.result().numerator()).isEqualTo(BigInteger.valueOf(80));
-        assertThat(componente(outcome.result(), "A").numerator()).isEqualTo(BigInteger.ONE);
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(outcome.result().numerator()).isEqualTo(BigInteger.valueOf(100));
+        assertThat(componente(outcome.result(), "A").numerator()).isEqualTo(BigInteger.TWO);
         assertThat(componente(outcome.result(), "D").status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
@@ -354,17 +351,18 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_11_primeiraConsultaPresencialEmNMais30EAmbigua() {
+    void ct_c2_11_primeiraConsultaPresencialEmNMais30Cumpre() {
         crianca(CRIANCA, N);
         add(presencial(CRIANCA, N.plusDays(30)));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "A", "AMB-C2-01");
-        IndicatorResult result = calcular().result();
-        assertThat(result.numerator()).isZero();
-        assertThat(result.denominator()).isEqualTo(BigInteger.ONE);
-        assertThat(calcular().teams())
+        RuleOutcome outcome = calcular();
+
+        assertCumpre(outcome, CRIANCA, "A");
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(outcome.result().numerator()).isEqualTo(VINTE);
+        assertThat(outcome.teams())
                 .singleElement()
-                .satisfies(t -> assertThat(t.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY));
+                .satisfies(t -> assertThat(t.result().status()).isEqualTo(IndicatorStatus.COMPUTED));
     }
 
     @Test
@@ -399,43 +397,147 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_15_puericulturaNaoEFiltradaLacunaL7() {
-        // A ficha exige "Puericultura" no problema/condição avaliado; o contrato não filtra (lacuna
-        // L7, sem marcador no PEC) e declara a limitação permanente. A consulta conta.
-        crianca(CRIANCA, N);
-        add(presencial(CRIANCA, N.plusDays(10)));
+    void ct_c2_15_puericulturaExigeA98OuZ001EntreOsProblemasAvaliados() {
+        // AMB-C2-05: só conta a consulta cujo problema avaliado é A98 (CIAP-2) ou Z001 (CID-10).
+        crianca("a98", N);
+        add(consultaCom("a98", N.plusDays(10), List.of("A98"), List.of()));
+        crianca("z001", N);
+        add(consultaCom("z001", N.plusDays(10), List.of(), List.of("Z001")));
+        crianca("z00-1", N);
+        add(consultaCom("z00-1", N.plusDays(10), List.of(), List.of("Z00.1")));
+        crianca("minuscula", N);
+        add(consultaCom("minuscula", N.plusDays(10), List.of(" a98 "), List.of()));
+        crianca("outro-ciap", N);
+        add(consultaCom("outro-ciap", N.plusDays(10), List.of("A97"), List.of("Z002")));
+        crianca("sem-problema", N);
+        add(consultaCom("sem-problema", N.plusDays(10), List.of(), List.of()));
+        crianca("cid-no-ciap", N);
+        add(consultaCom("cid-no-ciap", N.plusDays(10), List.of("Z001"), List.of("A98")));
 
-        assertCumpre(calcular(), CRIANCA, "A");
-        assertThat(new C2Pack().descriptor().standingLimitations()).anyMatch(menciona("L7", "puericultura"));
+        RuleOutcome outcome = calcular();
+
+        for (String chave : List.of("a98", "z001", "z00-1", "minuscula")) {
+            assertCumpre(outcome, chave, "A");
+        }
+        for (String chave : List.of("outro-ciap", "sem-problema", "cid-no-ciap")) {
+            assertNaoCumpre(outcome, chave, "A");
+        }
+        assertThat(new C2Pack().descriptor().standingLimitations()).anyMatch(menciona("C2-LIM-07", "A98"));
     }
 
     @Test
-    void ct_c2_16_unicaConsultaDomiciliarEAmbiguaAmb04() {
+    void ct_c2_15_semOMarcadorDePuericulturaNemAsNoveConsultasContamParaB() {
+        crianca(CRIANCA, N);
+        for (int i = 1; i <= 9; i++) {
+            add(consultaCom(CRIANCA, N.plusDays(40L * i), List.of("A97"), List.of("Z000")));
+        }
+
+        RuleOutcome outcome = calcular();
+
+        assertNaoCumpre(outcome, CRIANCA, "B");
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+    }
+
+    @Test
+    void ct_c2_16_unicaConsultaDomiciliarCumpreAmb04() {
         crianca(CRIANCA, N);
         add(domiciliar(CRIANCA, N.plusDays(10)));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "A", "AMB-C2-04");
+        RuleOutcome outcome = calcular();
+
+        assertCumpre(outcome, CRIANCA, "A");
+        assertThat(outcome.evidence()).anySatisfy(e -> {
+            assertThat(e.decision()).isEqualTo(EvidenceDecision.SUPPORTING_EVENT);
+            assertThat(e.modality()).isEqualTo("MIAI_DOMICILIAR");
+        });
     }
 
     @Test
-    void a_modalidadeDesconhecidaFicaAmbiguaPelaLacunaL3() {
+    void ct_c2_16_consultaDomiciliarContaParaB() {
+        crianca(CRIANCA, N);
+        consultasPresenciais(CRIANCA, N, 8);
+        add(domiciliar(CRIANCA, N.plusDays(400)));
+
+        assertCumpre(calcular(), CRIANCA, "B");
+    }
+
+    @Test
+    void a_modalidadeNaoInformadaEPresencialPelaLacunaL3() {
         crianca(CRIANCA, N);
         add(atendimento(CRIANCA, N.plusDays(10), MEDICO, null, "INDIVIDUAL", null));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "A", "LACUNA-L3");
-        // Lacuna de fonte, não ambiguidade da ficha: o motivo diz "dado indisponível".
-        assertThat(pratica(calcular(), CRIANCA, "A").reasonCode()).isEqualTo("DADO_INDISPONIVEL:LACUNA-L3");
+        RuleOutcome outcome = calcular();
+
+        assertCumpre(outcome, CRIANCA, "A");
+        assertThat(pratica(outcome, CRIANCA, "A").reasonCode()).isEqualTo("CUMPRIDA");
     }
 
     @Test
-    void a_procedimentoMip0301010277SemConsultaEAmbiguoAmb06() {
+    void a_teleconsultaMarcadaPeloProcedimentoDoMesmoDiaCboCnesEIneNaoCumpreAMasContaParaB() {
+        crianca("marcada", N);
+        add(atendimento("marcada", N.plusDays(10), MEDICO, null, "INDIVIDUAL", null));
+        add(procedimento("marcada", N.plusDays(10), "0301010250", MEDICO, "MIP"));
+        crianca("outro-dia", N);
+        add(atendimento("outro-dia", N.plusDays(10), MEDICO, null, "INDIVIDUAL", null));
+        add(procedimento("outro-dia", N.plusDays(11), "0301010250", MEDICO, "MIP"));
+        crianca("outro-profissional", N);
+        add(atendimento("outro-profissional", N.plusDays(10), MEDICO, null, "INDIVIDUAL", null));
+        add(procedimento("outro-profissional", N.plusDays(10), "0301010250", ENFERMEIRA, "MIP"));
+        crianca("cbo-com-hifen", N);
+        add(atendimento("cbo-com-hifen", N.plusDays(10), MEDICO, null, "INDIVIDUAL", null));
+        add(procedimento("cbo-com-hifen", N.plusDays(10), "0301010250", "2251-42", "MIP"));
+        crianca("solicitado", N);
+        add(atendimento("solicitado", N.plusDays(10), MEDICO, null, "INDIVIDUAL", null));
+        add(procedimentoEmEstagio("solicitado", N.plusDays(10), "0301010250", MEDICO, "REQUESTED"));
+        crianca("participacao-3a7", N);
+        add(atendimento("participacao-3a7", N.plusDays(10), MEDICO, true, "INDIVIDUAL", null));
+        // a consulta com marcador de remoto continua contando para B
+        crianca("remota-b", N);
+        consultasPresenciais("remota-b", N, 8);
+        add(atendimento("remota-b", N.plusDays(400), MEDICO, null, "INDIVIDUAL", null));
+        add(procedimento("remota-b", N.plusDays(400), "0301010250", MEDICO, "MIP"));
+
+        RuleOutcome outcome = calcular();
+
+        assertNaoCumpre(outcome, "marcada", "A");
+        assertCumpre(outcome, "outro-dia", "A");
+        assertCumpre(outcome, "outro-profissional", "A");
+        assertNaoCumpre(outcome, "cbo-com-hifen", "A");
+        assertCumpre(outcome, "solicitado", "A");
+        assertNaoCumpre(outcome, "participacao-3a7", "A");
+        assertCumpre(outcome, "remota-b", "B");
+    }
+
+    @Test
+    void a_procedimentoMip0301010277SemConsultaNaoCumpreAmb06() {
         crianca(CRIANCA, N);
         add(procedimento(CRIANCA, N.plusDays(10), "0301010277", ENFERMEIRA, "MIP"));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "A", "AMB-C2-06");
+        RuleOutcome outcome = calcular();
+
+        assertNaoCumpre(outcome, CRIANCA, "A");
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
-    // CT-C2-17 (equipe não 70/76, AMB-C2-11 em A/B): o contrato não declara essa leitura; omitido.
+    @Test
+    void ct_c2_17_consultaDeIneDeTipoConhecidoForaDe70e76NaoContaEDeTipoDesconhecidoConta() {
+        crianca("tipo-71", N);
+        add(consultaDeIne("tipo-71", N.plusDays(10), "0000000071"));
+        crianca("tipo-76", N);
+        add(consultaDeIne("tipo-76", N.plusDays(10), "0000000076"));
+        crianca("tipo-desconhecido", N);
+        add(consultaDeIne("tipo-desconhecido", N.plusDays(10), "0000000099"));
+        crianca("sem-ine", N);
+        add(consultaDeIne("sem-ine", N.plusDays(10), null));
+        add(equipeDeIne("0000000071", "71"), equipeDeIne("0000000076", "76"));
+
+        RuleOutcome outcome = calcular();
+
+        assertNaoCumpre(outcome, "tipo-71", "A");
+        assertCumpre(outcome, "tipo-76", "A");
+        assertCumpre(outcome, "tipo-desconhecido", "A");
+        assertCumpre(outcome, "sem-ine", "A");
+    }
 
     // ================================================================ Prática B (CT-18..24, MET-32)
 
@@ -461,42 +563,42 @@ class C2PackCasesTest {
 
     @Test
     void ct_c2_20_oitoAntesEUmaDepoisDoSegundoAniversarioNaoCumpre() {
-        crianca(CRIANCA, N_MARCO);
-        consultasPresenciais(CRIANCA, N_MARCO, 8);
+        crianca(CRIANCA, N);
+        consultasPresenciais(CRIANCA, N, 8);
         add(presencial(CRIANCA, SEGUNDO_ANIVERSARIO.plusDays(5)));
 
         RuleOutcome outcome = calcular();
 
         assertNaoCumpre(outcome, CRIANCA, "B");
-        // Quem completa 2 anos na competência deixa o mês em RULE_AMBIGUITY (AMB-C2-03, CT-C2-65).
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        // quem completa 2 anos na competência é a coorte do mês: o resultado sai calculado (AMB-C2-03)
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
-    void ct_c2_21_nonaConsultaNoDiaDoSegundoAniversarioEAmbigua() {
-        crianca(CRIANCA, N_MARCO);
-        consultasPresenciais(CRIANCA, N_MARCO, 8);
+    void ct_c2_21_nonaConsultaNoDiaDoSegundoAniversarioCumpre() {
+        crianca(CRIANCA, N);
+        consultasPresenciais(CRIANCA, N, 8);
         add(presencial(CRIANCA, SEGUNDO_ANIVERSARIO));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "B", "AMB-C2-02");
+        assertCumpre(calcular(), CRIANCA, "B");
     }
 
     @Test
-    void ct_c2_22_nonaSoNoMipComTeleconsultaEAmbigua() {
+    void ct_c2_22_nonaSoNoMipComTeleconsultaNaoCumpre() {
         crianca(CRIANCA, N);
         consultasPresenciais(CRIANCA, N, 8);
         add(procedimento(CRIANCA, N.plusDays(400), "0301010250", ENFERMEIRA, "MIP"));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "B", "AMB-C2-06");
+        assertNaoCumpre(calcular(), CRIANCA, "B");
     }
 
     @Test
-    void ct_c2_23_doisAtendimentosNoMesmoDiaEmOitoDiasEAmbiguo() {
+    void ct_c2_23_doisAtendimentosNoMesmoDiaEmOitoDiasCumpre() {
         crianca(CRIANCA, N);
         consultasPresenciais(CRIANCA, N, 8);
         add(atendimento(CRIANCA, N.plusDays(40), ENFERMEIRA, false, "INDIVIDUAL", null));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "B", "AMB-C2-15");
+        assertCumpre(calcular(), CRIANCA, "B");
     }
 
     @Test
@@ -573,12 +675,12 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_28_oitoNoMiaiEUmDiaSoComAvaliacaoAntropometricaEAmbiguo() {
+    void ct_c2_28_oitoNoMiaiEUmDiaSoComAvaliacaoAntropometricaCumpre() {
         crianca(CRIANCA, N);
         paresMiai(CRIANCA, N, 8);
         add(procedimento(CRIANCA, N.plusDays(400), "0101040024", TECNICO_ENFERMAGEM, "MIP"));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "C", "AMB-C2-07");
+        assertCumpre(calcular(), CRIANCA, "C");
     }
 
     @Test
@@ -593,12 +695,12 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_30_oitoDiasComUmDiaDeDoisParesEAmbiguo() {
+    void ct_c2_30_oitoDiasComUmDiaDeDoisParesNaoCumpreCadaDiaContaUmaVez() {
         crianca(CRIANCA, N);
         paresMiai(CRIANCA, N, 8); // o 1º em N+43
         add(CanonicalFixtures.measurement(CRIANCA, N.plusDays(43), "6.0", "60.0", "MIAC"));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "C", "AMB-C2-07");
+        assertNaoCumpre(calcular(), CRIANCA, "C");
     }
 
     @Test
@@ -615,15 +717,14 @@ class C2PackCasesTest {
 
     @Test
     void ct_c2_32_nonoParDepoisDoSegundoAniversarioNaoConta() {
-        crianca(CRIANCA, N_MARCO);
-        paresMiai(CRIANCA, N_MARCO, 8);
+        crianca(CRIANCA, N);
+        paresMiai(CRIANCA, N, 8);
         add(medidaMiai(CRIANCA, SEGUNDO_ANIVERSARIO.plusDays(10), "12.0", "86.0"));
 
         RuleOutcome outcome = calcular();
 
         assertNaoCumpre(outcome, CRIANCA, "C");
-        // Quem completa 2 anos na competência deixa o mês em RULE_AMBIGUITY (AMB-C2-03, CT-C2-65).
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     // ================================================================ Prática D (CT-33..45)
@@ -637,7 +738,7 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_34_primeiraVisitaEm29Cumpre_30Ambigua_31NaoCumpre() {
+    void ct_c2_34_primeiraVisitaEm29E30Cumprem_31NaoCumpre() {
         for (int dia : List.of(29, 30, 31)) {
             String chave = "visita-" + dia;
             crianca(chave, N);
@@ -647,9 +748,9 @@ class C2PackCasesTest {
         RuleOutcome outcome = calcular();
 
         assertCumpre(outcome, "visita-29", "D");
-        assertAmbigua(outcome, "visita-30", "D", "AMB-C2-01");
+        assertCumpre(outcome, "visita-30", "D");
         assertNaoCumpre(outcome, "visita-31", "D");
-        assertThat(avaliar().result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
@@ -661,19 +762,27 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_36_duasVisitasDentroDosTrintaDiasEAmbiguo() {
+    void ct_c2_36_duasVisitasDentroDosTrintaDiasNaoCumprem() {
         crianca(CRIANCA, N);
         add(visita(CRIANCA, N.plusDays(10)), visita(CRIANCA, N.plusDays(20)));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "D", "AMB-C2-08");
+        assertNaoCumpre(calcular(), CRIANCA, "D");
     }
 
     @Test
-    void ct_c2_37_segundaVisitaNoDiaDosSeisMesesEAmbigua() {
+    void ct_c2_36_segundaVisitaNoDia31Cumpre() {
+        crianca(CRIANCA, N);
+        add(visita(CRIANCA, N.plusDays(30)), visita(CRIANCA, N.plusDays(31)));
+
+        assertCumpre(calcular(), CRIANCA, "D");
+    }
+
+    @Test
+    void ct_c2_37_segundaVisitaNoDiaDosSeisMesesCumpre() {
         crianca(CRIANCA, N);
         add(visita(CRIANCA, N.plusDays(10)), visita(CRIANCA, N.plusMonths(6)));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "D", "AMB-C2-02");
+        assertCumpre(calcular(), CRIANCA, "D");
     }
 
     @Test
@@ -688,11 +797,11 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_39_doisRegistrosDeVisitaNaMesmaDataEAmbiguo() {
+    void ct_c2_39_doisRegistrosDeVisitaNaMesmaDataNaoCumprem() {
         crianca(CRIANCA, N);
         add(visita(CRIANCA, N.plusDays(10)), visita(CRIANCA, N.plusDays(10)));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "D", "AMB-C2-08");
+        assertNaoCumpre(calcular(), CRIANCA, "D");
     }
 
     @Test
@@ -719,13 +828,16 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_42_visitaComDesfechoNaoRealizadoEAmbigua() {
+    void ct_c2_42_visitaComDesfechoNaoRealizadoNaoConta() {
         crianca(CRIANCA, N);
         add(
                 visita(CRIANCA, N.plusDays(10), ACS, List.of("ACOMP_RECEM_NASCIDO"), "2"),
                 visita(CRIANCA, N.plusDays(100)));
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "D", "AMB-C2-08");
+        RuleOutcome outcome = calcular();
+
+        assertNaoCumpre(outcome, CRIANCA, "D");
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
@@ -875,18 +987,31 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_54_doseComIntervaloCurtoDescartadaOuInvalidandoEAmbiguo() {
+    void ct_c2_54_doseComIntervaloCurtoEDescartadaEAsOutrasTresBastam() {
         crianca(CRIANCA, N);
         doses(CRIANCA, "42", N.plusDays(60), N.plusDays(89), N.plusDays(150), N.plusDays(200));
         vip(CRIANCA, N);
         scr(CRIANCA, N);
         pneumo(CRIANCA, N);
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "E", "AMB-C2-09");
+        // 60, 89 (29 dias: descartada), 150, 200: as válidas são 60, 150 e 200
+        assertCumpre(calcular(), CRIANCA, "E");
     }
 
     @Test
-    void ct_c2_55_porComponenteCumprePorOcasiaoNaoEAmbiguo() {
+    void ct_c2_54_dosesCurtasContamDaUltimaDoseValida() {
+        crianca(CRIANCA, N);
+        // 60, 70 (descartada), 89 (descartada, 29 dias de 60), 91: válidas 60 e 91; só duas
+        doses(CRIANCA, "42", N.plusDays(60), N.plusDays(70), N.plusDays(89), N.plusDays(91));
+        vip(CRIANCA, N);
+        scr(CRIANCA, N);
+        pneumo(CRIANCA, N);
+
+        assertNaoCumpre(calcular(), CRIANCA, "E");
+    }
+
+    @Test
+    void ct_c2_55_porComponenteCumpre() {
         crianca(CRIANCA, N);
         doses(CRIANCA, "39", N.plusDays(60), N.plusDays(120), N.plusDays(180));
         doses(CRIANCA, "09", N.plusDays(70), N.plusDays(130), N.plusDays(190));
@@ -894,7 +1019,7 @@ class C2PackCasesTest {
         scr(CRIANCA, N);
         pneumo(CRIANCA, N);
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "E", "AMB-C2-09");
+        assertCumpre(calcular(), CRIANCA, "E");
     }
 
     @Test
@@ -929,7 +1054,7 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_58_hepBAoNascerDecideOTerceiroComponenteEAmbiguo() {
+    void ct_c2_58_hepBAoNascerContaComoTerceiraDose() {
         crianca(CRIANCA, N);
         doses(CRIANCA, "09", N);
         doses(CRIANCA, "42", N.plusDays(60), N.plusDays(120));
@@ -938,7 +1063,8 @@ class C2PackCasesTest {
         scr(CRIANCA, N);
         pneumo(CRIANCA, N);
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "E", "AMB-C2-09");
+        // hepatite B = 09 + 42 + 42; DTP e Hib = 42 + 42 + 39
+        assertCumpre(calcular(), CRIANCA, "E");
     }
 
     @Test
@@ -978,19 +1104,33 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_61_transcricaoRegistradaDepoisDosDoisAnosEAmbigua() {
+    void ct_c2_61_transcricaoRegistradaDepoisDosDoisAnosContaPelaAplicacao() {
         // CT-61: SCR aplicada aos 13 e aos 15 meses e transcrita depois do 2º aniversário (antes do
-        // corte): conta pela data de aplicação, não pela de registro (AMB-C2-09 v, AMB-C2-10 i).
-        crianca(CRIANCA, N_MARCO);
-        penta(CRIANCA, N_MARCO);
-        vip(CRIANCA, N_MARCO);
-        pneumo(CRIANCA, N_MARCO);
-        LocalDate registro = N_MARCO.plusYears(2).plusDays(10);
-        for (LocalDate data : List.of(N_MARCO.plusMonths(13), N_MARCO.plusMonths(15))) {
+        // corte): conta pela data de aplicação, não pela de registro (AMB-C2-09 v).
+        crianca(CRIANCA, N);
+        penta(CRIANCA, N);
+        vip(CRIANCA, N);
+        pneumo(CRIANCA, N);
+        LocalDate registro = N.plusYears(2).plusDays(10);
+        for (LocalDate data : List.of(N.plusMonths(13), N.plusMonths(15))) {
             add(CanonicalFixtures.transcribedDose(CRIANCA, data, registro, "24", null));
         }
 
-        assertAmbigua(calcular(), CRIANCA, "E", "AMB-C2-10");
+        assertCumpre(calcular(), CRIANCA, "E");
+    }
+
+    @Test
+    void ct_c2_61_transcricaoRegistradaDepoisDoCorteNaoEConhecidaNele() {
+        crianca(CRIANCA, N);
+        penta(CRIANCA, N);
+        vip(CRIANCA, N);
+        pneumo(CRIANCA, N);
+        LocalDate registro = CORTE.plusDays(5);
+        for (LocalDate data : List.of(N.plusMonths(13), N.plusMonths(15))) {
+            add(CanonicalFixtures.transcribedDose(CRIANCA, data, registro, "24", null));
+        }
+
+        assertNaoCumpre(calcular(), CRIANCA, "E");
     }
 
     @Test
@@ -1022,7 +1162,7 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_63_criancaDeTresMesesComUmaDoseDeCadaGrupoTemEZeroEEntraNoDenominador() {
+    void ct_c2_63_criancaDeTresMesesFicaForaDoDenominadorPoisAindaNaoCompletaDoisAnos() {
         LocalDate nascimento = LocalDate.of(2025, 12, 15);
         crianca(CRIANCA, nascimento);
         for (String codigo : List.of("42", "22", "24", "26")) {
@@ -1031,25 +1171,36 @@ class C2PackCasesTest {
 
         RuleOutcome outcome = calcular();
 
-        assertNaoCumpre(outcome, CRIANCA, "E");
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
-        assertThat(outcome.result().denominator()).isEqualTo(BigInteger.ONE);
-        assertThat(pessoa(outcome, CRIANCA).reasonCode()).isEqualTo("COORTE_ATE_2_ANOS");
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
+        assertThat(outcome.result().denominator()).isZero();
+        assertThat(pessoa(outcome, CRIANCA).decision()).isEqualTo(EvidenceDecision.EXCLUDED);
+        assertThat(pessoa(outcome, CRIANCA).reasonCode()).isEqualTo("EXCLUIDO_AINDA_NAO_COMPLETA_2_ANOS");
     }
 
     @Test
-    void e_doseDepoisDoSegundoAniversarioEAmbiguaAmb10() {
-        crianca(CRIANCA, N_MARCO);
-        doses(CRIANCA, "42", N_MARCO.plusDays(60), N_MARCO.plusDays(120), SEGUNDO_ANIVERSARIO.plusDays(5));
-        vip(CRIANCA, N_MARCO);
-        scr(CRIANCA, N_MARCO);
-        pneumo(CRIANCA, N_MARCO);
+    void e_doseDepoisDoSegundoAniversarioContaAmb10() {
+        crianca(CRIANCA, N);
+        doses(CRIANCA, "42", N.plusDays(60), N.plusDays(120), SEGUNDO_ANIVERSARIO.plusDays(5));
+        vip(CRIANCA, N);
+        scr(CRIANCA, N);
+        pneumo(CRIANCA, N);
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "E", "AMB-C2-10");
+        assertCumpre(calcular(), CRIANCA, "E");
     }
 
     @Test
-    void e_doseComCboForaDaListaEAmbiguaAmb11() {
+    void e_doseAplicadaAposOCorteNaoEConhecida() {
+        crianca(CRIANCA, N);
+        doses(CRIANCA, "42", N.plusDays(60), N.plusDays(120), CORTE.plusDays(1));
+        vip(CRIANCA, N);
+        scr(CRIANCA, N);
+        pneumo(CRIANCA, N);
+
+        assertNaoCumpre(calcular(), CRIANCA, "E");
+    }
+
+    @Test
+    void e_doseComCboForaDaListaContaAmb11() {
         crianca(CRIANCA, N);
         doses(CRIANCA, "42", N.plusDays(60), N.plusDays(120));
         add(new CanonicalImmunization(
@@ -1068,7 +1219,7 @@ class C2PackCasesTest {
         scr(CRIANCA, N);
         pneumo(CRIANCA, N);
 
-        assertAmbiguaAntesEDepoisDoPortao(CRIANCA, "E", "AMB-C2-11");
+        assertCumpre(calcular(), CRIANCA, "E");
     }
 
     // ================================================================ Coorte, ENG-27, ENG-36
@@ -1085,19 +1236,31 @@ class C2PackCasesTest {
     }
 
     @Test
-    void ct_c2_65_criancaQueCompletaDoisAnosNaCompetenciaDeixaOMesAmbiguo() {
-        // Transcrição (CT-C2-65, AMB-C2-03): RULE_AMBIGUITY quanto à inclusão naquele mês.
-        crianca(CRIANCA, N_MARCO);
+    void ct_c2_64_segundoAniversarioDepoisDoFimDaCompetenciaFicaForaDoDenominador() {
+        crianca("primeiro-de-abril", LocalDate.of(2024, 4, 1)); // 2º aniversário em 2026-04-01
+        crianca("ultimo-de-marco", LocalDate.of(2024, 3, 31)); // 2º aniversário em 2026-03-31, dentro
+        crianca("primeiro-de-marco", LocalDate.of(2024, 3, 1)); // 2º aniversário em 2026-03-01, dentro
+
+        RuleOutcome outcome = calcular();
+
+        assertThat(pessoa(outcome, "primeiro-de-abril").reasonCode()).isEqualTo("EXCLUIDO_AINDA_NAO_COMPLETA_2_ANOS");
+        assertThat(pessoa(outcome, "ultimo-de-marco").decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
+        assertThat(pessoa(outcome, "primeiro-de-marco").decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
+        assertThat(outcome.result().denominator()).isEqualTo(BigInteger.TWO);
+    }
+
+    @Test
+    void ct_c2_65_criancaQueCompletaDoisAnosNaCompetenciaEntraNoDenominadorSemAmbiguidade() {
+        crianca(CRIANCA, N);
 
         RuleOutcome outcome = calcular();
 
         assertThat(pessoa(outcome, CRIANCA).decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
         assertThat(pessoa(outcome, CRIANCA).reasonCode()).isEqualTo("COORTE_COMPLETA_2_ANOS_NA_COMPETENCIA");
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(outcome.result().valueText()).isNull();
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(outcome.result().valueText()).isEqualTo("0.0000");
         assertThat(outcome.result().denominator()).isEqualTo(BigInteger.ONE);
-        assertThat(outcome.result().limitations()).anyMatch(menciona("AMB-C2-03"));
-        assertThat(avaliar().result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        assertThat(outcome.result().limitations()).anyMatch(menciona("C2-LIM-08"));
     }
 
     @Test
@@ -1178,25 +1341,37 @@ class C2PackCasesTest {
         assertThat(pessoa(outcome, CRIANCA).reasonCode()).isEqualTo("COORTE_COMPLETA_2_ANOS_NA_COMPETENCIA");
         assertThat(outcome.result().denominator()).isEqualTo(BigInteger.ONE);
         assertThat(outcome.result().consolidationEligible()).isTrue();
-        // Pela regra CLAMP o 2º aniversário seria 28/02: a inclusão em março é AMB-C2-02 (transcrição).
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(outcome.result().limitations()).anyMatch(menciona("AMB-C2-02"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(outcome.result().limitations()).anyMatch(menciona("C2-LIM-09"));
     }
 
     @Test
-    void eng27_nascidaEm31DeAgostoTemAniversarioDeSeisMesesInexistente() {
-        LocalDate nascimento = LocalDate.of(2025, 8, 31); // 6 meses: 28/02 (CLAMP) ou 01/03 (NEXT_DAY)
-        crianca("divergente", nascimento);
-        add(visita("divergente", nascimento.plusDays(10)), visita("divergente", LocalDate.of(2026, 2, 28)));
-        crianca("antes", nascimento);
-        add(visita("antes", nascimento.plusDays(10)), visita("antes", LocalDate.of(2026, 2, 27)));
+    void eng27_nascidaEm29DeFevereiroNaoEstaNaCompetenciaDeFevereiro() {
+        crianca(CRIANCA, LocalDate.of(2024, 2, 29));
+        EvaluationContext fevereiro = EvaluationContext.endOfMonth(IBGE, YearMonth.of(2026, 2));
+
+        RuleOutcome outcome = C2Pack.compute(dados(fevereiro), fevereiro);
+
+        assertThat(pessoa(outcome, CRIANCA).reasonCode()).isEqualTo("EXCLUIDO_AINDA_NAO_COMPLETA_2_ANOS");
+    }
+
+    @Test
+    void eng27_nascidaEm31DeAgostoTemAniversarioDeSeisMesesNoDiaSeguinteQueNaoExiste() {
+        // competência 2026-08: quem nasceu em 2024-08-31 completa 2 anos em 2026-08-31 e 6 meses em 2025-03-01 (não
+        // 28/02)
+        LocalDate nascimento = LocalDate.of(2024, 8, 31);
+        EvaluationContext agosto = EvaluationContext.endOfMonth(IBGE, YearMonth.of(2026, 8));
+        crianca("vespera", nascimento);
+        add(visita("vespera", nascimento.plusDays(10)), visita("vespera", LocalDate.of(2025, 2, 28)));
+        crianca("no-dia", nascimento);
+        add(visita("no-dia", nascimento.plusDays(10)), visita("no-dia", LocalDate.of(2025, 3, 1)));
         crianca("depois", nascimento);
-        add(visita("depois", nascimento.plusDays(10)), visita("depois", LocalDate.of(2026, 3, 2)));
+        add(visita("depois", nascimento.plusDays(10)), visita("depois", LocalDate.of(2025, 3, 2)));
 
-        RuleOutcome outcome = calcular();
+        RuleOutcome outcome = C2Pack.compute(dados(agosto), agosto);
 
-        assertAmbigua(outcome, "divergente", "D", "AMB-C2-02");
-        assertCumpre(outcome, "antes", "D");
+        assertCumpre(outcome, "vespera", "D");
+        assertCumpre(outcome, "no-dia", "D");
         assertNaoCumpre(outcome, "depois", "D");
     }
 
@@ -1233,7 +1408,7 @@ class C2PackCasesTest {
         assertThat(pessoas).hasSize(9);
         assertThat(motivos)
                 .containsExactlyInAnyOrderEntriesOf(Map.of(
-                        "elegivel", "COORTE_ATE_2_ANOS",
+                        "elegivel", "COORTE_COMPLETA_2_ANOS_NA_COMPETENCIA",
                         "nasceu-depois", "EXCLUIDO_NASCIDO_APOS_CORTE",
                         "idade-acima", "EXCLUIDO_IDADE_ACIMA_2_ANOS",
                         "sem-vinculo", "EXCLUIDO_SEM_VINCULO",
@@ -1296,7 +1471,7 @@ class C2PackCasesTest {
 
     @Test
     void consolidacao_elegivelQuandoHaCriancaCompletandoDoisAnosNaCompetencia() {
-        crianca(CRIANCA, N_MARCO);
+        crianca(CRIANCA, N);
         crianca("bebe", LocalDate.of(2025, 1, 10));
 
         RuleOutcome outcome = avaliar();
@@ -1313,9 +1488,10 @@ class C2PackCasesTest {
 
         RuleOutcome outcome = avaliar();
 
+        // sem criança completando 2 anos não há linha de equipe: o mês é "-" para a NT 8/2026
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
         assertThat(outcome.result().consolidationEligible()).isFalse();
-        assertThat(outcome.teams())
-                .allSatisfy(t -> assertThat(t.result().consolidationEligible()).isFalse());
+        assertThat(outcome.teams()).isEmpty();
     }
 
     @Test
@@ -1348,6 +1524,12 @@ class C2PackCasesTest {
         assertThat(limitacoes).anyMatch(menciona("RNDS", "RIA"));
         assertThat(limitacoes).anyMatch(l -> l.toLowerCase(Locale.ROOT).contains("cadsus")); // CT-67
         assertThat(limitacoes).anyMatch(menciona("AMB-C2-03"));
+        assertThat(descritor.ruleVersion()).isEqualTo("c2-desenvolvimento-infantil@0.2.0");
+        assertThat(limitacoes).hasSize(25);
+        for (int i = 0; i < limitacoes.size(); i++) {
+            assertThat(limitacoes.get(i)).startsWith(String.format("C2-LIM-%02d: ", i + 1));
+        }
+        assertThat(limitacoes).noneMatch(menciona("RULE_AMBIGUITY", "ambíguo"));
     }
 
     @Test
@@ -1417,7 +1599,11 @@ class C2PackCasesTest {
     }
 
     private CanonicalDataset dados() {
-        CanonicalDataset.Builder builder = C2PackReviewTest.extractWindows(CONTEXTO.competencia());
+        return dados(CONTEXTO);
+    }
+
+    private CanonicalDataset dados(EvaluationContext contexto) {
+        CanonicalDataset.Builder builder = C2PackReviewTest.extractWindows(contexto.competencia());
         registros.forEach(builder::add);
         return builder.build();
     }
@@ -1530,6 +1716,15 @@ class C2PackCasesTest {
         return careEvent(chave, data, TECNICO_ENFERMAGEM, false, "INDIVIDUAL", null, peso, altura);
     }
 
+    /** Consulta de médico com os problemas avaliados dados (puericultura = A98 ou Z001). */
+    private static CanonicalCareEvent consultaCom(String chave, LocalDate data, List<String> ciap, List<String> cid) {
+        return careEvent(chave, data, MEDICO, false, "INDIVIDUAL", null, null, null, INE, ciap, cid);
+    }
+
+    private static CanonicalCareEvent consultaDeIne(String chave, LocalDate data, String ine) {
+        return careEvent(chave, data, MEDICO, false, "INDIVIDUAL", null, null, null, ine, List.of("A98"), List.of());
+    }
+
     private static CanonicalCareEvent careEvent(
             String chave,
             LocalDate data,
@@ -1539,6 +1734,21 @@ class C2PackCasesTest {
             String local,
             String peso,
             String altura) {
+        return careEvent(chave, data, cbo, remoto, forma, local, peso, altura, INE, List.of("A98"), List.of());
+    }
+
+    private static CanonicalCareEvent careEvent(
+            String chave,
+            LocalDate data,
+            String cbo,
+            Boolean remoto,
+            String forma,
+            String local,
+            String peso,
+            String altura,
+            String ine,
+            List<String> ciap,
+            List<String> cid) {
         return new CanonicalCareEvent(
                 CanonicalFixtures.ref("tb_fat_atendimento_individual"),
                 IBGE,
@@ -1547,12 +1757,12 @@ class C2PackCasesTest {
                 forma,
                 cbo,
                 CNES,
-                INE,
+                ine,
                 null,
                 local,
                 remoto,
-                List.of(),
-                List.of(),
+                ciap,
+                cid,
                 List.of(),
                 List.of(),
                 List.of(),
@@ -1568,13 +1778,23 @@ class C2PackCasesTest {
 
     private static CanonicalProcedureEvent procedimento(
             String chave, LocalDate data, String sigtap, String cbo, String origem) {
+        return procedimentoEmEstagio(chave, data, sigtap, cbo, "PERFORMED", origem);
+    }
+
+    private static CanonicalProcedureEvent procedimentoEmEstagio(
+            String chave, LocalDate data, String sigtap, String cbo, String estagio) {
+        return procedimentoEmEstagio(chave, data, sigtap, cbo, estagio, "MIP");
+    }
+
+    private static CanonicalProcedureEvent procedimentoEmEstagio(
+            String chave, LocalDate data, String sigtap, String cbo, String estagio, String origem) {
         return new CanonicalProcedureEvent(
                 CanonicalFixtures.ref("tb_fat_proced_atend_proced"),
                 IBGE,
                 chave,
                 data.toString(),
                 sigtap,
-                "PERFORMED",
+                estagio,
                 cbo,
                 CNES,
                 INE,
@@ -1634,6 +1854,10 @@ class C2PackCasesTest {
                 null);
     }
 
+    private static CanonicalTeam equipeDeIne(String ine, String tipo) {
+        return new CanonicalTeam(CanonicalFixtures.ref("tb_dim_equipe"), IBGE, ine, CNES, tipo, CORTE.toString());
+    }
+
     private static CanonicalTeam equipe(String tipo) {
         return new CanonicalTeam(CanonicalFixtures.ref("tb_dim_equipe"), IBGE, INE, CNES, tipo, CORTE.toString());
     }
@@ -1681,29 +1905,6 @@ class C2PackCasesTest {
         assertThat(linha.points())
                 .as("pontos da prática %s de %s", pratica, chave)
                 .isEqualTo(BigInteger.ZERO);
-    }
-
-    private static void assertAmbigua(RuleOutcome outcome, String chave, String pratica, String amb) {
-        EvidenceItem linha = pratica(outcome, chave, pratica);
-        assertThat(linha.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
-        assertThat(linha.points()).isNull();
-        assertThat(linha.reasonCode())
-                .matches("^(AMBIGUIDADE|DADO_INDISPONIVEL):.*")
-                .contains(amb);
-        ResultComponent componente = componente(outcome.result(), pratica);
-        assertThat(componente.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(componente.value()).isNull();
-        IndicatorResult result = outcome.result();
-        assertThat(result.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(result.valueText()).isNull();
-        assertThat(result.valueExact()).isNull();
-        assertThat(result.classification()).isNull();
-    }
-
-    /** A ambiguidade aparece antes do portão ({@code compute}) e sobrevive a ele ({@code evaluate}). */
-    private void assertAmbiguaAntesEDepoisDoPortao(String chave, String pratica, String amb) {
-        assertAmbigua(calcular(), chave, pratica, amb);
-        assertAmbigua(avaliar(), chave, pratica, amb);
     }
 
     private static PartRequirement parte(DataRequirements requisitos, String capacidade) {

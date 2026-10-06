@@ -9,9 +9,10 @@ import esusdata.indicator.model.DateWindow;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
- * One eligible child's source records. Practices read only those {@link #inScope} — inside the
+ * One eligible child's source records ({@code teamTypes}: the CNES type of each team INE known on the cutoff). Practices read only those {@link #inScope} — inside the
  * child's life and not after the evaluation cutoff, which is not known on the cutoff (§1.7.2).
  */
 record ChildRecords(
@@ -21,7 +22,8 @@ record ChildRecords(
         List<CanonicalProcedureEvent> procedures,
         List<CanonicalHomeVisit> visits,
         List<CanonicalMeasurement> measurements,
-        List<CanonicalImmunization> doses) {
+        List<CanonicalImmunization> doses,
+        Map<String, String> teamTypes) {
 
     ChildRecords {
         encounters = List.copyOf(encounters);
@@ -29,6 +31,7 @@ record ChildRecords(
         visits = List.copyOf(visits);
         measurements = List.copyOf(measurements);
         doses = List.copyOf(doses);
+        teamTypes = Map.copyOf(teamTypes);
     }
 
     /** Inside the child's life and not after the cutoff. */

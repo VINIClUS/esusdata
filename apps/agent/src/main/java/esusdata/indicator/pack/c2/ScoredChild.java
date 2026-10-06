@@ -13,17 +13,8 @@ record ScoredChild(C2Cohort.Member member, List<PracticeOutcome> outcomes, boole
         outcomes = List.copyOf(outcomes);
     }
 
-    boolean ambiguous() {
-        for (PracticeOutcome o : outcomes) {
-            if (o.status() == PracticeOutcome.Status.AMBIGUOUS) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Points of the practices met or exempt — a lower bound when {@link #ambiguous()}. */
-    BigInteger certainPoints(List<ComponentSpec> specs) {
+    /** Points of the practices met or exempt. */
+    BigInteger points(List<ComponentSpec> specs) {
         List<ComponentSpec> satisfied = new ArrayList<>();
         for (int i = 0; i < outcomes.size(); i++) {
             if (outcomes.get(i).scores()) {

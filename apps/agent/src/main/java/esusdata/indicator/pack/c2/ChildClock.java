@@ -3,16 +3,17 @@ package esusdata.indicator.pack.c2;
 import esusdata.indicator.model.AgeAt;
 import esusdata.indicator.model.AgeAt.AnniversaryRule;
 import java.time.LocalDate;
-import java.util.Set;
 
 /**
- * A child's calendar under one combination of readings: the ficha's "30º dia de vida" and
- * "até os N meses" become dates here and nowhere else, so every practice counts the same way.
+ * A child's calendar: the ficha's "30º dia de vida" and "até os N meses" become dates here and
+ * nowhere else, so every practice counts the same way. The readings are decided (record of
+ * decisions C2, AMB-C2-01 and AMB-C2-02): the day of birth is day 0 and day 30 is inside; the
+ * anniversary date is inside "até"; a missing anniversary day moves to the next day.
  */
 record ChildClock(LocalDate birth) {
 
-    /** The last day inside "até o 30º dia de vida" when the birth day is the 1º dia (AMB-C2-01). */
-    static final int LAST_DAY_BOTH_READINGS = 29;
+    /** The last day inside "até o 30º dia de vida": the day of birth is day 0 (AMB-C2-01). */
+    static final int LAST_DAY_OF_FIRST_30 = 30;
 
     /** "Até (os) dois anos de vida" in civil months. */
     static final long TWO_YEARS_IN_MONTHS = 24;
@@ -27,28 +28,23 @@ record ChildClock(LocalDate birth) {
     }
 
     /** "Até o 30º dia de vida" / "até os primeiros 30 (trinta) dias de vida". */
-    boolean withinFirst30Days(LocalDate date, Set<Reading> readings) {
+    boolean withinFirst30Days(LocalDate date) {
         long day = day(date);
-        int last = readings.contains(Reading.DAY_30_INSIDE) ? LAST_DAY_BOTH_READINGS + 1 : LAST_DAY_BOTH_READINGS;
-        return day >= 0 && day <= last;
+        return day >= 0 && day <= LAST_DAY_OF_FIRST_30;
     }
 
-    /** "Até os N meses de vida": before the anniversary, or on it when that reading holds. */
-    boolean upToMonths(LocalDate date, long months, Set<Reading> readings) {
-        LocalDate anniversary = anniversary(months, readings);
-        boolean onAnniversary = date.isEqual(anniversary) && readings.contains(Reading.ANNIVERSARY_DAY_INSIDE);
-        return bornBy(date) && (date.isBefore(anniversary) || onAnniversary);
+    /** "Até os N meses de vida": up to and including the anniversary (AMB-C2-02). */
+    boolean upToMonths(LocalDate date, long months) {
+        return bornBy(date) && !date.isAfter(anniversary(months));
     }
 
     /** "Não … antes dos N meses": on or after the anniversary. */
-    boolean fromMonths(LocalDate date, long months, Set<Reading> readings) {
-        return !date.isBefore(anniversary(months, readings));
+    boolean fromMonths(LocalDate date, long months) {
+        return !date.isBefore(anniversary(months));
     }
 
-    LocalDate anniversary(long months, Set<Reading> readings) {
-        AnniversaryRule rule = readings.contains(Reading.ANNIVERSARY_NEXT_DAY)
-                ? AnniversaryRule.NEXT_DAY
-                : AnniversaryRule.CLAMP_TO_MONTH_END;
-        return AgeAt.anniversaryMonths(birth, months, rule);
+    /** The anniversary after {@code months}; a day the month lacks moves to the next day (AMB-C2-02). */
+    LocalDate anniversary(long months) {
+        return AgeAt.anniversaryMonths(birth, months, AnniversaryRule.NEXT_DAY);
     }
 }

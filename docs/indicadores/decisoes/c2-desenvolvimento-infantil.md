@@ -823,6 +823,8 @@ Puericultura, A e B divergem..." sai porque o filtro passa a existir (C2-LIM-07)
 | Origem | Tipo | Tratamento |
 |---|---|---|
 | `C2Tally.limitations()` `:127-133`, "criança(s) com prática ou inclusão indeterminada ... RULE_AMBIGUITY" | removido | Depois das decisões nenhuma prática nem inclusão é ambígua por leitura. O ramo `ambiguousSubjects` (`C2Tally.java:45,77`) fica como guarda: se aparecer, é erro de implementação, não limitação. |
+
+> **Nota de 2026-10-06 (implementação de `c2-desenvolvimento-infantil@0.2.0`).** A guarda `ambiguousSubjects` de `C2Tally` continua no código, mas agora é **estrutural**: `PracticeOutcome.Status.AMBIGUOUS` deixou de existir, então o estado "prática ou inclusão indeterminada" não pode mais ser representado no tipo e o compilador impõe o que a guarda dizia. O código não tem ramo morto a testar; a decisão (nenhuma prática nem inclusão é ambígua por leitura) vale igual.
 | `C2Tally.limitations()` `:134-137`, "criança(s) de equipe sem tipo comprovado (lacuna L1) ..." | BLOCKING_GAP (C2-LIM-05) | O texto dinâmico fica como detalhe de C2-LIM-05, com a contagem. |
 | `C2Pack.unsupported()` `:~420-430`, "Capacidade X ausente do extrato ou com janela menor que a pedida" | não é limitação | É o **status** operacional `UNSUPPORTED_SOURCE` (dado necessário ausente). Na natureza é um bloqueio por dado ausente, mas é decidido em tempo de execução por extrato e não pertence à lista permanente. Fica como está. |
 

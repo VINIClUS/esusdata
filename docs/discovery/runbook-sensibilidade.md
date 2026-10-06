@@ -1,4 +1,4 @@
-# Runbook: sensibilidade das ambiguidades (RULE_AMBIGUITY de C2 e C3)
+# Runbook: sensibilidade das ambiguidades (RULE_AMBIGUITY de C3)
 
 Ferramenta **local**, na árvore de testes (`apps/agent/src/test/java/esusdata/indicator/sensitivity/`),
 sem chave de produção. Dado um extrato canônico real, que fica só no disco local, mostra para cada
@@ -10,13 +10,11 @@ B/D: veja o plano em `c1-c4-c5-e-rippling-riddle.md`, fatia S3.
 
 A ferramenta avalia cada pack como a produção faz (`evaluate`, só para ler contagens, evidência e
 limitações; o valor publicado nunca é lido). A linha de base tem de reproduzir a produção, ou a
-execução para com erro: C2 confere denominador, pontos e crianças ambíguas; C3 confere
-denominador e pontos pelos componentes.
+execução para com erro: C3 confere denominador e pontos pelos componentes.
 
 | Pack | Código | Leituras |
 |---|---|---|
-| C2 | AMB-C2-03, AMB-C2-02 | Incluir e marcar ambígua (produção), incluir sem marcar, excluir da coorte. A AMB-C2-02 (aniversário `NEXT_DAY` ou `CLAMP_TO_MONTH_END`) vem de `C2Cohort.classify`, o mesmo código da produção. |
-| C2 | demais AMB-C2-xx e LACUNA-L3 | **Limites**, não leituras: pontuação com as práticas que dependem do código todas não cumpridas e todas cumpridas. Crianças diferentes viram em sentidos diferentes, então o limite não é o resultado de uma leitura. |
+| C2 | — | Sem leituras desde `c2-desenvolvimento-infantil@0.2.0`: as AMB-C2-01 a -15 e a LACUNA-L3 foram decididas em `docs/indicadores/decisoes/c2-desenvolvimento-infantil.md`. Os números das leituras de 2026-08 ficam em `docs/discovery/2026-10-06-sensibilidade-2026-08.md`. Hoje entra como as demais: só o que dispara. |
 | C3 | AMB-C3-02 | Uma execução por convenção, com `C3Pack.withTrimesterConvention`. Dias contados da DUM (dia 0), limites inclusivos: 13s6d/28s0d = (97, 196); 13s6d/27s0d = (97, 189); 12s6d/28s0d = (90, 196); 14s0d/28s0d = (98, 196). Mostra também o numerador e o denominador de G e H. |
 | C3 | demais AMB-C3-xx | Frequência; os que aparecem como ambiguidade de inclusão do episódio na coorte, com as três leituras de inclusão; os de prática, com limites. |
 | C7 | — | Sem leituras desde `c7-prevencao-cancer@0.2.0`: as AMB-C7-05, -06 e -08 foram decididas em `docs/indicadores/decisoes/c7-prevencao-cancer.md`. Os números das leituras de 2026-08 ficam em `docs/discovery/2026-10-06-sensibilidade-2026-08.md`. Hoje entra como as demais: só o que dispara. |
@@ -51,7 +49,7 @@ em `<saída>/extratos`. Exige o opt-in explícito `ESUSDATA_SENSITIVITY_LIVE=tru
 binário do execplane e o arquivo de segredo dos outros testes ao vivo (o mesmo de
 [`runbook-validacao-capacidades.md`](runbook-validacao-capacidades.md): `PEC_DB_HOST/PORT/NAME/USER/PASSWORD`,
 `PEC_SOURCE_ID`, `PEC_VERSION`, `PEC_MUNICIPALITY_IBGE`; túnel no ar). Sem qualquer um deles o teste
-é ignorado. Opcional: `ESUSDATA_SENSITIVITY_PACKS=c2-desenvolvimento-infantil,c3-gestacao-puerperio`.
+é ignorado. Opcional: `ESUSDATA_SENSITIVITY_PACKS=c3-gestacao-puerperio,c4-cuidado-diabetes`.
 
 ```bash
 ESUSDATA_SENSITIVITY_LIVE=true \

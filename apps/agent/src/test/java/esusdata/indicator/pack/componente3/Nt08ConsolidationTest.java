@@ -584,16 +584,19 @@ class Nt08ConsolidationTest {
         assertNoScore(single(noDenominatorC3), IndicatorStatus.BLOCKED, "C7", C7);
     }
 
-    // ---- AMB-CIII-07: a NO_DENOMINATOR month outside C2/C3 is never zero and never skipped ----
+    // ---- AMB-CIII-07: an eligible NO_DENOMINATOR month is never zero and never skipped ----
     @Test
-    void ambCiii07_noDenominatorMonthInC4IsRuleAmbiguity() {
+    void ambCiii07_eligibleNoDenominatorMonthIsRuleAmbiguityAndNotEligibleOneIsADashMonthOutOfTheMean() {
         UnitResult unit = single(unit().status(C4, 2, IndicatorStatus.NO_DENOMINATOR));
         assertUnavailable(indicator(unit, C4), IndicatorStatus.RULE_AMBIGUITY);
         assertNoScore(unit, IndicatorStatus.RULE_AMBIGUITY, "C4", C4);
 
-        // the eligibility flag does not apply outside C2/C3
-        UnitResult flagged = single(unit().set(C4, 2, IndicatorStatus.NO_DENOMINATOR, null, false));
-        assertUnavailable(indicator(flagged, C4), IndicatorStatus.RULE_AMBIGUITY);
+        // flagged not eligible, the empty month is a "-" month out of the mean in every pack
+        UnitBuilder flagged = unit();
+        flagged.set(C4, 2, IndicatorStatus.NO_DENOMINATOR, null, false);
+        IndicatorQuadrimestral c4 = indicator(single(flagged), C4);
+        assertComputed(c4, pct(90), Classification.OTIMO);
+        assertThat(c4.monthsUsed()).doesNotContain(flagged.month(2)).hasSize(3);
 
         // in C2/C3 an eligible NO_DENOMINATOR month would enter the mean: also an ambiguity
         UnitResult eligibleC2 = single(unit().set(C2, 0, IndicatorStatus.NO_DENOMINATOR, null, true));
@@ -618,6 +621,122 @@ class Nt08ConsolidationTest {
         UnitResult unit = single(builder);
         assertUnavailable(indicator(unit, C6), IndicatorStatus.BLOCKED);
         assertNoScore(unit, IndicatorStatus.BLOCKED, "C6", C6);
+    }
+
+    // ---- AMB-C2-03: a team with no child completing 2 years has no C2 row: that is a "-" month ----
+    @Test
+    void teamWithoutC2RowInAMonthTheMunicipalityPublishedIsADashMonthOutOfTheMean() {
+        UnitBuilder municipal = unit().values(C2, pct(80), pct(60), pct(80), pct(60));
+        UnitBuilder team = unit();
+        team.results(C2, computed(C2, team.month(0), pct(90)), computed(C2, team.month(2), pct(70)));
+
+        ComponentIIIResult result =
+                consolidation.consolidate(input(Q1_2027, municipal.build(null, null), team.build(INE, CNES)), RULES);
+
+        UnitResult teamResult = result.units().stream()
+                .filter(u -> INE.equals(u.ine()))
+                .findFirst()
+                .orElseThrow();
+        IndicatorQuadrimestral c2 = indicator(teamResult, C2);
+        assertComputed(c2, pct(80), Classification.OTIMO);
+        assertThat(c2.monthsUsed()).containsExactly(team.month(0), team.month(2));
+        assertThat(teamResult.status()).isEqualTo(IndicatorStatus.COMPUTED);
+    }
+
+    @Test
+    void teamWithNoC2RowInAnyMonthHasNoC2MeanAndNoScoreNeverZero() {
+        UnitBuilder team = unit().without(C2);
+
+        ComponentIIIResult result =
+                consolidation.consolidate(input(Q1_2027, unit().build(null, null), team.build(INE, CNES)), RULES);
+
+        UnitResult teamResult = result.units().stream()
+                .filter(u -> INE.equals(u.ine()))
+                .findFirst()
+                .orElseThrow();
+        assertUnavailable(indicator(teamResult, C2), IndicatorStatus.NO_DENOMINATOR);
+        assertNoScore(teamResult, IndicatorStatus.NO_DENOMINATOR, "C2", C2);
+        assertThat(teamResult.limitations()).anyMatch(l -> l.contains("AMB-CIII-06"));
+    }
+
+    @Test
+    void absentTeamRowStillBlocksWhenTheMunicipalityDidNotPublishThatMonthOrThePackIsNotCohortOnly() {
+        // the municipality is missing the month too: a real publication gap, not a "-" month
+        UnitBuilder team = unit();
+        team.results(C2, computed(C2, team.month(0), pct(90)));
+        UnitBuilder municipalGap = unit();
+        municipalGap.results(C2, computed(C2, municipalGap.month(0), pct(90)));
+        ComponentIIIResult gap =
+                consolidation.consolidate(input(Q1_2027, municipalGap.build(null, null), team.build(INE, CNES)), RULES);
+        assertUnavailable(indicator(unitOf(gap, INE), C2), IndicatorStatus.BLOCKED);
+
+        // C4 is not a cohort-event pack: an absent month blocks even when the municipality has it
+        UnitBuilder c4Team = unit();
+        c4Team.values(C4, pct(60), pct(60), pct(60));
+        ComponentIIIResult notCohort =
+                consolidation.consolidate(input(Q1_2027, unit().build(null, null), c4Team.build(INE, CNES)), RULES);
+        assertUnavailable(indicator(unitOf(notCohort, INE), C4), IndicatorStatus.BLOCKED);
+
+        // the municipality itself never has a "-" month by absence
+        UnitBuilder municipalMissing = unit();
+        municipalMissing.values(C2, pct(80), pct(60), pct(80));
+        assertUnavailable(indicator(single(municipalMissing), C2), IndicatorStatus.BLOCKED);
+    }
+
+    // ---- a NO_DENOMINATOR month that is not eligible is a "-" month for every pack ----
+    @Test
+    void c7MonthWithoutDenominatorAndNotEligibleIsADashMonthOutOfTheMean() {
+        UnitBuilder builder = unit().values(C7, pct(90), pct(0), pct(60), pct(60));
+        builder.set(C7, 1, IndicatorStatus.NO_DENOMINATOR, null, false);
+
+        IndicatorQuadrimestral c7 = indicator(single(builder), C7);
+
+        assertComputed(c7, pct(70), Classification.BOM);
+        assertThat(c7.monthsUsed()).containsExactly(builder.month(0), builder.month(2), builder.month(3));
+    }
+
+    @Test
+    void c7WithEveryMonthWithoutDenominatorHasNoMeanAndNoScore() {
+        UnitBuilder builder = unit();
+        for (int i = 0; i < 4; i++) {
+            builder.set(C7, i, IndicatorStatus.NO_DENOMINATOR, null, false);
+        }
+        UnitResult unit = single(builder);
+
+        assertUnavailable(indicator(unit, C7), IndicatorStatus.NO_DENOMINATOR);
+        assertThat(indicator(unit, C7).monthsUsed()).isEmpty();
+        assertNoScore(unit, IndicatorStatus.NO_DENOMINATOR, "C7", C7);
+    }
+
+    @Test
+    void c3MonthWithoutDenominatorAmongValidMonthsIsADashMonthOutOfTheMean() {
+        UnitBuilder builder = unit().values(C3, pct(90), pct(0), pct(60), pct(60));
+        builder.set(C3, 1, IndicatorStatus.NO_DENOMINATOR, null, false);
+
+        IndicatorQuadrimestral c3 = indicator(single(builder), C3);
+
+        assertComputed(c3, pct(70), Classification.BOM);
+        assertThat(c3.monthsUsed()).containsExactly(builder.month(0), builder.month(2), builder.month(3));
+    }
+
+    @Test
+    void c3TeamWithoutRowInTheMonthsOfNoPuerperalCohortIsDashMonthsToo() {
+        UnitBuilder team = unit();
+        team.results(C3, computed(C3, team.month(1), pct(60)), computed(C3, team.month(3), pct(80)));
+
+        ComponentIIIResult result =
+                consolidation.consolidate(input(Q1_2027, unit().build(null, null), team.build(INE, CNES)), RULES);
+
+        IndicatorQuadrimestral c3 = indicator(unitOf(result, INE), C3);
+        assertComputed(c3, pct(70), Classification.BOM);
+        assertThat(c3.monthsUsed()).containsExactly(team.month(1), team.month(3));
+    }
+
+    private static UnitResult unitOf(ComponentIIIResult result, String ine) {
+        return result.units().stream()
+                .filter(u -> ine.equals(u.ine()))
+                .findFirst()
+                .orElseThrow();
     }
 
     // ---- COMPUTED without a value, or two results for one month, block the indicator ----

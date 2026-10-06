@@ -6,7 +6,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Predicate;
 
@@ -23,118 +22,55 @@ import java.util.function.Predicate;
  *   <li>Grupo 4 (pneumocócica): 2 doses, 30 days apart.
  * </ul>
  *
- * <p>Intervals count application dates; whether the 12-month and two-year limits use the application
- * or the registration date of a transcription is a reading (AMB-C2-09 v). The dose field is not
- * read: doses are applications (AMB-C2-09 iv).
+ * <p>Intervals count application dates, and so do the 12-month limit of SCR/SCRV and every other
+ * limit, also for a transcription (AMB-C2-09 v). Decided readings of the record of decisions C2:
+ * doses are counted per component (AMB-C2-09 i); the hepatitis B dose at birth counts (ii); a dose
+ * closer than 30 days is discarded (iii); the dose field is not read — doses are applications
+ * (iv); a dose after the second birthday counts when applied by the end of the competência and
+ * known on the cutoff (AMB-C2-10); the professional's CBO does not restrict a dose (AMB-C2-11).
  */
 final class VaccinePractice {
 
     private static final int MINIMUM_INTERVAL_DAYS = 30;
-    private static final long TWO_YEARS_IN_MONTHS = ChildClock.TWO_YEARS_IN_MONTHS;
-
-    /** "Dose ao nascer" of hepatitis B (AMB-C2-09 ii): a {@code 09} dose in the first 30 days (d ≤ 29). */
-    private static final int BIRTH_DOSE_LAST_DAY = 29;
-
     private static final long TWELVE_MONTHS = 12;
     private static final int PRIMARY_DOSES = 3;
     private static final int TWO_DOSES = 2;
 
-    private static final List<Reading> READINGS = List.of(
-            Reading.PER_OCCASION,
-            Reading.BIRTH_HEPATITIS_B,
-            Reading.SHORT_INTERVAL_INVALIDATES,
-            Reading.DOSES_AFTER_TWO_YEARS,
-            Reading.DOSE_BY_REGISTRATION_DATE,
-            Reading.VACCINE_CBO_RESTRICTED,
-            Reading.ANNIVERSARY_DAY_INSIDE,
-            Reading.ANNIVERSARY_NEXT_DAY);
-
     private VaccinePractice() {}
 
-    /**
-     * {@code date} is the application; {@code registered} the day a transcription was recorded (the
-     * application date for any other dose, whose registration date does not change what it proves).
-     */
-    private record Dose(LocalDate date, LocalDate registered, String code, String cbo, Support support) {
-        LocalDate limitDate(Set<Reading> readings) {
-            return readings.contains(Reading.DOSE_BY_REGISTRATION_DATE) ? registered : date;
-        }
-    }
+    /** {@code date} is the application: every limit of the practice uses it (AMB-C2-09 v). */
+    private record Dose(LocalDate date, String code, Support support) {}
 
     static PracticeOutcome evaluate(ChildRecords child) {
         List<Dose> doses = doses(child);
-        ChildClock clock = child.clock();
-        Readings.Verdict verdict = Readings.decide(READINGS, readings -> complete(clock, doses, readings));
         List<Support> support = new ArrayList<>();
         for (Dose d : doses) {
             support.add(d.support());
         }
-        return PracticeOutcome.of("E", verdict, support);
+        return PracticeOutcome.of("E", complete(child.clock(), doses), support);
     }
 
-    private static boolean complete(ChildClock clock, List<Dose> all, Set<Reading> readings) {
-        List<Dose> doses = new ArrayList<>();
-        for (Dose d : all) {
-            if (admitted(clock, d, readings)) {
-                doses.add(d);
-            }
-        }
-        NavigableSet<LocalDate> mmr =
-                dates(doses, C2Codes.MMR, d -> clock.fromMonths(d.limitDate(readings), TWELVE_MONTHS, readings));
-        return groupOne(clock, doses, readings)
-                && enough(dates(doses, C2Codes.POLIO, d -> true), PRIMARY_DOSES, readings)
+    private static boolean complete(ChildClock clock, List<Dose> doses) {
+        NavigableSet<LocalDate> mmr = dates(doses, C2Codes.MMR, d -> clock.fromMonths(d.date(), TWELVE_MONTHS));
+        return enough(dates(doses, C2Codes.DTP, d -> true), PRIMARY_DOSES)
+                && enough(dates(doses, C2Codes.HEPATITIS_B, d -> true), PRIMARY_DOSES)
+                && enough(dates(doses, C2Codes.HIB, d -> true), PRIMARY_DOSES)
+                && enough(dates(doses, C2Codes.POLIO, d -> true), PRIMARY_DOSES)
                 && mmr.size() >= TWO_DOSES
-                && enough(dates(doses, C2Codes.PNEUMOCOCCAL, d -> true), TWO_DOSES, readings);
-    }
-
-    /** Grupo 1: per component (each of DTP, HepB, Hib on its own dates) or per occasion (AMB-C2-09 i). */
-    private static boolean groupOne(ChildClock clock, List<Dose> doses, Set<Reading> readings) {
-        NavigableSet<LocalDate> dtp = dates(doses, C2Codes.DTP, d -> true);
-        NavigableSet<LocalDate> hepatitisB =
-                dates(doses, C2Codes.HEPATITIS_B, d -> !birthDoseSkipped(clock, d, readings));
-        NavigableSet<LocalDate> hib = dates(doses, C2Codes.HIB, d -> true);
-        if (readings.contains(Reading.PER_OCCASION)) {
-            NavigableSet<LocalDate> occasions = new TreeSet<>(dtp);
-            occasions.retainAll(hepatitisB);
-            occasions.retainAll(hib);
-            return enough(occasions, PRIMARY_DOSES, readings);
-        }
-        return enough(dtp, PRIMARY_DOSES, readings)
-                && enough(hepatitisB, PRIMARY_DOSES, readings)
-                && enough(hib, PRIMARY_DOSES, readings);
-    }
-
-    /** The {@code 09} dose of the first 30 days, left out when the birth dose does not count (AMB-C2-09 ii). */
-    private static boolean birthDoseSkipped(ChildClock clock, Dose dose, Set<Reading> readings) {
-        return !readings.contains(Reading.BIRTH_HEPATITIS_B)
-                && C2Codes.HEPATITIS_B_ONLY.equals(dose.code())
-                && clock.day(dose.date()) <= BIRTH_DOSE_LAST_DAY;
-    }
-
-    private static boolean admitted(ChildClock clock, Dose dose, Set<Reading> readings) {
-        boolean restrictedCbo = readings.contains(Reading.VACCINE_CBO_RESTRICTED)
-                && dose.cbo() != null
-                && !C2Codes.PROCEDURE.matches(dose.cbo());
-        boolean inWindow = readings.contains(Reading.DOSES_AFTER_TWO_YEARS)
-                || clock.upToMonths(dose.limitDate(readings), TWO_YEARS_IN_MONTHS, readings);
-        return !restrictedCbo && inWindow;
+                && enough(dates(doses, C2Codes.PNEUMOCOCCAL, d -> true), TWO_DOSES);
     }
 
     /**
-     * Whether {@code dates} hold {@code required} doses at least 30 days apart: a dose too close is
-     * skipped (earliest-first, which keeps the most doses) or, in the other reading of AMB-C2-09 iii,
-     * invalidates the component.
+     * Whether {@code dates} hold {@code required} doses at least 30 days apart: a dose too close to
+     * the last valid one is discarded and the next ones count from that last valid dose (AMB-C2-09 iii).
      */
-    private static boolean enough(NavigableSet<LocalDate> dates, int required, Set<Reading> readings) {
+    private static boolean enough(NavigableSet<LocalDate> dates, int required) {
         int valid = 0;
         LocalDate last = null;
         for (LocalDate date : dates) {
-            boolean spaced = last == null || !date.isBefore(last.plusDays(MINIMUM_INTERVAL_DAYS));
-            if (spaced) {
+            if (last == null || !date.isBefore(last.plusDays(MINIMUM_INTERVAL_DAYS))) {
                 valid++;
                 last = date;
-            } else if (readings.contains(Reading.SHORT_INTERVAL_INVALIDATES)) {
-                return false;
             }
         }
         return valid >= required;
@@ -166,9 +102,7 @@ final class VaccinePractice {
                 String model = transcription ? "MIV_TRANSCRICAO" : "MIV";
                 doses.add(new Dose(
                         date,
-                        registered,
                         code,
-                        i.cbo(),
                         new PracticeOutcome.Support(i.sourceRef(), date, i.cbo(), i.cnes(), i.ine(), model)));
             }
         }

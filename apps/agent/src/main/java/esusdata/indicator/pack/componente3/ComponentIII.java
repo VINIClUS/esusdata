@@ -19,7 +19,7 @@ import java.util.List;
 public final class ComponentIII {
 
     public static final String ID = "componente-iii-nota-final";
-    public static final String RULE_VERSION = ID + "@0.2.0";
+    public static final String RULE_VERSION = ID + "@0.3.0";
 
     /** NT 8/2026: weights 1/2/2/1/1/1/2 over C1–C7 for eSF/eAP. */
     public static final PackDescriptor DESCRIPTOR = new PackDescriptor(

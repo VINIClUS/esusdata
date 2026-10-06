@@ -6,18 +6,15 @@ import esusdata.indicator.model.CanonicalPerson;
 import esusdata.indicator.model.CanonicalRegistration;
 import esusdata.indicator.model.EvaluationContext;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.SortedSet;
-import java.util.TreeSet;
 
 /**
- * The C2 cohort (items 14, 15 and 23, p.1–2; 4.1 p.4): "Nº total de crianças com até 02 (dois) anos
- * de vida vinculadas à equipe no período", read literally for the month (AMB-C2-03, a standing
- * limitation): every linked child born by the cutoff whose second birthday is not before the first
- * day of the competência — children completing two years in the month included.
+ * The C2 cohort (items 14, 15 and 23, p.1–2; 4.1 p.4), as decided in AMB-C2-03: the children linked
+ * to the team whose second birthday falls in the competência. Each child is evaluated once, in the
+ * month it completes two years, over its whole life up to that birthday (NT 8/2026: a month with no
+ * child completing two years has no result). A child who completes two years before the first day
+ * of the competência, or after its last, is out.
  *
  * <p>The link is the latest complete individual registration version up to the cutoff (§1.7.3;
  * the NT 30/2025 national link is not reproducible locally, DW gap L8); interruptions are those of
@@ -27,15 +24,14 @@ final class C2Cohort {
 
     /**
      * The anniversary the pack reports for the cohort (ENG-27): Lei nº 810/1949, art. 3º — a child
-     * born on 29/02 completes two years on 01/03. When {@code CLAMP_TO_MONTH_END} would decide the
-     * month differently, the child's inclusion is AMB-C2-02 (the transcription's treatment).
+     * born on 29/02 completes two years on 01/03 (AMB-C2-02).
      */
     static final AnniversaryRule COHORT_RULE = AnniversaryRule.NEXT_DAY;
 
-    static final String ELIGIBLE = "COORTE_ATE_2_ANOS";
-    static final String ELIGIBLE_COMPLETES_TWO = "COORTE_COMPLETA_2_ANOS_NA_COMPETENCIA";
+    static final String ELIGIBLE = "COORTE_COMPLETA_2_ANOS_NA_COMPETENCIA";
     static final String BORN_AFTER_CUTOFF = "EXCLUIDO_NASCIDO_APOS_CORTE";
     static final String OVER_TWO_YEARS = "EXCLUIDO_IDADE_ACIMA_2_ANOS";
+    static final String NOT_YET_TWO_YEARS = "EXCLUIDO_AINDA_NAO_COMPLETA_2_ANOS";
     static final String NO_LINK = "EXCLUIDO_SEM_VINCULO";
     static final String REFUSED = "EXCLUIDO_RECUSA_CADASTRO";
     static final String TERRITORY_CHANGE = "INTERROMPIDO_MUDANCA_TERRITORIO";
@@ -52,66 +48,19 @@ final class C2Cohort {
 
     /** Where one person of the citizen extract stands on the cutoff. */
     record Member(
-            CanonicalPerson person,
-            ChildClock clock,
-            boolean eligible,
-            String reasonCode,
-            String ine,
-            String cnes,
-            boolean completesTwoInMonth,
-            SortedSet<String> cohortAmbiguities) {
-        Member {
-            cohortAmbiguities = Collections.unmodifiableSortedSet(new TreeSet<>(cohortAmbiguities));
-        }
-    }
+            CanonicalPerson person, ChildClock clock, boolean eligible, String reasonCode, String ine, String cnes) {}
 
     static Member classify(
             CanonicalPerson person, List<CanonicalRegistration> registrations, EvaluationContext context) {
         LocalDate birth = LocalDate.parse(person.birthDate());
         ChildClock clock = new ChildClock(birth);
         LocalDate cutoff = context.dataCutoff();
-        YearMonth month = context.competencia();
-        LocalDate secondBirthday = AgeAt.anniversaryYears(birth, 2, COHORT_RULE);
-        LocalDate clampedBirthday = AgeAt.anniversaryYears(birth, 2, AnniversaryRule.CLAMP_TO_MONTH_END);
         CanonicalRegistration link = latest(registrations, cutoff, false);
         CanonicalRegistration latest = latest(registrations, cutoff, true);
         String ine = link == null ? null : blankToNull(link.ine());
         String cnes = link == null ? null : link.cnes();
-        LocalDate lastBirthday = secondBirthday.isAfter(clampedBirthday) ? secondBirthday : clampedBirthday;
-        // the cohort leaves a child out only when both anniversary rules do
-        String excluded = exclusion(person, link, latest, birth, lastBirthday, context);
-        if (excluded != null) {
-            return new Member(person, clock, false, excluded, ine, cnes, false, new TreeSet<>());
-        }
-        boolean completesTwo = YearMonth.from(secondBirthday).equals(month);
-        boolean clampedCompletesTwo = YearMonth.from(clampedBirthday).equals(month);
-        SortedSet<String> ambiguities = cohortAmbiguities(secondBirthday, clampedBirthday, month);
-        return new Member(
-                person,
-                clock,
-                true,
-                completesTwo ? ELIGIBLE_COMPLETES_TWO : ELIGIBLE,
-                ine,
-                cnes,
-                completesTwo || clampedCompletesTwo,
-                ambiguities);
-    }
-
-    /**
-     * Where the ficha leaves the child's inclusion open: the two anniversary rules disagree on the
-     * month (AMB-C2-02), or the child completes two years in it (AMB-C2-03, CT-C2-65).
-     */
-    private static SortedSet<String> cohortAmbiguities(LocalDate secondBirthday, LocalDate clamped, YearMonth month) {
-        boolean completesTwo = YearMonth.from(secondBirthday).equals(month);
-        boolean clampedCompletesTwo = YearMonth.from(clamped).equals(month);
-        SortedSet<String> ambiguities = new TreeSet<>();
-        if (completesTwo != clampedCompletesTwo || clamped.isBefore(month.atDay(1))) {
-            ambiguities.add(C2Codes.AMB_C2_02);
-        }
-        if (completesTwo || clampedCompletesTwo) {
-            ambiguities.add(C2Codes.AMB_C2_03);
-        }
-        return ambiguities;
+        String excluded = exclusion(person, link, latest, birth, context);
+        return new Member(person, clock, excluded == null, excluded == null ? ELIGIBLE : excluded, ine, cnes);
     }
 
     /**
@@ -123,14 +72,7 @@ final class C2Cohort {
             return member;
         }
         return new Member(
-                member.person(),
-                member.clock(),
-                false,
-                TEAM_TYPE_NOT_CONSIDERED,
-                member.ine(),
-                member.cnes(),
-                false,
-                new TreeSet<>());
+                member.person(), member.clock(), false, TEAM_TYPE_NOT_CONSIDERED, member.ine(), member.cnes());
     }
 
     private static String exclusion(
@@ -138,14 +80,17 @@ final class C2Cohort {
             CanonicalRegistration link,
             CanonicalRegistration latest,
             LocalDate birth,
-            LocalDate secondBirthday,
             EvaluationContext context) {
         LocalDate cutoff = context.dataCutoff();
+        LocalDate secondBirthday = AgeAt.anniversaryYears(birth, 2, COHORT_RULE);
         if (birth.isAfter(cutoff)) {
             return BORN_AFTER_CUTOFF;
         }
         if (secondBirthday.isBefore(context.competencia().atDay(1))) {
             return OVER_TWO_YEARS;
+        }
+        if (secondBirthday.isAfter(context.competencia().atEndOfMonth())) {
+            return NOT_YET_TWO_YEARS;
         }
         if (person.deathDate() != null && !LocalDate.parse(person.deathDate()).isAfter(cutoff)) {
             return DEATH;

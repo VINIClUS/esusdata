@@ -84,7 +84,7 @@ Os demais itens estão nas seções próprias: 14, 15, 17 e 24 a/b em "Coorte e 
 | Prática D | "sendo a primeira até os primeiros 30 (trinta) dias de vida e a segunda até os 06 (seis) meses de vida"; no MIVDT: "primeira visita até 30 (trinta) dias de vida e segunda até 6 (seis) meses de vida" | item 16 p.2; 24 e p.3; Quadro 01 p.5; Quadro 04 p.6 |
 | Prática E — SCR/SCRV | "não devem ser consideradas doses registradas antes dos 12 meses de vida da criança" | 24 g p.3 |
 | Prática E — penta, VIP, VPC10 | "com intervalo mínimo de 30 dias entre as doses" | 24 g p.3–4 |
-| Não definido pela ficha | se o dia do nascimento é o dia 0 ou o 1º dia de vida; se a data exata de aniversário (6 meses, 12 meses, 2 anos) está dentro de "até"; o que é "período" (competência, quadrimestre) | ver AMB-C2-01, AMB-C2-02 e AMB-C2-03 |
+| Não definido pela ficha | se o dia do nascimento é o dia 0 ou o 1º dia de vida; se a data exata de aniversário (6 meses, 12 meses, 2 anos) está dentro de "até"; o que é "período" (competência, quadrimestre) | ver AMB-C2-01, AMB-C2-02 e AMB-C2-03 (decididas em `docs/indicadores/decisoes/c2-desenvolvimento-infantil.md`) |
 
 **Vínculo — remissão literal (item 14, p.1):** "conforme regras da Nota Técnica n° 30/2025-CGESCO/DESCO/SAPS/MS". A ficha não reproduz essas regras; elas não são resumidas aqui.
 
@@ -185,7 +185,7 @@ Quadro de detalhamento (p.5–6), título literal: "Quadro 03. Detalhamento para
 
 - **CBO de procedimentos (24 d, p.2):** a lista geral exclui expressamente `03.01.01.026-9`, que o Quadro 03 aceita para C (AMB-C2-06).
 - **Validade do SIGTAP (24 f, p.3):** "o procedimento só é válido respeitando-se as habilitações de CBO previstos na tabela SIGTAP".
-- **Simultaneidade e contagem:** a simultaneidade é "no mesmo dia", pela Observação. Ainda são ambíguos o procedimento isolado sem valores e vários pares no mesmo dia (AMB-C2-07).
+- **Simultaneidade e contagem:** a simultaneidade é "no mesmo dia", pela Observação. O procedimento isolado sem valores vale o registro do dia, e cada dia conta uma vez (AMB-C2-07, decidida no registro de decisões C2).
 - **CIAP-2/CID-10:** não se aplica. **Vacinas:** não se aplica.
 - **Nota:** o MIAC aparece só neste quadro; o item 24 e de C2 não o descreve.
 
@@ -433,43 +433,43 @@ Item 33 "Limitações" (p.4), literal:
 
 ## Ambiguidades
 
-Convenção: `RULE_AMBIGUITY` significa que o motor não decide o cenário afetado (Tech Spec §1.7.1 e §4.2: "Os resultados esperados de uma ambiguidade devem permanecer bloqueados até esclarecimento documentado"). A propagação da prática para a criança e para a equipe segue a Tech Spec, não esta transcrição. Quando várias leituras levam ao mesmo resultado, o motor decide. O bloqueio vale só para os cenários em que as leituras divergem.
+Convenção histórica: a regra `@0.1.0` devolvia `RULE_AMBIGUITY` onde a ficha admite mais de uma leitura (Tech Spec §1.7.1 e §4.2). Cada ambiguidade abaixo foi decidida, com fonte e raciocínio, no registro `docs/indicadores/decisoes/c2-desenvolvimento-infantil.md` (2026-10-06), e a regra `@0.2.0` aplica uma única leitura: o C2 não devolve mais `RULE_AMBIGUITY` nem `PRACTICE_AMBIGUOUS` por leitura da ficha. Cada item abaixo mantém o texto da ambiguidade (o que a ficha deixa aberto) e troca o "tratamento proposto" pela **decisão vigente**; as convenções decididas são divulgadas com o resultado como limitações `C2-LIM-NN` (`C2Pack.STANDING_LIMITATIONS`).
 
 **AMB-C2-01 — Contagem do "30º dia de vida".**
 - **Onde:** item 16 (A e D) p.2; item 17 p.2 ("30° dia de vida"); 24 e MIVDT p.3 ("primeira visita até 30 (trinta) dias de vida"); Quadros 01, 02 e 04, p.5–6.
 - **O que é ambíguo:** a ficha não diz se o dia do nascimento é o 1º dia de vida, o que põe o limite em nascimento + 29 dias, ou o dia 0, com limite em nascimento + 30. "Até o 30º dia" (ordinal) e "até os primeiros 30 (trinta) dias" admitem as duas leituras. O MET-19 da Tech Spec ("aos 30 dias" aceita, "aos 31" não) também não fixa a convenção, porque "aos 30 dias" pode ser qualquer uma das duas datas.
 - **Por que importa:** decide A e a 1ª visita de D.
-- **Tratamento proposto:** `RULE_AMBIGUITY` para um evento datado exatamente em nascimento + 30 quando só ele decide a prática. Nascimento + 29 cumpre nas duas leituras; nascimento + 31 não cumpre em nenhuma.
+- **Decisão (`@0.2.0`):** o dia do nascimento é o dia 0 e nascimento + 30 está dentro de "até o 30º dia" (`dia <= 30`; Código Civil, art. 132, por extensão). Nascimento + 29 e + 30 cumprem; + 31 não cumpre. `C2-LIM-09`.
 
 **AMB-C2-02 — Fronteiras em meses e anos.**
 - **Onde:** "até os 06 (seis) meses de vida" (D, p.2/p.5/p.6); "antes dos 12 meses de vida" (SCR/SCRV, 24 g p.3); "até (os) dois anos de vida" (B, C, p.2/p.5) e "com até 02 (dois) anos de vida" (coorte, itens 14 e 23, 4.1).
 - **O que é ambíguo:** a ficha não diz se a data exata em que a criança completa 6 meses ou 2 anos está dentro de "até". Também não diz como tratar aniversários inexistentes no mês de destino, como nascimento em 31/08 mais 6 meses, ou em 29/02 mais 12 meses. "Com até 02 (dois) anos" poderia ser lido como idade em anos completos ≤ 2, ou seja, até a véspera dos 3 anos. Os itens 4 e 7 falam em "dois primeiros anos de vida", o que sustenta a leitura "até o 2º aniversário". Para "antes dos 12 meses", uma dose aplicada no dia em que a criança completa 12 meses não é "antes" e conta, salvo o caso de data inexistente no mês.
 - **Por que importa:** decide D, B, C e a pertença à coorte nas datas de fronteira.
-- **Tratamento proposto:**
-  - `RULE_AMBIGUITY` só na data exata do aniversário de 6 meses e de 2 anos, e nos aniversários inexistentes no mês de destino. A aritmética é de calendário, sem aproximar meses por dias (Tech Spec §4.2).
-  - Limitação declarada: a coorte vai até o 2º aniversário, leitura sustentada pelos itens 4 e 7. A leitura "anos completos ≤ 2" fica registrada e não é adotada.
+- **Decisão (`@0.2.0`):**
+  - a data exata do aniversário de 6 meses e de 2 anos está dentro de "até"; aniversário inexistente no mês de destino vale o dia imediato (nascida em 29/02/2024 completa 2 anos em 01/03/2026; 31/08 + 6 meses = 01/03). A aritmética é de calendário, sem aproximar meses por dias (Tech Spec §4.2). `C2-LIM-09`.
+  - a coorte vai até o 2º aniversário, leitura sustentada pelos itens 4 e 7. A leitura "anos completos ≤ 2" fica registrada e não é adotada.
 
 **AMB-C2-03 — Composição do denominador mensal e significado de "período".**
 - **Onde:** itens 14 e 23 (p.1–2) e 4.1 (p.4): "com até 02 (dois) anos de vida no período" e "vinculadas à equipe no período".
 - **O que é ambíguo:** a ficha não define "período" (competência mensal? quadrimestre?). Também não diz se entram no denominador do mês crianças cujas práticas ainda não venceram; um bebê de 2 meses, por exemplo, ainda não pode ter cumprido B, C nem E. A Tech Spec §2.4, citando a NT nº 8/2026 (Q08), diz que para C2 só entram na média quadrimestral os meses em que há crianças que completaram dois anos. Isso sugere uma coorte mensal das crianças que completam 2 anos, mas esta ficha não diz isso.
 - **Por que importa:** muda o denominador e o escore de praticamente todas as crianças.
-- **Tratamento proposto:** `RULE_AMBIGUITY` para a composição do denominador mensal até a reconciliação com a lista nominal do Siaps (Tech Spec P06). O texto da NT 8/2026 está transcrito à parte em `componente-iii-nt08-2026.md` e não é resumido aqui. O escore individual de cada prática não depende desta ambiguidade.
+- **Decisão (`@0.2.0`):** o denominador do mês é o das crianças vinculadas à equipe cujo 2º aniversário cai na competência (NT 8/2026, item 4 "Atenção" e nota do Quadro 1: só entram na média os meses com crianças que completaram dois anos). A criança é avaliada uma vez, no mês em que completa 2 anos, sobre toda a vida até o aniversário. Quem não completa 2 anos na competência fica fora (`EXCLUIDO_AINDA_NAO_COMPLETA_2_ANOS`; antes da competência, `EXCLUIDO_IDADE_ACIMA_2_ANOS`). Equipe sem criança completando 2 anos não tem linha no mês, e a consolidação do Componente III trata a ausência como mês "-", fora da média. `C2-LIM-08`. O texto da NT 8/2026 está transcrito à parte em `componente-iii-nt08-2026.md`.
 
 **AMB-C2-04 — "Consulta presencial" e atendimento domiciliar.**
 - **Onde:** A exige consulta "presencial" (item 16, p.2); B aceita "presenciais ou remotas". O MIAI considera "Atendimento Individual (presencial, domiciliar e remoto)" (24 e, p.3), três modalidades distintas.
 - **O que é ambíguo:** se um atendimento individual domiciliar de médico ou enfermeiro conta como "presencial" para A e conta para B.
-- **Tratamento proposto:** `RULE_AMBIGUITY` quando A, ou o alcance das 9 consultas de B, depende de atendimento domiciliar.
+- **Decisão (`@0.2.0`):** o atendimento individual (MIAI) no domicílio é presencial e conta para A e para B (o domicílio é local, não modalidade remota). Outro modelo de atendimento domiciliar (MIAD) não é lido. `C2-LIM-17`.
 
 **AMB-C2-05 — Representação de "Puericultura".**
 - **Onde:** Quadro 02 (p.5) exige "problema/condição avaliado “Puericultura”".
 - **O que é ambíguo:** a ficha não lista CIAP-2, CID-10 nem código rápido equivalente, e não diz se uma consulta registrada só com CIAP-2/CID-10, sem a opção "Puericultura", conta.
-- **Tratamento proposto:** limitação declarada. Pela leitura literal, só pontuam consultas com "Puericultura" explícita; consultas codificadas apenas por CIAP-2/CID-10 não pontuam e aparecem como limitação de cobertura. A forma como "Puericultura" é gravada no PEC deve ser comprovada no Portão C, sem inventar lista de códigos.
+- **Decisão (`@0.2.0`):** uma consulta só conta para A e B se, entre os problemas **avaliados** do atendimento, houver CIAP-2 `A98` ou CID-10 `Z001` (maiúsculas, sem pontos, hífens e espaços), os códigos que o PEC grava com o campo de puericultura (Guia de Preenchimento, T1). Reverte a resposta S-C2-01 da integração. Os códigos não são exclusivos desse campo (AMB-GUIA-01). `C2-LIM-07`.
 
 **AMB-C2-06 — Papel e CBO de `03.01.01.025-0`, `03.01.01.027-7` e `03.01.01.026-9`.**
 - **Onde:** os três estão em 24 f (p.3) e na exceção de 24 d (p.2). O 24 d os exclui dos grupos de CBO de procedimentos sem dizer quais CBO valem para eles; o 24 f diz apenas "respeitando-se as habilitações de CBO previstos na tabela SIGTAP".
 - **O que é ambíguo:** `03.01.01.025-0` (teleconsulta) e `03.01.01.027-7` não aparecem em nenhum quadro, e o Quadro 02 (A/B) cita só o MIAI. Não se sabe se um registro só no MIP com esses códigos conta como consulta. Já `03.01.01.026-9` é aceito no Quadro 03 (C), cuja lista de CBO é ampla, mas está fora do grupo de CBO de procedimentos.
 - **Por que importa:** consultas registradas só no MIP; validade de `03.01.01.026-9` registrado por CBO não habilitado.
-- **Tratamento proposto:** `RULE_AMBIGUITY` para evidência de A, B ou C que dependa exclusivamente desses três códigos. Depende da tabela SIGTAP de habilitações, externa à ficha.
+- **Decisão (`@0.2.0`):** registro só no MIP com `03.01.01.025-0` ou `03.01.01.027-7` não é consulta de A nem de B; só o atendimento individual (MIAI) conta. `03.01.01.025-0` serve de marcador de modalidade remota (LACUNA-L3). `03.01.01.026-9` vale no Quadro 03 (C) pela lista de CBO do Quadro 03. A habilitação de CBO da tabela SIGTAP não é reproduzida. `C2-LIM-21`, `C2-LIM-22`.
 
 **AMB-C2-07 — Prática C: o que é um "registro simultâneo de peso e altura".**
 - **Onde:** item 16 (p.2), Quadro 03 (p.5–6).
@@ -477,7 +477,7 @@ Convenção: `RULE_AMBIGUITY` significa que o motor não decide o cenário afeta
 - **O que é ambíguo:**
   - (i) se `01.01.04.002-4` ou `03.01.01.026-9` sozinhos, sem valores de peso e altura, valem um registro simultâneo;
   - (ii) se vários pares no mesmo dia (ex.: MIAI e MIAC) contam uma vez ou mais.
-- **Tratamento proposto:** `RULE_AMBIGUITY` quando o limiar de 9 só é atingido pela leitura mais ampla de (i) ou (ii).
+- **Decisão (`@0.2.0`):** (i) `01.01.04.002-4`, `03.01.01.026-9` e o campo "Antropometria" do MIAC valem o registro do dia mesmo sem valores; (ii) cada dia conta uma vez, qualquer que seja o número de pares. Peso sem altura (ou o inverso) no dia continua sem contar. `C2-LIM-11`.
 
 **AMB-C2-08 — Prática D: ordem, duplicidade, motivo e desfecho das visitas.**
 - **Onde:** item 16 (p.2), 24 e MIVDT (p.3), Quadro 04 (p.6).
@@ -486,9 +486,12 @@ Convenção: `RULE_AMBIGUITY` significa que o motor não decide o cenário afeta
   - (ii) se dois registros de visita no mesmo dia contam como duas visitas;
   - (iii) o Quadro 04 diz "Serão considerados os registros de visita domiciliar." sem restringir o motivo, enquanto o 24 e exige motivo "recém-nascido" ou "criança";
   - (iv) se contam visitas cujo desfecho indica que não houve visita. A ficha C2 não cita o campo de desfecho; a ficha C3, Quadro 05, o regula expressamente.
-- **Tratamento proposto:**
-  - (i), (ii) e (iv): `RULE_AMBIGUITY`.
-  - (iii): limitação declarada. O 24 e e o Quadro 04 valem cumulativamente, porque o quadro não contradiz o 24 e, que acrescenta a condição. Visitas com outro motivo não contam, e isso deve ser revisto se a reconciliação (Portão D) mostrar o contrário.
+- **Decisão (`@0.2.0`):**
+  - (i) a 2ª visita é posterior ao 30º dia (a 1ª está em dia 0 a 30; a 2ª, depois do dia 30 e até o aniversário de 6 meses, inclusive);
+  - (ii) dois registros de visita no mesmo dia são uma visita (sem efeito após (i));
+  - (iii) limitação declarada: o 24 e e o Quadro 04 valem cumulativamente; visitas com outro motivo não contam;
+  - (iv) só conta visita com desfecho "realizada".
+  `C2-LIM-15`.
 
 **AMB-C2-09 — Prática E: modelo de contagem de doses.**
 - **Onde:** 24 g (p.3–4), Quadro 05 (p.6).
@@ -498,7 +501,7 @@ Convenção: `RULE_AMBIGUITY` significa que o motor não decide o cenário afeta
   - (iii) O que fazer com uma dose aplicada com intervalo menor que 30 dias: descartar e seguir contando, ou invalidar o esquema.
   - (iv) Se vale o campo "dose" do MIV (D1/D2/D3, reforço…) ou a contagem de aplicações.
   - (v) Se "doses registradas antes dos 12 meses" usa a data de aplicação ou a de registro. Isso importa nas transcrições.
-- **Tratamento proposto:** `RULE_AMBIGUITY` quando as leituras divergem para a criança. Quando todas concordam, por exemplo 3 doses de `42` com 30 dias ou mais de intervalo, o motor decide.
+- **Decisão (`@0.2.0`):** (i) por componente; (ii) a dose `09` ao nascer conta; (iii) dose com menos de 30 dias da última válida é descartada e as seguintes contam a partir da última dose válida; (iv) conta aplicações em datas distintas, o campo dose não é lido; (v) o limite de 12 meses do SCR/SCRV usa a data de aplicação. `C2-LIM-10`.
 
 **AMB-C2-10 — Prática E: janela, intervalo do SCR e esquemas alternativos.**
 - **Onde:** item 16 (p.2) e 24 g (p.3).
@@ -507,7 +510,7 @@ Convenção: `RULE_AMBIGUITY` significa que o motor não decide o cenário afeta
   - (ii) O grupo 3 (SCR/SCRV) não tem intervalo mínimo.
   - (iii) Só o "Esquema Primário" é descrito; não há regra para esquemas de atraso ou resgate.
 - **Tratamento proposto:**
-  - (i) `RULE_AMBIGUITY` para doses datadas depois do 2º aniversário;
+  - (i) decisão (`@0.2.0`): E não tem janela de idade própria; conta a dose aplicada até o fim da competência e conhecida no corte da execução (o extrato lê até o último dia da competência);
   - (ii) limitação declarada: nenhum intervalo é inventado; duas doses em datas distintas, a partir dos 12 meses, bastam, e registros do mesmo código na mesma data contam uma vez (deduplicação de evidência, MET-32);
   - (iii) limitação declarada: vale só o que está no 24 g.
 
@@ -516,7 +519,7 @@ Convenção: `RULE_AMBIGUITY` significa que o motor não decide o cenário afeta
 - **O que é ambíguo:**
   - O Quadro 02 exige registro "alocado conforme os códigos das equipes descritos"; os únicos tipos descritos são 70 e 76 (24 b). Já o 4.4 diz que contam "os registros de qualquer profissional habilitado em estabelecimento de saúde da APS, no país".
   - Na prática E, o MIV de 24 e exige "profissionais de saúde dos CBO supracitados", e o Quadro 05 aceita "Todos que submeterem o registro ao SIAPS ou à RNDS".
-- **Tratamento proposto:** `RULE_AMBIGUITY` em dois casos: consultas de A/B por médico ou enfermeiro não alocado em equipe tipo 70 ou 76, e registros de vacina de E feitos por CBO fora das listas do 24 c/d. Os demais registros de vacina não são afetados, porque as duas leituras os aceitam.
+- **Decisão (`@0.2.0`):** (1) a dose de vacina conta qualquer que seja o CBO de quem registra (Quadro 05 e item 4.4); (2) a consulta de A/B conta se a equipe (INE) do próprio atendimento é de tipo 70 ou 76 ou se o tipo é desconhecido; com tipo conhecido e outro, não conta. Enquanto o tipo de equipe não existir no extrato (lacuna L1) a regra não filtra. `C2-LIM-05`, `C2-LIM-06`, `C2-LIM-16`.
 
 **AMB-C2-12 — Efeito da interrupção do acompanhamento.**
 - **Onde:** item 15 (p.2).
@@ -536,7 +539,7 @@ Convenção: `RULE_AMBIGUITY` significa que o motor não decide o cenário afeta
 **AMB-C2-15 — Prática B: várias consultas no mesmo dia.**
 - **Onde:** item 16 (p.2).
 - **O que é ambíguo:** "pelo menos 09 (nove) consultas" não diz se dois atendimentos distintos no mesmo dia (ex.: médico e enfermeira) contam como dois. Em C, a ficha explicita o "mesmo dia"; em B, não.
-- **Tratamento proposto:** `RULE_AMBIGUITY` quando o limiar de 9 só é atingido contando mais de um atendimento no mesmo dia. O mesmo atendimento registrado em duplicidade conta uma vez (MET-32).
+- **Decisão (`@0.2.0`):** atendimentos distintos no mesmo dia contam como consultas distintas. O mesmo atendimento registrado em duplicidade (mesma data, CBO normalizado, CNES e INE) conta uma vez (MET-32). `C2-LIM-19`.
 
 **AMB-C2-16 — Corte de extração.**
 - **Onde:** item 11 (p.1): "SIAPS: 20º dia útil de cada mês."
@@ -574,38 +577,38 @@ Notação: N = data de nascimento. N+k = k dias corridos após N (ex.: com N = 2
 | CT-C2-08 | Crianças elegíveis sem nenhuma prática | 0 → Regular; zero é resultado, não falha | MET-03; item 30 p.4 |
 | CT-C2-09 | Nenhuma criança elegível na equipe | valor nulo, `NO_DENOMINATOR` | MET-04 |
 | CT-C2-10 | A: 1ª consulta presencial em N+29 | A cumpre (20) | item 16 p.2; Quadro 02 p.5; AMB-C2-01 |
-| CT-C2-11 | A: 1ª consulta presencial em N+30 | `RULE_AMBIGUITY` | AMB-C2-01; MET-19 |
+| CT-C2-11 | A: 1ª consulta presencial em N+30 | A cumpre (20) | AMB-C2-01; MET-19 |
 | CT-C2-12 | A: 1ª consulta presencial em N+31 | A não cumpre | item 16 p.2; MET-19 |
 | CT-C2-13 | A: consulta remota em N+10; 1ª presencial em N+35 | A não cumpre (exige presencial). As duas contam para B | item 16 p.2; Quadro 02 p.5 |
 | CT-C2-14 | A: consulta presencial em N+10 por cirurgião-dentista (`2232`) | A não cumpre (CBO fora do Quadro 02) | Quadro 02 p.5; 24 c p.2 |
-| CT-C2-15 | A: consulta presencial de médico em N+10 sem "Puericultura" | A não cumpre | Quadro 02 p.5 (Observação) |
-| CT-C2-16 | A: única consulta até N+30 é atendimento domiciliar de enfermeira em N+10 | `RULE_AMBIGUITY` | AMB-C2-04; 24 e p.3 |
-| CT-C2-17 | A/B: consulta de médico de equipe não 70/76 em estabelecimento da APS | `RULE_AMBIGUITY` | AMB-C2-11; Quadro 02 p.5; 4.4 p.5 |
+| CT-C2-15 | A: consulta presencial de médico em N+10 sem `A98`/`Z001` entre os problemas avaliados | A não cumpre (com `A98` ou `Z001`, cumpre) | Quadro 02 p.5 (Observação); AMB-C2-05 |
+| CT-C2-16 | A: única consulta até N+30 é atendimento domiciliar de enfermeira em N+10 | A cumpre (20) | AMB-C2-04; 24 e p.3 |
+| CT-C2-17 | A/B: consulta de médico de equipe de tipo conhecido não 70/76 | não conta (tipo desconhecido: conta) | AMB-C2-11; Quadro 02 p.5; 4.4 p.5 |
 | CT-C2-18 | B: 8 consultas válidas antes do 2º aniversário | B não cumpre | item 16 p.2 |
 | CT-C2-19 | B: 9 consultas válidas (presenciais e remotas) antes do 2º aniversário | B cumpre (20) | item 16 p.2; Quadro 02 p.5 |
 | CT-C2-20 | B: 8 consultas antes do 2º aniversário + 1 depois | B não cumpre (fora da janela) | item 16 p.2 |
-| CT-C2-21 | B: 9ª consulta exatamente no dia do 2º aniversário | `RULE_AMBIGUITY` | AMB-C2-02 |
-| CT-C2-22 | B: 8 consultas no MIAI + 1 só no MIP com `03.01.01.025-0` | `RULE_AMBIGUITY` | AMB-C2-06; 24 f p.3 |
-| CT-C2-23 | B: 9 atendimentos, dois deles no mesmo dia (médico e enfermeira), 8 dias distintos | `RULE_AMBIGUITY` | AMB-C2-15 |
+| CT-C2-21 | B: 9ª consulta exatamente no dia do 2º aniversário | B cumpre (20) | AMB-C2-02 |
+| CT-C2-22 | B: 8 consultas no MIAI + 1 só no MIP com `03.01.01.025-0` | B não cumpre | AMB-C2-06; 24 f p.3 |
+| CT-C2-23 | B: 9 atendimentos, dois deles no mesmo dia (médico e enfermeira), 8 dias distintos | B cumpre (20) | AMB-C2-15 |
 | CT-C2-24 | B: a mesma consulta registrada em duplicidade | conta 1 (deduplicação de evidência) | MET-32 |
 | CT-C2-25 | C: 9 dias distintos com peso e altura no campo do PEC (MIAI) | C cumpre (20) | Quadro 03 p.5 |
 | CT-C2-26 | C: 8 dias com peso e altura + 1 dia só com peso | C não cumpre | item 16 p.2 ("simultâneos"); Quadro 03 |
 | CT-C2-27 | C: 8 dias no MIAI + 1 dia com `01.01.04.008-3` e `01.01.04.007-5` no MIP, mesmo dia | C cumpre (par no mesmo dia, códigos listados) | Quadro 03 p.5–6 |
-| CT-C2-28 | C: 8 dias no MIAI + 1 dia só com `01.01.04.002-4`, sem valores | `RULE_AMBIGUITY` | AMB-C2-07 (i) |
+| CT-C2-28 | C: 8 dias no MIAI + 1 dia só com `01.01.04.002-4`, sem valores | C cumpre (20) | AMB-C2-07 (i) |
 | CT-C2-29 | C: 8 dias no MIAI + 1 dia com peso no MIAI e altura no MIVDT | C cumpre (mesmo dia; Observação "Registros realizados no mesmo dia.", reconstruída do layout) | Quadro 03 p.5–6; AMB-C2-07 |
-| CT-C2-30 | C: 8 dias distintos, um com dois pares (MIAI e MIAC) | `RULE_AMBIGUITY` | AMB-C2-07 (ii) |
+| CT-C2-30 | C: 8 dias distintos, um com dois pares (MIAI e MIAC) | C não cumpre (cada dia conta uma vez) | AMB-C2-07 (ii) |
 | CT-C2-31 | C: peso e altura só em registro de procedimento consolidado | não conta | Quadro 03 p.5 ("com exceção do registro de procedimento consolidado") |
 | CT-C2-32 | C: 9º par registrado depois do 2º aniversário | não conta | item 16 p.2 |
 | CT-C2-33 | D: visitas em N+10 e N+100 | D cumpre (20) | item 16 p.2; Quadro 04 p.6; 24 e p.3 |
-| CT-C2-34 | D: visitas em N+29 e N+100 / em N+30 e N+100 / em N+31 e N+100 | cumpre / `RULE_AMBIGUITY` / não cumpre | AMB-C2-01 |
+| CT-C2-34 | D: visitas em N+29 e N+100 / em N+30 e N+100 / em N+31 e N+100 | cumpre / cumpre / não cumpre | AMB-C2-01 |
 | CT-C2-35 | D: visitas em N+40 e N+100 | D não cumpre (1ª fora dos 30 dias) | item 16 p.2 |
-| CT-C2-36 | D: visitas em N+10 e N+20 (as duas nos 30 dias) | `RULE_AMBIGUITY` | AMB-C2-08 (i) |
-| CT-C2-37 | D: visita em N+10 e outra no dia em que completa 6 meses | `RULE_AMBIGUITY` | AMB-C2-02 |
+| CT-C2-36 | D: visitas em N+10 e N+20 (as duas nos 30 dias) | D não cumpre (a 2ª é posterior ao 30º dia) | AMB-C2-08 (i) |
+| CT-C2-37 | D: visita em N+10 e outra no dia em que completa 6 meses | D cumpre (20) | AMB-C2-02 |
 | CT-C2-38 | D: visita em N+10 e outra no dia seguinte ao aniversário de 6 meses | D não cumpre | item 16 p.2 |
-| CT-C2-39 | D: dois registros de visita na mesma data N+10 e nenhum outro | `RULE_AMBIGUITY` | AMB-C2-08 (ii) |
+| CT-C2-39 | D: dois registros de visita na mesma data N+10 e nenhum outro | D não cumpre (uma visita) | AMB-C2-08 (ii) |
 | CT-C2-40 | D: visitas de técnico de enfermagem (CBO `3222` diferente de `3222-55`) | não contam | Quadro 04 p.6 |
 | CT-C2-41 | D: visitas com motivo diferente de "recém-nascido" ou "criança" | não contam | 24 e p.3; AMB-C2-08 (iii) |
-| CT-C2-42 | D: visita em N+10 com desfecho indicando visita não realizada | `RULE_AMBIGUITY` | AMB-C2-08 (iv) |
+| CT-C2-42 | D: visita em N+10 com desfecho indicando visita não realizada | não conta | AMB-C2-08 (iv) |
 | CT-C2-43 | D: criança de eAP tipo 76 sem nenhuma visita | D = 20 (pontuação integral) | 24 b p.2 |
 | CT-C2-44 | D: criança de eSF tipo 70 sem nenhuma visita | D = 0 | 24 b p.2 |
 | CT-C2-45 | eAP tipo 76: criança cumpre A, B, C e E, sem visitas | 100 pontos | 24 b p.2; Quadro 01 p.5 |
@@ -617,21 +620,21 @@ Notação: N = data de nascimento. N+k = k dias corridos após N (ex.: com N = 2
 | CT-C2-51 | E: `24` no dia do aniversário de 12 meses e aos 15 meses | 2 doses válidas (grupo 3 cumpre) | 24 g p.3; AMB-C2-02 |
 | CT-C2-52 | E: penta `42` em N+60, N+89 (29 dias) e N+150 | grupo 1 com 2 doses válidas → E não cumpre | 24 g p.3 ("intervalo mínimo de 30 dias") |
 | CT-C2-53 | E: penta `42` em N+60, N+90 (30 dias) e N+120 | intervalo de 30 dias aceito → grupo 1 cumpre | 24 g p.3 |
-| CT-C2-54 | E: penta `42` em N+60, N+89, N+150 e N+200 | `RULE_AMBIGUITY` (descartar N+89 dá 3 doses válidas; invalidar o esquema não) | AMB-C2-09 (iii) |
-| CT-C2-55 | E: `39` (DTP/Hib) 3× e `09` (HepB) 3×, nenhuma ao nascer, em datas diferentes das de `39`, todas com ≥ 30 dias por componente; demais grupos completos | `RULE_AMBIGUITY` (cumpre por componente, não por ocasião) | AMB-C2-09 (i) |
+| CT-C2-54 | E: penta `42` em N+60, N+89, N+150 e N+200 | grupo 1 cumpre (N+89 é descartada; 60, 150 e 200 são 3 doses válidas) | AMB-C2-09 (iii) |
+| CT-C2-55 | E: `39` (DTP/Hib) 3× e `09` (HepB) 3×, nenhuma ao nascer, em datas diferentes das de `39`, todas com ≥ 30 dias por componente; demais grupos completos | E cumpre (contagem por componente) | AMB-C2-09 (i) |
 | CT-C2-56 | E: `46` + `09` + `17` na mesma data, em 3 ocasiões com ≥ 30 dias; demais grupos completos | E cumpre (as duas leituras concordam) | 24 g p.3; AMB-C2-09 |
 | CT-C2-57 | E: `09` ao nascer + `42` em N+60 e N+120 (2 doses de penta); demais grupos completos | E não cumpre (D, T, P e Hib com 2 doses) | 24 g p.3 |
-| CT-C2-58 | E: `09` em N+0, `42` em N+60 e N+120, `39` em N+180; demais grupos completos | `RULE_AMBIGUITY`: HepB só tem 3 doses se a dose ao nascer contar, e pela leitura por ocasião só há 2 datas com os 5 componentes | AMB-C2-09 (i) e (ii) |
+| CT-C2-58 | E: `09` em N+0, `42` em N+60 e N+120, `39` em N+180; demais grupos completos | E cumpre: HepB tem 3 doses com a dose ao nascer, contada por componente | AMB-C2-09 (i) e (ii) |
 | CT-C2-59 | E: pneumocócica `26` em N+60 e `59` em N+120 | grupo 4 cumpre (códigos listados, ≥ 30 dias) | 24 g p.4 |
 | CT-C2-60 | E: mesma dose de `42` em N+60 no MIV e via RIA | conta 1 dose (mesma data; intervalo 0 < 30) | 24 g p.3; MET-32 |
-| CT-C2-61 | E: `24` aplicada aos 13 meses e transcrita (registrada) aos 26 meses | `RULE_AMBIGUITY` | AMB-C2-09 (v); AMB-C2-10 (i); Quadro 05 p.6 ("transcrição") |
+| CT-C2-61 | E: `24` aplicada aos 13 meses e transcrita (registrada) aos 26 meses | a dose conta pela data de aplicação (SCR aos 13 meses cumpre; transcrição registrada depois do corte da execução não é conhecida nele) | AMB-C2-09 (v); AMB-C2-10 (i); Quadro 05 p.6 ("transcrição") |
 | CT-C2-62 | E: dose com código fora da lista do Quadro 05 | não conta | Quadro 05 p.6 |
-| CT-C2-63 | E: criança de 3 meses com 1 dose de cada grupo | E = 0 para a criança. A inclusão dela no denominador do mês segue AMB-C2-03 | 24 g p.3; AMB-C2-03 |
+| CT-C2-63 | E: criança de 3 meses com 1 dose de cada grupo | fora do denominador do mês (não completa 2 anos na competência; `EXCLUIDO_AINDA_NAO_COMPLETA_2_ANOS`) | 24 g p.3; AMB-C2-03 |
 | CT-C2-64 | Coorte: 2º aniversário antes do 1º dia da competência | fora do denominador | item 23 p.2; 4.1 p.4 |
-| CT-C2-65 | Coorte: criança completa 2 anos dentro da competência | `RULE_AMBIGUITY` quanto à inclusão naquele mês | AMB-C2-02; AMB-C2-03 |
+| CT-C2-65 | Coorte: criança completa 2 anos dentro da competência | entra no denominador do mês, sem ambiguidade (2º aniversário depois do fim da competência: fora) | AMB-C2-02; AMB-C2-03 |
 | CT-C2-66 | Interrupção: cadastro individual mais recente com "Saída do cidadão do cadastro" + "Mudança de território" | criança deixa o acompanhamento da equipe. O mês do evento segue AMB-C2-12 | item 15 p.2 |
 | CT-C2-67 | Interrupção: óbito registrado só no CadSUS | não detectável no PEC local → limitação declarada | item 15 p.2; item 33 p.4 |
 | CT-C2-68 | Consultas feitas em UBS de outro município, registradas só lá | invisíveis ao PEC local → limitação declarada (local pode ficar abaixo do Siaps) | 4.4 p.5 |
 | CT-C2-69 | Criança sem CPF/CNS válido | não identificável conforme 24 a → limitação declarada | 24 a p.2; AMB-C2-14 |
 | CT-C2-70 | Consulta digitada depois do corte da competência (retroativa) | recalcular a janela afetada e manter proveniência | MET-32; item 11 p.1 |
-| CT-C2-71 | Quadrimestre com meses 1 e 3 elegíveis e meses 2 e 4 sem criança completando dois anos | média só dos meses 1 e 3. Regra da NT 8/2026 via Tech Spec, não desta ficha | MET-34 |
+| CT-C2-71 | Quadrimestre com meses 1 e 3 elegíveis e meses 2 e 4 sem criança completando dois anos (equipe sem linha nesses meses) | média só dos meses 1 e 3; os meses 2 e 4 são "-" | NT 8/2026 item 4 e Quadro 1; MET-34 |
