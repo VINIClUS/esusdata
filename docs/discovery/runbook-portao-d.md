@@ -78,3 +78,11 @@ A evidência de cada pack é o resumo: o registro guarda `ref` (caminho relativo
   INE e contados com `C1Rule.computeEvidenceOnly`; o valor exato vem de `ResultJson.exactValue`,
   como o produto armazena. Esse caminho tem teste unitário com dados sintéticos, mas ainda não foi
   exercitado ao vivo contra o PEC.
+
+## Depois de registrar o D
+
+Com o D registrado em `release-gates.json` e a versão liberada, não é preciso recalcular nada à mão: o
+agendador trata como não cobertas as competências cujo resultado foi gravado com o D em outro estado
+(ADR 0032, nota de 2026-10-06) e as recalcula sozinho, a mais antiga primeiro, um job por tick. Para
+acelerar, dispare "Verificar agora" na fonte (`POST /api/v1/sources/{id}/schedule/run-now`), uma vez
+por competência pendente.

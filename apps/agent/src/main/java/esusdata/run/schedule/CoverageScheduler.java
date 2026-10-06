@@ -2,7 +2,9 @@ package esusdata.run.schedule;
 
 import esusdata.auth.ScopeResolver;
 import esusdata.auth.model.Permission;
+import esusdata.indicator.ReleaseGateRegistry;
 import esusdata.indicator.model.IndicatorRule;
+import esusdata.result.model.PublishedCoverage;
 import esusdata.result.model.ResultRepository;
 import esusdata.run.job.ActiveJobExistsException;
 import esusdata.run.job.EnqueueRequest;
@@ -49,6 +51,16 @@ import org.springframework.context.SmartLifecycle;
  * 0026, per pack) is what makes a manual click and the scheduler never compute the same pack and
  * competência twice.
  *
+ * <p>A competência counts as published (covered) only for a result of the pack's compiled {@code
+ * rule_version} whose recorded registry gates, A and D, equal the registry's current ones for that
+ * pack and version (ADR 0032): a result of an older rule, one computed while D was pending that a
+ * release has since recorded as passed, and one without a gate snapshot (before V12, or the {@code
+ * legacy} marker) are all due again. Gates B and C are not compared: every run evaluates them from
+ * the source, and a result held back by them would otherwise be recomputed on every tick. Due
+ * competências, never computed or stale alike, go in the planner's order: oldest first per pack.
+ * History stays in sequence, and Componente III needs a whole quadrimestre under one rule version,
+ * so the oldest stale month is the one that unblocks it. Still one job per tick.
+ *
  * <p>"Published" and "failed recently" are per pack. A pack is eligible only when every capability
  * it reads is {@code VALIDATED} for the source ({@link SourcePacks}); until the live validation of
  * the canonical v2 capabilities that is C1 alone, so the scheduler keeps doing what it did.
@@ -88,6 +100,7 @@ public final class CoverageScheduler implements SmartLifecycle {
     private final Clock clock;
     private final Settings settings;
     private final SourcePacks sourcePacks;
+    private final ReleaseGateRegistry gateRegistry;
 
     private ScheduledExecutorService executor;
     private ScheduledFuture<?> ticks;
@@ -141,6 +154,32 @@ public final class CoverageScheduler implements SmartLifecycle {
             Clock clock,
             Settings settings,
             SourcePacks sourcePacks) {
+        this(
+                sourceRepository,
+                coverageService,
+                jobRepository,
+                resultRepository,
+                scopeResolver,
+                scheduleRepository,
+                clock,
+                settings,
+                sourcePacks,
+                ReleaseGateRegistry.bundled());
+    }
+
+    /** With the registry that decides whether a published result still counts as coverage. */
+    public CoverageScheduler(
+            SourceRepository sourceRepository,
+            SourceCoverageService coverageService,
+            JobRepository jobRepository,
+            ResultRepository resultRepository,
+            ScopeResolver scopeResolver,
+            JdbcScheduleRepository scheduleRepository,
+            Clock clock,
+            Settings settings,
+            SourcePacks sourcePacks,
+            ReleaseGateRegistry gateRegistry) {
+        this.gateRegistry = gateRegistry;
         this.sourceRepository = sourceRepository;
         this.coverageService = coverageService;
         this.jobRepository = jobRepository;
@@ -281,10 +320,13 @@ public final class CoverageScheduler implements SmartLifecycle {
                 .findFirst();
     }
 
+    /**
+     * The competências each pack counts as covered: a published result of the compiled rule
+     * version, recorded under the registry's current A and D ({@link PublishedCoverage}).
+     */
     private Map<String, Set<YearMonth>> publishedByPack(SourceRecord source) {
         Map<String, Set<YearMonth>> published = new LinkedHashMap<>();
-        resultRepository
-                .findPublishedPeriodsByPack(source.municipalityIbge())
+        PublishedCoverage.coveredByPack(resultRepository.findPublishedCoverage(source.municipalityIbge()), gateRegistry)
                 .forEach((pack, periods) -> published.put(
                         pack, periods.stream().map(YearMonth::parse).collect(Collectors.toCollection(TreeSet::new))));
         return published;

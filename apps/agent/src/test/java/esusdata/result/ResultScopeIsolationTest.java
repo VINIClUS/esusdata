@@ -13,6 +13,7 @@ import esusdata.result.model.ExtractionManifestRepository;
 import esusdata.result.model.PublicationAuthorization;
 import esusdata.result.model.PublicationOutcome;
 import esusdata.result.model.PublicationRequest;
+import esusdata.result.model.PublishedCoverage;
 import esusdata.result.model.ResultRepository;
 import esusdata.result.model.ResultStagingArea;
 import esusdata.result.model.StagingRequest;
@@ -144,7 +145,7 @@ class ResultScopeIsolationTest {
                 "SOURCE_EVENT",
                 "sha256:" + "0".repeat(64),
                 List.of(),
-                GateFixtures.snapshot()));
+                GateFixtures.snapshot("c1-mais-acesso")));
         stagingArea.writeEvidence(
                 stagingId,
                 List.of(
@@ -242,6 +243,33 @@ class ResultScopeIsolationTest {
 
         assertThat(resultRepository.findPublishedPeriodsByPack("3541307")).isEmpty();
         assertThat(resultRepository.findPublishedPeriods("3541307")).containsExactly("2026-03");
+    }
+
+    @Test
+    void findPublishedCoverageReportsPackVersionCompetenciaAndGateSnapshotInScope() {
+        assertThat(resultRepository.findPublishedCoverage("3541307"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.indicatorPack()).isEqualTo("c1-mais-acesso");
+                    assertThat(row.ruleVersion()).isEqualTo("c1-mais-acesso@0.5.0");
+                    assertThat(row.referencePeriod()).isEqualTo("2026-03");
+                    assertThat(row.gateSnapshotJson()).contains("\"gates\"");
+                });
+        assertThat(resultRepository.findPublishedCoverage("3550308")).isEmpty();
+    }
+
+    @Test
+    void aCompetenciaPublishedWithTheLegacySnapshotIsNotPublishedForScheduling() {
+        context.getBean(JdbcTemplate.class)
+                .update(
+                        "UPDATE results SET gate_snapshot_json = '{\"legacy\":true}' WHERE result_id = ?",
+                        resultIdMunicipalityA);
+
+        assertThat(resultRepository.findPublishedPeriodsByPack("3541307")).isEmpty();
+        assertThat(resultRepository.findPublishedCoverage("3541307"))
+                .singleElement()
+                .extracting(PublishedCoverage::gateSnapshotJson)
+                .isEqualTo("{\"legacy\":true}");
     }
 
     @Test

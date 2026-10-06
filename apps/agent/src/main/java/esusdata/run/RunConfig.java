@@ -407,6 +407,7 @@ public class RunConfig {
             JdbcScheduleRepository scheduleRepository,
             Clock clock,
             SourcePacks sourcePacks,
+            ReleaseGateRegistry releaseGateRegistry,
             @Value("${observatorio.scheduler.enabled:false}") boolean enabled,
             @Value("${observatorio.scheduler.interval:PT6H}") Duration interval,
             @Value("${observatorio.scheduler.initial-delay:PT2M}") Duration initialDelay,
@@ -421,7 +422,8 @@ public class RunConfig {
                 scheduleRepository,
                 clock,
                 new CoverageScheduler.Settings(enabled, interval, initialDelay, settleDays, maxJobsPerTick),
-                sourcePacks);
+                sourcePacks,
+                releaseGateRegistry);
     }
 
     /**
