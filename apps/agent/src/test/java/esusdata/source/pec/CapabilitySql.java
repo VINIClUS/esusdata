@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  */
 final class CapabilitySql {
 
-    private static final Pattern TABLE_ALIAS = Pattern.compile("public\\.(tb_\\w+)\\s+(?:AS\\s+)?(\\w+)");
+    private static final Pattern TABLE_ALIAS = Pattern.compile("public\\.(t[abl]_\\w+)\\s+(?:AS\\s+)?(\\w+)");
     private static final Pattern QUALIFIED_COLUMN = Pattern.compile("\\b(\\w+)\\.(\\w+)\\b");
 
     private CapabilitySql() {}

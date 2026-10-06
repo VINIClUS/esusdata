@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Compatibility matrices for tests of capability eligibility (ADR 0030): which capabilities are
- * {@code VALIDATED} for which PEC versions, on the PEC_DW read model of a PRONTUARIO installation.
+ * {@code VALIDATED} for which PEC versions, on the read model of each capability (PEC_DW, or PEC_OLTP for {@code team}) of a PRONTUARIO installation.
  * The entries carry every field {@link PecCompatibilityMatrix#entries()} parses; their fingerprints
  * are placeholders — nothing here is a validated contract.
  */
@@ -32,8 +32,13 @@ public final class CompatibilityMatrices {
     /** One {@code tested_with} entry. */
     public static String entry(String capability, String status, List<String> pecVersions) {
         String hash = "sha256:" + "0".repeat(64);
+        String readModel = CapabilityCatalog.packaged()
+                .find(capability)
+                .map(CapabilityContract::readModel)
+                .orElse(CapabilityContract.DEFAULT_READ_MODEL);
         return "{\"pec_versions\":[\"" + String.join("\",\"", pecVersions) + "\"],"
-                + "\"postgresql_version\":\"9.6.13\",\"adapter_version\":\"0.1.0\",\"read_model\":\"PEC_DW\","
+                + "\"postgresql_version\":\"9.6.13\",\"adapter_version\":\"0.1.0\",\"read_model\":\"" + readModel
+                + "\","
                 + "\"installation_role\":\"PRONTUARIO\",\"capability\":\"" + capability + "\",\"status\":\""
                 + status + "\",\"objects_used\":[{\"object\":\"tb_teste\",\"columns_used\":[\"co_seq\"],"
                 + "\"signature_fingerprint\":\"" + hash + "\"}],\"municipal_isolation_evidence\":"

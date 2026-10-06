@@ -1,0 +1,29 @@
+{
+  "capability": "team",
+  "adapter_version": "0.1.0",
+  "description": "Estados do tipo da equipe (código do MS em tb_tipo_equipe.nu_ms) por INE, com CNES e vigência, lidos do esquema transacional do PEC e restritos às equipes que o DW conhece (ADR 0031, §1.7.3 Equipe).",
+  "read_model": "PEC_OLTP",
+  "record_kind": "team",
+  "entity_type_column": "source_entity_type",
+  "record_id_column": "source_record_id",
+  "municipality_column": "municipality_ibge",
+  "scope_date_column": null,
+  "query": "queries/team@0.1.0.sql",
+  "binds": [
+    {
+      "name": "municipality_ibge",
+      "type": "MUNICIPALITY_IBGE"
+    }
+  ],
+  "columns": [
+    { "name": "source_entity_type", "type": "text", "required": true },
+    { "name": "source_record_id", "type": "text", "required": true },
+    { "name": "municipality_ibge", "type": "text", "required": true },
+    { "name": "ine", "type": "text", "required": true },
+    { "name": "cnes", "type": "text", "required": false },
+    { "name": "team_type_code", "type": "text", "required": true },
+    { "name": "valid_from", "type": "date", "required": false },
+    { "name": "valid_to", "type": "date", "required": false },
+    { "name": "type_source", "type": "text", "required": true }
+  ]
+}

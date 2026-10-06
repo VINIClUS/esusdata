@@ -324,3 +324,77 @@ Valem as regras do passo 4 do inventário do DW. O repositório é público e a 
 
 O resumo vai em `docs/discovery/AAAA-MM-DD-pec-5528-equipe-transacional.md` e alimenta a seção
 "Pendências" do ADR 0031.
+
+## Inventário L6 (formato da PA da visita) e exame do pé (C4)
+
+Dois achados que faltam ao DW, num script só de agregados:
+`contracts/compatibility/inventory/dw-l6-foot-inventory.sql`.
+
+- **L6:** em `tb_fat_visita_domiciliar.nu_medicao_pressao_arterial`, quantas linhas há, quantas são
+  não nulas, que parte casa com `^\d{2,3}[/xX]\d{2,3}$` e quais são as formas dos valores (dígito
+  vira 9, letra vira a; formas com menos de 5 linhas juntas em "(outras)"). Nunca sai um valor de PA.
+- **C4:** as colunas de fatos e dimensões cujo nome lembra pé, diabetes ou exame (só catálogo) e,
+  em `tb_fat_atendimento_individual`, as linhas não nulas de cada uma (nas booleanas, também as
+  verdadeiras).
+
+O `DwFootInventoryGuard` repete a barreira pelo plano: só catálogo ou agregado sobre
+`tb_fat_visita_domiciliar` e `tb_fat_atendimento_individual`; qualquer outra tabela, ou linhas de
+fato sem agregar, derrubam a execução antes da consulta. As contagens são varreduras das duas
+tabelas, dentro do `statement_timeout` de 30 s; se estourar, registre o erro e não aumente o
+orçamento sem decisão do usuário.
+
+```bash
+# Túnel aberto como no passo 1 desta seção; saída em apps/agent/target/dw-l6-foot/
+mvn -B -f apps/agent/pom.xml test -Djacoco.skip=true \
+  -Dsurefire.reuseForks=false \
+  -Dtest=DwFootInventoryLiveTest -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dobservatorio.execution-plane.live-pec=true \
+  -Dobservatorio.execution-plane.live-pec.env-file=$HOME/.config/observatorio-aps/pec-253.env
+umask 077 && mkdir -p ~/observatorio-aps-inventario
+cp apps/agent/target/dw-l6-foot/dw-l6-foot-inventory-*.txt ~/observatorio-aps-inventario/
+```
+
+Mesmas regras de git da seção anterior: contagens e formas de valor podem ir para o documento de
+descoberta (contagens abaixo de 10 como `<10`), nunca a saída crua.
+
+## Captura da assinatura e das contagens da capacidade `team`
+
+O `TeamFingerprintCaptureLiveTest` calcula, no PEC, a `signature_fingerprint` de cada objeto de
+`team@0.1.0`, compara com a da matriz empacotada (MATCH ou DIFFERENT) e roda a consulta congelada
+uma vez para o município informado, devolvendo só contagens (linhas por origem do tipo e código,
+INEs distintos, máximo de estados por INE), nunca INE nem CNES. Saída em
+`apps/agent/target/team-capture/`.
+
+```bash
+mvn -B -f apps/agent/pom.xml test -Djacoco.skip=true \
+  -Dsurefire.reuseForks=false \
+  -Dtest=TeamFingerprintCaptureLiveTest -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dobservatorio.execution-plane.live-pec=true \
+  -Dobservatorio.execution-plane.live-pec.env-file=$HOME/.config/observatorio-aps/pec-253.env \
+  -Dobservatorio.team-capture.ibge=<IBGE de 7 dígitos do município da fonte>
+```
+
+Se algum objeto sair DIFFERENT, as `signature_fingerprint` da entrada `team` (hoje as da fixture
+sintética) são substituídas pelas capturadas; a entrada continua `NOT_TESTED` até a aprovação do
+usuário (ADR 0023).
+
+### Diferencial Rust x JDBC ao vivo para `team`
+
+As assinaturas da entrada `team` já são as reais (captura de 2026-10-06). Para rodar a aquisição v2
+pelo filho Rust e comparar com o JDBC (passo 4 de `runbook-validacao-capacidades.md`), só na cópia de
+trabalho, **sem commitar**, em `contracts/compatibility/pec-adapters.json`, na entrada `team`:
+`status` para `VALIDATED`, `test_result` para `PASS`, e `approved_by` e `approved_at` com qualquer
+valor provisório (o schema exige os quatro). Depois:
+
+```bash
+cargo build --release --locked --manifest-path apps/execplane/Cargo.toml
+mvn -B -f apps/agent/pom.xml test -Dsurefire.reuseForks=false \
+  -Dtest=ExecPlaneCapabilityLivePecTest \
+  -Dobservatorio.execution-plane.binary=$PWD/apps/execplane/target/release/observatorio-execplane \
+  -Dobservatorio.execution-plane.live-pec=true \
+  -Dobservatorio.execution-plane.live-pec.env-file=$HOME/.config/observatorio-aps/pec-253.env \
+  -Dobservatorio.capabilities.live.only=team
+```
+
+Reverta a entrada com `git checkout contracts/compatibility/pec-adapters.json` ao fim. O arquivo de
+ambiente precisa de `PEC_SOURCE_ID`, `PEC_VERSION` e `PEC_MUNICIPALITY_IBGE`.

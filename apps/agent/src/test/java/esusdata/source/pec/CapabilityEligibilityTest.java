@@ -24,6 +24,7 @@ class CapabilityEligibilityTest {
         List<String> on5528 =
                 new ArrayList<>(List.of("individual_encounter_modality", "municipal_isolation", "period_coverage"));
         on5528.addAll(Capabilities.ALL);
+        on5528.add(Capabilities.TEAM);
 
         assertThat(packaged.validatedCapabilities(PEC_5_4_37)).containsExactly("individual_encounter_modality");
         assertThat(packaged.validatedCapabilities(PEC_5_5_28)).containsExactlyInAnyOrderElementsOf(on5528);
@@ -119,5 +120,44 @@ class CapabilityEligibilityTest {
                 .isEmpty();
         assertThat(CapabilityEligibility.identityOf("src", "5.4", "PEC_DW", "PRONTUARIO"))
                 .isEmpty();
+    }
+
+    @Test
+    void aCapabilityIsComparedWithItsOwnReadModelNotTheSourcesOwn() {
+        PecCompatibilityMatrix matrix =
+                CompatibilityMatrices.validated(List.of("5.5.28"), List.of(Capabilities.TEAM, Capabilities.CITIZEN));
+        PecSourceIdentity dw = new PecSourceIdentity("src", "5.5.28", "PEC_DW", "PRONTUARIO");
+        PecSourceIdentity oltp = new PecSourceIdentity("src", "5.5.28", "PEC_OLTP", "PRONTUARIO");
+
+        // team is a PEC_OLTP capability: a source registered as PEC_DW reads it (same PostgreSQL)...
+        assertThat(matrix.validatedCapabilities(dw)).containsExactlyInAnyOrder(Capabilities.TEAM, Capabilities.CITIZEN);
+        assertThat(matrix.findExact(Capabilities.TEAM, "0.1.0", dw, "9.6.13").readModel())
+                .isEqualTo("PEC_OLTP");
+        // ...while a DW capability still needs a source registered with the DW model.
+        assertThat(matrix.validatedCapabilities(oltp)).containsExactly(Capabilities.TEAM);
+    }
+
+    @Test
+    void aTeamEntryThatNamesTheWrongModelValidatesNothing() {
+        String entry = CompatibilityMatrices.entry(Capabilities.TEAM, "VALIDATED", List.of("5.5.28"))
+                .replace("\"read_model\":\"PEC_OLTP\"", "\"read_model\":\"PEC_DW\"");
+        PecCompatibilityMatrix matrix = CompatibilityMatrices.of(List.of(entry));
+
+        assertThat(matrix.validatedCapabilities(new PecSourceIdentity("src", "5.5.28", "PEC_DW", "PRONTUARIO")))
+                .isEmpty();
+    }
+
+    @Test
+    void theTeamCapabilityIsValidatedOnItsOwnModelForAPecDwSource() {
+        PecCompatibilityMatrix packaged = PecCompatibilityMatrix.fromClasspathResource();
+
+        assertThat(packaged.validatedCapabilities(PEC_5_5_28)).contains(Capabilities.TEAM);
+        assertThat(packaged.entries())
+                .filteredOn(entry -> Capabilities.TEAM.equals(entry.capability()))
+                .singleElement()
+                .satisfies(entry -> {
+                    assertThat(entry.status()).isEqualTo("VALIDATED");
+                    assertThat(entry.readModel()).isEqualTo("PEC_OLTP");
+                });
     }
 }

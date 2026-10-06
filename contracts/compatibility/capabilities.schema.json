@@ -31,6 +31,10 @@
       "type": "string",
       "minLength": 1
     },
+    "read_model": {
+      "enum": ["PEC_DW", "PEC_OLTP"],
+      "description": "Modelo de leitura da capacidade (ADR 0031). Opcional; o padrão é PEC_DW. A entrada da matriz é comparada com ele, não com o modelo da fonte."
+    },
     "record_kind": {
       "enum": [
         "person",

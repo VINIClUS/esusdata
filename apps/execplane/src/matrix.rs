@@ -104,4 +104,23 @@ mod tests {
         );
         assert!(objects.is_empty());
     }
+
+    /// `team` is a `PEC_OLTP` entry (ADR 0031): found under that model, never under the DW's.
+    #[test]
+    fn finds_the_transactional_team_entry_only_under_its_own_model() {
+        let objects = objects_to_probe("team", "0.1.0", "5.5.28", "PEC_OLTP", "PRONTUARIO");
+        let names: Vec<&str> = objects.iter().map(|o| o.object.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "ta_equipe",
+                "tb_dim_equipe",
+                "tb_dim_municipio",
+                "tb_equipe",
+                "tb_tipo_equipe",
+                "tb_unidade_saude"
+            ]
+        );
+        assert!(objects_to_probe("team", "0.1.0", "5.5.28", "PEC_DW", "PRONTUARIO").is_empty());
+    }
 }

@@ -60,6 +60,11 @@ public final class CanonicalDataset {
         return of(RecordKind.TEAM, CanonicalTeam.class);
     }
 
+    /** The team types of {@link #teams()} as states over time, to look a type up on a day (ADR 0031). */
+    public TeamTimeline teamTimeline() {
+        return TeamTimeline.of(teams());
+    }
+
     public List<CanonicalCareEvent> careEvents() {
         return of(RecordKind.CARE_EVENT, CanonicalCareEvent.class);
     }
