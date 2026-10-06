@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** AMB-C3-19: the two MIAC conditions, given practice lists in LEDI codes. */
+/** AMB-C3-19: the two MIAC conditions (conjunction), given practice lists in LEDI codes. */
 class MiacMatchTest {
 
     private static CanonicalMeasurement activity(String type, String practice) {
@@ -17,17 +17,15 @@ class MiacMatchTest {
     }
 
     @Test
-    void bothConditionsCountWithTheQuadroOwnReading() {
-        MiacMatch match = MiacMatch.of(activity("5", "2"), List.of("2"));
-        assertThat(match).isEqualTo(MiacMatch.BOTH);
-        assertThat(match.ambiguity(Ambiguity.AMB_C3_04)).isEqualTo(Ambiguity.AMB_C3_04);
+    void bothConditionsCount() {
+        assertThat(MiacMatch.counts(activity("5", "2"), List.of("2"))).isTrue();
     }
 
     @Test
-    void onlyOneConditionIsAmb19AndNeitherDoesNotCount() {
-        assertThat(MiacMatch.of(activity("5", "9"), List.of("2")).ambiguity(Ambiguity.AMB_C3_04))
-                .isEqualTo(Ambiguity.AMB_C3_19);
-        assertThat(MiacMatch.of(activity("4", "9"), List.of("2")).counts()).isFalse();
+    void onlyOneConditionOrNeitherDoesNotCount() {
+        assertThat(MiacMatch.counts(activity("5", "9"), List.of("2"))).isFalse();
+        assertThat(MiacMatch.counts(activity("4", "2"), List.of("2"))).isFalse();
+        assertThat(MiacMatch.counts(activity("4", "9"), List.of("2"))).isFalse();
     }
 
     @Test
@@ -36,11 +34,13 @@ class MiacMatchTest {
         assertThat(C3Codes.MIAC_PRACTICES).containsExactly("20", "2", "9");
         assertThat(C3Codes.MIAC_PRACTICES_ANTHROPOMETRY).containsExactly("20");
         assertThat(C3Codes.MIAC_PRACTICES_ORAL_HEALTH).containsExactly("2", "9");
-        assertThat(MiacMatch.of(activity("05", "02"), C3Codes.MIAC_PRACTICES_ORAL_HEALTH))
-                .isEqualTo(MiacMatch.BOTH);
-        assertThat(MiacMatch.of(activity("05", "01"), C3Codes.MIAC_PRACTICES_ANTHROPOMETRY))
-                .isEqualTo(MiacMatch.ONE);
-        assertThat(MiacMatch.of(activity("4", "20"), C3Codes.MIAC_PRACTICES_ANTHROPOMETRY))
-                .isEqualTo(MiacMatch.ONE);
+        assertThat(MiacMatch.counts(activity("05", "02"), C3Codes.MIAC_PRACTICES_ORAL_HEALTH))
+                .isTrue();
+        assertThat(MiacMatch.counts(activity("05", "01"), C3Codes.MIAC_PRACTICES_ANTHROPOMETRY))
+                .isFalse();
+        assertThat(MiacMatch.counts(activity("4", "20"), C3Codes.MIAC_PRACTICES_ANTHROPOMETRY))
+                .isFalse();
+        assertThat(MiacMatch.counts(activity("06", "20"), C3Codes.MIAC_PRACTICES_ANTHROPOMETRY))
+                .isTrue();
     }
 }

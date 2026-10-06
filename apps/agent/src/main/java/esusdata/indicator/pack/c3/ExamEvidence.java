@@ -12,10 +12,11 @@ import java.util.Set;
 
 /**
  * One record of a rapid test or evaluated exam of the Quadro 07 (G, H): performed or evaluated,
- * never only requested (CT-C3-47), by a CBO of the quadro. {@code quality} is {@code null} when the
- * record itself is certain, AMB-C3-18 for the HTLV code (ii) or a MIAI of CBO 2234/3222 (iv).
+ * never only requested (CT-C3-47), by a CBO of the quadro in any model (AMB-C3-18 (iv)); the date
+ * is the record's (iii). Each SIGTAP covers the agent its name says; the anti-HTLV covers none
+ * (ii).
  */
-record ExamEvidence(EventRef event, String sigtap, Set<ExamEvidence.Agent> agents, Ambiguity quality) {
+record ExamEvidence(EventRef event, String sigtap, Set<ExamEvidence.Agent> agents) {
 
     /** The agents of G and H, named in each code's own description (AMB-C3-18 (ii)). */
     enum Agent {
@@ -33,8 +34,7 @@ record ExamEvidence(EventRef event, String sigtap, Set<ExamEvidence.Agent> agent
         List<ExamEvidence> evidence = new ArrayList<>();
         for (CanonicalProcedureEvent procedure : person.procedures()) {
             if (Procedures.counts(procedure) && C3Codes.TEST_CBO.matches(procedure.cbo())) {
-                boolean miai = Procedures.fromMiai(procedure);
-                add(evidence, EventRef.of(procedure), Procedures.sigtap(procedure), miai);
+                add(evidence, EventRef.of(procedure), Procedures.sigtap(procedure));
             }
         }
         for (CanonicalCareEvent event : person.individualCare()) {
@@ -43,7 +43,7 @@ record ExamEvidence(EventRef event, String sigtap, Set<ExamEvidence.Agent> agent
                 event.proceduresEvaluated().forEach(c -> codes.add(Procedures.digits(c)));
                 event.proceduresPerformed().forEach(c -> codes.add(Procedures.digits(c)));
                 for (String code : codes) {
-                    add(evidence, EventRef.of(event), code, true);
+                    add(evidence, EventRef.of(event), code);
                 }
             }
         }
@@ -53,34 +53,24 @@ record ExamEvidence(EventRef event, String sigtap, Set<ExamEvidence.Agent> agent
 
     /**
      * The same exam (date and SIGTAP) recorded by the care event and by the exam capability is one
-     * record (MET-32): the certain one, else the first in evidence order.
+     * record (MET-32): the first in evidence order.
      */
     private static List<ExamEvidence> distinctByContent(List<ExamEvidence> evidence) {
         Map<String, ExamEvidence> byContent = new LinkedHashMap<>();
         for (ExamEvidence item : evidence) {
-            String key = item.event().date() + "|" + item.sigtap();
-            ExamEvidence held = byContent.get(key);
-            if (held == null || (held.quality() != null && item.quality() == null)) {
-                byContent.put(key, item);
-            }
+            byContent.putIfAbsent(item.event().date() + "|" + item.sigtap(), item);
         }
         return List.copyOf(byContent.values());
     }
 
-    private static void add(List<ExamEvidence> evidence, EventRef event, String sigtap, boolean miai) {
+    private static void add(List<ExamEvidence> evidence, EventRef event, String sigtap) {
         Set<Agent> agents = agentsOf(sigtap);
-        if (event.date() == null || agents.isEmpty()) {
-            return;
+        if (event.date() != null && !agents.isEmpty()) {
+            evidence.add(new ExamEvidence(event, sigtap, agents));
         }
-        boolean htlv = C3Codes.HTLV_SIGTAP.equals(sigtap);
-        boolean outsideConsult = miai && C3Codes.TEST_CBO_OUTSIDE_CONSULT.matches(event.cbo());
-        evidence.add(new ExamEvidence(event, sigtap, agents, htlv || outsideConsult ? Ambiguity.AMB_C3_18 : null));
     }
 
     private static Set<Agent> agentsOf(String sigtap) {
-        if (C3Codes.HTLV_SIGTAP.equals(sigtap)) {
-            return EnumSet.allOf(Agent.class);
-        }
         Set<Agent> agents = EnumSet.noneOf(Agent.class);
         if (C3Codes.SYPHILIS_SIGTAP.contains(sigtap)) {
             agents.add(Agent.SYPHILIS);

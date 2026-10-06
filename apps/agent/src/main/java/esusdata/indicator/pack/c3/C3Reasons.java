@@ -1,10 +1,6 @@
 package esusdata.indicator.pack.c3;
 
-/**
- * The stable reason codes of C3's evidence rows (contract of the rule; ENG-36). An ambiguity of
- * the ficha is written {@code AMBIGUIDADE_AMB_C3_xx} on a subject or practice and {@code
- * EVIDENCIA_AMBIGUA_AMB_C3_xx} on the event behind it.
- */
+/** The stable reason codes of C3's evidence rows (contract of the rule; ENG-36). */
 final class C3Reasons {
 
     // ---- cohort ----
@@ -14,6 +10,13 @@ final class C3Reasons {
     static final String INTERROMPIDO_MUDANCA_TERRITORIO = "INTERROMPIDO_MUDANCA_TERRITORIO";
     static final String EXCLUIDO_OBITO = "EXCLUIDO_OBITO";
     static final String EXCLUIDO_ABORTO = "EXCLUIDO_ABORTO";
+
+    /** A DUM or IG without a 24 f pregnancy code in {@code [DUM, D]} (AMB-C3-03 (iii)). */
+    static final String EXCLUIDO_SEM_CODIGO_GESTACAO = "EXCLUIDO_SEM_CODIGO_GESTACAO";
+
+    /** A 24 f pregnancy code without a DUM or IG to date it (AMB-C3-03 (iii)). */
+    static final String EXCLUIDO_SEM_DUM_NEM_IG = "EXCLUIDO_SEM_DUM_NEM_IG";
+
     static final String ELEGIVEL_DESFECHO_REGISTRADO = "ELEGIVEL_DESFECHO_REGISTRADO";
     static final String ELEGIVEL_DATA_SUBSTITUTIVA_294D = "ELEGIVEL_DATA_SUBSTITUTIVA_294D";
     static final String ELEGIVEL_DESFECHO_RESOLUCAO_LPC = "ELEGIVEL_DESFECHO_RESOLUCAO_LPC";
@@ -26,20 +29,5 @@ final class C3Reasons {
     static final String EAP_TIPO_76_PONTUACAO_INTEGRAL = "EAP_TIPO_76_PONTUACAO_INTEGRAL";
     static final String EVIDENCIA = "EVIDENCIA";
 
-    // ---- ambiguities: built from Ambiguity by ambiguity(...) and ambiguousEvidence(...) ----
-
-    static final String AMBIGUITY_PREFIX = "AMBIGUIDADE_";
-    static final String AMBIGUOUS_EVIDENCE_PREFIX = "EVIDENCIA_AMBIGUA_";
-
     private C3Reasons() {}
-
-    /** {@code AMBIGUIDADE_AMB_C3_xx}: a subject or practice the ficha leaves undecided. */
-    static String ambiguity(Ambiguity ambiguity) {
-        return AMBIGUITY_PREFIX + ambiguity.name();
-    }
-
-    /** {@code EVIDENCIA_AMBIGUA_AMB_C3_xx}: an event that counts only under one reading. */
-    static String ambiguousEvidence(Ambiguity ambiguity) {
-        return AMBIGUOUS_EVIDENCE_PREFIX + ambiguity.name();
-    }
 }

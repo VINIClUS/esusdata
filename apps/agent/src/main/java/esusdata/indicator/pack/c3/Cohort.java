@@ -8,25 +8,13 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
 
 /**
  * The cohort of one competência, in the contract's order: activity in the competência (4.1),
- * link at the cutoff (item 14), death (item 15), abortion (24 g), the ficha's ambiguities and,
+ * link at the cutoff (item 14), death (item 15), abortion (24 g), the pregnancy code (24 f) and,
  * last, eligibility with the end date used (MET-21).
  */
 final class Cohort {
-
-    /** Whether an episode is "ativa na competência" (4.1). */
-    enum Activity {
-        ACTIVE,
-        /**
-         * Not active under every reading of the dates: only the boundary day D + 42 falls in the
-         * competência (AMB-C3-04), or the readings disagree (AMB-C3-03).
-         */
-        BOUNDARY,
-        INACTIVE
-    }
 
     private final LocalDate firstDay;
     private final LocalDate cutoff;
@@ -38,41 +26,31 @@ final class Cohort {
         this.cutoff = cutoff;
     }
 
-    /** Across the readings of the dates: inactive in all, or the combined activity. */
-    Activity activity(Episode episode) {
-        List<Activity> perReading = new ArrayList<>();
-        for (GestationWindow reading : episode.readings()) {
-            perReading.add(activity(reading));
-        }
-        if (perReading.stream().allMatch(a -> a == Activity.INACTIVE)) {
-            return Activity.INACTIVE;
-        }
-        return perReading.stream().allMatch(a -> a == Activity.ACTIVE) ? Activity.ACTIVE : Activity.BOUNDARY;
+    /**
+     * Whether an episode is "ativa na competência" (4.1): the pregnancy has started by the cutoff
+     * and the puerperium (D + 42 inclusive) reaches the competência (AMB-C3-04).
+     */
+    boolean active(Episode episode) {
+        GestationWindow window = episode.window();
+        return !window.dum().isAfter(cutoff) && !window.lastDay().isBefore(firstDay);
     }
 
-    /** The cohort decision of an active (or boundary) episode. */
-    Verdict decide(Episode episode, PersonRecords person, RegistrationLink link, Activity activity) {
-        LocalDate end = episode.primary().end();
+    /** The cohort decision of an active episode. */
+    Verdict decide(Episode episode, PersonRecords person, RegistrationLink link) {
+        GestationWindow window = episode.window();
+        LocalDate end = window.end();
         Verdict personal = personal(person, link, end);
         if (personal != null) {
             return personal;
         }
-        Verdict abortion = Verdict.agreed(perReading(episode, r -> abortion(person, r)), end);
+        LocalDate abortion = abortion(person, window);
         if (abortion != null) {
-            return abortion;
+            return Verdict.excluded(C3Reasons.EXCLUIDO_ABORTO, abortion);
         }
-        if (activity != Activity.ACTIVE) {
-            boolean anyActive = episode.readings().stream().anyMatch(r -> activity(r) == Activity.ACTIVE);
-            return Verdict.ambiguous(anyActive ? Ambiguity.AMB_C3_03 : Ambiguity.AMB_C3_04, end);
+        if (!pregnancyCode(person, window)) {
+            return Verdict.excluded(C3Reasons.EXCLUIDO_SEM_CODIGO_GESTACAO, end);
         }
-        if (episode.datesAmbiguity() != null) {
-            return Verdict.ambiguous(episode.datesAmbiguity(), end);
-        }
-        Verdict code = Verdict.agreed(perReading(episode, r -> pregnancyCode(person, r, end)), end);
-        if (code != null) {
-            return code;
-        }
-        String reason = switch (episode.primary().endSource()) {
+        String reason = switch (window.endSource()) {
             case RECORDED_OUTCOME -> C3Reasons.ELEGIVEL_DESFECHO_REGISTRADO;
             case LPC_RESOLUTION -> C3Reasons.ELEGIVEL_DESFECHO_RESOLUCAO_LPC;
             case SUBSTITUTE_294 -> C3Reasons.ELEGIVEL_DATA_SUBSTITUTIVA_294D;
@@ -103,140 +81,74 @@ final class Cohort {
         return null;
     }
 
-    /** True when {@code date} falls in {@code [first day of the competência, cutoff]}. */
-    boolean inCompetencia(LocalDate date) {
-        return C3Dates.within(date, firstDay, cutoff);
-    }
-
     LocalDate firstDay() {
         return firstDay;
     }
 
-    private Activity activity(GestationWindow reading) {
-        boolean overlaps =
-                !reading.dum().isAfter(cutoff) && !reading.lastCertainDay().isBefore(firstDay);
-        if (overlaps) {
-            return Activity.ACTIVE;
-        }
-        return inCompetencia(reading.boundaryDay()) ? Activity.BOUNDARY : Activity.INACTIVE;
-    }
-
-    private static List<Verdict> perReading(Episode episode, Function<GestationWindow, Verdict> check) {
-        List<Verdict> verdicts = new ArrayList<>();
-        for (GestationWindow reading : episode.readings()) {
-            verdicts.add(check.apply(reading));
-        }
-        return verdicts;
-    }
-
     /**
-     * 24 g: an exact exclusion code in {@code [DUM, D]} excludes (from the earliest such date); a
-     * code that matches only by prefix is AMB-C3-08; a code in {@code (D, D + 42]}, or an LPC
-     * condition that is not active or latent ("ativos", AMB-C3-07 (ii)), is AMB-C3-07.
+     * 24 g: the earliest exclusion code in {@code [DUM, D]} known at the cutoff excludes the
+     * episode from the competência of the record (AMB-C3-07 (i)); {@code null} when none. A code
+     * outside {@code [DUM, D]}, in the puerperium included, belongs to another pregnancy (iv). An
+     * LPC condition counts when active, latent or resolved (ii).
      */
-    private static Verdict abortion(PersonRecords person, GestationWindow reading) {
-        LocalDate exact = null;
-        LocalDate prefix = null;
-        LocalDate other = null;
-        for (CodeAt code : exclusionCodes(person)) {
-            switch (code.bucket(reading)) {
-                case EXCLUDES -> exact = earliest(exact, code.date());
-                case PREFIX_ONLY -> prefix = earliest(prefix, code.date());
-                case UNDECIDED -> other = earliest(other, code.date());
-                case OUTSIDE -> {
-                    // another episode's code
-                }
+    private LocalDate abortion(PersonRecords person, GestationWindow window) {
+        LocalDate earliest = null;
+        for (LocalDate date : exclusionDates(person)) {
+            boolean counts = window.inPregnancy(date) && !date.isAfter(cutoff);
+            if (counts && (earliest == null || date.isBefore(earliest))) {
+                earliest = date;
             }
         }
-        if (exact != null) {
-            return Verdict.excluded(C3Reasons.EXCLUIDO_ABORTO, exact);
-        }
-        if (prefix != null) {
-            return Verdict.ambiguous(Ambiguity.AMB_C3_08, prefix);
-        }
-        return other == null ? null : Verdict.ambiguous(Ambiguity.AMB_C3_07, other);
+        return earliest;
     }
 
-    /** What a 24 g code means for one reading of an episode. */
-    private enum Bucket {
-        EXCLUDES,
-        PREFIX_ONLY,
-        UNDECIDED,
-        OUTSIDE
-    }
-
-    /**
-     * A 24 g code found on a date; {@code active} is false for an LPC condition that is not active
-     * or latent ("ativos", AMB-C3-07 (ii)).
-     */
-    private record CodeAt(LocalDate date, CodeMatch match, boolean active) {
-        Bucket bucket(GestationWindow reading) {
-            if (reading.inPregnancy(date)) {
-                if (!active) {
-                    return Bucket.UNDECIDED;
-                }
-                return match == CodeMatch.EXACT ? Bucket.EXCLUDES : Bucket.PREFIX_ONLY;
-            }
-            boolean puerperium = C3Dates.within(date, reading.end().plusDays(1), reading.boundaryDay());
-            return puerperium ? Bucket.UNDECIDED : Bucket.OUTSIDE;
-        }
-    }
-
-    private static List<CodeAt> exclusionCodes(PersonRecords person) {
-        List<CodeAt> codes = new ArrayList<>();
+    private static List<LocalDate> exclusionDates(PersonRecords person) {
+        List<LocalDate> dates = new ArrayList<>();
         for (CanonicalCareEvent event : person.individualCare()) {
-            add(codes, event.careDate(), CodeMatch.of(event, C3Codes.EXCLUSION_CIAP, C3Codes.EXCLUSION_CID), true);
+            add(dates, event.careDate(), CodeMatch.of(event, C3Codes.EXCLUSION_CIAP, C3Codes.EXCLUSION_CID, List.of()));
         }
         for (CanonicalPregnancyOutcome outcome : person.outcomes()) {
             for (String code : outcome.codes()) {
                 add(
-                        codes,
+                        dates,
                         outcome.outcomeDate(),
-                        CodeMatch.any(code, C3Codes.EXCLUSION_CIAP, C3Codes.EXCLUSION_CID),
-                        true);
+                        CodeMatch.any(code, C3Codes.EXCLUSION_CIAP, C3Codes.EXCLUSION_CID, List.of()));
             }
         }
         for (CanonicalCondition condition : person.conditions()) {
             add(
-                    codes,
+                    dates,
                     condition.recordedDate(),
-                    CodeMatch.of(condition, C3Codes.EXCLUSION_CIAP, C3Codes.EXCLUSION_CID),
-                    C3Codes.active(condition));
+                    C3Codes.recorded(condition)
+                            && CodeMatch.of(condition, C3Codes.EXCLUSION_CIAP, C3Codes.EXCLUSION_CID, List.of()));
         }
-        return codes;
+        return dates;
     }
 
-    private static void add(List<CodeAt> codes, String date, CodeMatch match, boolean active) {
+    private static void add(List<LocalDate> dates, String date, boolean match) {
         LocalDate parsed = C3Dates.parse(date);
-        if (match.found() && parsed != null) {
-            codes.add(new CodeAt(parsed, match, active));
+        if (match && parsed != null) {
+            dates.add(parsed);
         }
     }
 
     /**
-     * 24 f: a pregnancy code in some MIAI, or in the LPC, within {@code [DUM, D]}. Exact ⇒ no
-     * objection; only by prefix ⇒ AMB-C3-08; none ⇒ AMB-C3-03 (iii).
+     * 24 f: a pregnancy code in some MIAI, or in the LPC, within {@code [DUM, D]}; the CID-10 by
+     * category, the more specific list deciding (AMB-C3-08).
      */
-    private static Verdict pregnancyCode(PersonRecords person, GestationWindow reading, LocalDate eventDate) {
-        CodeMatch best = CodeMatch.NONE;
+    private static boolean pregnancyCode(PersonRecords person, GestationWindow window) {
         for (CanonicalCareEvent event : person.individualCare()) {
-            if (reading.inPregnancy(C3Dates.parse(event.careDate()))) {
-                best = CodeMatch.better(best, CodeMatch.of(event, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID));
+            if (window.inPregnancy(C3Dates.parse(event.careDate()))
+                    && CodeMatch.of(event, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID, C3Codes.PUERPERIUM_CID)) {
+                return true;
             }
         }
         for (CanonicalCondition condition : person.conditions()) {
-            if (reading.inPregnancy(C3Dates.parse(condition.recordedDate()))) {
-                best = CodeMatch.better(best, CodeMatch.of(condition, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID));
+            if (window.inPregnancy(C3Dates.parse(condition.recordedDate()))
+                    && CodeMatch.of(condition, C3Codes.PREGNANCY_CIAP, C3Codes.PREGNANCY_CID, C3Codes.PUERPERIUM_CID)) {
+                return true;
             }
         }
-        return switch (best) {
-            case EXACT -> null;
-            case PREFIX -> Verdict.ambiguous(Ambiguity.AMB_C3_08, eventDate);
-            case NONE -> Verdict.ambiguous(Ambiguity.AMB_C3_03, eventDate);
-        };
-    }
-
-    private static LocalDate earliest(LocalDate held, LocalDate candidate) {
-        return held == null || candidate.isBefore(held) ? candidate : held;
+        return false;
     }
 }

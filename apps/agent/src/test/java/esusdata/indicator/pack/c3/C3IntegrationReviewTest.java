@@ -17,7 +17,6 @@ import static esusdata.indicator.pack.c3.C3Fixtures.PREGNANCY_CIAP;
 import static esusdata.indicator.pack.c3.C3Fixtures.SUBSTITUTE_END;
 import static esusdata.indicator.pack.c3.C3Fixtures.SYPHILIS;
 import static esusdata.indicator.pack.c3.C3Fixtures.anchor;
-import static esusdata.indicator.pack.c3.C3Fixtures.assertAmbiguous;
 import static esusdata.indicator.pack.c3.C3Fixtures.assertMet;
 import static esusdata.indicator.pack.c3.C3Fixtures.assertNotMet;
 import static esusdata.indicator.pack.c3.C3Fixtures.bloodPressure;
@@ -25,7 +24,6 @@ import static esusdata.indicator.pack.c3.C3Fixtures.care;
 import static esusdata.indicator.pack.c3.C3Fixtures.collectiveActivity;
 import static esusdata.indicator.pack.c3.C3Fixtures.computeNovember;
 import static esusdata.indicator.pack.c3.C3Fixtures.condition;
-import static esusdata.indicator.pack.c3.C3Fixtures.conventionPack;
 import static esusdata.indicator.pack.c3.C3Fixtures.dum;
 import static esusdata.indicator.pack.c3.C3Fixtures.episodeKey;
 import static esusdata.indicator.pack.c3.C3Fixtures.episodeRow;
@@ -142,13 +140,13 @@ class C3IntegrationReviewTest {
     // ---- B5: MIAC practices in LEDI ----
 
     @Test
-    void b5_anthropometryPracticeWithAnotherActivityIsAmbiguous() {
+    void b5_anthropometryPracticeWithAnotherActivityDoesNotCount() {
         List<Record> records = pregnancy();
         for (int i = 0; i < 6; i++) {
             records.add(measurement(P1, dum(101 + i), "62.5", "160", null, null, NURSE, MIP));
         }
         records.add(collectiveActivity(P1, dum(120), NURSE, "4", "20"));
-        assertAmbiguous(practice(compute(records), EP1, "D"), "19");
+        assertNotMet(practice(compute(records), EP1, "D"));
     }
 
     // ---- B6: measurement procedures only from the MIP ----
@@ -211,17 +209,17 @@ class C3IntegrationReviewTest {
             RuleOutcome outcome = compute(records);
             assertThat(episodeRow(outcome, P1 + "#sem-dum").reasonCode())
                     .as("IG %d", weeks)
-                    .isEqualTo("AMBIGUIDADE_AMB_C3_03");
+                    .isEqualTo("EXCLUIDO_SEM_DUM_NEM_IG");
         }
     }
 
     // ---- I3: TSB occupations ----
 
     @Test
-    void i3_anOralHealthAssistantIsAmbiguousForK() {
+    void i3_anOralHealthAssistantDoesNotMeetK() {
         List<Record> records = pregnancy();
         records.add(care(P1, dum(140)).form("DENTAL").cbo("322415").build());
-        assertAmbiguous(practice(compute(records), EP1, "K"), "20");
+        assertNotMet(practice(compute(records), EP1, "K"));
     }
 
     @Test
@@ -266,15 +264,15 @@ class C3IntegrationReviewTest {
         assertThat(team.cnes()).isNull();
     }
 
-    // ---- M2: ambiguous cohort subjects carry their ambiguity ----
+    // ---- M2: a subject excluded by the pregnancy code carries its reason ----
 
     @Test
-    void m2_anAmbiguousCohortSubjectIsExcludedWithItsAmbiguity() {
+    void m2_aPregnancyWithoutACodeIsExcludedWithItsReason() {
         List<Record> records = new ArrayList<>(linked(P1, INE));
         records.add(care(P1, dum(56)).lmp(DUM).build()); // no 24 f code
         EvidenceItem row = episodeRow(compute(records), EP1);
         assertThat(row.decision()).isEqualTo(EvidenceDecision.EXCLUDED);
-        assertThat(row.reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_03");
+        assertThat(row.reasonCode()).isEqualTo("EXCLUIDO_SEM_CODIGO_GESTACAO");
     }
 
     // ---- M4: the same exam from two capabilities ----
@@ -286,7 +284,7 @@ class C3IntegrationReviewTest {
                 .ciap(PREGNANCY_CIAP)
                 .evaluated(SYPHILIS, HIV, HEPATITIS_B, HEPATITIS_C)
                 .build());
-        RuleOutcome outcome = computeNovember(conventionPack(), records);
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
         assertMet(practice(outcome, EP1, "G"), 9);
         // the four MIP tests are the same exams as the encounter's: only the encounter remains
         assertThat(supporting(outcome, EP1, "G"))
@@ -298,7 +296,7 @@ class C3IntegrationReviewTest {
     void m4_examsOfDifferentDaysStayDistinct() {
         List<Record> records = new ArrayList<>(fullEpisode(P1));
         records.addAll(tests(P1, dum(61), SYPHILIS));
-        RuleOutcome outcome = computeNovember(conventionPack(), records);
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
         assertThat(supporting(outcome, EP1, "G")).hasSize(5);
     }
 }

@@ -643,6 +643,22 @@ class Nt08ConsolidationTest {
         assertThat(teamResult.status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
+    // ---- C3 emits no TeamResult for a team without an eligible episode: a "-" month, not a block ----
+    @Test
+    void teamWithoutC3RowInAMonthTheMunicipalityPublishedIsADashMonthOutOfTheMean() {
+        UnitBuilder municipal = unit().values(C3, pct(80), pct(60), pct(80), pct(60));
+        UnitBuilder team = unit();
+        team.results(C3, computed(C3, team.month(0), pct(90)), computed(C3, team.month(3), pct(70)));
+
+        ComponentIIIResult result =
+                consolidation.consolidate(input(Q1_2027, municipal.build(null, null), team.build(INE, CNES)), RULES);
+
+        IndicatorQuadrimestral c3 = indicator(unitOf(result, INE), C3);
+        assertComputed(c3, pct(80), Classification.OTIMO);
+        assertThat(c3.monthsUsed()).containsExactly(team.month(0), team.month(3));
+        assertThat(indicator(unitOf(result, INE), C3).status()).isEqualTo(IndicatorStatus.COMPUTED);
+    }
+
     @Test
     void teamWithNoC2RowInAnyMonthHasNoC2MeanAndNoScoreNeverZero() {
         UnitBuilder team = unit().without(C2);

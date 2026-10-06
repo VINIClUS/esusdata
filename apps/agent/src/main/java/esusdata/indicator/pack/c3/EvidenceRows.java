@@ -9,8 +9,8 @@ import java.util.List;
 
 /**
  * The minimal evidence of one subject (§1.8, ENG-36), keyed by the opaque episode key: the cohort
- * row, the DUM milestone, one row per practice A..K and the events behind each met or ambiguous
- * practice, each source record once per practice (MET-32).
+ * row, the DUM milestone, one row per practice A..K and the events behind each met practice, each
+ * source record once per practice (MET-32).
  */
 final class EvidenceRows {
 
@@ -43,17 +43,14 @@ final class EvidenceRows {
         EventRef anchor = episode.anchor();
         rows.add(row(
                 subject,
-                new EventRef(anchor.sourceRef(), episode.primary().dum(), anchor.cbo(), anchor.cnes(), anchor.ine()),
+                new EventRef(anchor.sourceRef(), episode.window().dum(), anchor.cbo(), anchor.cnes(), anchor.ine()),
                 null,
                 C3Reasons.MARCO_DUM));
         for (Practice practice : Practice.values()) {
             PracticeOutcome outcome = subject.practice(practice);
             rows.add(practiceRow(subject, practice, outcome));
-            for (Support support : outcome.supports()) {
-                String reason = support.ambiguity() == null
-                        ? C3Reasons.EVIDENCIA
-                        : C3Reasons.ambiguousEvidence(support.ambiguity());
-                rows.add(row(subject, support.event(), practice.name(), reason));
+            for (EventRef support : outcome.supports()) {
+                rows.add(row(subject, support, practice.name(), C3Reasons.EVIDENCIA));
             }
         }
         return rows;
@@ -66,8 +63,6 @@ final class EvidenceRows {
             case EXEMPT ->
                 new Decided(EvidenceDecision.PRACTICE_EXEMPT, C3Reasons.EAP_TIPO_76_PONTUACAO_INTEGRAL, weight);
             case NOT_MET -> new Decided(EvidenceDecision.PRACTICE_NOT_MET, C3Reasons.NAO_CUMPRIDA, BigInteger.ZERO);
-            case AMBIGUOUS ->
-                new Decided(EvidenceDecision.PRACTICE_AMBIGUOUS, C3Reasons.ambiguity(outcome.ambiguity()), null);
         };
         return new EvidenceItem(
                 EvidenceSubjectKind.EPISODE,
@@ -84,7 +79,7 @@ final class EvidenceRows {
                 null);
     }
 
-    /** How a practice decision is written: an ambiguous one has no points (contract). */
+    /** How a practice decision is written. */
     private record Decided(EvidenceDecision decision, String reason, BigInteger points) {}
 
     private static EvidenceItem row(Subject subject, EventRef event, String component, String reason) {

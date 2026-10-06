@@ -2,8 +2,6 @@ package esusdata.indicator.sensitivity;
 
 import esusdata.indicator.IndicatorRuleRegistry;
 import esusdata.indicator.model.IndicatorRule;
-import esusdata.indicator.pack.c3.C3Pack;
-import esusdata.indicator.pack.c3.C3Sensitivity;
 import esusdata.indicator.sensitivity.PackSensitivity.PackReport;
 import esusdata.run.worker.SensitivityExtracts.PackInput;
 import java.util.ArrayList;
@@ -15,12 +13,11 @@ public final class SensitivityRunner {
     private SensitivityRunner() {}
 
     /**
-     * The pack's own readings (C3 only) or, for the others, what fires in it. C2 and C7 have no readings left:
-     * {@code c2-desenvolvimento-infantil@0.2.0} and {@code c7-prevencao-cancer@0.2.0} decided them
-     * (docs/indicadores/decisoes/).
+     * What fires in the pack. No pack has candidate readings left: C2, C3 and C7 decided theirs at
+     * {@code @0.2.0} (docs/indicadores/decisoes/).
      */
     static PackSensitivity sensitivityOf(IndicatorRule rule) {
-        return C3Pack.ID.equals(rule.descriptor().id()) ? new C3Sensitivity() : new GenericSensitivity(rule);
+        return new GenericSensitivity(rule);
     }
 
     /** One report per pack of the registry; a pack that found no extract it accepts says so. */

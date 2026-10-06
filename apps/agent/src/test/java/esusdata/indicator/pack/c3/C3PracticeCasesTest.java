@@ -24,14 +24,12 @@ import static esusdata.indicator.pack.c3.C3Fixtures.SUBSTITUTE_END;
 import static esusdata.indicator.pack.c3.C3Fixtures.SYPHILIS;
 import static esusdata.indicator.pack.c3.C3Fixtures.anchor;
 import static esusdata.indicator.pack.c3.C3Fixtures.anthropometry;
-import static esusdata.indicator.pack.c3.C3Fixtures.assertAmbiguous;
 import static esusdata.indicator.pack.c3.C3Fixtures.assertMet;
 import static esusdata.indicator.pack.c3.C3Fixtures.assertNotMet;
 import static esusdata.indicator.pack.c3.C3Fixtures.bloodPressure;
 import static esusdata.indicator.pack.c3.C3Fixtures.care;
 import static esusdata.indicator.pack.c3.C3Fixtures.collectiveActivity;
 import static esusdata.indicator.pack.c3.C3Fixtures.computeNovember;
-import static esusdata.indicator.pack.c3.C3Fixtures.conventionPack;
 import static esusdata.indicator.pack.c3.C3Fixtures.dental;
 import static esusdata.indicator.pack.c3.C3Fixtures.dose;
 import static esusdata.indicator.pack.c3.C3Fixtures.dtpa;
@@ -63,8 +61,9 @@ import org.junit.jupiter.api.Test;
  * The practice cases CT-C3-09..61 of {@code docs/metodologia/c3-gestacao-puerperio.md}, one test
  * per case, for person {@code gestante-1} with DUM 2025-01-01 in competência 2025-11. Unless a case
  * says otherwise the pregnancy is anchored by a nurse's prenatal consultation (W78) on DUM+56 (IG
- * 8s, so A is met), has no recorded outcome (D = DUM+294 = 2025-10-22) and runs without a
- * trimester convention, so G/H are decided only when an agent has no evidence at all (AMB-C3-02).
+ * 8s, so A is met), has no recorded outcome (D = DUM+294 = 2025-10-22) and runs with the
+ * production trimester convention (1º trimestre up to DUM+97, 3º from DUM+196; AMB-C3-02). Every
+ * reading of the ficha is decided: no case is ambiguous.
  *
  * <p>Cases the canonical model cannot express are not tests here: CT-C3-61 (the dentist's own team
  * allocation is not a field of the dental encounter), CT-C3-23 as written (a home visit carries no
@@ -85,17 +84,17 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct10_firstConsultOnDumPlus84IsAmbiguous() {
+    void ct10_firstConsultOnDumPlus84MeetsA() {
         RuleOutcome outcome = computeNovember(new C3Pack(), withAnchorOn(dum(84)));
-        assertAmbiguous(practice(outcome, "A"), "01");
-        assertRuleAmbiguity(outcome);
+        assertMet(practice(outcome, "A"), 10);
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
-    void ct10_firstConsultOnDumPlus90IsAmbiguous() {
+    void ct10_firstConsultOnDumPlus90MeetsA() {
         RuleOutcome outcome = computeNovember(new C3Pack(), withAnchorOn(dum(90)));
-        assertAmbiguous(practice(outcome, "A"), "01");
-        assertRuleAmbiguity(outcome);
+        assertMet(practice(outcome, "A"), 10);
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
@@ -132,12 +131,28 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct15_consultWithACodeOutsideTheListsIsAmbiguousForA() {
+    void ct15_consultWithACodeOutsideTheListsDoesNotCountForA() {
+        // AMB-C3-11: only a consultation with a code of the 24 f pregnancy list counts
         List<Record> records = withAnchorOn(dum(100));
         records.add(care(P1, dum(56)).ciap("A01").build());
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "A"), "11");
-        assertRuleAmbiguity(outcome);
+        assertNotMet(practice(outcome, "A"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+    }
+
+    @Test
+    void amb11_aCidSubcategoryInsideAListedCategoryCountsForA() {
+        // AMB-C3-08: O26.8 is inside the category O26 of the pregnancy list
+        List<Record> records = withAnchorOn(dum(100));
+        records.add(care(P1, dum(56)).cid("O26.8").build());
+        assertMet(practice(computeNovember(new C3Pack(), records), "A"), 10);
+    }
+
+    @Test
+    void amb11_aPuerperalCodeDoesNotCountForA() {
+        List<Record> records = withAnchorOn(dum(100));
+        records.add(puerperal(P1, dum(56)));
+        assertNotMet(practice(computeNovember(new C3Pack(), records), "A"));
     }
 
     // ---- B: at least 7 consultations during the pregnancy ----
@@ -166,12 +181,13 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct19_aConsultationOnlyInTheMipIsAmbiguousForB() {
+    void ct19_aConsultationOnlyInTheMipDoesNotCountForB() {
+        // AMB-C3-12 (i): the Quadro 02 cites only the MIAI
         List<Record> records = withPrenatalConsults(5);
         records.add(procedure(P1, dum(266), PRENATAL_CONSULT_SIGTAP, PERFORMED, MIP, NURSE));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "B"), "12");
-        assertRuleAmbiguity(outcome);
+        assertNotMet(practice(outcome, "B"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
@@ -184,21 +200,29 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct21_twoConsultationsOnTheSameDayAreAmbiguousForB() {
+    void ct21_twoConsultationsOnTheSameDayCountOnceForB() {
+        // AMB-C3-12 (ii): six days plus a duplicate do not meet B
         List<Record> records = withPrenatalConsults(5);
         LocalDate sameDay = dum(MORE_PRENATAL_DAYS.get(2));
         records.add(care(P1, sameDay).cbo(DOCTOR).ciap(PREGNANCY_CIAP).build());
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "B"), "12");
-        assertRuleAmbiguity(outcome);
+        assertNotMet(practice(outcome, "B"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
-    void amb04_aConsultationOnTheEndDayIsAmbiguousForB() {
+    void amb04_aConsultationOnTheEndDayCountsForB() {
+        // AMB-C3-04: the pregnancy is [DUM, D], D inclusive
         List<Record> records = withPrenatalConsults(5);
         records.add(prenatal(P1, SUBSTITUTE_END));
-        RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "B"), "04");
+        assertMet(practice(computeNovember(new C3Pack(), records), "B"), 9);
+    }
+
+    @Test
+    void amb04_aConsultationOnTheDayAfterTheEndDoesNotCountForB() {
+        List<Record> records = withPrenatalConsults(5);
+        records.add(prenatal(P1, SUBSTITUTE_END.plusDays(1)));
+        assertNotMet(practice(computeNovember(new C3Pack(), records), "B"));
     }
 
     @Test
@@ -219,20 +243,37 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct23_aSeventhReadingByAnAcsIsAmbiguous() {
+    void ct23_aSeventhReadingByAnAcsDoesNotCountForC() {
+        // AMB-C3-14 (i): the Quadro 03 list has no 5151-05
         List<Record> records = measuredConsults(6, true, false);
         records.add(bloodPressure(P1, dum(250), ACS));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "C"), "14");
-        assertRuleAmbiguity(outcome);
+        assertNotMet(practice(outcome, "C"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
-    void ct24_twoReadingsOnTheSameDayAreAmbiguous() {
+    void ct24_twoReadingsOnTheSameDayCountOnce() {
+        // AMB-C3-14 (ii): one reading per day
         List<Record> records = measuredConsults(6, true, false);
         records.add(bloodPressure(P1, dum(56), NURSE));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "C"), "14");
+        assertNotMet(practice(outcome, "C"));
+    }
+
+    @Test
+    void amb14_aCollectivePressureWithTheFichaCodesCounts() {
+        // AMB-C3-14 (iii): the MIAC counts with activity 05/06 and practice 01/02/04 (LEDI 20, 2, 9)
+        List<Record> records = measuredConsults(6, true, false);
+        records.add(C3Fixtures.collectivePressure(P1, dum(250), "05", "9"));
+        assertMet(practice(computeNovember(new C3Pack(), records), "C"), 9);
+    }
+
+    @Test
+    void amb14_aCollectivePressureWithOnlyTheActivityDoesNotCount() {
+        List<Record> records = measuredConsults(6, true, false);
+        records.add(C3Fixtures.collectivePressure(P1, dum(250), "05", "7"));
+        assertNotMet(practice(computeNovember(new C3Pack(), records), "C"));
     }
 
     @Test
@@ -280,12 +321,25 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct29_anthropometricEvaluationWithoutValuesIsAmbiguous() {
+    void ct29_anthropometricEvaluationWithoutValuesIsAPairOnItsDay() {
+        // AMB-C3-15 (i)
         List<Record> records = measuredConsults(6, false, true);
         records.add(procedure(P1, dum(250), C3Codes.ANTHROPOMETRIC_EVALUATION_SIGTAP, PERFORMED, MIP, NURSE));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "D"), "15");
-        assertRuleAmbiguity(outcome);
+        assertMet(practice(outcome, "D"), 9);
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+    }
+
+    @Test
+    void amb15_twoPairsOnTheSameDayCountOnce() {
+        // AMB-C3-15 (ii): one pair per day
+        List<Record> records = measuredConsults(6, false, true);
+        records.add(care(P1, dum(56))
+                .ciap(PREGNANCY_CIAP)
+                .weight("63")
+                .height("161")
+                .build());
+        assertNotMet(practice(computeNovember(new C3Pack(), records), "D"));
     }
 
     @Test
@@ -305,10 +359,11 @@ class C3PracticeCasesTest {
 
     @Test
     void amb19_theFichaNumberingIsNotALediPracticeCode() {
-        // the ficha's "01" is LEDI 20 (capacidades-dw-v2 §3.7): "01" itself matches only the activity
+        // the ficha's "01" is LEDI 20 (capacidades-dw-v2 §3.7): "01" itself matches only the activity,
+        // so the record meets one condition and does not count
         List<Record> records = measuredConsults(6, false, true);
         records.add(collectiveActivity(P1, dum(250), NURSE, "05", "01"));
-        assertAmbiguous(practice(computeNovember(new C3Pack(), records), "D"), "19");
+        assertNotMet(practice(computeNovember(new C3Pack(), records), "D"));
     }
 
     @Test
@@ -320,12 +375,12 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void amb19_aCollectiveActivityMeetingOnlyTheActivityCodeIsAmbiguousForD() {
+    void amb19_aCollectiveActivityMeetingOnlyTheActivityCodeDoesNotCountForD() {
         List<Record> records = measuredConsults(6, false, true);
         records.add(collectiveActivity(P1, dum(250), NURSE, "05", "02"));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "D"), "19");
-        assertRuleAmbiguity(outcome);
+        assertNotMet(practice(outcome, "D"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     // ---- E: at least 3 ACS/TACS visits after the first prenatal consultation ----
@@ -344,17 +399,31 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct32_aVisitOnTheDayOfTheFirstConsultationIsAmbiguous() {
+    void ct32_aVisitOnTheDayOfTheFirstConsultationDoesNotCount() {
+        // AMB-C3-16 (i): "após" is strictly after the date of the first consultation
         RuleOutcome outcome = computeNovember(new C3Pack(), withVisits(dum(56), dum(140), dum(210)));
-        assertAmbiguous(practice(outcome, "E"), "16");
-        assertRuleAmbiguity(outcome);
+        assertNotMet(practice(outcome, "E"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
-    void ct33_aVisitInThePuerperiumIsAmbiguousForE() {
+    void ct32_aVisitOnTheDayAfterTheFirstConsultationCounts() {
+        RuleOutcome outcome = computeNovember(new C3Pack(), withVisits(dum(57), dum(140), dum(210)));
+        assertMet(practice(outcome, "E"), 9);
+    }
+
+    @Test
+    void amb16_twoVisitsOnTheSameDayCountOnce() {
+        RuleOutcome outcome = computeNovember(new C3Pack(), withVisits(dum(70), dum(70), dum(140)));
+        assertNotMet(practice(outcome, "E"));
+    }
+
+    @Test
+    void ct33_aVisitInThePuerperiumCountsForJNotForE() {
+        // AMB-C3-16 (ii)
         RuleOutcome outcome =
                 computeNovember(new C3Pack(), withVisits(dum(140), dum(210), SUBSTITUTE_END.plusDays(10)));
-        assertAmbiguous(practice(outcome, "E"), "16");
+        assertNotMet(practice(outcome, "E"));
         assertMet(practice(outcome, "J"), 9);
     }
 
@@ -368,11 +437,12 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct35_aVisitByANursingTechnicianIsAmbiguous() {
+    void ct35_aVisitByANursingTechnicianDoesNotCount() {
+        // AMB-C3-16 (iii): only 5151-05 and 3222-55
         List<Record> records = withVisits(dum(140), dum(210));
         records.add(visit(P1, dum(180), NURSING_TECHNICIAN));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "E"), "16");
+        assertNotMet(practice(outcome, "E"));
     }
 
     @Test
@@ -406,15 +476,16 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct39_dtpaOnDumPlus133IsAmbiguous() {
+    void ct39_dtpaOnDumPlus133DoesNotMeetF() {
+        // AMB-C3-01: completed weeks, F from DUM+140
         RuleOutcome outcome = computeNovember(new C3Pack(), withDose(dtpa(P1, dum(133))));
-        assertAmbiguous(practice(outcome, "F"), "01");
-        assertRuleAmbiguity(outcome);
+        assertNotMet(practice(outcome, "F"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
-    void ct39_dtpaOnDumPlus139IsAmbiguous() {
-        assertAmbiguous(practice(computeNovember(new C3Pack(), withDose(dtpa(P1, dum(139)))), "F"), "01");
+    void ct39_dtpaOnDumPlus139DoesNotMeetF() {
+        assertNotMet(practice(computeNovember(new C3Pack(), withDose(dtpa(P1, dum(139)))), "F"));
     }
 
     @Test
@@ -436,9 +507,16 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct43_dtpaAfterTheEndOfThePregnancyIsAmbiguous() {
+    void ct43_dtpaInThePuerperiumMeetsF() {
+        // AMB-C3-17 (i): [DUM+140, D+42]
         RuleOutcome outcome = computeNovember(new C3Pack(), withDose(dtpa(P1, SUBSTITUTE_END.plusDays(5))));
-        assertAmbiguous(practice(outcome, "F"), "17");
+        assertMet(practice(outcome, "F"), 9);
+    }
+
+    @Test
+    void amb17_aDoseOnDPlus42MeetsFAndOnDPlus43DoesNot() {
+        assertMet(practice(computeNovember(new C3Pack(), withOutcomeAnd(dtpa(P1, OUTCOME.plusDays(42)))), "F"), 9);
+        assertNotMet(practice(computeNovember(new C3Pack(), withOutcomeAnd(dtpa(P1, OUTCOME.plusDays(43)))), "F"));
     }
 
     @Test
@@ -466,33 +544,65 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void amb13_aDoseWithoutAListedCboIsAmbiguous() {
+    void amb13_aDoseByAnyCboMeetsF() {
+        // AMB-C3-13: any CBO that sends the record
         RuleOutcome outcome = computeNovember(new C3Pack(), withDose(dose(P1, dum(196), DTPA, null, false)));
-        assertAmbiguous(practice(outcome, "F"), "13");
+        assertMet(practice(outcome, "F"), 9);
     }
 
     // ---- G/H: tests and evaluated exams by trimester (AMB-C3-02, AMB-C3-18) ----
 
     @Test
-    void ct45_fourAgentsInWeek8MeetGWithTheConvention() {
+    void ct45_fourAgentsInWeek8MeetG() {
         List<Record> records = withTests(dum(56), SYPHILIS, HIV, HEPATITIS_B, HEPATITIS_C);
-        assertMet(practice(computeNovember(conventionPack(), records), "G"), 9);
+        assertMet(practice(computeNovember(new C3Pack(), records), "G"), 9);
     }
 
     @Test
-    void ct45_fourAgentsInWeek8AreAmbiguousWithoutTheConvention() {
-        List<Record> records = withTests(dum(56), SYPHILIS, HIV, HEPATITIS_B, HEPATITIS_C);
+    void amb02_theFirstTrimesterEndsOnDumPlus97() {
+        assertMet(
+                practice(
+                        computeNovember(new C3Pack(), withTests(dum(97), "0214010074", HIV, HEPATITIS_B, HEPATITIS_C)),
+                        "G"),
+                9);
+        assertNotMet(practice(
+                computeNovember(new C3Pack(), withTests(dum(98), "0214010074", HIV, HEPATITIS_B, HEPATITIS_C)), "G"));
+    }
+
+    @Test
+    void amb02_theThirdTrimesterStartsOnDumPlus196() {
+        assertNotMet(practice(computeNovember(new C3Pack(), withTests(dum(195), SYPHILIS, HIV)), "H"));
+        assertMet(practice(computeNovember(new C3Pack(), withTests(dum(196), SYPHILIS, HIV)), "H"), 9);
+    }
+
+    @Test
+    void amb02_theThirdTrimesterIncludesTheDayD() {
+        // AMB-C3-04: [DUM+196, D], D inclusive
+        List<Record> records = withAnchorOn(dum(56));
+        records.add(outcome(P1, OUTCOME));
+        records.addAll(tests(P1, OUTCOME, SYPHILIS, HIV));
+        assertMet(practice(computeNovember(new C3Pack(), records), "H"), 9);
+    }
+
+    @Test
+    void amb02_anOutcomeBeforeDumPlus196NeverMeetsH() {
+        // DUM 2025-06-01, outcome on DUM+150 (2025-10-29): active in November, D before DUM+196
+        LocalDate lmp = LocalDate.of(2025, 6, 1);
+        List<Record> records = new ArrayList<>(linked(P1, INE));
+        records.add(anchor(P1, lmp.plusDays(56), lmp));
+        records.add(outcome(P1, lmp.plusDays(150)));
+        records.addAll(tests(P1, lmp.plusDays(150), SYPHILIS, HIV));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "G"), "02");
-        assertRuleAmbiguity(outcome);
+        assertNotMet(practice(outcome, episodeKey(P1, lmp), "H"));
     }
 
     @Test
     void ct46_noHepatitisCInTheWholePregnancyFailsGWhateverTheTrimester() {
         RuleOutcome outcome = computeNovember(new C3Pack(), withTests(dum(56), SYPHILIS, HIV, HEPATITIS_B));
         assertNotMet(practice(outcome, "G"));
-        // H still depends on where the syphilis and HIV tests fall (AMB-C3-02)
-        assertAmbiguous(practice(outcome, "H"), "02");
+        // the syphilis and HIV tests of week 8 are not of the 3º trimestre
+        assertNotMet(practice(outcome, "H"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
@@ -517,35 +627,31 @@ class C3PracticeCasesTest {
         for (String code : List.of("0202031110", "0202030300", "0202030970", "0202030679")) {
             records.add(procedure(P1, dum(60), code, EVALUATED, "MIAI", NURSE));
         }
-        assertMet(practice(computeNovember(conventionPack(), records), "G"), 9);
+        assertMet(practice(computeNovember(new C3Pack(), records), "G"), 9);
     }
 
     @Test
-    void ct48_htlvInPlaceOfHepatitisCIsAmbiguous() {
+    void ct48_htlvInPlaceOfHepatitisCDoesNotMeetG() {
+        // AMB-C3-18 (ii): the anti-HTLV covers none of the four agents
         List<Record> records = withTests(dum(56), SYPHILIS, HIV, HEPATITIS_B, C3Codes.HTLV_SIGTAP);
-        RuleOutcome outcome = computeNovember(conventionPack(), records);
-        assertAmbiguous(practice(outcome, "G"), "18");
-        assertRuleAmbiguity(outcome);
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
+        assertNotMet(practice(outcome, "G"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
-    void ct49_aTestInAPharmacistsMiaiIsAmbiguous() {
+    void ct49_aTestInAPharmacistsMiaiMeetsG() {
+        // AMB-C3-18 (iv): the CBO list of the Quadro 07 holds in every model
         List<Record> records = withTests(dum(56), SYPHILIS, HIV, HEPATITIS_B);
         records.add(care(P1, dum(56)).cbo(PHARMACIST).performed(HEPATITIS_C).build());
-        RuleOutcome outcome = computeNovember(conventionPack(), records);
-        assertAmbiguous(practice(outcome, "G"), "18");
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
+        assertMet(practice(outcome, "G"), 9);
     }
 
     @Test
-    void ct50_syphilisAndHivInWeek34MeetHWithTheConvention() {
+    void ct50_syphilisAndHivInWeek34MeetH() {
         List<Record> records = withTests(dum(238), "0214010082", "0214010279");
-        assertMet(practice(computeNovember(conventionPack(), records), "H"), 9);
-    }
-
-    @Test
-    void ct50_syphilisAndHivInWeek34AreAmbiguousWithoutTheConvention() {
-        List<Record> records = withTests(dum(238), "0214010082", "0214010279");
-        assertAmbiguous(practice(computeNovember(new C3Pack(), records), "H"), "02");
+        assertMet(practice(computeNovember(new C3Pack(), records), "H"), 9);
     }
 
     @Test
@@ -559,7 +665,7 @@ class C3PracticeCasesTest {
     @Test
     void amb02_secondTrimesterTestsMeetNeitherGNorHWithTheConvention() {
         List<Record> records = withTests(dum(150), SYPHILIS, HIV, HEPATITIS_B, HEPATITIS_C);
-        RuleOutcome outcome = computeNovember(conventionPack(), records);
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
         assertNotMet(practice(outcome, "G"));
         assertNotMet(practice(outcome, "H"));
     }
@@ -581,10 +687,11 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct53_aConsultationOnDPlus42IsAmbiguous() {
+    void ct53_aConsultationOnDPlus42MeetsI() {
+        // AMB-C3-04: the puerperium is (D, D+42], D+42 inclusive
         RuleOutcome outcome = computeNovember(new C3Pack(), withOutcomeAnd(puerperal(P1, OUTCOME.plusDays(42))));
-        assertAmbiguous(practice(outcome, "I"), "04");
-        assertRuleAmbiguity(outcome);
+        assertMet(practice(outcome, "I"), 9);
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
@@ -596,10 +703,34 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct54_aConsultationOnTheOutcomeDayIsAmbiguousForI() {
+    void ct54_aConsultationOnTheOutcomeDayDoesNotMeetI() {
+        // AMB-C3-04: the day D is the pregnancy, not the puerperium
         RuleOutcome outcome = computeNovember(new C3Pack(), withOutcomeAnd(puerperal(P1, OUTCOME)));
-        assertAmbiguous(practice(outcome, "I"), "04");
-        assertRuleAmbiguity(outcome);
+        assertNotMet(practice(outcome, "I"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+    }
+
+    @Test
+    void amb11_aConsultationWithAPregnancyCodeInThePuerperiumDoesNotMeetI() {
+        RuleOutcome outcome = computeNovember(new C3Pack(), withOutcomeAnd(prenatal(P1, OUTCOME.plusDays(10))));
+        assertNotMet(practice(outcome, "I"));
+    }
+
+    @Test
+    void amb08_aCodeInBothListsCountsInBothPhasesByTheDates() {
+        // O98 is in the pregnancy and in the puerperium list: the dates decide the phase
+        List<Record> records = withAnchorOn(dum(56));
+        records.add(outcome(P1, OUTCOME));
+        records.add(care(P1, OUTCOME.plusDays(10)).cid("O98.9").build());
+        assertMet(practice(computeNovember(new C3Pack(), records), "I"), 9);
+    }
+
+    @Test
+    void amb08_theMoreSpecificListDecidesAPuerperalSubcategory() {
+        // O15.2 is a puerperal entry; O15 (pregnancy) is less specific: it is not a prenatal consultation
+        List<Record> records = withAnchorOn(dum(100));
+        records.add(care(P1, dum(56)).cid("O15.2").build());
+        assertNotMet(practice(computeNovember(new C3Pack(), records), "A"));
     }
 
     @Test
@@ -616,10 +747,10 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void met21_aVisitOnDPlus42IsAmbiguous() {
+    void met21_aVisitOnDPlus42MeetsJ() {
         RuleOutcome outcome = computeNovember(new C3Pack(), withOutcomeAnd(visit(P1, OUTCOME.plusDays(42), ACS)));
-        assertAmbiguous(practice(outcome, "J"), "04");
-        assertRuleAmbiguity(outcome);
+        assertMet(practice(outcome, "J"), 9);
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
@@ -667,18 +798,26 @@ class C3PracticeCasesTest {
     }
 
     @Test
-    void ct60_aCollectiveActivityWithOnlyPractice01IsAmbiguousForK() {
+    void ct60_aCollectiveActivityWithOnlyPractice01DoesNotMeetK() {
         List<Record> records = withAnchorOn(dum(56));
         records.add(collectiveActivity(P1, dum(140), ORAL_HEALTH_TECHNICIAN, "05", "01"));
         RuleOutcome outcome = computeNovember(new C3Pack(), records);
-        assertAmbiguous(practice(outcome, "K"), "19");
-        assertRuleAmbiguity(outcome);
+        assertNotMet(practice(outcome, "K"));
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     @Test
-    void amb04_aDentalEncounterOnTheOutcomeDayIsAmbiguousForK() {
+    void amb20_anOralHealthAssistantDoesNotMeetK() {
+        // AMB-C3-20: 3224-05 and 3224-25 only
+        List<Record> records = withAnchorOn(dum(56));
+        records.add(care(P1, dum(140)).form("DENTAL").cbo("322430").build());
+        assertNotMet(practice(computeNovember(new C3Pack(), records), "K"));
+    }
+
+    @Test
+    void amb04_aDentalEncounterOnTheOutcomeDayMeetsK() {
         RuleOutcome outcome = computeNovember(new C3Pack(), withOutcomeAnd(dental(P1, OUTCOME)));
-        assertAmbiguous(practice(outcome, "K"), "04");
+        assertMet(practice(outcome, "K"), 9);
     }
 
     // ---- helpers ----
@@ -746,13 +885,5 @@ class C3PracticeCasesTest {
         records.add(outcome(P1, OUTCOME));
         records.add(extra);
         return records;
-    }
-
-    private static void assertRuleAmbiguity(RuleOutcome outcome) {
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(outcome.result().numerator()).isNull();
-        assertThat(outcome.result().valueExact()).isNull();
-        assertThat(outcome.result().classification()).isNull();
-        assertThat(outcome.result().denominator()).isEqualTo(BigInteger.ONE);
     }
 }

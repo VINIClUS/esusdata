@@ -18,7 +18,6 @@ import static esusdata.indicator.pack.c3.C3Fixtures.PREGNANCY_CIAP;
 import static esusdata.indicator.pack.c3.C3Fixtures.SUBSTITUTE_END;
 import static esusdata.indicator.pack.c3.C3Fixtures.SYPHILIS;
 import static esusdata.indicator.pack.c3.C3Fixtures.anchor;
-import static esusdata.indicator.pack.c3.C3Fixtures.assertAmbiguous;
 import static esusdata.indicator.pack.c3.C3Fixtures.assertMet;
 import static esusdata.indicator.pack.c3.C3Fixtures.assertNotMet;
 import static esusdata.indicator.pack.c3.C3Fixtures.bloodPressure;
@@ -26,7 +25,6 @@ import static esusdata.indicator.pack.c3.C3Fixtures.care;
 import static esusdata.indicator.pack.c3.C3Fixtures.collectivePressure;
 import static esusdata.indicator.pack.c3.C3Fixtures.computeNovember;
 import static esusdata.indicator.pack.c3.C3Fixtures.condition;
-import static esusdata.indicator.pack.c3.C3Fixtures.conventionPack;
 import static esusdata.indicator.pack.c3.C3Fixtures.dose;
 import static esusdata.indicator.pack.c3.C3Fixtures.dtpa;
 import static esusdata.indicator.pack.c3.C3Fixtures.dum;
@@ -37,7 +35,6 @@ import static esusdata.indicator.pack.c3.C3Fixtures.linked;
 import static esusdata.indicator.pack.c3.C3Fixtures.outcome;
 import static esusdata.indicator.pack.c3.C3Fixtures.person;
 import static esusdata.indicator.pack.c3.C3Fixtures.practice;
-import static esusdata.indicator.pack.c3.C3Fixtures.prenatal;
 import static esusdata.indicator.pack.c3.C3Fixtures.puerperal;
 import static esusdata.indicator.pack.c3.C3Fixtures.registration;
 import static esusdata.indicator.pack.c3.C3Fixtures.registrationVersion;
@@ -53,7 +50,6 @@ import esusdata.indicator.model.CanonicalHomeVisit;
 import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
-import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.SourceRef;
 import esusdata.indicator.model.TeamResult;
@@ -93,11 +89,11 @@ class C3ReviewCasesTest {
     // ---- M1: readings that agree on the decision but not on its date ----
 
     @Test
-    void m1_twoReadingsExcludingByAbortionOnDifferentDatesStayExcluded() {
+    void m1_theEarliestAbortionCodeOfThePregnancyDatesTheExclusion() {
         List<Record> records = pregnancy(P1, DUM);
         records.add(care(P1, dum(60)).ciap(PREGNANCY_CIAP).lmp(dum(20)).build());
-        records.add(care(P1, dum(10)).cid("O03").build()); // only in the reading by the smaller DUM
-        records.add(care(P1, dum(40)).ciap("W82").build()); // in both readings
+        records.add(care(P1, dum(10)).cid("O03").build());
+        records.add(care(P1, dum(40)).ciap("W82").build());
         EvidenceItem row = episodeRow(compute(records), EP1);
         assertThat(row.decision()).isEqualTo(EvidenceDecision.EXCLUDED);
         assertThat(row.reasonCode()).isEqualTo("EXCLUIDO_ABORTO");
@@ -105,12 +101,14 @@ class C3ReviewCasesTest {
     }
 
     @Test
-    void m1_readingsThatDisagreeOnTheDecisionAreAmbiguous() {
-        List<Record> records = pregnancy(P1, DUM);
-        records.add(care(P1, dum(60)).ciap(PREGNANCY_CIAP).lmp(dum(20)).build());
-        records.add(care(P1, dum(10)).cid("O03").build()); // excludes only under the smaller DUM
-        EvidenceItem row = episodeRow(compute(records), EP1);
-        assertThat(row.reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_03");
+    void m1_anAbortionCodeBeforeTheDumOfTheFirstRecordDoesNotExclude() {
+        // AMB-C3-03 (i): the DUM of the first record opens the window; a code before it is another pregnancy's
+        List<Record> records = new ArrayList<>(linked(P1, INE));
+        records.add(care(P1, dum(30)).ciap(PREGNANCY_CIAP).lmp(dum(20)).build());
+        records.add(anchor(P1, dum(56), DUM)); // a later record with an earlier DUM: same pregnancy
+        records.add(care(P1, dum(10)).cid("O03").build());
+        EvidenceItem row = episodeRow(compute(records), episodeKey(P1, dum(20)));
+        assertThat(row.decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
     }
 
     // ---- M2: codes of both lists ----
@@ -130,11 +128,12 @@ class C3ReviewCasesTest {
     }
 
     @Test
-    void m2_aPregnancyPrefixCodeOutsideEveryEpisodeIsStillWithoutDum() {
+    void m2_aPregnancyPrefixCodeOutsideEveryEpisodeIsWithoutDum() {
         List<Record> records = twoPregnancies();
         records.add(care(P1, LocalDate.of(2025, 2, 1)).cid("O26.8").build());
         EvidenceItem row = episodeRow(compute(records), P1 + "#sem-dum");
-        assertThat(row.reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_03");
+        assertThat(row.decision()).isEqualTo(EvidenceDecision.EXCLUDED);
+        assertThat(row.reasonCode()).isEqualTo("EXCLUIDO_SEM_DUM_NEM_IG");
     }
 
     @Test
@@ -142,8 +141,11 @@ class C3ReviewCasesTest {
         List<Record> records = pregnancy(P1, DUM);
         records.add(puerperal(P1, LocalDate.of(2024, 12, 15)));
         RuleOutcome outcome = compute(records);
-        assertThat(episodeRow(outcome, P1 + "#sem-dum").eventDate()).isEqualTo("2024-12-15");
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        EvidenceItem row = episodeRow(outcome, P1 + "#sem-dum");
+        assertThat(row.eventDate()).isEqualTo("2024-12-15");
+        assertThat(row.reasonCode()).isEqualTo("EXCLUIDO_SEM_DUM_NEM_IG");
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(outcome.result().denominator()).isEqualTo(BigInteger.ONE);
     }
 
     @Test
@@ -186,17 +188,20 @@ class C3ReviewCasesTest {
                 null,
                 null));
         RuleOutcome outcome = compute(records);
-        assertThat(episodeRow(outcome, P1 + "#sem-dum").reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_03");
+        assertThat(episodeRow(outcome, P1 + "#sem-dum").reasonCode()).isEqualTo("EXCLUIDO_SEM_DUM_NEM_IG");
     }
 
     // ---- M3: a late recorded outcome is never overridden by the LPC ----
 
     @Test
-    void m3_lateRecordedOutcomeIsAmbiguousEvenWithAnLpcResolutionInRange() {
+    void m3_lateRecordedOutcomeIsIgnoredAndTheLpcResolutionInRangeEndsThePregnancy() {
+        // AMB-C3-05: an outcome after DUM+294 is ignored; the resolution of W78 in range decides
         List<Record> records = pregnancy(P1, DUM);
         records.add(condition(P1, "CIAP2", PREGNANCY_CIAP, dum(56), "2", dum(273)));
         records.add(outcome(P1, dum(304)));
-        assertThat(episodeRow(compute(records), EP1).reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_05");
+        EvidenceItem row = episodeRow(compute(records), EP1);
+        assertThat(row.reasonCode()).isEqualTo("ELEGIVEL_DESFECHO_RESOLUCAO_LPC");
+        assertThat(row.eventDate()).isEqualTo(dum(273).toString());
     }
 
     @Test
@@ -211,23 +216,17 @@ class C3ReviewCasesTest {
     // ---- M5: a DUM derived from the IG within a week of a recorded DUM ----
 
     @Test
-    void m5_dumDerivedFromIgWithinSixDaysOfTheRecordedDumIsTheSameDum() {
-        List<Record> records = new ArrayList<>(linked(P1, INE));
-        records.add(anchor(P1, dum(86), DUM)); // A: DUM+86 is the ordinal-week band
-        // IG 10 on DUM+73 derives DUM+3: the recorded DUM read in whole weeks
-        records.add(
-                care(P1, dum(73)).cbo(NURSING_TECHNICIAN).gestationalWeeks(10).build());
-        assertAmbiguous(practice(compute(records), EP1, "A"), "01");
-    }
-
-    @Test
-    void m5_dumDerivedFromIgSevenDaysAfterIsAnotherReading() {
+    void m5_theDumDerivedFromTheIgOfTheFirstRecordIsTheEpisodeDum() {
+        // AMB-C3-03 (i): the first record (IG 10 on DUM+73, so DUM+3) opens the episode, whatever its CBO
         List<Record> records = new ArrayList<>(linked(P1, INE));
         records.add(anchor(P1, dum(86), DUM));
-        // IG 10 on DUM+77 derives DUM+7: A is met under that reading (k = 79)
         records.add(
-                care(P1, dum(77)).cbo(NURSING_TECHNICIAN).gestationalWeeks(10).build());
-        assertAmbiguous(practice(compute(records), EP1, "A"), "03");
+                care(P1, dum(73)).cbo(NURSING_TECHNICIAN).gestationalWeeks(10).build());
+        RuleOutcome outcome = compute(records);
+        assertThat(episodeRow(outcome, episodeKey(P1, dum(3))).decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
+        assertThat(hasSubject(outcome, EP1)).isFalse();
+        // the anchor on DUM+86 is on day 83 of that DUM: A met
+        assertMet(practice(outcome, episodeKey(P1, dum(3)), "A"), 10);
     }
 
     // ---- M6: deduplication by whole record ----
@@ -269,17 +268,18 @@ class C3ReviewCasesTest {
     }
 
     @Test
-    void minor1_firstTrimesterRecordOnTheDayDIsAmbiguous() {
+    void minor1_firstTrimesterRecordOnTheDayDCounts() {
+        // AMB-C3-04: D is inclusive; the first trimester is truncated at D
         List<Record> records = earlyOutcome();
         records.addAll(tests(P1, LocalDate.of(2025, 11, 10), SYPHILIS, HIV, HEPATITIS_B, HEPATITIS_C));
-        assertAmbiguous(practice(computeNovember(conventionPack(), records), EARLY, "G"), "04");
+        assertMet(practice(computeNovember(new C3Pack(), records), EARLY, "G"), 9);
     }
 
     @Test
     void minor1_firstTrimesterEndsAtD() {
         List<Record> records = earlyOutcome();
         records.addAll(tests(P1, LocalDate.of(2025, 11, 15), SYPHILIS, HIV, HEPATITIS_B, HEPATITIS_C));
-        assertNotMet(practice(computeNovember(conventionPack(), records), EARLY, "G"));
+        assertNotMet(practice(computeNovember(new C3Pack(), records), EARLY, "G"));
     }
 
     @Test
@@ -297,10 +297,10 @@ class C3ReviewCasesTest {
     }
 
     @Test
-    void minor3_lpcExclusionWithUnknownStatusIsAmbiguous() {
+    void minor3_lpcExclusionWithUnknownStatusDoesNotExclude() {
         List<Record> records = pregnancy(P1, DUM);
         records.add(condition(P1, "CID10", "O03", dum(100), null, null));
-        assertThat(episodeRow(compute(records), EP1).reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_07");
+        assertThat(episodeRow(compute(records), EP1).decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
     }
 
     @Test
@@ -341,50 +341,36 @@ class C3ReviewCasesTest {
     }
 
     @Test
-    void minor5_anAmbiguousEpisodeReachingDPlus42MakesTheMonthCount() {
+    void minor5_anExcludedEpisodeReachingDPlus42DoesNotMakeTheMonthCount() {
         LocalDate dum = LocalDate.of(2024, 12, 15); // D = 2025-10-05, D+42 = 2025-11-16
         List<Record> records = new ArrayList<>(linked(P1, INE));
-        records.add(care(P1, dum.plusDays(56)).lmp(dum).build()); // no 24 f code: AMB-C3-03
+        records.add(care(P1, dum.plusDays(56)).lmp(dum).build()); // no 24 f code
         RuleOutcome outcome = compute(records);
-        assertThat(episodeRow(outcome, episodeKey(P1, dum)).reasonCode()).isEqualTo("AMBIGUIDADE_AMB_C3_03");
+        assertThat(episodeRow(outcome, episodeKey(P1, dum)).reasonCode()).isEqualTo("EXCLUIDO_SEM_CODIGO_GESTACAO");
+        assertThat(outcome.result().consolidationEligible()).isFalse();
+    }
+
+    @Test
+    void minor5_anEligibleEpisodeReachingDPlus42MakesTheMonthCount() {
+        LocalDate dum = LocalDate.of(2024, 12, 15);
+        RuleOutcome outcome = compute(pregnancy(P1, dum));
+        assertThat(episodeRow(outcome, episodeKey(P1, dum)).decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
         assertThat(outcome.result().consolidationEligible()).isTrue();
     }
 
     @Test
-    void minor6_anAmbiguousCohortSubjectLeavesEveryComponentUndefined() {
+    void minor6_anExcludedSubjectIsNotInTheDenominatorOfAnyComponent() {
         List<Record> records = new ArrayList<>(fullEpisode(P1));
         records.addAll(linked(P2, INE));
         records.add(care(P2, dum(56)).lmp(DUM).build()); // no 24 f code
-        RuleOutcome outcome = computeNovember(conventionPack(), records);
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
         assertThat(outcome.result().components()).hasSize(11).allSatisfy(c -> {
-            assertThat(c.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-            assertThat(c.value()).isNull();
+            assertThat(c.status()).isEqualTo(IndicatorStatus.COMPUTED);
+            assertThat(c.value()).isNotNull();
             assertThat(c.numerator()).isEqualTo(BigInteger.ONE);
             assertThat(c.denominator()).isEqualTo(BigInteger.ONE);
         });
-    }
-
-    @Test
-    void minor7_divergingReadingsRelabelOnlyTheSupportsTheyDoNotShare() {
-        List<Record> records = new ArrayList<>(linked(P1, INE));
-        records.add(anchor(P1, dum(10), DUM)); // before the larger DUM: only the smaller reading
-        records.add(care(P1, dum(126)).ciap(PREGNANCY_CIAP).lmp(dum(20)).build());
-        for (int day : List.of(154, 182, 210, 238, 266)) {
-            records.add(prenatal(P1, dum(day)));
-        }
-        records.add(prenatal(P1, dum(314))); // D of the larger reading (AMB-C3-04), puerperium of the other
-        RuleOutcome outcome = compute(records);
-        assertAmbiguous(practice(outcome, EP1, "B"), "03");
-        List<EvidenceItem> supports = supporting(outcome, EP1, "B");
-        assertThat(supports)
-                .filteredOn(e -> dum(154).toString().equals(e.eventDate()))
-                .singleElement()
-                .satisfies(e -> assertThat(e.reasonCode()).isEqualTo("EVIDENCIA"));
-        assertThat(supports)
-                .filteredOn(e -> dum(10).toString().equals(e.eventDate()))
-                .singleElement()
-                .satisfies(e -> assertThat(e.reasonCode()).isEqualTo("EVIDENCIA_AMBIGUA_AMB_C3_03"));
     }
 
     @Test
@@ -434,22 +420,30 @@ class C3ReviewCasesTest {
     // ---- cohort branches ----
 
     @Test
-    void onlyDPlus42InTheCompetenciaIsAmbiguous() {
+    void onlyDPlus42InTheCompetenciaIsActiveAndEligible() {
+        // AMB-C3-04: the puerperium reaches D+42 inclusive
         LocalDate dum = NOVEMBER_FIRST.minusDays(336); // D+42 = 2025-11-01
-        assertThat(episodeRow(compute(pregnancy(P1, dum)), episodeKey(P1, dum)).reasonCode())
-                .isEqualTo("AMBIGUIDADE_AMB_C3_04");
+        EvidenceItem row = episodeRow(compute(pregnancy(P1, dum)), episodeKey(P1, dum));
+        assertThat(row.decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
+        assertThat(row.reasonCode()).isEqualTo("ELEGIVEL_DATA_SUBSTITUTIVA_294D");
     }
 
     @Test
-    void readingsActiveAndInactiveAreAmbiguous() {
-        LocalDate dum = LocalDate.of(2025, 10, 31).minusDays(335); // D+41 = 2025-10-31
+    void anEpisodeWhoseDPlus42IsBeforeTheCompetenciaIsNotActive() {
+        LocalDate dum = NOVEMBER_FIRST.minusDays(337); // D+42 = 2025-10-31
+        assertThat(hasSubject(compute(pregnancy(P1, dum)), episodeKey(P1, dum))).isFalse();
+    }
+
+    @Test
+    void theDumOfTheFirstRecordDecidesTheActivity() {
+        // D+42 = 2025-10-31 by the DUM of the first record; a later record's DUM (+20) does not reopen it
+        LocalDate dum = LocalDate.of(2025, 10, 31).minusDays(336);
         List<Record> records = pregnancy(P1, dum);
         records.add(care(P1, dum.plusDays(60))
                 .ciap(PREGNANCY_CIAP)
                 .lmp(dum.plusDays(20))
                 .build());
-        assertThat(episodeRow(compute(records), episodeKey(P1, dum)).reasonCode())
-                .isEqualTo("AMBIGUIDADE_AMB_C3_03");
+        assertThat(hasSubject(compute(records), episodeKey(P1, dum))).isFalse();
     }
 
     @Test
@@ -510,7 +504,7 @@ class C3ReviewCasesTest {
     // ---- practice branches ----
 
     @Test
-    void collectiveBloodPressureWithTheFichaCodesIsAmbiguous() {
+    void collectiveBloodPressureWithTheFichaCodesCounts() {
         List<Record> records = pregnancy(P1, DUM);
         for (int i = 0; i < 6; i++) {
             records.add(bloodPressure(P1, dum(101 + i), NURSE));
@@ -520,57 +514,50 @@ class C3ReviewCasesTest {
     }
 
     @Test
-    void collectiveBloodPressureWithOnlyTheActivityIsAmbiguous() {
+    void collectiveBloodPressureWithOnlyTheActivityDoesNotCount() {
         List<Record> records = pregnancy(P1, DUM);
         for (int i = 0; i < 6; i++) {
             records.add(bloodPressure(P1, dum(101 + i), NURSE));
         }
         records.add(collectivePressure(P1, dum(120), "5"));
-        assertAmbiguous(practice(compute(records), EP1, "C"), "19");
+        assertNotMet(practice(compute(records), EP1, "C"));
     }
 
     @Test
-    void thirdTrimesterRecordOnTheDayDIsAmbiguous() {
+    void thirdTrimesterRecordOnTheDayDCounts() {
         List<Record> records = pregnancy(P1, DUM);
         records.add(outcome(P1, OUTCOME));
         records.addAll(tests(P1, OUTCOME, SYPHILIS, HIV));
-        assertAmbiguous(practice(computeNovember(conventionPack(), records), EP1, "H"), "04");
+        assertMet(practice(computeNovember(new C3Pack(), records), EP1, "H"), 9);
     }
 
     @Test
-    void visitBetweenTheFirstUndecidedAndTheFirstCertainConsultationIsAmbiguous() {
-        List<Record> records = pregnancy(P1, DUM); // first certain consultation on DUM+56
-        records.add(care(P1, dum(30)).cid("Z00").build()); // first consultation, not a prenatal code
-        records.add(visit(P1, dum(40), ACS));
+    void theFirstConsultationOfEIsTheFirstWithAPregnancyCode() {
+        List<Record> records = pregnancy(P1, DUM); // first prenatal consultation on DUM+56
+        records.add(care(P1, dum(30)).cid("Z00").build()); // a consultation with another code: not the first
+        records.add(visit(P1, dum(40), ACS)); // before the first prenatal consultation
         records.add(visit(P1, dum(150), ACS));
         records.add(visit(P1, dum(160), ACS));
-        assertAmbiguous(practice(compute(records), EP1, "E"), "16");
+        assertNotMet(practice(compute(records), EP1, "E"));
     }
 
     @Test
-    void unmappedPuerperalCiapIsNotACertainPuerperalConsultation() {
+    void unmappedPuerperalCiapIsNotAPuerperalConsultation() {
         List<Record> records = pregnancy(P1, DUM);
         records.add(care(P1, SUBSTITUTE_END.plusDays(10)).ciap("48").build());
         assertThat(C3Codes.PUERPERIUM_CIAP).doesNotContain("48", "49");
-        assertAmbiguous(practice(compute(records), EP1, "I"), "11");
+        assertNotMet(practice(compute(records), EP1, "I"));
     }
 
     // ---- results ----
 
     @Test
-    void teamWithOnlyAnAmbiguousSubjectIsAmbiguousWithoutDenominator() {
+    void teamWithOnlyAnExcludedSubjectHasNoResult() {
         List<Record> records = new ArrayList<>(fullEpisode(P1));
         records.addAll(linked(P2, OTHER_INE));
         records.add(care(P2, dum(56)).lmp(DUM).build()); // no 24 f code
-        RuleOutcome outcome = computeNovember(conventionPack(), records);
-        TeamResult other = outcome.teams().stream()
-                .filter(t -> OTHER_INE.equals(t.ine()))
-                .findFirst()
-                .orElseThrow();
-        assertThat(other.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(other.result().denominator()).isEqualTo(BigInteger.ZERO);
-        assertThat(other.result().components())
-                .extracting(ResultComponent::status)
-                .containsOnly(IndicatorStatus.RULE_AMBIGUITY);
+        RuleOutcome outcome = computeNovember(new C3Pack(), records);
+        assertThat(outcome.teams()).extracting(TeamResult::ine).containsExactly(INE);
+        assertThat(episodeRow(outcome, episodeKey(P2, DUM)).reasonCode()).isEqualTo("EXCLUIDO_SEM_CODIGO_GESTACAO");
     }
 }
