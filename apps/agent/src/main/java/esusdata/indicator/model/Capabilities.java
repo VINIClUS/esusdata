@@ -1,6 +1,7 @@
 package esusdata.indicator.model;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * The capability ids of the canonical v2 extract and the names of the code-list binds they take
@@ -21,6 +22,12 @@ public final class Capabilities {
     public static final String CONDITION_LIST = "condition_list";
     /** Weight, height and blood pressure written outside an encounter: MIP and MIAC (ADR 0030). */
     public static final String MEASUREMENT_RECORD = "measurement_record";
+
+    /**
+     * The team type and its validity, read from the transactional schema ({@code PEC_OLTP}, ADR
+     * 0031). Not in {@link #ALL}: that list is the DW foundation, validated as one set.
+     */
+    public static final String TEAM = "team";
 
     /** {@code text[]} bind of SIGTAP codes, digits only. */
     public static final String PROCEDURE_CODES = "procedure_codes";
@@ -46,6 +53,10 @@ public final class Capabilities {
             PROCEDURE_PERFORMED,
             CONDITION_LIST,
             MEASUREMENT_RECORD);
+
+    /** Every packaged canonical v2 capability: the foundation and {@link #TEAM}. */
+    public static final List<String> PACKAGED =
+            Stream.concat(ALL.stream(), Stream.of(TEAM)).toList();
 
     private Capabilities() {}
 }

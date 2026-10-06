@@ -139,7 +139,7 @@ class ExtractReaderV2Test {
                     part.capability(),
                     new DateWindow(LocalDate.parse(part.periodStart()), LocalDate.parse(part.periodEndExclusive())));
         }
-        assertThat(dataset.windows()).isEqualTo(expected).hasSize(Capabilities.ALL.size());
+        assertThat(dataset.windows()).isEqualTo(expected).hasSize(Capabilities.PACKAGED.size());
         assertThat(dataset.windowOf(Capabilities.HOME_VISIT))
                 .contains(new DateWindow(LocalDate.of(2025, 4, 1), LocalDate.of(2026, 4, 1)));
         assertThat(dataset.homeVisits()).isEmpty();

@@ -156,8 +156,20 @@ public final class PecCompatibilityMatrix {
                 && sameInstallation(candidate, identity);
     }
 
+    /**
+     * The entry's read model is the one its capability declares (ADR 0031), and the installation
+     * role is the source's. A DW capability still needs a source registered with its own model; the
+     * one capability read from the transactional schema ({@code PEC_OLTP}) is served by a source
+     * registered as {@code PEC_DW}, the PostgreSQL being the same, or as {@code PEC_OLTP}.
+     */
     private static boolean sameInstallation(JsonNode candidate, PecSourceIdentity identity) {
-        return identity.readModel().equals(text(candidate, "read_model"))
+        String entryModel = text(candidate, "read_model");
+        String capabilityModel = CapabilityCatalog.packaged()
+                .find(text(candidate, CAPABILITY))
+                .map(CapabilityContract::readModel)
+                .orElse(CapabilityContract.DEFAULT_READ_MODEL);
+        return capabilityModel.equals(entryModel)
+                && (entryModel.equals(identity.readModel()) || "PEC_DW".equals(identity.readModel()))
                 && identity.installationRole().equals(text(candidate, "installation_role"));
     }
 

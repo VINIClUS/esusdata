@@ -139,6 +139,13 @@ final class LivePecInventory {
         return output;
     }
 
+    /** A session read-only from the login on, for a live test that is not a psql-style script. */
+    Connection openReadOnly() throws SQLException {
+        Connection connection = open();
+        beginReadOnlyTransaction(connection);
+        return connection;
+    }
+
     // javac's try lint: the resource is held for the block's scope, never read.
     @SuppressWarnings("try")
     private boolean canLogIn() {

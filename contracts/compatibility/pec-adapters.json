@@ -935,6 +935,85 @@
       "test_notes": "Validada em 2026-10-05 ao vivo contra o PEC 5.5.28 / PostgreSQL 9.6.13 de produção do município, por túnel SSH e só leitura, competência 2026-08, com a entrada marcada VALIDATED localmente e o execution plane reconstruído a partir dela (receita da ADR 0023): captura sem erro, sem violação de contrato e sem violação de formato, 648 linhas em 2,4 s; aquisição canônica v2 pelo Rust com as dez capacidades, idêntica linha a linha à mesma consulta congelada via JDBC, com os fingerprints conferidos no handshake. Diferencial Rust × JDBC na fixture também verde. Peso e altura de tb_fat_proced_atend e de tb_fat_visita_domiciliar vêm vazios nesta instalação; a pressão arterial só aparece como procedimento SIGTAP 0301100039.",
       "approved_at": "2026-10-05",
       "approved_by": "vinicius0zero0@gmail.com"
+    },
+    {
+      "pec_versions": [
+        "5.5.28"
+      ],
+      "postgresql_version": "9.6.13",
+      "adapter_version": "0.1.0",
+      "read_model": "PEC_OLTP",
+      "installation_role": "PRONTUARIO",
+      "capability": "team",
+      "status": "NOT_TESTED",
+      "status_reason": "Capacidade nova (ADR 0031), a única que lê o esquema transacional do PEC. Consulta escrita sobre o inventário de 2026-10-06 (docs/discovery/2026-10-06-pec-5528-equipe-transacional.md). As signature_fingerprint são as da fixture sintética PostgreSQL 9.6, com os tipos de coluna do PEC 5.5.28; a captura ao vivo no PEC de produção e a aprovação do usuário ainda faltam.",
+      "objects_used": [
+        {
+          "object": "ta_equipe",
+          "columns_used": [
+            "co_seq_taequipe",
+            "co_seq_equipe",
+            "co_unidade_saude",
+            "dt_auditoria",
+            "nu_ine",
+            "tp_equipe",
+            "UNIQUE_KEY=co_seq_taequipe"
+          ],
+          "signature_fingerprint": "sha256:72a9f64cc20766a9047958995d30d41f2344900ca0550ca2e1070df343c3fd95"
+        },
+        {
+          "object": "tb_dim_equipe",
+          "columns_used": [
+            "nu_ine"
+          ],
+          "signature_fingerprint": "sha256:d100f58cb56d79a3851017cb5a9e02f5127e2d11e237549d36f63420ebe70ed8"
+        },
+        {
+          "object": "tb_dim_municipio",
+          "columns_used": [
+            "co_ibge"
+          ],
+          "signature_fingerprint": "sha256:cebf0e52028c98829f6c2d7fcb8f186b3c9b43ca0d0c8d908d27ae706ff03d96"
+        },
+        {
+          "object": "tb_equipe",
+          "columns_used": [
+            "co_seq_equipe",
+            "co_unidade_saude",
+            "nu_ine",
+            "tp_equipe",
+            "UNIQUE_KEY=co_seq_equipe"
+          ],
+          "signature_fingerprint": "sha256:4b7548a79f3f08d3d1edd44035d486d0dbb54596968517258ee199fafa9ef433"
+        },
+        {
+          "object": "tb_tipo_equipe",
+          "columns_used": [
+            "co_seq_tipo_equipe",
+            "nu_ms",
+            "UNIQUE_KEY=co_seq_tipo_equipe"
+          ],
+          "signature_fingerprint": "sha256:e5f35951b697ec6c83527cbd6c5a2457af718d3cf3b7388e8c82a3e830681ab7"
+        },
+        {
+          "object": "tb_unidade_saude",
+          "columns_used": [
+            "co_seq_unidade_saude",
+            "nu_cnes",
+            "UNIQUE_KEY=co_seq_unidade_saude"
+          ],
+          "signature_fingerprint": "sha256:f4d7deb23f568463dba1410ff571a1c8df44c403d6c87421e77ff5477d39df4b"
+        }
+      ],
+      "municipal_isolation_evidence": {
+        "binding_column": "tb_dim_municipio.co_ibge",
+        "mechanism": "O esquema transacional não tem caminho até município (nenhuma FK em até 4 saltos). A consulta só devolve linhas se tb_dim_municipio contém o co_ibge do bind (texto de 7 dígitos), só para equipes cujo INE existe em tb_dim_equipe.nu_ine, e devolve esse co_ibge em municipality_ibge. Nunca por nome de equipe. Limite declarado no ADR 0031: numa instalação com mais de um município o DW pode ter INEs de outros e a regra não os separa; por isso só PRONTUARIO.",
+        "single_municipality_installation": true
+      },
+      "query_checksum": "sha256:0890d74bff5a469992177b04a9bad351ac0d4801266b36ac7fa045ff78e1dbfe",
+      "fixture_checksum": "sha256:8f9180796cc58cea3f3eb620e38381abde420609d6c562bedd59dc734cd8a214",
+      "test_result": "NOT_RUN",
+      "test_evidence_ref": "docs/discovery/2026-10-06-pec-5528-equipe-transacional.md"
     }
   ]
 }

@@ -417,7 +417,7 @@ fn probe_message(
             &descriptor.capability,
             &descriptor.adapter_version,
             &envelope.pec_version,
-            &envelope.read_model,
+            &descriptor.read_model,
             &envelope.installation_role,
         ) {
             let measured = cache.probe_object(txn, &object.object, &object.columns_used)?;

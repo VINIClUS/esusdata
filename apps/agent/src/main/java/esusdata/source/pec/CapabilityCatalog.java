@@ -77,9 +77,11 @@ public final class CapabilityCatalog {
         String queryPath = d.get("query").asString();
         String query = FrozenQuery.load(QUERY_ROOT + queryPath);
         JsonNode scope = d.get("scope_date_column");
+        JsonNode model = d.get("read_model");
         return new CapabilityContract(
                 d.get("capability").asString(),
                 d.get("adapter_version").asString(),
+                model == null || model.isNull() ? CapabilityContract.DEFAULT_READ_MODEL : model.asString(),
                 d.get("record_kind").asString(),
                 d.get("entity_type_column").asString(),
                 d.get("record_id_column").asString(),
