@@ -30,6 +30,7 @@ import esusdata.indicator.model.ValueKind;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -69,9 +70,7 @@ class C7RuleTest {
 
     private static final String PRATICA_CUMPRIDA = "PRATICA_CUMPRIDA";
     private static final String PRATICA_NAO_CUMPRIDA = "PRATICA_NAO_CUMPRIDA";
-    private static final String AMB_08 = "AMB_C7_08_HPV_MOLECULAR_ANTES_2026";
-    private static final String AMB_06 = "AMB_C7_06_DOSE_HPV_ALEM_60_MESES";
-    private static final String AMB_05 = "AMB_C7_05_HOMEM_TRANSGENERO_9_14";
+    private static final String SEM_SUBGRUPO = "EXCLUIDO_HOMEM_TRANSGENERO_SEM_SUBGRUPO";
 
     // ---- MET-24 / CT01: one denominator per subpopulation -> exactly 40 (Suficiente) ----
     @Test
@@ -106,17 +105,18 @@ class C7RuleTest {
     }
 
     @Test
-    void met25_ct02b_hpvMolecularBefore2026AsOnlyEvidenceIsRuleAmbiguity() {
+    void met25_ct02b_hpvMolecularDatedBefore2026CountsFromCompetenciaJanuary2026() {
+        // C7-D2: the footnote 4 fixes the competência where counting starts, not the date of the record
         RuleOutcome outcome =
-                assertAOnly(JUN_2026, HPV_MOLECULAR, d("2023-01-15"), 0, IndicatorStatus.RULE_AMBIGUITY, AMB_08);
+                assertAOnly(JUN_2026, HPV_MOLECULAR, d("2023-01-15"), 1, IndicatorStatus.COMPUTED, PRATICA_CUMPRIDA);
 
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(outcome.result().valueExact()).isNull();
-        assertThat(outcome.result().limitations()).anyMatch(l -> l.contains("AMB-C7-08"));
+        assertThat(rows(outcome, e -> e.decision() == EvidenceDecision.SUPPORTING_EVENT))
+                .singleElement()
+                .satisfies(e -> assertThat(e.reasonCode()).isEqualTo("EVENTO_SUSTENTA_PRATICA"));
     }
 
     @Test
-    void met25_ct02b_hpvMolecularBefore2026IsNotAmbiguousWhenAnotherExamAlreadyMeetsA() {
+    void met25_ct02b_hpvMolecularBefore2026AndAnotherExamCountOnce() {
         IndicatorResult result = new Scenario()
                 .woman("p", d("1986-01-10"))
                 .add(exam("p", d("2023-01-15"), HPV_MOLECULAR), exam("p", d("2025-01-15"), CITO_RASTREAMENTO))
@@ -159,9 +159,9 @@ class C7RuleTest {
                 YearMonth.of(2029, 6), HPV_MOLECULAR, d("2026-02-10"), 1, IndicatorStatus.COMPUTED, PRATICA_CUMPRIDA);
     }
 
-    // ---- CT06 / AMB-C7-01: empty subpopulation -> unavailable, never 70 nor renormalized ----
+    // ---- CT06 / C7-D4: empty subpopulation -> rescaled over the weights present ----
     @Test
-    void ct06_emptySubgroupBMakesTheScoreUnavailableNever70() {
+    void ct06_emptySubgroupBRescalesTheScoreOverTheWeightsPresent() {
         IndicatorResult result = new Scenario()
                 .woman("p1", d("1971-01-15"))
                 .woman("p2", d("1966-01-15"))
@@ -173,11 +173,77 @@ class C7RuleTest {
 
         assertComponent(result, "B", 0, 0, IndicatorStatus.NO_DENOMINATOR);
         assertComponent(result, "A", 1, 2, IndicatorStatus.COMPUTED);
-        assertThat(result.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        assertThat(result.status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(result.classification()).isEqualTo(Classification.SUFICIENTE);
+        assertThat(result.limitations())
+                .anyMatch(l -> l.startsWith("Subgrupo B sem denominador") && l.contains("C7-LIM-14"));
+        assertThat(result.limitations()).noneMatch(l -> l.contains("Subgrupo A sem denominador"));
+        // A 1/2, C 2/3, D 0/2: 20 * 1/2 + 30 * 2/3 + 20 * 0 = 30 over the 70 points present -> 300/7
+        assertThat(result.valueExact()).isEqualByComparingTo(ExactRatio.of(300, 7));
+        assertThat(result.valueText()).isEqualTo("42.8571");
+        // the zero reading would publish 30; the 70-point ceiling would not rescale at all
+        assertThat(result.valueExact()).isNotEqualByComparingTo(ExactRatio.of(30, 1));
+    }
+
+    @Test
+    void ct06_twoEmptySubgroupsRescaleOverTheRemainingWeights() {
+        // only a 40-year-old woman: A (20) and C (30) have a denominator; B and D are empty
+        IndicatorResult result = new Scenario()
+                .woman("p", d("1986-01-15"))
+                .add(exam("p", d("2025-01-15"), CITO_RASTREAMENTO))
+                .compute(JUN_2026)
+                .result();
+
+        assertComponent(result, "A", 1, 1, IndicatorStatus.COMPUTED);
+        assertComponent(result, "C", 0, 1, IndicatorStatus.COMPUTED);
+        assertComponent(result, "B", 0, 0, IndicatorStatus.NO_DENOMINATOR);
+        assertComponent(result, "D", 0, 0, IndicatorStatus.NO_DENOMINATOR);
+        // 20 * 1 + 30 * 0 = 20 over the 50 points present -> 40
+        assertThat(result.status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(result.valueExact()).isEqualByComparingTo(ExactRatio.of(40, 1));
+        assertThat(result.limitations())
+                .filteredOn(l -> l.startsWith("Subgrupo "))
+                .hasSize(2);
+    }
+
+    @Test
+    void ct06_onlyBWithDenominatorScoresTheFullRescaledValue() {
+        // three girls of 9, 11 and 13, one dose: B = 1/3 is the whole score, 30 * 1/3 * 100 / 30 = 100/3
+        IndicatorResult result = new Scenario()
+                .woman("g9", d("2017-01-15"))
+                .woman("g11", d("2015-01-15"))
+                .woman("g13", d("2013-01-15"))
+                .add(hpv("g9", d("2026-02-01")))
+                .compute(JUN_2026)
+                .result();
+
+        assertComponent(result, "B", 1, 3, IndicatorStatus.COMPUTED);
+        assertComponent(result, "A", 0, 0, IndicatorStatus.NO_DENOMINATOR);
+        assertComponent(result, "C", 0, 0, IndicatorStatus.NO_DENOMINATOR);
+        assertComponent(result, "D", 0, 0, IndicatorStatus.NO_DENOMINATOR);
+        assertThat(result.status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(result.valueExact()).isEqualByComparingTo(ExactRatio.of(100, 3));
+        assertThat(result.consolidationEligible()).isTrue();
+    }
+
+    @Test
+    void ct06_allSubgroupsEmptyLeaveTheMonthWithoutValue() {
+        // a 70-year-old and an 8-year-old belong to no subgroup
+        IndicatorResult result = new Scenario()
+                .woman("old", d("1956-01-15"))
+                .woman("young", d("2018-01-15"))
+                .compute(JUN_2026)
+                .result();
+
+        assertThat(result.components())
+                .extracting(ResultComponent::status)
+                .containsOnly(IndicatorStatus.NO_DENOMINATOR);
+        assertThat(result.status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
         assertThat(result.valueExact()).isNull();
         assertThat(result.valueText()).isNull();
         assertThat(result.classification()).isNull();
-        assertThat(result.limitations()).anyMatch(l -> l.contains("AMB-C7-01"));
+        assertThat(result.limitations()).noneMatch(l -> l.startsWith("Subgrupo "));
+        assertThat(result.consolidationEligible()).isFalse();
     }
 
     // ---- CT05: registered sex x gender identity (items 4.1/4.2) ----
@@ -206,17 +272,30 @@ class C7RuleTest {
     }
 
     @Test
-    void ct05_amb05_twelveYearOldTransManLeavesSubgroupBUndefined() {
+    void ct05_amb05_transManIsOutOfBAndWithoutSubgroupBetweenNineAndThirteen() {
         RuleOutcome outcome = new Scenario()
-                .person("homemTrans", d("2014-01-10"), MASCULINO, HOMEM_TRANS)
+                .person("trans09", d("2017-01-10"), MASCULINO, HOMEM_TRANS)
+                .person("trans12", d("2014-01-10"), MASCULINO, HOMEM_TRANS)
+                .person("trans13", d("2012-07-01"), MASCULINO, HOMEM_TRANS)
+                .person("trans14", d("2012-06-30"), MASCULINO, HOMEM_TRANS)
+                .person("trans25", d("2001-01-10"), MASCULINO, HOMEM_TRANS)
                 .woman("menina", d("2014-01-10"))
                 .compute(JUN_2026);
 
-        assertComponent(outcome.result(), "B", 0, 1, IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(practiceRow(outcome, "homemTrans", "B"))
-                .extracting(EvidenceItem::decision, EvidenceItem::reasonCode)
-                .containsExactly(EvidenceDecision.PRACTICE_AMBIGUOUS, AMB_05);
+        assertThat(personReasons(outcome))
+                .containsEntry("trans09", SEM_SUBGRUPO)
+                .containsEntry("trans12", SEM_SUBGRUPO)
+                .containsEntry("trans13", SEM_SUBGRUPO)
+                .containsEntry("trans14", "ELEGIVEL_HOMEM_TRANSGENERO")
+                .containsEntry("trans25", "ELEGIVEL_HOMEM_TRANSGENERO")
+                .containsEntry("menina", "ELEGIVEL_SEXO_FEMININO");
+        assertThat(rows(outcome, e -> "trans12".equals(e.subjectKey())))
+                .singleElement()
+                .satisfies(e -> assertThat(e.decision()).isEqualTo(EvidenceDecision.EXCLUDED));
+        assertThat(subgroups(outcome, "trans14")).containsExactly("C");
+        assertThat(subgroups(outcome, "trans25")).containsExactly("A", "C");
+        assertComponent(outcome.result(), "B", 0, 1, IndicatorStatus.COMPUTED);
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
     }
 
     // ---- CT03: age boundaries, completed years on 2026-06-30, inclusive limits ----
@@ -281,16 +360,32 @@ class C7RuleTest {
     }
 
     @Test
-    void ct03_amb06_hpvDoseOlderThan60MonthsIsRuleAmbiguity() {
-        // born 2012-03-10, dose at 9 on 2021-03-10; the 60 months of 2026-06 start on 2021-07-01
+    void ct03_amb06_hpvDoseOlderThan60MonthsStillCountsWhenGivenFromTheNinthBirthday() {
+        // born 2012-03-10, dose at 9 on 2021-03-10; the 60 months of 2026-06 start on 2021-07-01 (C7-D1)
         RuleOutcome outcome = new Scenario()
                 .woman("p", d("2012-03-10"))
                 .add(hpv("p", d("2021-03-10")))
                 .compute(JUN_2026);
 
-        assertComponent(outcome.result(), "B", 0, 1, IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(practiceRow(outcome, "p", "B").reasonCode()).isEqualTo(AMB_06);
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+        assertComponent(outcome.result(), "B", 1, 1, IndicatorStatus.COMPUTED);
+        assertThat(practiceRow(outcome, "p", "B").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+    }
+
+    @Test
+    void ct03_amb06_hpvDoseAtEightYearsAndElevenMonthsStillDoesNotCount() {
+        // 9th birthday on 2021-03-10: the day before is not "nessa faixa etária", however old the girl is now
+        RuleOutcome outcome = new Scenario()
+                .woman("p", d("2012-03-10"))
+                .add(hpv("p", d("2021-03-09")))
+                .compute(JUN_2026);
+
+        assertComponent(outcome.result(), "B", 0, 1, IndicatorStatus.COMPUTED);
+        assertThat(practiceRow(outcome, "p", "B").decision()).isEqualTo(EvidenceDecision.PRACTICE_NOT_MET);
+    }
+
+    @Test
+    void ct03_subgroupBWindowIsTheDoseWindowOfThePack() {
+        assertThat(C7Subgroup.B.months()).isEqualTo(C7Pack.DOSE_MONTHS);
     }
 
     // ---- CT04: civil-month windows, last day out / first day in, across 29/02 ----
@@ -340,7 +435,7 @@ class C7RuleTest {
     }
 
     @Test
-    void ct04_window60MonthsAtJanuary2026FirstDayInIsAmb08() {
+    void ct04_window60MonthsAtJanuary2026FirstDayInCounts() {
         RuleOutcome outcome = new Scenario()
                 .woman("out", d("1986-01-10"))
                 .woman("in", d("1986-01-10"))
@@ -348,8 +443,8 @@ class C7RuleTest {
                 .compute(YearMonth.of(2026, 1));
 
         assertThat(practiceRow(outcome, "out", "A").reasonCode()).isEqualTo(PRATICA_NAO_CUMPRIDA);
-        assertThat(practiceRow(outcome, "in", "A").reasonCode()).isEqualTo(AMB_08);
-        assertComponent(outcome.result(), "A", 0, 2, IndicatorStatus.RULE_AMBIGUITY);
+        assertThat(practiceRow(outcome, "in", "A").reasonCode()).isEqualTo(PRATICA_CUMPRIDA);
+        assertComponent(outcome.result(), "A", 1, 2, IndicatorStatus.COMPUTED);
     }
 
     // ---- ENG-25 / CT07: exact band edges, no rounding before classifying ----
@@ -723,39 +818,59 @@ class C7RuleTest {
         assertComponent(outcome.result(), "A", 0, 1, IndicatorStatus.COMPUTED);
     }
 
-    // ---- AMB-C7-08 inside 36 months too, with the record that made it ambiguous in the evidence ----
+    // ---- C7-D2 inside 36 months too, with the record in the evidence ----
     @Test
-    void met25_hpvMolecularInside36MonthsButBefore2026IsAmbiguousAndShowsItsRecord() {
+    void met25_hpvMolecularInside36MonthsButBefore2026CountsAndShowsItsRecord() {
         CanonicalProcedureEvent exam = exam("p", d("2025-06-15"), HPV_MOLECULAR);
         RuleOutcome outcome =
                 new Scenario().woman("p", d("1986-01-10")).add(exam).compute(JUN_2026);
 
-        assertComponent(outcome.result(), "A", 0, 1, IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(practiceRow(outcome, "p", "A").reasonCode()).isEqualTo(AMB_08);
-        assertThat(practiceRow(outcome, "p", "A").decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
+        assertComponent(outcome.result(), "A", 1, 1, IndicatorStatus.COMPUTED);
+        assertThat(practiceRow(outcome, "p", "A").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
         assertThat(rows(outcome, e -> e.decision() == EvidenceDecision.SUPPORTING_EVENT))
                 .singleElement()
                 .satisfies(e -> {
                     assertThat(e.sourceRef()).isEqualTo(exam.sourceRef());
-                    assertThat(e.reasonCode()).isEqualTo("EVENTO_AMBIGUO");
+                    assertThat(e.reasonCode()).isEqualTo("EVENTO_SUSTENTA_PRATICA");
                 });
-        assertThat(outcome.result().limitations())
-                .anyMatch(l -> l.startsWith("Subpopulação A") && l.contains("AMB-C7-08"));
+    }
+
+    // ---- C7-D5: no path returns RULE_AMBIGUITY ----
+    @Test
+    void c7NeverReturnsRuleAmbiguity() {
+        List<RuleOutcome> outcomes = List.of(
+                met24().compute(JUN_2026),
+                new Scenario().woman("p", d("1986-01-10")).compute(JUN_2026),
+                new Scenario()
+                        .person("t", d("2014-01-10"), MASCULINO, HOMEM_TRANS)
+                        .compute(JUN_2026),
+                new Scenario()
+                        .woman("p", d("1986-01-10"))
+                        .add(exam("p", d("2023-01-15"), HPV_MOLECULAR))
+                        .compute(JUN_2026),
+                new Scenario().compute(JUN_2026));
+        for (RuleOutcome outcome : outcomes) {
+            List<IndicatorResult> results = new ArrayList<>();
+            results.add(outcome.result());
+            outcome.teams().forEach(t -> results.add(t.result()));
+            for (IndicatorResult result : results) {
+                assertThat(result.status()).isNotEqualTo(IndicatorStatus.RULE_AMBIGUITY);
+                assertThat(result.components())
+                        .extracting(ResultComponent::status)
+                        .doesNotContain(IndicatorStatus.RULE_AMBIGUITY);
+            }
+        }
     }
 
     // ---- Gates never turn an undefined result into BLOCKED-with-value or zero ----
     @Test
-    void gate_ruleAmbiguityAndNoDenominatorPassThroughWithEveryGate() {
+    void gate_noDenominatorPassesThroughWithEveryGate() {
         C7Pack pack = new C7Pack();
-        IndicatorResult ambiguous = pack.evaluate(
-                        new Scenario().woman("adult", d("1986-01-10")).build(), context(JUN_2026))
-                .result();
         IndicatorResult empty = pack.evaluate(CanonicalDataset.builder().build(), context(JUN_2026))
                 .result();
 
-        assertThat(ambiguous.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
         assertThat(empty.status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
-        for (IndicatorResult result : List.of(ambiguous, empty)) {
+        for (IndicatorResult result : List.of(empty)) {
             assertThat(result.valueExact()).isNull();
             assertThat(result.limitations())
                     .contains(
@@ -1218,7 +1333,7 @@ class C7RuleTest {
                         EvidenceItem::subjectKey, EvidenceItem::reasonCode, (a, b) -> a, TreeMap::new));
     }
 
-    /** The single practice decision of {@code key} in {@code component} (met, not met or AMB-C7-05 exclusion). */
+    /** The single practice decision of {@code key} in {@code component} (met or not met). */
     private static EvidenceItem practiceRow(RuleOutcome outcome, String key, String component) {
         List<EvidenceItem> found = rows(
                 outcome,
@@ -1254,10 +1369,7 @@ class C7RuleTest {
     }
 
     private static boolean isPractice(EvidenceItem e) {
-        // an AMB-C7-05 row is ambiguous about the denominator itself, so it is not counted there
-        return e.decision() == EvidenceDecision.PRACTICE_MET
-                || e.decision() == EvidenceDecision.PRACTICE_NOT_MET
-                || (e.decision() == EvidenceDecision.PRACTICE_AMBIGUOUS && !AMB_05.equals(e.reasonCode()));
+        return e.decision() == EvidenceDecision.PRACTICE_MET || e.decision() == EvidenceDecision.PRACTICE_NOT_MET;
     }
 
     /** Linked people (every person gets a registration version on 2020-01-01) plus their records. */

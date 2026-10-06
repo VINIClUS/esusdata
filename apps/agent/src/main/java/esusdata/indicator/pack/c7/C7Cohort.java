@@ -41,6 +41,9 @@ final class C7Cohort {
     static final String EXCLUIDO_CADASTRO_SIMPLIFICADO = "EXCLUIDO_CADASTRO_SIMPLIFICADO";
     static final String EXCLUIDO_VINCULO_CONFLITANTE = "EXCLUIDO_VINCULO_CONFLITANTE";
     static final String EXCLUIDO_PESSOA_CONFLITANTE = "EXCLUIDO_PESSOA_CONFLITANTE";
+    /** A trans man of 9 to 13: B is "do sexo feminino" and A, C and D start later (C7-D3). */
+    static final String EXCLUIDO_HOMEM_TRANSGENERO_SEM_SUBGRUPO = "EXCLUIDO_HOMEM_TRANSGENERO_SEM_SUBGRUPO";
+
     /** A "saída do cidadão do cadastro" with a reason outside 135/136: out, never silently kept. */
     static final String EXCLUIDO_SAIDA_MOTIVO_DESCONHECIDO = "EXCLUIDO_SAIDA_MOTIVO_DESCONHECIDO";
 
@@ -61,7 +64,13 @@ final class C7Cohort {
             boolean eligible,
             String reason,
             String cnes,
-            String ine) {}
+            String ine) {
+
+        /** The same person, out of the cohort for {@code exclusionReason}. */
+        Member excluded(String exclusionReason) {
+            return new Member(personKey, birth, age, transMan, false, exclusionReason, cnes, ine);
+        }
+    }
 
     /**
      * Decides every person once, sorted by key. Rows of the same key that disagree on birth, sex or

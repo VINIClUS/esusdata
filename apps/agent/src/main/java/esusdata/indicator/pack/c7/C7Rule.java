@@ -32,24 +32,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.SortedSet;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.function.Function;
 
 /**
  * C7 for one competência, before the release gates (item 23 da ficha, pp. 2–3):
  * {@code 20·(a/b) + 30·(c/d) + 30·(e/f) + 20·(g/h)}, each subgroup over its own denominator, on
- * the 0–100 scale (never ×100 again). A subgroup without denominator or with a case the ficha
- * leaves open leaves the score undefined ({@code RULE_AMBIGUITY}, P10/AMB-C7-01) — never zeroed,
- * never renormalized. {@link C7Pack#evaluate} applies the gates.
+ * the 0–100 scale (never ×100 again). A subgroup without denominator leaves the sum and the divisor
+ * (the score is rescaled to the weights present, C7-D4); with all four empty the month has no value
+ * ({@code NO_DENOMINATOR}). C7 never returns {@code RULE_AMBIGUITY}: every open case of the ficha is
+ * decided. {@link C7Pack#evaluate} applies the gates.
  */
 public final class C7Rule {
 
     static final String EVENTO_SUSTENTA_PRATICA = "EVENTO_SUSTENTA_PRATICA";
-
-    /** A record that made the practice ambiguous for the person (AMB-C7-06/08). */
-    static final String EVENTO_AMBIGUO = "EVENTO_AMBIGUO";
 
     private C7Rule() {}
 
@@ -98,16 +94,16 @@ public final class C7Rule {
     /** A person with the decision of each subgroup of their age (empty when not eligible). */
     private record Evaluated(Member member, Map<C7Subgroup, Decision> decisions) {}
 
-    /** One subgroup's counts and the reason codes of the cases the ficha leaves open in it. */
-    private record Count(ResultComponent component, SortedSet<String> ambiguities) {}
-
     private static Evaluated evaluate(Member m, C7Practices practices) {
         Map<C7Subgroup, Decision> decisions = new EnumMap<>(C7Subgroup.class);
         if (m.eligible()) {
             for (C7Subgroup subgroup : C7Subgroup.values()) {
-                if (subgroup.includes(m.age())) {
+                if (subgroup.includes(m.age(), m.transMan())) {
                     decisions.put(subgroup, practices.decide(subgroup, m));
                 }
+            }
+            if (decisions.isEmpty()) {
+                return new Evaluated(m.excluded(C7Cohort.EXCLUIDO_HOMEM_TRANSGENERO_SEM_SUBGRUPO), decisions);
             }
         }
         return new Evaluated(m, decisions);
@@ -117,23 +113,18 @@ public final class C7Rule {
         List<ResultComponent> components = new ArrayList<>(C7Pack.COMPONENTS.size());
         List<String> limitations = new ArrayList<>();
         for (ComponentSpec spec : C7Pack.COMPONENTS) {
-            Count count = count(spec, group);
-            components.add(count.component());
-            if (count.component().status() == IndicatorStatus.NO_DENOMINATOR) {
-                limitations.add("AMB-C7-01: subpopulação " + spec.code() + " sem denominador; a ficha não define "
-                        + "o escore (P10) — sem zerar nem renormalizar as demais.");
-            } else if (!count.ambiguities().isEmpty()) {
-                limitations.add("Subpopulação " + spec.code() + " com caso que a ficha não define ("
-                        + String.join(", ", count.ambiguities()) + "): escore indisponível até esclarecimento.");
+            ResultComponent component = count(spec, group);
+            components.add(component);
+            if (component.status() == IndicatorStatus.NO_DENOMINATOR) {
+                limitations.add("Subgrupo " + spec.code() + " sem denominador: escore reescalado sobre os pesos dos "
+                        + "subgrupos presentes (C7-LIM-14).");
             }
         }
-        Optional<ExactRatio> value = Scores.weightedSum(components);
-        IndicatorStatus status;
-        if (components.stream().allMatch(c -> c.status() == IndicatorStatus.NO_DENOMINATOR)) {
+        Optional<ExactRatio> value = Scores.weightedMeanOfDefined(components);
+        IndicatorStatus status = IndicatorStatus.COMPUTED;
+        if (value.isEmpty()) {
             status = IndicatorStatus.NO_DENOMINATOR;
             limitations.clear();
-        } else {
-            status = value.isPresent() ? IndicatorStatus.COMPUTED : IndicatorStatus.RULE_AMBIGUITY;
         }
         limitations.addAll(C7Pack.STANDING_LIMITATIONS);
         ExactRatio exact = value.orElse(null);
@@ -153,47 +144,26 @@ public final class C7Rule {
                 ValueKind.COMPOSITE_SCORE,
                 exact,
                 components,
-                true);
+                // a month without any subgroup has no value and stays out of the quadrimestral mean (C7-D4)
+                status != IndicatorStatus.NO_DENOMINATOR);
     }
 
-    /** Exact counts of one subgroup; any open case of the ficha makes it {@code RULE_AMBIGUITY}. */
-    private static Count count(ComponentSpec spec, List<Evaluated> group) {
+    /** Exact counts of one subgroup; an empty one is {@code NO_DENOMINATOR}, never zero. */
+    private static ResultComponent count(ComponentSpec spec, List<Evaluated> group) {
         C7Subgroup subgroup = C7Subgroup.valueOf(spec.code());
         BigInteger numerator = BigInteger.ZERO;
         BigInteger denominator = BigInteger.ZERO;
-        SortedSet<String> ambiguities = new TreeSet<>();
         for (Evaluated e : group) {
             Decision d = e.decisions().get(subgroup);
             if (d == null) {
                 continue;
             }
-            if (d.outcome() != Outcome.AMBIGUOUS_DENOMINATOR) {
-                denominator = denominator.add(BigInteger.ONE);
-            }
+            denominator = denominator.add(BigInteger.ONE);
             if (d.outcome() == Outcome.MET) {
                 numerator = numerator.add(BigInteger.ONE);
-            } else if (d.outcome() != Outcome.NOT_MET) {
-                ambiguities.add(ambiguityId(d.reason()));
             }
         }
-        if (ambiguities.isEmpty()) {
-            return new Count(ResultComponent.of(spec, numerator, denominator), ambiguities);
-        }
-        return new Count(
-                new ResultComponent(
-                        spec.code(),
-                        spec.kind(),
-                        spec.weight(),
-                        numerator,
-                        denominator,
-                        null,
-                        IndicatorStatus.RULE_AMBIGUITY),
-                ambiguities);
-    }
-
-    /** {@code AMB_C7_08_HPV_…} → {@code AMB-C7-08}, the id of the transcription. */
-    private static String ambiguityId(String reasonCode) {
-        return reasonCode.substring(0, "AMB_C7_NN".length()).replace('_', '-');
+        return ResultComponent.of(spec, numerator, denominator);
     }
 
     private static List<EvidenceItem> evidence(List<Evaluated> evaluated) {
@@ -205,7 +175,6 @@ public final class C7Rule {
                 Decision d = entry.getValue();
                 String component = entry.getKey().name();
                 items.add(row(m, component, decisionOf(d.outcome()), d.reason()));
-                String supportReason = d.outcome() == Outcome.MET ? EVENTO_SUSTENTA_PRATICA : EVENTO_AMBIGUO;
                 for (Fact f : d.support()) {
                     items.add(new EvidenceItem(
                             EvidenceSubjectKind.PERSON,
@@ -214,7 +183,7 @@ public final class C7Rule {
                             f.date().toString(),
                             component,
                             EvidenceDecision.SUPPORTING_EVENT,
-                            supportReason,
+                            EVENTO_SUSTENTA_PRATICA,
                             null,
                             f.cnes(),
                             f.ine(),
@@ -227,11 +196,7 @@ public final class C7Rule {
     }
 
     private static EvidenceDecision decisionOf(Outcome outcome) {
-        return switch (outcome) {
-            case MET -> EvidenceDecision.PRACTICE_MET;
-            case NOT_MET -> EvidenceDecision.PRACTICE_NOT_MET;
-            case AMBIGUOUS_PRACTICE, AMBIGUOUS_DENOMINATOR -> EvidenceDecision.PRACTICE_AMBIGUOUS;
-        };
+        return outcome == Outcome.MET ? EvidenceDecision.PRACTICE_MET : EvidenceDecision.PRACTICE_NOT_MET;
     }
 
     /** A person-level row; points stay null: C7 scores subpopulations, not people (AMB-C7-02). */

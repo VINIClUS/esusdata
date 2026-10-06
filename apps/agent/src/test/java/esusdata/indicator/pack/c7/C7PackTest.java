@@ -45,9 +45,30 @@ class C7PackTest {
         assertThat(d.standingLimitations())
                 .isNotEmpty()
                 .noneMatch(l -> l.contains("Regra em implementação"))
-                .anyMatch(l -> l.contains("lacuna L1"))
-                .anyMatch(l -> l.contains("lacuna L4"))
-                .anyMatch(l -> l.contains("AMB-C7-09"));
+                .anyMatch(l -> l.startsWith("C7-LIM-04: ") && l.contains("tipo de equipe"))
+                .anyMatch(l -> l.startsWith("C7-LIM-03: "))
+                .anyMatch(l -> l.startsWith("C7-LIM-05: "))
+                .anyMatch(l -> l.startsWith("C7-LIM-14: "))
+                .noneMatch(l -> l.contains("RULE_AMBIGUITY"));
+        assertThat(d.standingLimitations())
+                .extracting(l -> l.substring(0, "C7-LIM-NN".length()))
+                .containsExactly(
+                        "C7-LIM-01",
+                        "C7-LIM-02",
+                        "C7-LIM-03",
+                        "C7-LIM-04",
+                        "C7-LIM-05",
+                        "C7-LIM-06",
+                        "C7-LIM-07",
+                        "C7-LIM-08",
+                        "C7-LIM-09",
+                        "C7-LIM-10",
+                        "C7-LIM-11",
+                        "C7-LIM-12",
+                        "C7-LIM-13",
+                        "C7-LIM-14");
+        assertThat(d.ruleVersion()).isEqualTo("c7-prevencao-cancer@0.2.0");
+        assertThat(d.calculationPolicyVersion()).isEqualTo("c7-exact-score@2");
         assertThat(d.requiredCapabilities())
                 .containsExactlyInAnyOrderElementsOf(
                         parts(YearMonth.of(2026, 6)).keySet());

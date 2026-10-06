@@ -6,7 +6,6 @@ import esusdata.indicator.pack.c2.C2Pack;
 import esusdata.indicator.pack.c2.C2Sensitivity;
 import esusdata.indicator.pack.c3.C3Pack;
 import esusdata.indicator.pack.c3.C3Sensitivity;
-import esusdata.indicator.pack.c7.C7Pack;
 import esusdata.indicator.sensitivity.PackSensitivity.PackReport;
 import esusdata.run.worker.SensitivityExtracts.PackInput;
 import java.util.ArrayList;
@@ -17,12 +16,14 @@ public final class SensitivityRunner {
 
     private SensitivityRunner() {}
 
-    /** The pack's own readings (C2, C3, C7) or, for the others, what fires in it. */
+    /**
+     * The pack's own readings (C2, C3) or, for the others, what fires in it. C7 has no readings left:
+     * {@code c7-prevencao-cancer@0.2.0} decided them (docs/indicadores/decisoes/c7-prevencao-cancer.md).
+     */
     static PackSensitivity sensitivityOf(IndicatorRule rule) {
         return switch (rule.descriptor().id()) {
             case C2Pack.ID -> new C2Sensitivity();
             case C3Pack.ID -> new C3Sensitivity();
-            case C7Pack.ID -> new C7Sensitivity();
             default -> new GenericSensitivity(rule);
         };
     }

@@ -6,7 +6,7 @@ import java.math.BigInteger;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** §2.4: mean of points for C2–C6, weighted subpopulations for C7 — no ×100, no renormalization. */
+/** §2.4: mean of points for C2–C6, weighted subpopulations for C7 — no ×100; an empty subgroup is rescaled out (C7-D4). */
 class ScoresTest {
 
     private static final ComponentSpec A = ComponentSpec.subgroup("A", "A", 20, "36 meses");
@@ -21,14 +21,25 @@ class ScoresTest {
     @Test
     void met24_weightedSubpopulationsScoreForty() {
         // A=1/2, B=1/4, C=3/4, D=0/2 -> 10 + 7.5 + 22.5 + 0 = 40, each with its own denominator
-        ExactRatio score = Scores.weightedSum(List.of(part(A, 1, 2), part(B, 1, 4), part(C, 3, 4), part(D, 0, 2)))
+        ExactRatio score = Scores.weightedMeanOfDefined(
+                        List.of(part(A, 1, 2), part(B, 1, 4), part(C, 3, 4), part(D, 0, 2)))
                 .orElseThrow();
         assertThat(score.compareTo(ExactRatio.of(40, 1))).isZero();
     }
 
     @Test
-    void p10_anEmptySubpopulationLeavesTheScoreUndefined() {
-        assertThat(Scores.weightedSum(List.of(part(A, 1, 2), part(B, 0, 0), part(C, 3, 4), part(D, 1, 2))))
+    void p10_anEmptySubpopulationLeavesTheSumAndTheDivisor() {
+        // B empty: 20 * 1/2 + 30 * 3/4 + 20 * 1/2 = 42.5 over 70 points -> 42.5 * 100 / 70
+        ExactRatio score = Scores.weightedMeanOfDefined(
+                        List.of(part(A, 1, 2), part(B, 0, 0), part(C, 3, 4), part(D, 1, 2)))
+                .orElseThrow();
+        assertThat(score.compareTo(new ExactRatio(BigInteger.valueOf(4250), BigInteger.valueOf(70))))
+                .isZero();
+    }
+
+    @Test
+    void p10_noSubpopulationWithDenominatorHasNoScore() {
+        assertThat(Scores.weightedMeanOfDefined(List.of(part(A, 0, 0), part(B, 0, 0), part(C, 0, 0), part(D, 0, 0))))
                 .isEmpty();
     }
 

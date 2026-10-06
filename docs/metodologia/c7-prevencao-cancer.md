@@ -4,7 +4,11 @@ Documento de referência da Fase 1a. Transcreve a nota metodológica oficial do 
 Componente III (Qualidade) para uso no pacote `c7`. Não contém decisão de implementação: onde a
 fonte é omissa ou contraditória, o ponto está registrado em [Ambiguidades](#ambiguidades-amb-c7-nn)
 e a regra conservadora da Tech Spec (§4.2: "Os resultados esperados de uma ambiguidade devem
-permanecer bloqueados até esclarecimento documentado") prevalece.
+permanecer bloqueados até esclarecimento documentado") prevalece. Todas as ambiguidades AMB-C7-NN foram
+decididas em 2026-10-06 (`docs/indicadores/decisoes/c7-prevencao-cancer.md`, regra
+`c7-prevencao-cancer@0.2.0`): 01, 05, 06 e 08 mudam o comportamento; as demais são convenções
+declaradas já aplicadas (C7-LIM-05 a 11) ou decisões sem mudança de código. O pacote não devolve mais
+`RULE_AMBIGUITY`.
 
 **Convenções de citação.** `p. N` = página N do PDF (= N-ésimo bloco separado por form-feed em
 [`fontes/c7-prevencao-cancer.txt`](fontes/c7-prevencao-cancer.txt)). Trechos entre aspas são
@@ -92,7 +96,8 @@ combinação):
 | masculino | outra ou sem registro | não se enquadra em 4.1.1 nem 4.1.2 | 4.1 (enumeração fechada "com: … ou …") |
 | outro valor de sexo, ou sem registro | qualquer | não tratado pela ficha | ver AMB-C7-12 |
 
-A prática B restringe a subpopulação a "do sexo feminino" (ver AMB-C7-05).
+A prática B restringe a subpopulação a "do sexo feminino": homem transgênero não pertence a B
+(AMB-C7-05, decidida).
 
 ### Um denominador por boa prática (item 23, pp. 2–3)
 
@@ -159,7 +164,7 @@ Observação; item 16; item 23, a). Os códigos de coleta para exame molecular (
 02.01.02.008-4) não têm essa observação e ficam nos 36 meses. Vigência: "A contabilização desse
 SIGTAP passou a ser realizada a partir da competência janeiro de 2026, considerando-se a janela
 temporal de 60 meses para fins de composição da boa prática (A)." (Nota de rodapé 4, p. 7; ver
-AMB-C7-08).
+AMB-C7-08, decidida: conta de 2026-01 em diante, inclusive registros de 2025).
 
 O Quadro 02 associa "solicitados ou avaliados" ao MIAI e "registros com os códigos SIGTAP" ao MIP.
 Não associa explicitamente o termo "coletado" (itens 16 e 23) a nenhum dos dois modelos.
@@ -429,6 +434,8 @@ A nota revoga a versão SEI 0049702875 (p. 6). O texto dessa versão anterior n�
 
 Em todas as ambiguidades abaixo, o tratamento conservador é o mesmo: não inferir, manter o
 resultado afetado bloqueado ou indisponível e documentar a decisão quando houver regra oficial.
+Todas têm decisão registrada no documento de decisão; as de 01, 05, 06 e 08 mudam o comportamento
+e levam a nota **Decisão** abaixo. O texto original de cada ambiguidade é mantido como transcrição.
 
 - **AMB-C7-01 — Subpopulação sem denominador.** Se b, d, f ou h for zero (por exemplo, uma equipe
   sem meninas de 9 a 14 anos vinculadas), a parcela correspondente (x/0) fica indefinida. A ficha
@@ -436,6 +443,10 @@ resultado afetado bloqueado ou indisponível e documentar a decisão quando houv
   não estiver definida") e, no §2.4, manda não zerar nem renormalizar automaticamente. Portanto, não
   tratar a parcela como 0, não reescalar as demais para 100 e não publicar 70 como teto. Também
   fica em aberto se esse mês entra na média quadrimestral da NT nº 8/2026 (ver AMB-CIII-07).
+  **Decisão (C7-D4, 2026-10-06):** subgrupo sem denominador sai da soma e do divisor; o escore é
+  `Σ(peso·razão)·100 / Σ peso` sobre os subgrupos presentes (com B vazio, o teto é 100, não 70).
+  Com os quatro vazios o mês é `NO_DENOMINATOR`, sem valor, e fica fora da média quadrimestral.
+  Política de cálculo `c7-exact-score@2`; limitação divulgada C7-LIM-14.
 - **AMB-C7-02 — "100 pontos, para cada pessoa" × fórmula por subpopulação.** O item 4.4 (p. 5) fala
   em pontuação máxima de 100 "para cada pessoa no período". Pelas faixas etárias, nenhuma pessoa
   pertence a B (09–14) e a D (50–69) ao mesmo tempo. O item 23 define proporções por subpopulação.
@@ -453,10 +464,15 @@ resultado afetado bloqueado ou indisponível e documentar a decisão quando houv
   identidade de gênero “Homem transgênero”", para 9 a 69 anos. B (itens 16 e 23, c/d; Quadros 01 e
   03) restringe a "crianças e adolescentes do sexo feminino". Não está definido se uma pessoa de 9 a
   14 anos com registro de sexo masculino e identidade "Homem transgênero" entra em d.
+  **Decisão (C7-D3):** não entra em B (a regra específica prevalece). Aos 14 anos entra em C; aos 9
+  a 13 anos não pertence a nenhum subgrupo e sai da coorte com o motivo
+  `EXCLUIDO_HOMEM_TRANSGENERO_SEM_SUBGRUPO`.
 - **AMB-C7-06 — Janela de B × NT nº 8/2026, Figura 2.** A ficha não dá janela em meses para B:
   vale a dose "administrada nessa faixa etária" (9–14 anos, até cerca de seis anos de retroação).
   A NT nº 8/2026, Figura 2 (p. 2, imagem), mostra para C7 um "Período máximo de monitoramento" de
   "Últimos 60 meses". Uma dose aplicada aos 9 anos, para quem tem 14, pode estar a mais de 60 meses.
+  **Decisão (C7-D1):** conta toda dose aplicada do 9º aniversário em diante, sem teto em meses (a
+  janela de B é de 72 meses civis, o máximo possível para quem tem 14 anos).
 - **AMB-C7-07 — Dose transcrita.** O RIA aceita "Registro da vacina ou transcrição" (Quadro 03).
   A ficha não diz se a faixa etária da dose usa a data de aplicação ou a data do registro ou
   transcrição.
@@ -465,6 +481,8 @@ resultado afetado bloqueado ou indisponível e documentar a decisão quando houv
   os anteriores a 2026. Leitura 2: só contam registros a partir de 2026-01. Nas competências até
   2025-12 o código não conta (nas duas leituras). Até 2029-01, qualquer registro com mais de 36
   meses é anterior a 2026-01, então o MET-25 depende desta definição.
+  **Decisão (C7-D2):** leitura 1. Competência `>= 2026-01`: conta registro dos últimos 60 meses civis,
+  anterior ou não a 2026-01; competência anterior: o código não conta.
 - **AMB-C7-09 — Conjuntos de CBO e escopo de profissional ou estabelecimento divergentes.** Há
   cinco enunciados: (i) item 24, c (consultas: médicos e enfermeiros); (ii) item 24, d ("para o
   cálculo do indicador": inclui 2516-05, 2234-45, 2236-05, 2238-10, 2237-10, 2515-10, 2239-05 e
@@ -531,7 +549,7 @@ de uma instalação. O resultado local é uma aproximação rotulada (Tech Spec 
 
 Os números são sintéticos. Datas: convenção candidata (AMB-C7-03 e AMB-C7-04), com âncora no último
 dia da competência e janela de N meses civis terminando no mês da competência. Em datas com âncora
-no fim do mês, isso equivale a `(âncora − N meses, âncora]`. Linhas marcadas "bloqueado" dependem de
+no fim do mês, isso equivale a `(âncora − N meses, âncora]`. Linhas marcadas "bloqueado" (histórico; hoje decididas ou declaradas, C7-LIM-08) dependem de
 uma ambiguidade e não devem ter o resultado esperado fixado até o esclarecimento.
 
 ### CT01 — MET-24: escore por subpopulação = 40 pontos
@@ -565,12 +583,12 @@ Mulher de 40 anos, competência 2026-06 (âncora 2026-06-30). A janela de 36 mes
 | c | 02.01.02.007-6 (coleta para exame molecular) | 2023-01-15 | A não cumprida: os 60 meses valem só para 02.02.10.025-1 |
 | d | 02.02.10.025-1 | 2021-01-15 | A não cumprida (fora de 60 meses) |
 | e | 02.02.10.025-1, mas competência 2025-12 | 2024-01-15 | A não cumprida: o código não é contabilizado antes da competência janeiro de 2026 (nota de rodapé 4). O pacote precisa versionar a regra por competência |
-| f | 02.03.01.008-6 | 2023-07-01 | A cumprida (primeiro dia da janela civil de 36 meses). Fronteira exata: **bloqueado** (AMB-C7-04) |
+| f | 02.03.01.008-6 | 2023-07-01 | A cumprida (primeiro dia da janela civil de 36 meses). Fronteira exata: convenção declarada (AMB-C7-04, C7-LIM-08) |
 
 ### CT03 — Fronteiras de idade
 
 Competência 2026-06, âncora 2026-06-30, idade em anos completos, limites inclusivos (convenção
-candidata). Todos os pares de datas exatas ficam **bloqueados** pela AMB-C7-03. O par serve para
+candidata). Todos os pares de datas exatas seguem a convenção declarada (AMB-C7-03, C7-LIM-08). O par serve para
 distinguir *anos completos* de *ano de nascimento*.
 
 | Fronteira | Nascimento | Idade | Esperado |
@@ -590,15 +608,14 @@ distinguir *anos completos* de *ano de nascimento*.
 | 69/70 | 1956-06-30 | 70 | fora de todos os denominadores |
 
 Para B, conta a idade na data da dose: nascimento 2012-03-10; dose 67 em 2021-03-09 (8 anos) → B
-não cumprida; dose em 2021-03-10 (9 anos) → B cumprida pela ficha. Porém a dose está a mais de 60
-meses da âncora, então o caso fica **bloqueado** pela AMB-C7-06 (e pela AMB-C7-07 se a dose for
-transcrita).
+não cumprida; dose em 2021-03-10 (9 anos) → B cumprida. A dose a mais de 60 meses da âncora vale (AMB-C7-06,
+decidida: sem teto em meses); só a dose antes do 9º aniversário não conta.
 
 ### CT04 — Janelas de 12, 24, 36 e 60 meses em meses civis
 
 Cada linha testa o último dia fora e o primeiro dia dentro da janela civil. Todas as janelas
 escolhidas atravessam um 29 de fevereiro, de modo que uma janela de 365×k dias com início exclusivo
-excluiria indevidamente o primeiro dia civil. A fronteira exata fica **bloqueada** (AMB-C7-04); o
+excluiria indevidamente o primeiro dia civil. A fronteira exata segue a convenção declarada (AMB-C7-04, C7-LIM-08); o
 teste contra *contar dias* não fica.
 
 | Prática | Competência (âncora) | Janela civil | Fora | Dentro | Âncora − 365×k dias |
@@ -606,7 +623,7 @@ teste contra *contar dias* não fica.
 | C (12) | 2028-02 (2028-02-29) | [2027-03-01, 2028-02-29], 366 dias | 2027-02-28 | 2027-03-01 | 2027-03-01 |
 | D (24) | 2025-02 (2025-02-28) | [2023-03-01, 2025-02-28], 731 dias | 2023-02-28 | 2023-03-01 | 2023-03-01 |
 | A (36) | 2026-06 (2026-06-30) | [2023-07-01, 2026-06-30], 1096 dias | 2023-06-30 | 2023-07-01 | 2023-07-01 |
-| A, 02.02.10.025-1 (60) | 2026-01 (2026-01-31) | [2021-02-01, 2026-01-31], 1826 dias | 2021-01-31 | 2021-02-01 (bloqueado também pela AMB-C7-08) | 2021-02-01 |
+| A, 02.02.10.025-1 (60) | 2026-01 (2026-01-31) | [2021-02-01, 2026-01-31], 1826 dias | 2021-01-31 | 2021-02-01 (conta; AMB-C7-08 decidida) | 2021-02-01 |
 
 ### CT05 — Sexo × identidade de gênero
 
@@ -619,14 +636,16 @@ Pessoa de 30 anos, competência 2026-06.
 | masculino | "Homem transgênero" | em A e C (4.1.2) |
 | masculino | sem registro | fora (não se enquadra em 4.1) |
 
-Variante com 12 anos, sexo masculino e identidade "Homem transgênero": entrada em B **bloqueada**
-(AMB-C7-05).
+Variante com 12 anos, sexo masculino e identidade "Homem transgênero": fora de B (AMB-C7-05,
+decidida) e sem subgrupo; excluído com `EXCLUIDO_HOMEM_TRANSGENERO_SEM_SUBGRUPO`. Aos 14 anos entra só
+em C.
 
 ### CT06 — Subpopulação vazia (P10)
 
-Equipe sem nenhuma pessoa elegível para B (d = 0) e com A, C e D calculáveis. Esperado: C7
-indisponível, com motivo explícito. Não deve publicar `20·(a/b) + 30·(e/f) + 20·(g/h)` (máximo 70),
-nem reescalar essa soma para 100, nem fixar B = 0 (AMB-C7-01).
+Equipe sem nenhuma pessoa elegível para B (d = 0) e com A, C e D calculáveis. Esperado: escore
+reescalado sobre os pesos presentes, `(20·(a/b) + 30·(e/f) + 20·(g/h))·100/70` (C7-D4); nunca
+o valor com B = 0 nem teto de 70. Com A=1/2, C=3/4, D=0/2: 32,5 → 46,4285. Com os quatro
+subgrupos vazios, o mês não tem valor e fica fora da média quadrimestral.
 
 ### CT07 — Classificação sem arredondamento
 

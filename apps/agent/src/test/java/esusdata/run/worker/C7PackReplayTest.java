@@ -119,7 +119,10 @@ class C7PackReplayTest {
                         ResultJson.StoredTeam::valueText)
                 .containsExactly(
                         tuple(TEAM_ONE, "2750325", "BLOCKED", null),
-                        tuple(TEAM_TWO, "2750333", "RULE_AMBIGUITY", null));
+                        // C7-D4: team two has only B (1/3); A, C and D leave the sum and the divisor, so the
+                        // team is COMPUTED (33,3333) and the release gates hide it as BLOCKED, no longer
+                        // RULE_AMBIGUITY
+                        tuple(TEAM_TWO, "2750333", "BLOCKED", null));
 
         List<EvidenceRecord> evidence = fixture.evidence(run.resultId(), IBGE);
         assertThat(evidence)

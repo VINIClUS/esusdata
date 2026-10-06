@@ -10,6 +10,12 @@ import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.model.ValueKind;
 import esusdata.indicator.pack.c1.C1Rule;
+import esusdata.indicator.pack.c2.C2Pack;
+import esusdata.indicator.pack.c3.C3Pack;
+import esusdata.indicator.pack.c4.C4Pack;
+import esusdata.indicator.pack.c5.C5Pack;
+import esusdata.indicator.pack.c6.C6Pack;
+import esusdata.indicator.pack.c7.C7Pack;
 import esusdata.indicator.pack.componente3.ComponentIII;
 import esusdata.web.ApiFixtureSupport;
 import java.math.BigInteger;
@@ -54,6 +60,23 @@ class QualityComponentConsolidationTest extends ApiFixtureSupport {
             "c5-cuidado-hipertensao", List.of(90L, 90L, 90L, 90L),
             "c6-cuidado-pessoa-idosa", List.of(90L, 90L, 90L, 90L),
             "c7-prevencao-cancer", List.of(90L, 90L, 90L, 90L));
+
+    /** Each month is calculated by the pack's current rule version; an older one blocks the unit. */
+    private static final Map<String, String> RULE_VERSIONS = Map.of(
+            "c1-mais-acesso",
+            C1Rule.RULE_VERSION,
+            C2Pack.ID,
+            C2Pack.RULE_VERSION,
+            C3Pack.ID,
+            C3Pack.RULE_VERSION,
+            C4Pack.ID,
+            C4Pack.RULE_VERSION,
+            C5Pack.ID,
+            C5Pack.RULE_VERSION,
+            C6Pack.ID,
+            C6Pack.RULE_VERSION,
+            C7Pack.ID,
+            C7Pack.RULE_VERSION);
 
     @Test
     void publishedMonthlyResultsOfC1ToC7YieldTheNotaFinalPerUnit() throws Exception {
@@ -176,7 +199,7 @@ class QualityComponentConsolidationTest extends ApiFixtureSupport {
                 c1 ? "PROGRAMADOS_MAIS_ESPONTANEOS" : null,
                 null,
                 period,
-                c1 ? C1Rule.RULE_VERSION : pack + (pack.matches("c[456]-.*") ? "@0.2.0" : "@0.1.0"),
+                RULE_VERSIONS.get(pack),
                 YearMonth.parse(period).atEndOfMonth().toString(),
                 IBGE,
                 List.of(),

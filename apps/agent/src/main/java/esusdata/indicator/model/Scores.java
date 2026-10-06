@@ -7,6 +7,8 @@ import java.util.Optional;
 /** Exact score arithmetic for C2–C7 (§2.4); never multiplies a 0–100 score by 100 again. */
 public final class Scores {
 
+    private static final BigInteger ONE_HUNDRED = BigInteger.valueOf(100);
+
     private Scores() {}
 
     /**
@@ -21,19 +23,24 @@ public final class Scores {
     }
 
     /**
-     * C7: {@code Σ weight × numerator/denominator}. Empty when any part has no denominator: the
-     * ficha does not say how to score an empty subpopulation (P10), so the score stays undefined
-     * rather than renormalized or zeroed.
+     * C7 (C7-D4): {@code Σ(weight × value) × 100 / Σ weight}, only over the parts that have a
+     * denominator. An empty subgroup leaves both the sum and the divisor, so the score is rescaled
+     * to the weights present. Empty when no part has a denominator ({@code NO_DENOMINATOR}).
      */
-    public static Optional<ExactRatio> weightedSum(List<ResultComponent> parts) {
+    public static Optional<ExactRatio> weightedMeanOfDefined(List<ResultComponent> parts) {
         ExactRatio total = ExactRatio.zero();
+        BigInteger weights = BigInteger.ZERO;
         for (ResultComponent part : parts) {
-            if (part.value() == null) {
-                return Optional.empty();
+            if (part.value() != null) {
+                total = total.plus(part.value().times(part.weight()));
+                weights = weights.add(part.weight());
             }
-            total = total.plus(part.value().times(part.weight()));
         }
-        return Optional.of(total);
+        if (weights.signum() == 0) {
+            return Optional.empty();
+        }
+        return Optional.of(new ExactRatio(
+                total.numerator().multiply(ONE_HUNDRED), total.denominator().multiply(weights)));
     }
 
     /** Points a subject earns: the sum of the weights of the components it satisfied. */
