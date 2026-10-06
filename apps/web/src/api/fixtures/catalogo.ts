@@ -30,7 +30,8 @@ function portao(
     status,
     check: passed ? 'verificacao-demo@1' : null,
     checkedAt: passed ? '2026-09-30' : null,
-    evidenceRefs: [],
+    // A e D decidem fora da execução e deixam evidência; B e C são avaliados a cada resultado.
+    evidenceRefs: passed && (gate === 'A' || gate === 'D') ? ['docs/metodologia/demo.md'] : [],
     note,
   }
 }

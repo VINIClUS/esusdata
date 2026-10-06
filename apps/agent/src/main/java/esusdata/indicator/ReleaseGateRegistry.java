@@ -206,8 +206,9 @@ public final class ReleaseGateRegistry {
             throw invalid(where + " needs an evidence array");
         }
         List<GateCheck.Evidence> items = new ArrayList<>();
+        String itemWhere = where + " evidence";
         for (JsonNode item : node) {
-            String sha = requireText(item, "sha256", where + " evidence");
+            String sha = requireText(item, "sha256", itemWhere);
             if (!SHA256.matcher(sha).matches()) {
                 throw invalid(where + " evidence sha256 must be 64 lowercase hex digits");
             }

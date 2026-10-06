@@ -284,7 +284,8 @@ public class OverviewController {
                 result == null ? null : result.status(),
                 result == null ? null : result.valueText(),
                 result == null ? List.of() : limitations(result.limitationsJson()),
-                result == null ? null : result.publishedAt());
+                result == null ? null : result.publishedAt(),
+                pack.standingLimitations());
     }
 
     private List<String> limitations(String json) {

@@ -1,5 +1,9 @@
 package esusdata.architecture;
 
+import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
@@ -7,8 +11,6 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import esusdata.indicator.ReleaseGateRegistry;
-import esusdata.indicator.model.CanonicalDataset;
-import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.GateChecks;
 import esusdata.indicator.model.GateStatus;
@@ -16,6 +18,7 @@ import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.RuleOutcomes;
+import esusdata.indicator.pack.c1.C1Rule;
 import esusdata.run.worker.RunExecutor;
 import org.junit.jupiter.api.Test;
 
@@ -95,7 +98,11 @@ class ModuleBoundaryTest {
                 .check(CLASSES);
     }
 
-    /** ADR 0032: only the executor may ask a rule for an outcome; what it returns is not publishable. */
+    /**
+     * ADR 0032: only the executor may ask a rule for an outcome; what a rule returns is not
+     * publishable. Covers a call through any type that is an {@code IndicatorRule} (a concrete pack
+     * included) and C1's public static {@code compute}, which the legacy path used to call directly.
+     */
     @Test
     void onlyTheExecutorEvaluatesARule() {
         noClasses()
@@ -104,7 +111,10 @@ class ModuleBoundaryTest {
                 .and()
                 .resideOutsideOfPackage(BASE + ".indicator.pack..")
                 .should()
-                .callMethod(IndicatorRule.class, "evaluate", CanonicalDataset.class, EvaluationContext.class)
+                .callMethodWhere(
+                        target(owner(assignableTo(IndicatorRule.class))).and(target(name("evaluate"))))
+                .orShould()
+                .callMethodWhere(target(owner(assignableTo(C1Rule.class))).and(target(name("compute"))))
                 .check(CLASSES);
     }
 

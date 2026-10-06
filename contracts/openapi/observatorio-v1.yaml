@@ -1298,6 +1298,12 @@ components:
               value: { type: string, nullable: true }
               limitations: { type: array, items: { type: string } }
               publishedAt: { type: string, format: date-time, nullable: true }
+              standingLimitations:
+                type: array
+                items: { type: string }
+                description: >-
+                  The pack's standing limitations, so a screen can tell them from what the result adds
+                  (an open ambiguity, a gate reason) in limitations.
         history:
           type: array
           items:

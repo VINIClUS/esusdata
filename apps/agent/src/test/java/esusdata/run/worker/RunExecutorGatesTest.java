@@ -6,7 +6,10 @@ import esusdata.indicator.GateFixtures;
 import esusdata.indicator.ReleaseGateRegistry;
 import esusdata.indicator.model.CanonicalFixtures;
 import esusdata.indicator.model.Capabilities;
+import esusdata.indicator.pack.c1.C1Pack;
+import esusdata.indicator.pack.c1.C1Rule;
 import esusdata.result.model.PublishedResult;
+import esusdata.run.extract.ExtractFixtures;
 import esusdata.run.extract.ExtractFixturesV2;
 import esusdata.run.extract.ExtractionManifest;
 import esusdata.source.pec.CompatibilityMatrices;
@@ -114,6 +117,25 @@ class RunExecutorGatesTest {
         assertThat(snapshotOf(published).get("stale").asBoolean()).isTrue();
         assertThat(snapshotOf(published).get("gates").get("A").get("status").asString())
                 .isEqualTo("PENDING");
+    }
+
+    @Test
+    void c1WithoutADenominatorStaysBlockedLikeV019AndCarriesItsSnapshot() throws Exception {
+        // Only unmapped encounters: 0/0. v0.1.9 published C1 BLOCKED here, never NO_DENOMINATOR.
+        ExtractionManifest extract =
+                ExtractFixtures.write(fixture.extractsDir, "ext-c1-empty", "src-1", IBGE, "2026-03", 0, 0, 2);
+
+        RunExecutor.RunOutcome run = fixture.replay(extract, new C1Pack(), COMPETENCIA, "gestor");
+
+        PublishedResult published = fixture.published(run.resultId(), IBGE);
+        assertThat(published.status()).isEqualTo("BLOCKED");
+        assertThat(published.numeratorText()).isEqualTo("0");
+        assertThat(published.denominatorText()).isEqualTo("0");
+        assertThat(published.limitationsJson())
+                .contains("Portão A (fonte e vigência) incompleto", "Portão D (reconciliação) incompleto");
+        JsonNode snapshot = snapshotOf(published);
+        assertThat(snapshot.get("pack").asString()).isEqualTo(C1Rule.INDICATOR_PACK);
+        assertThat(snapshot.get("gates").get("B").get("status").asString()).isEqualTo("FAILED");
     }
 
     @Test

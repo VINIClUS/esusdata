@@ -643,6 +643,21 @@ export function gateChecklist(pack: {
   return pack.gateRegistryStale ? [GATES_VOIDED, ...reasons] : reasons
 }
 
+/**
+ * The limitation a RULE_AMBIGUITY result adds to its pack's own. The packs list standing limitations
+ * (which may cite AMB codes in passing) before or after it, so position says nothing: it is the first
+ * limitation that is neither one of the pack's standing limitations nor a gate reason. An older API
+ * without `standingLimitations` falls back to the first that is not a gate reason.
+ */
+function ambiguityLimitation(indicator: OverviewIndicator): string {
+  const standing = new Set(indicator.standingLimitations ?? [])
+  return (
+    indicator.limitations.find((l) => !standing.has(l) && !l.startsWith('Portão ')) ??
+    indicator.limitations[0] ??
+    'A ficha não decide um caso que afeta o valor.'
+  )
+}
+
 /** One reason per line: the Painel shows them stacked. */
 function pendingReason(indicator: OverviewIndicator): string {
   const checklist = gateChecklist(indicator)
@@ -654,11 +669,8 @@ function pendingReason(indicator: OverviewIndicator): string {
           : [indicator.limitations[0] ?? 'Retido pelos portões de liberação.']
       ).join('\n')
     case 'RULE_AMBIGUITY':
-      // The ambiguity code comes first: it is what the ficha owes, the gates come after it.
-      return [
-        indicator.limitations[0] ?? 'A ficha não decide um caso que afeta o valor.',
-        ...checklist,
-      ].join('\n')
+      // The ambiguity comes first: it is what the ficha owes, the gates come after it.
+      return [ambiguityLimitation(indicator), ...checklist].join('\n')
     case 'UNSUPPORTED_SOURCE':
       return faltam(indicator.missingCapabilities ?? [])
     case null:

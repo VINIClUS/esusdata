@@ -49,14 +49,23 @@ test('BLOCKED lista todo portão que não passou, e não só o primeiro', () => 
   ])
 })
 
-test('RULE_AMBIGUITY mostra a ambiguidade primeiro e depois a checklist de portões', () => {
+test('RULE_AMBIGUITY mostra a ambiguidade primeiro, mesmo depois das limitações permanentes', () => {
+  // A ordem real das packs: as limitações permanentes (que citam códigos AMB de passagem), depois a
+  // nota de ambiguidade do resultado, depois os motivos dos portões.
+  const permanentes = [
+    'Lacuna L1: tipo de equipe ausente (AMB-C5-01 não se aplica).',
+    'AMB-C7-09: só médicos e enfermeiros contam.',
+  ]
+  const ambiguidade =
+    'RULE_AMBIGUITY: 3 sujeito(s) dependem de ambiguidade da ficha (AMB-C3-02); valor indisponível.'
   const { motivo } = pendencia({
     status: 'RULE_AMBIGUITY',
-    limitations: ['AMB-C2-03: criança que completa 2 anos na competência.', 'outra limitação'],
+    standingLimitations: permanentes,
+    limitations: [...permanentes, ambiguidade, 'Portão A (fonte e vigência) incompleto'],
     gates: NENHUM_PASSOU,
   })
   const linhas = motivo.split('\n')
-  assert.equal(linhas[0], 'AMB-C2-03: criança que completa 2 anos na competência.')
+  assert.equal(linhas[0], ambiguidade)
   assert.deepEqual(linhas.slice(1), [
     `${A} incompleto`,
     `${B} incompleto: 2 limitação(ões) permanente(s) bloqueante(s)`,

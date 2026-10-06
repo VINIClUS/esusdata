@@ -94,7 +94,7 @@ pedido inválido.
 **Descritor do pacote** (`PackDescriptor`):
 Identidade, versão da regra, pacote metodológico (`qualidade-esf-eap-2026-06`), família
 (`QUALIDADE_ESF_EAP`), código (C1…C7), título, natureza do valor, práticas, capacidades lidas,
-portões e limitações permanentes. Estar descrito não habilita execução.
+e limitações permanentes. Estar descrito não habilita execução; os portões não são do descritor.
 
 **Natureza do valor** (`ValueKind`):
 `PERCENTAGE` (C1, 100 × n/d), `SCORE` (C2–C6, média de pontos 0–100), `COMPOSITE_SCORE` (C7, soma
@@ -110,8 +110,14 @@ práticas comprovadas; o resultado mostra, por prática, quantos elegíveis a cu
 Uma subpopulação do C7 com denominador próprio. Subgrupo sem denominador deixa o escore indefinido
 (P10), nunca zero.
 
-**Portões de liberação** (`ReleaseGates`):
-Os Portões A–E da Tech Spec §4.4. Enquanto algum falta, o resultado sai `BLOCKED` com as contagens.
+**Portões de liberação** (`GateStatus`, registro `contracts/indicators/release-gates.json`, ADR 0032):
+Os Portões A–D, que emendam a Tech Spec §4.4 (o Portão E saiu): verificações automáticas, nunca
+assinatura de uma pessoa. A (fonte e vigência) e D (reconciliação) vêm do registro por
+`pack@rule_version`; B (nenhuma lacuna bloqueante) e C (capacidades `VALIDATED` na fonte) são avaliados
+a cada resultado. Só o `RunExecutor` aplica os portões; enquanto algum não passou, o resultado sai
+`BLOCKED` com as contagens, e o instantâneo dos portões fica gravado com ele. Versão de regra nova
+anula as verificações antigas.
+_Avoid_: aprovação humana, Portão E
 
 **Capacidade** (`CapabilityContract`, descritor `capabilities/<id>@<versão>.json`):
 Uma consulta congelada que produz um tipo de registro canônico. A SQL é o esquema: os aliases das

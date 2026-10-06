@@ -96,6 +96,8 @@ export interface OverviewIndicator {
   value: string | null
   limitations: string[]
   publishedAt: string | null
+  /** The pack's standing limitations: what `limitations` carries beyond them is the result's own. */
+  standingLimitations?: string[]
 }
 
 export interface OverviewHistoryPoint {
