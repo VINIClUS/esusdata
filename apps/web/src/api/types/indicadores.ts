@@ -34,7 +34,27 @@ export interface PackComponentSpec {
   window: string | null
 }
 
-/** `GET /indicator-packs`. The fields after `blockedGates` are ADR 0030's: absent from an older API. */
+/**
+ * One release gate (ADR 0032, which amends Tech Spec §4.4: Portão E removed, A–D automatic). Nobody
+ * signs a gate off: there is a check and a date, never an approver.
+ */
+export interface PackGate {
+  gate: 'A' | 'B' | 'C' | 'D'
+  label: string
+  status: 'PENDING' | 'PASSED' | 'FAILED'
+  /** The automated check, e.g. `conferencia-fichas@1`; null while pending. */
+  check: string | null
+  checkedAt: string | null
+  /** Repo-relative documents the check relied on. */
+  evidenceRefs: string[]
+  /** Why a gate has not passed, e.g. the capabilities the source lacks. */
+  note: string | null
+}
+
+/**
+ * `GET /indicator-packs`. The fields after `blockedGates` are ADR 0030's: absent from an older API;
+ * `gates` and `gateRegistryStale` are ADR 0032's (a client falls back to `blockedGates` without them).
+ */
 export interface IndicatorPack {
   id: string
   ruleVersion: string
@@ -43,6 +63,9 @@ export interface IndicatorPack {
   dependsOn: string[]
   executionEnabled: boolean
   blockedGates: string[]
+  gates?: PackGate[]
+  /** The gate registry only knows an older rule version: its checks no longer count. */
+  gateRegistryStale?: boolean
   code?: string
   title?: string
   packageId?: string

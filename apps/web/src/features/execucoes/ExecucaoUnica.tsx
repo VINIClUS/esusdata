@@ -14,6 +14,7 @@ import {
   usePacotesIndicadores,
 } from '@/api/hooks'
 import {
+  gateChecklist,
   indicatorDisplayName,
   isRunTerminal,
   nomesIndicadores,
@@ -397,8 +398,8 @@ export function ExecucaoUnica({
               <Callout variant="warning" title="O resultado sai bloqueado">
                 {nomes.get(pacote.id) ?? indicatorDisplayName(pacote.id)} ainda não tem a regra
                 aprovada para publicar valor
-                {pacote.blockedGates.length > 0 ? ` (${pacote.blockedGates.join('; ')})` : ''}. A
-                execução lê o PEC e publica o resultado como bloqueado, com esses motivos.
+                {gateChecklist(pacote).length > 0 ? ` (${gateChecklist(pacote).join('; ')})` : ''}.
+                A execução lê o PEC e publica o resultado como bloqueado, com esses motivos.
               </Callout>
             </Box>
           )}

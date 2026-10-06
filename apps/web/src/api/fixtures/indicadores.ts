@@ -18,12 +18,11 @@ const IBGE = '3538704'
 const PUBLICADO_EM = '2026-09-19T13:14:10Z'
 const CORTE = '2026-09-10'
 
+// ADR 0032: o Portão C passa (as capacidades estão VALIDATED); A, B e D seguem pendentes.
 const PORTOES = [
   'Portão A (fonte e vigência) incompleto',
   'Portão B (modelo de cálculo) incompleto',
-  'Portão C (adaptador) incompleto',
   'Portão D (reconciliação) incompleto',
-  'Portão E (piloto e operação) incompleto',
 ]
 const FORA_DO_PEC_LOCAL =
   'O PEC municipal não tem os registros de outros municípios que a ficha considera (qualquer profissional do país).'

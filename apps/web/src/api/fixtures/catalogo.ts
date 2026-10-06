@@ -2,19 +2,53 @@
 // `GET /indicator-packs` como a API o descreve (ADR 0030): códigos, títulos, práticas, pesos e janelas
 // são os dos descritores C1–C7 e da Nota Final. No demo o C1 aparece liberado, para mostrar um valor
 // publicado; C2–C7 seguem com os portões incompletos, como sairão até a validação.
-import type { IndicatorPack, PackComponentSpec } from '../types'
+import type { IndicatorPack, PackComponentSpec, PackGate } from '../types'
 
 const PACOTE = 'qualidade-esf-eap-2026-06'
 const FAMILIA = 'QUALIDADE_ESF_EAP'
 const FICHAS =
   'https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia'
 
+// ADR 0032: Portões A–D, todos verificações automáticas. O catálogo não decide o C (é por fonte e por
+// execução); `blockedGates` fala de A, B e D, como a API.
 const PORTOES = [
   'Portão A (fonte e vigência) incompleto',
   'Portão B (modelo de cálculo) incompleto',
-  'Portão C (adaptador) incompleto',
   'Portão D (reconciliação) incompleto',
-  'Portão E (piloto e operação) incompleto',
+]
+
+function portao(
+  gate: PackGate['gate'],
+  label: string,
+  status: PackGate['status'],
+  note: string | null = null,
+): PackGate {
+  const passed = status === 'PASSED'
+  return {
+    gate,
+    label,
+    status,
+    check: passed ? 'verificacao-demo@1' : null,
+    checkedAt: passed ? '2026-09-30' : null,
+    evidenceRefs: [],
+    note,
+  }
+}
+
+/** C2–C7 e a Nota Final: A e D esperam a verificação automática; B falha pelas limitações permanentes. */
+const GATES_PENDENTES: PackGate[] = [
+  portao('A', 'Portão A (fonte e vigência)', 'PENDING'),
+  portao('B', 'Portão B (modelo de cálculo)', 'FAILED', 'limitações permanentes bloqueantes'),
+  portao('C', 'Portão C (adaptador)', 'PENDING', 'avaliado por fonte e a cada execução'),
+  portao('D', 'Portão D (reconciliação)', 'PENDING'),
+]
+
+/** O C1 do demo aparece liberado: os quatro portões passaram. */
+const GATES_LIBERADOS: PackGate[] = [
+  portao('A', 'Portão A (fonte e vigência)', 'PASSED'),
+  portao('B', 'Portão B (modelo de cálculo)', 'PASSED'),
+  portao('C', 'Portão C (adaptador)', 'PASSED'),
+  portao('D', 'Portão D (reconciliação)', 'PASSED'),
 ]
 
 const FORA_DO_PEC_LOCAL =
@@ -54,6 +88,8 @@ function pacote(
     dependsOn: [],
     executionEnabled: false,
     blockedGates: PORTOES,
+    gates: GATES_PENDENTES,
+    gateRegistryStale: false,
     code,
     title,
     packageId: PACOTE,
@@ -81,6 +117,8 @@ export const catalogoFixture: IndicatorPack[] = [
     dependsOn: [],
     executionEnabled: true,
     blockedGates: [],
+    gates: GATES_LIBERADOS,
+    gateRegistryStale: false,
     code: 'C1',
     title: 'Mais acesso',
     packageId: PACOTE,
@@ -434,6 +472,8 @@ export const catalogoFixture: IndicatorPack[] = [
     ],
     executionEnabled: false,
     blockedGates: PORTOES,
+    gates: GATES_PENDENTES,
+    gateRegistryStale: false,
     code: 'Componente III',
     title: 'Nota Final do Componente III (qualidade)',
     packageId: 'cofin-quad-nt08-2026',

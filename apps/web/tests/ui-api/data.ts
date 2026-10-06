@@ -7,6 +7,7 @@ import type {
   OverviewIndicator,
   OverviewResponse,
   PackComponentSpec,
+  PackGate,
   QualityComponent,
   QualityComponentUnit,
   ResultComponentResponse,
@@ -202,6 +203,14 @@ export function overview(
 
 const GATE = 'Portão A (fonte e vigência) incompleto'
 
+/** ADR 0032: Portões A–D as `GET /indicator-packs` serves them for a pack that has not passed any. */
+const GATES: PackGate[] = [
+  { gate: 'A', label: 'Portão A (fonte e vigência)', status: 'PENDING' },
+  { gate: 'B', label: 'Portão B (modelo de cálculo)', status: 'PENDING' },
+  { gate: 'C', label: 'Portão C (adaptador)', status: 'PENDING' },
+  { gate: 'D', label: 'Portão D (reconciliação)', status: 'PENDING' },
+].map((g) => ({ ...g, check: null, checkedAt: null, evidenceRefs: [], note: null }) as PackGate)
+
 /** A pack of the quality package (qualidade-esf-eap-2026-06) as GET /indicator-packs serves it. */
 export function qualityPack(
   id: string,
@@ -214,6 +223,8 @@ export function qualityPack(
     unit: 'percentual',
     executionEnabled: false,
     blockedGates: [GATE],
+    gates: GATES,
+    gateRegistryStale: false,
     code,
     title,
     packageId: 'qualidade-esf-eap-2026-06',
@@ -287,6 +298,8 @@ export function overviewOfPack(
     missingCapabilities: [],
     executionEnabled: p.executionEnabled,
     blockedGates: p.blockedGates,
+    gates: p.gates,
+    gateRegistryStale: p.gateRegistryStale,
     ...overrides,
   }
 }

@@ -53,15 +53,17 @@ const pendenciaColumns: Column<IndicadorPendencia>[] = [
   {
     key: 'motivo',
     header: 'Motivo',
-    // A reason can be a long limitation: three lines here, the whole text in the detail.
+    // A reason can be a long limitation, or a gate checklist one line per gate (ADR 0032): five
+    // lines here, the whole text in the detail.
     render: (r) => (
       <Typography
         sx={{
           fontSize: 12,
           color: colors.textSecondary,
           lineHeight: 1.3,
+          whiteSpace: 'pre-line',
           display: '-webkit-box',
-          WebkitLineClamp: 3,
+          WebkitLineClamp: 5,
           WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
         }}

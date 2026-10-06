@@ -176,7 +176,7 @@ test.describe('detalhe de um pacote por práticas (C4)', () => {
     await expect(page.getByText('Soma dos pontos')).toBeVisible()
     await expect(page.getByText('32.855')).toBeVisible()
     await expect(page.getByText('Sem valor: bloqueado')).toBeVisible()
-    await expect(page.getByText('Portão C (adaptador) incompleto')).toBeVisible()
+    await expect(page.getByText('Portão D (reconciliação) incompleto')).toBeVisible()
     const praticas = page.getByRole('table')
     await expect(praticas.getByRole('row')).toHaveCount(7)
     const a = praticas.getByRole('row', { name: /^A Ter pelo menos 01 \(uma\) consulta/ })
@@ -205,7 +205,7 @@ test.describe('detalhe de um pacote por práticas (C4)', () => {
   test('a metodologia mostra a ficha: pesos, janelas, portões e capacidades', async ({ page }) => {
     await page.getByRole('tab', { name: 'Metodologia' }).click()
     await expect(page.getByRole('heading', { name: 'Boas práticas da ficha' })).toBeVisible()
-    await expect(page.getByText('Portão E (piloto e operação) incompleto')).toBeVisible()
+    await expect(page.getByText('Portão D (reconciliação) incompleto')).toBeVisible()
     await expect(page.getByText(/Capacidades lidas do PEC: citizen/)).toBeVisible()
     await expect(page.getByRole('link', { name: /nota-metodologica-c4/ })).toHaveAttribute(
       'href',

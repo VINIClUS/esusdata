@@ -38,6 +38,8 @@ const indicators: OverviewIndicator[] = catalogoFixture.map((pack) => {
     missingCapabilities: faltam,
     executionEnabled: pack.executionEnabled,
     blockedGates: pack.blockedGates,
+    gates: pack.gates,
+    gateRegistryStale: pack.gateRegistryStale,
     resultId: result?.resultId ?? null,
     status: result?.status ?? null,
     value: result?.value ?? null,
