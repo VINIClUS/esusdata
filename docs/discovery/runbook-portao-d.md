@@ -1,7 +1,9 @@
 # Runbook: conferência do Portão D com o SIAPS público
 
-Regra, elegibilidade e limiar: `docs/indicadores/portoes/portao-d-conciliacao-siaps.md`
-(`siaps-distribuicao-por-classe@1`). Este texto só diz como rodar.
+Regra, elegibilidade e limiar de C1–C7: `docs/indicadores/portoes/portao-d-conciliacao-siaps.md`
+(`siaps-distribuicao-por-classe@1`); da Nota Final do Componente III:
+`docs/indicadores/portoes/portao-d-nota-final-siaps.md` (`siaps-nota-final-por-classe@1`). Este texto só
+diz como rodar.
 
 O produto nunca chama o SIAPS. A conferência é ferramenta de desenvolvimento na árvore de testes
 (`apps/agent/src/test/java/esusdata/indicator/reconciliation`). Ela só roda com
@@ -9,7 +11,7 @@ O produto nunca chama o SIAPS. A conferência é ferramenta de desenvolvimento n
 
 ## Quando rodar
 
-Nas versões finais das regras de C1–C7, depois que o quadrimestre elegível estiver publicado no
+Nas versões finais das regras de C1–C7 e da Nota Final, depois que o quadrimestre elegível estiver publicado no
 SIAPS (hoje 2026Q2; sem ele o resultado é PENDING, "aguardando 2026Q2 no SIAPS"). Não rodar contra o
 PEC de produção antes disso, a não ser para o modo informativo combinado.
 
@@ -68,6 +70,15 @@ sensibilidade e reaproveitados em `apps/agent/target/portao-d/extratos` numa seg
 | Resumo informativo: `informativo-portao-d-...md` | `apps/agent/target/portao-d/informativo/` | não |
 | Contagens por classe e classes por INE (`*-contagens.csv`, `*-equipes.csv`) | `apps/agent/target/portao-d/` | não |
 | Snapshot do SIAPS, extratos | `apps/agent/target/portao-d/` | não |
+
+**Nota Final do Componente III.** Na mesma rodada, depois dos sete packs, a ferramenta compara a
+classe final de cada equipe (consolidação da NT 8/2026 sobre os resultados mensais sem bloqueio de
+C1–C7, os mesmos extratos e o mesmo snapshot) com as linhas `QUALIDADE` de `classificacaoFinalComponente`.
+Não há chamada nova ao SIAPS. O resumo é `portao-d-componente-iii-nota-final-<quadrimestre>.md` e, com
+`observatorio.gate.d.registry`, o resultado decidido vai para `gates.D` da entrada
+`componente-iii-nota-final`. Um snapshot salvo antes desta versão já traz a lista
+`classificacaoFinalComponente` (é a resposta inteira do SIAPS); sem ela a Nota Final fica PENDING
+("o SIAPS não devolveu a classificação final").
 
 A evidência de cada pack é o resumo: o registro guarda `ref` (caminho relativo ao repositório) e o
 `sha256` do arquivo. Rodar um pack de novo reescreve só o resumo dele.

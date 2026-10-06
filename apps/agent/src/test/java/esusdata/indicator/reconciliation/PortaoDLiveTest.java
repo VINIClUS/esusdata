@@ -6,6 +6,7 @@ import esusdata.indicator.IndicatorRuleRegistry;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.Quadrimestre;
 import esusdata.indicator.model.TeamResult;
+import esusdata.indicator.pack.componente3.ComponentIII;
 import esusdata.indicator.reconciliation.PackVerdict.Mode;
 import esusdata.run.worker.SensitivityExtracts;
 import esusdata.run.worker.SensitivityExtracts.PackInput;
@@ -31,8 +32,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Portão D, {@code siaps-distribuicao-por-classe@1}: the on-demand check against the public SIAPS
- * (rule: docs/indicadores/portoes/portao-d-conciliacao-siaps.md). Developer tooling: the product
+ * Portão D, {@code siaps-distribuicao-por-classe@1} for C1–C7 and, after them, {@code
+ * siaps-nota-final-por-classe@1} for the Nota Final do Componente III: the on-demand check against the
+ * public SIAPS (rules: docs/indicadores/portoes/portao-d-conciliacao-siaps.md and
+ * portao-d-nota-final-siaps.md). C1 is read as in production, with its team supplement ({@link
+ * SensitivityExtracts}). Developer tooling: the product
  * never calls the SIAPS, and CI never runs this test, which is skipped unless {@code
  * -Dobservatorio.gate.d.live=true}.
  *
@@ -112,7 +116,7 @@ class PortaoDLiveTest {
 
         List<PackVerdict> verdicts = new ArrayList<>();
         Map<GatePack, Quadrimestre> references = new LinkedHashMap<>();
-        for (GatePack pack : GatePack.all()) {
+        for (GatePack pack : GatePack.allWithNotaFinal()) {
             Optional<Quadrimestre> reference = reference(pack, published);
             if (reference.isPresent()) {
                 references.put(pack, reference.get());
@@ -124,7 +128,7 @@ class PortaoDLiveTest {
             verdicts.addAll(compare(references, published, Pec.assumed(), client, snapshotFile, out));
         }
         record(verdicts, out, LocalDate.now(ZoneId.of("America/Sao_Paulo")));
-        assertThat(verdicts).hasSize(GatePack.all().size());
+        assertThat(verdicts).hasSize(GatePack.allWithNotaFinal().size());
     }
 
     /** Fetches (or reads) one snapshot per quadrimestre, acquires the months and compares each pack. */
@@ -152,10 +156,33 @@ class PortaoDLiveTest {
         for (Map.Entry<GatePack, Quadrimestre> entry : references.entrySet()) {
             GatePack pack = entry.getKey();
             Quadrimestre quadrimestre = entry.getValue();
-            Map<YearMonth, List<TeamResult>> months = local.get(quadrimestre).getOrDefault(pack.packId(), Map.of());
-            verdicts.add(verdict(pack, quadrimestre, published, snapshots.get(quadrimestre), months));
+            SiapsSnapshot snapshot = snapshots.get(quadrimestre);
+            if (pack.isNotaFinal()) {
+                // after the seven pack checks (GatePack.allWithNotaFinal puts it last)
+                verdicts.add(notaFinalVerdict(quadrimestre, published, snapshot, local.get(quadrimestre)));
+            } else {
+                Map<YearMonth, List<TeamResult>> months =
+                        local.get(quadrimestre).getOrDefault(pack.packId(), Map.of());
+                verdicts.add(verdict(pack, quadrimestre, published, snapshot, months));
+            }
         }
         return verdicts;
+    }
+
+    /** {@code siaps-nota-final-por-classe@1}: the Nota Final of each team from the seven packs' months. */
+    private static PackVerdict notaFinalVerdict(
+            Quadrimestre quadrimestre,
+            List<String> published,
+            SiapsSnapshot snapshot,
+            Map<String, Map<YearMonth, List<TeamResult>>> byPack) {
+        GatePack pack = GatePack.NOTA_FINAL;
+        Mode mode = Eligibility.isReference(pack, quadrimestre, published) ? Mode.GATE : Mode.INFORMATIVO;
+        List<String> missing = LocalClasses.missingNotaFinalInputs(quadrimestre, byPack);
+        if (!missing.isEmpty()) {
+            return PackVerdict.pending(pack, ruleVersion(pack), mode, "faltam as entradas locais de " + missing);
+        }
+        return PackVerdict.evaluate(
+                pack, ruleVersion(pack), mode, snapshot, LocalClasses.ofNotaFinal(quadrimestre, byPack));
     }
 
     private static PackVerdict verdict(
@@ -281,6 +308,8 @@ class PortaoDLiveTest {
     }
 
     private static String ruleVersion(GatePack pack) {
-        return rule(pack).descriptor().ruleVersion();
+        return pack.isNotaFinal()
+                ? ComponentIII.RULE_VERSION
+                : rule(pack).descriptor().ruleVersion();
     }
 }

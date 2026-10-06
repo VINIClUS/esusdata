@@ -62,7 +62,7 @@ public final class RegistryUpdater {
         ObjectNode gate = MAPPER.createObjectNode();
         gate.put("status", verdict.status().name());
         if (decided) {
-            gate.put("check", Comparison.CHECK_ID);
+            gate.put("check", verdict.pack().checkId());
             gate.put("checked_at", checkedAt.toString());
         }
         ArrayNode evidence = gate.putArray("evidence");

@@ -69,7 +69,8 @@ class SensitivityExtractsTest {
 
     private static PackInput c1(List<PackInput> inputs) {
         return inputs.stream()
-                .filter(input -> C1Rule.INDICATOR_PACK.equals(input.rule().descriptor().id()))
+                .filter(input ->
+                        C1Rule.INDICATOR_PACK.equals(input.rule().descriptor().id()))
                 .findFirst()
                 .orElseThrow();
     }
@@ -83,11 +84,14 @@ class SensitivityExtractsTest {
         PackInput input = c1(SensitivityExtracts.fromDirectory(extracts, MARCH));
         RuleOutcome outcome = input.rule().evaluate(input.data(), input.context());
 
-        assertThat(input.data().windowOf(Capabilities.TEAM)).as("the supplement was read").isPresent();
+        assertThat(input.data().windowOf(Capabilities.TEAM))
+                .as("the supplement was read")
+                .isPresent();
         assertThat(outcome.result().numerator().intValue()).isEqualTo(7);
         assertThat(outcome.result().denominator().intValue()).isEqualTo(10);
-        assertThat(outcome.teams()).singleElement().satisfies(team -> assertThat(team.ine())
-                .isEqualTo(ENCOUNTERS_INE));
+        assertThat(outcome.teams())
+                .singleElement()
+                .satisfies(team -> assertThat(team.ine()).isEqualTo(ENCOUNTERS_INE));
     }
 
     @Test
@@ -99,7 +103,9 @@ class SensitivityExtractsTest {
         PackInput input = c1(SensitivityExtracts.fromDirectory(extracts, MARCH));
         RuleOutcome outcome = input.rule().evaluate(input.data(), input.context());
 
-        assertThat(outcome.teams()).as("the team of type 72 is not a team of C1").isEmpty();
+        assertThat(outcome.teams())
+                .as("the team of type 72 is not a team of C1")
+                .isEmpty();
         assertThat(outcome.result().denominator().intValue()).isZero();
         assertThat(outcome.result().limitations()).anyMatch(l -> l.startsWith("C1-LIM-10/contagem"));
     }
@@ -110,7 +116,8 @@ class SensitivityExtractsTest {
         Files.delete(extracts.resolve("ext-c1-team.manifest.json"));
 
         assertThat(SensitivityExtracts.fromDirectory(extracts, MARCH))
-                .noneMatch(input -> C1Rule.INDICATOR_PACK.equals(input.rule().descriptor().id()));
+                .noneMatch(input ->
+                        C1Rule.INDICATOR_PACK.equals(input.rule().descriptor().id()));
     }
 
     @Test
@@ -120,7 +127,8 @@ class SensitivityExtractsTest {
         ExtractFixtures.write(extracts, "ext-c1", "src-1", CanonicalFixtures.IBGE, "2026-03", 7, 3, 2);
 
         assertThat(SensitivityExtracts.fromDirectory(extracts, MARCH))
-                .noneMatch(input -> C1Rule.INDICATOR_PACK.equals(input.rule().descriptor().id()));
+                .noneMatch(input ->
+                        C1Rule.INDICATOR_PACK.equals(input.rule().descriptor().id()));
     }
 
     @Test

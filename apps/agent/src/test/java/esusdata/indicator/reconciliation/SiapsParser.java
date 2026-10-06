@@ -24,6 +24,8 @@ public final class SiapsParser {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String CONCEITO = "conceitoPorIndicadorQualidade";
+    private static final String FINAL = "classificacaoFinalComponente";
+    private static final String QUALIDADE = "QUALIDADE";
 
     private SiapsParser() {}
 
@@ -53,17 +55,45 @@ public final class SiapsParser {
             if (GatePack.bySiapsCode(code).isEmpty() || !(ESF.equals(type) || EAP.equals(type))) {
                 continue;
             }
-            rows.add(new Row(
-                    text(entry, "nuQuadrimestre"),
-                    code,
-                    type,
-                    new ClassCounts(
-                            count(entry, "qtdClassificacaoRegular"),
-                            count(entry, "qtdClassificacaoSuficiente"),
-                            count(entry, "qtdClassificacaoBom"),
-                            count(entry, "qtdClassificacaoOtimo"))));
+            rows.add(new Row(text(entry, "nuQuadrimestre"), code, type, countsOf(entry)));
         }
         return List.copyOf(rows);
+    }
+
+    /**
+     * The final classification of the Componente III per team type: the {@code QUALIDADE} rows of
+     * {@code classificacaoFinalComponente} for eSF and eAP, as rows of {@link
+     * GatePack#NOTA_FINAL_CODE}. Other origins (CVAT) and team types are not the Nota Final of eSF/eAP.
+     * An answer without the list gives no rows (the Nota Final check stays pending); two rows for the
+     * same type are refused, never merged.
+     */
+    public static List<Row> finalRows(String filtroJson) {
+        JsonNode list = MAPPER.readTree(filtroJson).path(FINAL);
+        if (list.isMissingNode() || list.isNull()) {
+            return List.of();
+        }
+        requireArray(list, FINAL);
+        List<Row> rows = new ArrayList<>();
+        Set<String> types = new LinkedHashSet<>();
+        for (JsonNode entry : list) {
+            String type = text(entry, "sgEquipe");
+            if (!QUALIDADE.equals(entry.path("tipoOrigem").asString()) || !(ESF.equals(type) || EAP.equals(type))) {
+                continue;
+            }
+            if (!types.add(type)) {
+                throw new IllegalArgumentException("SIAPS answer with two QUALIDADE rows of " + type + " in " + FINAL);
+            }
+            rows.add(new Row(text(entry, "nuQuadrimestre"), GatePack.NOTA_FINAL_CODE, type, countsOf(entry)));
+        }
+        return List.copyOf(rows);
+    }
+
+    private static ClassCounts countsOf(JsonNode entry) {
+        return new ClassCounts(
+                count(entry, "qtdClassificacaoRegular"),
+                count(entry, "qtdClassificacaoSuficiente"),
+                count(entry, "qtdClassificacaoBom"),
+                count(entry, "qtdClassificacaoOtimo"));
     }
 
     /** The team list of {@code filtros/equipes}: INE (10 digits) and eSF/eAP, other types ignored. */
@@ -88,7 +118,9 @@ public final class SiapsParser {
         JsonNode root = MAPPER.readTree(json);
         List<String> published =
                 publishedQuadrimestres(root.path("competencias").toString());
-        List<Row> rows = classRows(root.path("filtro").toString());
+        String filtro = root.path("filtro").toString();
+        List<Row> rows = new ArrayList<>(classRows(filtro));
+        rows.addAll(finalRows(filtro));
         Set<String> quadrimestres = new LinkedHashSet<>();
         rows.forEach(row -> quadrimestres.add(row.quadrimestre()));
         if (quadrimestres.size() != 1) {

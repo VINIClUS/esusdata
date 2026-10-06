@@ -15,6 +15,9 @@ public final class Comparison {
 
     public static final String CHECK_ID = "siaps-distribuicao-por-classe@1";
 
+    /** The Nota Final's check: the same comparison over the final class of each team. */
+    public static final String CHECK_ID_NOTA_FINAL = "siaps-nota-final-por-classe@1";
+
     private static final int CLASSES = 4;
     private static final int FLOOR = 2;
     private static final int PERCENT = 100;

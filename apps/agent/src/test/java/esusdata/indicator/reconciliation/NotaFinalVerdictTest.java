@@ -1,0 +1,264 @@
+package esusdata.indicator.reconciliation;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import esusdata.indicator.ReleaseGateRegistry;
+import esusdata.indicator.model.Classification;
+import esusdata.indicator.model.GateCheck;
+import esusdata.indicator.model.GateId;
+import esusdata.indicator.model.Quadrimestre;
+import esusdata.indicator.pack.componente3.ComponentIII;
+import esusdata.indicator.reconciliation.PackVerdict.Mode;
+import esusdata.indicator.reconciliation.PackVerdict.Status;
+import esusdata.indicator.reconciliation.SiapsSnapshot.Row;
+import esusdata.indicator.reconciliation.SiapsSnapshot.Team;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+/** {@code siaps-nota-final-por-classe@1} end to end on invented data: parser, eligibility, verdict, record. */
+class NotaFinalVerdictTest {
+
+    private static final GatePack NOTA_FINAL = GatePack.NOTA_FINAL;
+    private static final LocalDate DAY = LocalDate.of(2026, 10, 7);
+    private static final Path REPO = Path.of("..", "..");
+    private static final String EVIDENCE = "docs/indicadores/portoes/portao-d-nota-final-siaps.md";
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private static final String FILTRO = """
+            {"classificacaoFinalComponente":[
+              {"nuQuadrimestre":"2026Q2","sgEquipe":"eSF","tipoOrigem":"QUALIDADE",
+               "qtdClassificacaoOtimo":3,"qtdClassificacaoBom":5,"qtdClassificacaoSuficiente":2,"qtdClassificacaoRegular":1,
+               "totalEquipesValidasParaComponente":11},
+              {"nuQuadrimestre":"2026Q2","sgEquipe":"eAP","tipoOrigem":"QUALIDADE",
+               "qtdClassificacaoOtimo":0,"qtdClassificacaoBom":1,"qtdClassificacaoSuficiente":0,"qtdClassificacaoRegular":0,
+               "totalEquipesValidasParaComponente":1},
+              {"nuQuadrimestre":"2026Q2","sgEquipe":"eSF","tipoOrigem":"CVAT",
+               "qtdClassificacaoOtimo":9,"qtdClassificacaoBom":9,"qtdClassificacaoSuficiente":9,"qtdClassificacaoRegular":9,
+               "totalEquipesValidasParaComponente":36},
+              {"nuQuadrimestre":"2026Q2","sgEquipe":"eSB","tipoOrigem":"QUALIDADE",
+               "qtdClassificacaoOtimo":8,"qtdClassificacaoBom":8,"qtdClassificacaoSuficiente":8,"qtdClassificacaoRegular":8,
+               "totalEquipesValidasParaComponente":32}],
+             "conceitoPorIndicadorQualidade":[]}
+            """;
+
+    private static final List<Team> TEAMS = List.of(new Team("0000000011", "eSF"), new Team("0000000012", "eSF"));
+
+    /** A snapshot whose final rows are the given counts and whose seven team lists are {@code lists}. */
+    private static SiapsSnapshot snapshot(ClassCounts esf, ClassCounts eap, Map<Integer, List<Team>> lists) {
+        return new SiapsSnapshot(
+                "2026Q2",
+                List.of("2026Q2"),
+                List.of(
+                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eSF", esf),
+                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eAP", eap)),
+                lists);
+    }
+
+    private static Map<Integer, List<Team>> sameListForEvery(List<Team> teams) {
+        Map<Integer, List<Team>> lists = new LinkedHashMap<>();
+        GatePack.all().forEach(pack -> lists.put(pack.siapsCode(), teams));
+        return lists;
+    }
+
+    private static PackVerdict evaluate(SiapsSnapshot snapshot, Map<String, Classification> local) {
+        return PackVerdict.evaluate(
+                NOTA_FINAL, ComponentIII.RULE_VERSION, Mode.GATE, snapshot, new LocalClasses(local, local.keySet()));
+    }
+
+    @Test
+    void readsOnlyTheQualidadeRowsOfEsfAndEapOfTheFinalClassification() {
+        List<Row> rows = SiapsParser.finalRows(FILTRO);
+
+        assertThat(rows)
+                .containsExactly(
+                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eSF", new ClassCounts(1, 2, 5, 3)),
+                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eAP", new ClassCounts(0, 0, 1, 0)));
+    }
+
+    @Test
+    void anAnswerWithoutTheListGivesNoRowsAndTwoRowsOfOneTypeAreRefused() {
+        assertThat(SiapsParser.finalRows("{\"conceitoPorIndicadorQualidade\":[]}"))
+                .isEmpty();
+        String twice = FILTRO.replace("\"sgEquipe\":\"eAP\"", "\"sgEquipe\":\"eSF\"");
+        assertThatThrownBy(() -> SiapsParser.finalRows(twice))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("two QUALIDADE rows");
+        assertThatThrownBy(() -> SiapsParser.finalRows("{\"classificacaoFinalComponente\":{}}"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void theSnapshotFileCarriesTheFinalRowsBesideThePackRows() {
+        String file = "{\"competencias\":[{\"nuCompetencia\":\"2026Q2\",\"quadrimestre\":true}],"
+                + "\"filtro\":"
+                + FILTRO.replace(
+                        "\"conceitoPorIndicadorQualidade\":[]",
+                        "\"conceitoPorIndicadorQualidade\":["
+                                + "{\"nuQuadrimestre\":\"2026Q2\",\"sgEquipe\":\"eSF\",\"coTipoIndicador\":110,"
+                                + "\"qtdClassificacaoOtimo\":1,\"qtdClassificacaoBom\":0,\"qtdClassificacaoSuficiente\":0,"
+                                + "\"qtdClassificacaoRegular\":0}]")
+                + ",\"equipes\":{}}";
+
+        SiapsSnapshot snapshot = SiapsParser.snapshot(file);
+
+        assertThat(snapshot.hasFinalRows()).isTrue();
+        assertThat(snapshot.counts(GatePack.NOTA_FINAL_CODE, "eSF")).contains(new ClassCounts(1, 2, 5, 3));
+        assertThat(snapshot.counts(110, "eSF")).contains(new ClassCounts(0, 0, 0, 1));
+        assertThat(SiapsParser.snapshot(file.replace("classificacaoFinalComponente", "outra"))
+                        .hasFinalRows())
+                .isFalse();
+    }
+
+    @Test
+    void theEligibilityIsThatOfTheLatestOfTheSevenFichasAndOnlyTheLatestPublishedIsTheReference() {
+        assertThat(NOTA_FINAL.floor()).isEqualTo(LocalDate.of(2026, 6, 24));
+        assertThat(GatePack.all())
+                .allSatisfy(pack -> assertThat(NOTA_FINAL.floor()).isAfterOrEqualTo(pack.floor()));
+        assertThat(Eligibility.firstEligible(NOTA_FINAL)).isEqualTo(new Quadrimestre(2026, 2));
+        assertThat(GatePack.all()).doesNotContain(NOTA_FINAL);
+
+        assertThat(Eligibility.reference(NOTA_FINAL, List.of("2026Q1"))).isEmpty();
+        assertThat(Eligibility.waitingFor(NOTA_FINAL)).isEqualTo("aguardando 2026Q2 no SIAPS");
+        List<String> published = List.of("2026Q1", "2026Q2", "2026Q3");
+        assertThat(Eligibility.reference(NOTA_FINAL, published)).contains(new Quadrimestre(2026, 3));
+        assertThat(Eligibility.isReference(NOTA_FINAL, new Quadrimestre(2026, 3), published))
+                .isTrue();
+        assertThat(Eligibility.isReference(NOTA_FINAL, new Quadrimestre(2026, 2), published))
+                .as("eligible, but not the most recent published")
+                .isFalse();
+    }
+
+    @Test
+    void passesWhenTheDistributionsAgreeWithinTheThresholdPerTeamType() {
+        SiapsSnapshot snapshot = snapshot(new ClassCounts(0, 0, 1, 1), ClassCounts.EMPTY, sameListForEvery(TEAMS));
+
+        PackVerdict verdict =
+                evaluate(snapshot, Map.of("0000000011", Classification.BOM, "0000000012", Classification.OTIMO));
+
+        assertThat(verdict.status()).isEqualTo(Status.PASSED);
+        assertThat(verdict.isGateEvidence()).isTrue();
+        assertThat(verdict.rows()).hasSize(2);
+        assertThat(verdict.rows().getFirst().distance()).isZero();
+        assertThat(verdict.rows().get(1).evaluated())
+                .as("eAP: nobody on either side")
+                .isFalse();
+    }
+
+    @Test
+    void failsWhenOneTypeIsOverTheThresholdAndAnUnclassifiedTeamIsReportedNotCounted() {
+        SiapsSnapshot snapshot = snapshot(new ClassCounts(0, 0, 1, 1), ClassCounts.EMPTY, sameListForEvery(TEAMS));
+
+        PackVerdict verdict = evaluate(snapshot, Map.of("0000000011", Classification.REGULAR));
+
+        // cum: SIAPS 0,0,1,2 against local 1,1,1,1: D = 1 + 1 + 0 + 1 = 3 > T = 2
+        assertThat(verdict.status()).isEqualTo(Status.FAILED);
+        assertThat(verdict.rows().getFirst().semClasseLocal()).isEqualTo(1);
+        assertThat(verdict.rows().getFirst().distance()).isEqualTo(3);
+        assertThat(verdict.rows().getFirst().threshold()).isEqualTo(2);
+    }
+
+    @Test
+    void theComparisonSetIsTheTeamsOfAllSevenLists() {
+        Map<Integer, List<Team>> lists = sameListForEvery(TEAMS);
+        lists.put(GatePack.all().get(3).siapsCode(), List.of(new Team("0000000011", "eSF")));
+
+        SiapsSnapshot snapshot = snapshot(new ClassCounts(0, 0, 1, 1), ClassCounts.EMPTY, lists);
+
+        assertThat(snapshot.notaFinalTeams()).contains(List.of(new Team("0000000011", "eSF")));
+        PackVerdict verdict =
+                evaluate(snapshot, Map.of("0000000011", Classification.BOM, "0000000012", Classification.OTIMO));
+        assertThat(verdict.localNotInSiaps())
+                .as("the team missing from one list is outside")
+                .isEqualTo(1);
+        assertThat(verdict.rows().getFirst().localTeams()).isEqualTo(1);
+    }
+
+    @Test
+    void aTeamListedWithAnotherTypeInOneListIsOutsideTheSet() {
+        Map<Integer, List<Team>> lists = sameListForEvery(TEAMS);
+        lists.put(GatePack.all().get(1).siapsCode(), List.of(new Team("0000000011", "eAP"), TEAMS.get(1)));
+
+        assertThat(snapshot(ClassCounts.EMPTY, ClassCounts.EMPTY, lists).notaFinalTeams())
+                .contains(List.of(TEAMS.get(1)));
+    }
+
+    @Test
+    void isPendingWithoutTheFinalRowsOrWithoutOneOfTheSevenLists() {
+        SiapsSnapshot noFinalRows = new SiapsSnapshot("2026Q2", List.of("2026Q2"), List.of(), sameListForEvery(TEAMS));
+        Map<Integer, List<Team>> sixLists = sameListForEvery(TEAMS);
+        sixLists.remove(GatePack.all().getLast().siapsCode());
+
+        PackVerdict first = evaluate(noFinalRows, Map.of("0000000011", Classification.BOM));
+        PackVerdict second = evaluate(
+                snapshot(new ClassCounts(0, 0, 1, 1), ClassCounts.EMPTY, sixLists),
+                Map.of("0000000011", Classification.BOM));
+
+        assertThat(first.status()).isEqualTo(Status.PENDING);
+        assertThat(first.reason()).contains("classificação final");
+        assertThat(second.status()).isEqualTo(Status.PENDING);
+        assertThat(second.reason()).contains("listas de equipes");
+        assertThat(first.isGateEvidence()).isFalse();
+    }
+
+    @Test
+    void theSummaryNamesTheNotaFinalCheckAndRuleAndMasksTheCounts() {
+        PackVerdict verdict = evaluate(
+                snapshot(new ClassCounts(0, 0, 1, 1), ClassCounts.EMPTY, sameListForEvery(TEAMS)),
+                Map.of("0000000011", Classification.BOM, "0000000012", Classification.OTIMO));
+
+        String text = SummaryWriter.render(verdict, DAY);
+
+        assertThat(text)
+                .contains("`siaps-nota-final-por-classe@1`")
+                .contains("`" + EVIDENCE + "`")
+                .contains(ComponentIII.RULE_VERSION)
+                .contains("| CIII | eSF | <10 | <10 |")
+                .doesNotContain("siaps-distribuicao-por-classe@1");
+        assertThat(SummaryWriter.fileName(verdict)).isEqualTo("portao-d-componente-iii-nota-final-2026Q2.md");
+    }
+
+    @Test
+    void theRegistryRecordsTheNotaFinalCheckInItsOwnEntry(@TempDir Path directory) throws Exception {
+        Path file = directory.resolve("release-gates.json");
+        Files.copy(REPO.resolve("contracts/indicators/release-gates.json"), file);
+        String sha = SummaryWriter.sha256(REPO.resolve(EVIDENCE));
+        PackVerdict passed = new PackVerdict(
+                NOTA_FINAL,
+                ComponentIII.RULE_VERSION,
+                Mode.GATE,
+                Status.PASSED,
+                "",
+                "2026Q2",
+                List.of(),
+                0,
+                new ArrayList<>());
+
+        RegistryUpdater.record(file, REPO, passed, DAY, EVIDENCE, sha);
+
+        GateCheck d = ReleaseGateRegistry.fromJson(Files.readString(file))
+                .statusOf(ComponentIII.DESCRIPTOR)
+                .check(GateId.D);
+        assertThat(d.isPassed()).isTrue();
+        assertThat(d.check()).isEqualTo("siaps-nota-final-por-classe@1");
+        // every other entry is untouched: the seven packs keep their own D
+        JsonNode before = MAPPER.readTree(Files.readString(REPO.resolve("contracts/indicators/release-gates.json")))
+                .path("packs");
+        JsonNode after = MAPPER.readTree(Files.readString(file)).path("packs");
+        assertThat(after.size()).isEqualTo(before.size());
+        for (int i = 0; i < before.size(); i++) {
+            if (!before.get(i).path("pack").asString().equals(ComponentIII.ID)) {
+                assertThat(after.get(i)).isEqualTo(before.get(i));
+            }
+        }
+    }
+}
