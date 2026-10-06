@@ -81,10 +81,11 @@ fórmula (o lado ausente tem contagens zero).
 
 ## Veredito do pack
 
-- **PASSED** se toda linha avaliada (eSF e eAP) passa.
+- **PASSED** se há ao menos uma linha avaliada e toda linha avaliada (eSF e eAP) passa.
 - **FAILED** se alguma linha reprova.
-- **PENDING** se não há quadrimestre de referência elegível publicado, ou se faltam as entradas locais
-  dos quatro meses do quadrimestre.
+- **PENDING** se não há quadrimestre de referência elegível publicado, se faltam as entradas locais
+  dos quatro meses do quadrimestre, ou se nenhuma linha é avaliável (todas ignoradas por N_S = 0 e
+  N_L = 0; razão "sem linhas avaliáveis"). Um PASSED sem linhas seria vazio.
 
 ## Mascaramento e privacidade
 
