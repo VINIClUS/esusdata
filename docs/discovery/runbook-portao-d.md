@@ -29,13 +29,13 @@ Propriedades opcionais:
 | Propriedade | Efeito |
 |---|---|
 | `observatorio.gate.d.snapshot=<arquivo>` | Lê o SIAPS de um arquivo em vez de chamar a API (formato abaixo). |
-| `observatorio.gate.d.quadrimestre=2026Q1` | Compara esse quadrimestre. Se não for elegível para o pack, a rodada é informativa. |
+| `observatorio.gate.d.quadrimestre=2026Q1` | Compara esse quadrimestre. Só é rodada de portão se for exatamente o quadrimestre de referência do pack (o mais recente elegível publicado); qualquer outro, elegível ou não, é informativo. |
 | `observatorio.gate.d.uf=SP` | UF para o SIAPS (padrão: deduzida do código IBGE do PEC). |
 | `observatorio.gate.d.registry=<release-gates.json>` | Grava o D decidido (modo de portão) de cada pack nesse arquivo. Sem ela, nada é gravado. |
 | `observatorio.gate.d.repo-root=<dir>` | Raiz do repositório (padrão: achada a partir do diretório de trabalho). |
 
-Chamadas ao SIAPS (só leitura, anônimas): 9 por quadrimestre (competências, resultado do município,
-lista de equipes de cada um dos 7 indicadores). O snapshot fica em
+Chamadas ao SIAPS (só leitura, anônimas): até 10 por quadrimestre (competências, lidas duas vezes; resultado do
+município; lista de equipes de cada um dos 7 indicadores). O snapshot fica em
 `apps/agent/target/portao-d/snapshot-<quadrimestre>.json` e pode ser reaproveitado com
 `observatorio.gate.d.snapshot`. Formato do arquivo: `{"competencias": [...], "filtro": {...},
 "equipes": {"110": [...], ...}}`, cada parte exatamente como o SIAPS respondeu.
@@ -67,7 +67,9 @@ A evidência de cada pack é o resumo: o registro guarda `ref` (caminho relativo
   de confiar nele, conferir com um arquivo baixado de verdade. O nome do indicador na coluna
   "Indicador por tipo de equipe" é aceito com ou sem o sufixo " - eSF"/" - eAP" e qualquer outro nome
   é recusado. A conferência por JSON não depende dele.
-- C1 usa o caminho de aquisição v1 (encontros). A conferência o cobre: os encontros são agrupados por
+- C1 usa o caminho de aquisição v1 (encontros). A nota `2026-10-06-sensibilidade-2026-08.md` registra que o
+  harness de sensibilidade não reproduziu o C1 por causa desse caminho (lacuna conhecida do harness; a causa
+  exata não foi investigada aqui). A conferência trata o C1 por conta própria: os encontros são agrupados por
   INE e contados com `C1Rule.computeEvidenceOnly`; o valor exato vem de `ResultJson.exactValue`,
   como o produto armazena. Esse caminho tem teste unitário com dados sintéticos, mas ainda não foi
   exercitado ao vivo contra o PEC.

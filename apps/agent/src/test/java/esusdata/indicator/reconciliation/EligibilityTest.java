@@ -53,6 +53,25 @@ class EligibilityTest {
     }
 
     @Test
+    void onlyTheMostRecentEligiblePublishedQuadrimestreIsTheReference() {
+        GatePack pack = packSignedOn(LocalDate.of(2026, 6, 24));
+        List<String> published = List.of("2026Q1", "2026Q2", "2026Q3");
+
+        assertThat(Eligibility.isReference(pack, new Quadrimestre(2026, 1), published))
+                .isFalse(); // not eligible
+        assertThat(Eligibility.isReference(pack, new Quadrimestre(2026, 2), published))
+                .isFalse(); // eligible, but not the latest
+        assertThat(Eligibility.isReference(pack, new Quadrimestre(2026, 3), published))
+                .isTrue();
+        assertThat(Eligibility.isReference(pack, new Quadrimestre(2027, 1), published))
+                .isFalse(); // not published
+        assertThat(Eligibility.isReference(pack, new Quadrimestre(2026, 2), List.of("2026Q1", "2026Q2")))
+                .isTrue();
+        assertThat(Eligibility.isReference(pack, new Quadrimestre(2026, 1), List.of("2026Q1")))
+                .isFalse();
+    }
+
+    @Test
     void theNt8SignatureIsAFloorWhenItIsLaterThanTheFicha() {
         GatePack early = packSignedOn(LocalDate.of(2026, 4, 1));
 

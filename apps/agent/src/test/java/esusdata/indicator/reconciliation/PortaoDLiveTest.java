@@ -41,10 +41,10 @@ import org.slf4j.LoggerFactory;
  *
  * <ul>
  *   <li>{@code observatorio.gate.d.snapshot=<file>} reads the SIAPS snapshot from a file instead of
- *       calling the SIAPS (9 anonymous requests per quadrimestre, saved to {@code
+ *       calling the SIAPS (up to 10 anonymous requests per quadrimestre, saved to {@code
  *       target/portao-d/snapshot-<quadrimestre>.json}).
  *   <li>{@code observatorio.gate.d.quadrimestre=2026Q1} compares that quadrimestre; one that is not
- *       eligible for a pack makes that pack's run informative.
+ *       the pack's reference (most recent eligible published) makes that pack's run informative.
  *   <li>{@code observatorio.gate.d.uf=SP} (default: derived from the municipality code).
  *   <li>{@code observatorio.gate.d.registry=<release-gates.json>} records the decided, non-
  *       informative D of each pack there. Absent, nothing is recorded.
@@ -121,7 +121,7 @@ class PortaoDLiveTest {
             }
         }
         if (!references.isEmpty()) {
-            verdicts.addAll(compare(references, Pec.assumed(), client, snapshotFile, out));
+            verdicts.addAll(compare(references, published, Pec.assumed(), client, snapshotFile, out));
         }
         record(verdicts, out, LocalDate.now(ZoneId.of("America/Sao_Paulo")));
         assertThat(verdicts).hasSize(GatePack.all().size());
@@ -129,7 +129,12 @@ class PortaoDLiveTest {
 
     /** Fetches (or reads) one snapshot per quadrimestre, acquires the months and compares each pack. */
     private static List<PackVerdict> compare(
-            Map<GatePack, Quadrimestre> references, Pec pec, SiapsClient client, String snapshotFile, Path out)
+            Map<GatePack, Quadrimestre> references,
+            List<String> published,
+            Pec pec,
+            SiapsClient client,
+            String snapshotFile,
+            Path out)
             throws IOException {
         Map<Quadrimestre, SiapsSnapshot> snapshots = new LinkedHashMap<>();
         Map<Quadrimestre, Map<String, Map<YearMonth, List<TeamResult>>>> local = new LinkedHashMap<>();
@@ -148,14 +153,18 @@ class PortaoDLiveTest {
             GatePack pack = entry.getKey();
             Quadrimestre quadrimestre = entry.getValue();
             Map<YearMonth, List<TeamResult>> months = local.get(quadrimestre).getOrDefault(pack.packId(), Map.of());
-            verdicts.add(verdict(pack, quadrimestre, snapshots.get(quadrimestre), months));
+            verdicts.add(verdict(pack, quadrimestre, published, snapshots.get(quadrimestre), months));
         }
         return verdicts;
     }
 
     private static PackVerdict verdict(
-            GatePack pack, Quadrimestre quadrimestre, SiapsSnapshot snapshot, Map<YearMonth, List<TeamResult>> months) {
-        Mode mode = quadrimestre.cutoff().isAfter(pack.floor()) ? Mode.GATE : Mode.INFORMATIVO;
+            GatePack pack,
+            Quadrimestre quadrimestre,
+            List<String> published,
+            SiapsSnapshot snapshot,
+            Map<YearMonth, List<TeamResult>> months) {
+        Mode mode = Eligibility.isReference(pack, quadrimestre, published) ? Mode.GATE : Mode.INFORMATIVO;
         IndicatorRule rule = rule(pack);
         List<YearMonth> missing = LocalClasses.missingMonths(quadrimestre, months);
         if (!missing.isEmpty()) {
@@ -227,7 +236,7 @@ class PortaoDLiveTest {
         Path root = repoRoot();
         String registry = System.getProperty(REGISTRY);
         for (PackVerdict verdict : verdicts) {
-            Path directory = verdict.mode() == Mode.GATE ? root.resolve(EVIDENCE_DIR) : out.resolve("informativo");
+            Path directory = verdict.isGateEvidence() ? root.resolve(EVIDENCE_DIR) : out.resolve("informativo");
             Optional<Path> summary = SummaryWriter.write(directory, verdict, today);
             RawWriter.write(out, verdict);
             log.info(
