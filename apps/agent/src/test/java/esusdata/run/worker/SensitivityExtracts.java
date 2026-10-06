@@ -36,6 +36,8 @@ import java.util.stream.Stream;
  * a pack only ever sees an extract its own plan accepts ({@code requireCovers}: source,
  * municipality, period and every part's window, binds and query checksum) — and, in live mode,
  * acquires one extract per pack with the very command {@code runLive} builds from the same plan.
+ * A plan with a supplement (C1's {@code team}, ADR 0033) is read, and acquired, as a pair: the
+ * extract and its {@code <id>-team}, and a pack that finds only half of it is not accepted.
  */
 public final class SensitivityExtracts {
 
@@ -87,14 +89,41 @@ public final class SensitivityExtracts {
                     : YearMonth.from(
                             LocalDate.parse(manifest.periodEndExclusive()).minusDays(1));
             ReadPlan plan = ReadPlan.of(rule, month, catalog);
-            if (accepts(plan, rule, manifest, month)) {
-                return Optional.of(new PackInput(
-                        rule,
-                        plan.read(store, manifest),
-                        EvaluationContext.endOfMonth(manifest.municipalityIbge(), month)));
+            if (!accepts(plan, rule, manifest, month)) {
+                continue;
             }
+            // ADR 0033: a plan that reads a supplement (C1's team) is accepted only with the extract
+            // of the pair, as RunExecutor.runFromExtract reads it; without it the run fails
+            ExtractionManifest supplement = null;
+            if (plan.hasSupplement()) {
+                supplement = acceptedSupplement(plan, manifest, manifests);
+                if (supplement == null) {
+                    continue;
+                }
+            }
+            CanonicalDataset data =
+                    supplement == null ? plan.read(store, manifest) : plan.read(store, manifest, supplement);
+            return Optional.of(
+                    new PackInput(rule, data, EvaluationContext.endOfMonth(manifest.municipalityIbge(), month)));
         }
         return Optional.empty();
+    }
+
+    /** The supplementary extract the plan accepts for {@code manifest}, or {@code null}. */
+    private static ExtractionManifest acceptedSupplement(
+            ReadPlan plan, ExtractionManifest manifest, List<ExtractionManifest> manifests) {
+        String id = ReadPlan.supplementExtractionId(manifest.extractionId());
+        for (ExtractionManifest candidate : manifests) {
+            if (candidate.extractionId().equals(id)) {
+                try {
+                    plan.requireSupplementCovers(manifest, candidate);
+                    return candidate;
+                } catch (IllegalStateException notThePlans) {
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 
     private static boolean accepts(ReadPlan plan, IndicatorRule rule, ExtractionManifest manifest, YearMonth month) {
@@ -149,6 +178,13 @@ public final class SensitivityExtracts {
             ReadPlan plan = ReadPlan.of(rule, competencia, CapabilityCatalog.packaged());
             String extractionId = LABEL + "-" + rule.descriptor().code().toLowerCase(Locale.ROOT) + "-" + competencia;
             AcquisitionCommand command = plan.command(connection, identity, extractionId, ZONE);
+            if (plan.hasSupplement()) {
+                // as runLive does: the small supplementary read (C1's team, ADR 0033) comes first
+                adapter.acquire(
+                        plan.supplementCommand(connection, identity, extractionId, ZONE),
+                        new CancellationToken(),
+                        new Silent());
+            }
             acquired.add(adapter.acquire(command, new CancellationToken(), new Silent())
                     .extractionId());
         }
