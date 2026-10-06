@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * The consolidation of NT nº 8/2026 (items 4.1–4.3, Quadros 2 and 6), per unit (each team and the
@@ -26,6 +27,8 @@ import java.util.Set;
  * <ol>
  *   <li>per indicator, the exact mean of the monitored months of the quadrimestre (4.1); C2 and C3
  *       only over the months with a cohort event ({@code consolidationEligible}, "Atenção", p. 1);
+ *       a team with no row in a month the municipality published (no child completing two years) is
+ *       that "-" month, out of the mean, not a missing result (AMB-C2-03);
  *   <li>the band of the indicator's own ficha ({@link IndicatorRule#classify}) on the exact mean,
  *       never rounded first (AMB-CIII-04), and its factor ({@link Nt08Tables#factor});
  *   <li>the Nota Final {@code Σ factor × weight} (Quadro 2) and its band (Quadro 6).
@@ -67,8 +70,12 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
     @Override
     public ComponentIIIResult consolidate(ComponentIIIInput input, Map<String, IndicatorRule> rules) {
         Quadrimestre quadrimestre = input.quadrimestre();
+        List<Monthly> municipal = input.units().stream()
+                .filter(unit -> unit.ine() == null)
+                .flatMap(unit -> unit.monthly().stream())
+                .toList();
         List<UnitResult> units = input.units().stream()
-                .map(unit -> unit(quadrimestre, unit, rules))
+                .map(unit -> unit(quadrimestre, unit, municipal, rules))
                 .toList();
         return new ComponentIIIResult(quadrimestre, units, limitations(quadrimestre));
     }
@@ -88,7 +95,10 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
     }
 
     private static UnitResult unit(
-            Quadrimestre quadrimestre, ComponentIIIInput.Unit unit, Map<String, IndicatorRule> rules) {
+            Quadrimestre quadrimestre,
+            ComponentIIIInput.Unit unit,
+            List<Monthly> municipal,
+            Map<String, IndicatorRule> rules) {
         List<IndicatorQuadrimestral> indicators = new ArrayList<>();
         List<String> limitations = new ArrayList<>();
         for (ComponentSpec spec : ComponentIII.DESCRIPTOR.components()) {
@@ -97,7 +107,14 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
                             && Quadrimestre.of(m.month()).equals(quadrimestre))
                     .sorted(Comparator.comparing(Monthly::month).thenComparing(Monthly::resultId))
                     .toList();
-            Assessment assessment = new Reading(spec, read, rules.get(spec.code())).assess(quadrimestre);
+            Set<YearMonth> municipalMonths = unit.ine() == null
+                    ? Set.of()
+                    : municipal.stream()
+                            .filter(m -> spec.code().equals(m.indicatorPack()))
+                            .map(Monthly::month)
+                            .collect(Collectors.toSet());
+            Assessment assessment =
+                    new Reading(spec, read, municipalMonths, rules.get(spec.code())).assess(quadrimestre);
             indicators.add(assessment.indicator());
             assessment.notes().forEach(note -> limitations.add(spec.label() + ": " + note));
         }
@@ -132,7 +149,7 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
     }
 
     /** The monthly results of one indicator of one unit in the quadrimestre, in month order. */
-    private record Reading(ComponentSpec spec, List<Monthly> read, IndicatorRule rule) {
+    private record Reading(ComponentSpec spec, List<Monthly> read, Set<YearMonth> municipalMonths, IndicatorRule rule) {
 
         Assessment assess(Quadrimestre quadrimestre) {
             Optional<Monthly> blocking = read.stream()
@@ -149,13 +166,23 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
             if (invalid.isPresent()) {
                 return unavailable(IndicatorStatus.BLOCKED, invalid.get());
             }
-            // NT 8/2026, "Atenção" (p. 1): C2 and C3 count "apenas os meses que possuam crianças que
-            // completaram dois anos e gestações que atingiram o 42° dia de puerpério" — each pack declares it.
-            boolean cohortOnly = rule.descriptor().monthlyEligibility() == MonthlyEligibility.MONTHS_WITH_COHORT_EVENT;
-            List<Monthly> used = read.stream()
-                    .filter(m -> !cohortOnly || m.consolidationEligible())
-                    .toList();
+            List<Monthly> used = read.stream().filter(m -> !dashMonth(m)).toList();
             return bandOfMean(used);
+        }
+
+        /**
+         * The NT 8/2026 "-" month, out of the mean: C2 and C3 count "apenas os meses que possuam
+         * crianças que completaram dois anos e gestações que atingiram o 42° dia de puerpério" (each
+         * pack declares it), and any pack's month that arrives {@code NO_DENOMINATOR} and not
+         * eligible (C7 with its four subgroups empty) has nothing to average.
+         */
+        private boolean dashMonth(Monthly month) {
+            boolean empty = month.status() == IndicatorStatus.NO_DENOMINATOR;
+            return !month.consolidationEligible() && (cohortOnly() || empty);
+        }
+
+        private boolean cohortOnly() {
+            return rule.descriptor().monthlyEligibility() == MonthlyEligibility.MONTHS_WITH_COHORT_EVENT;
         }
 
         /**
@@ -164,14 +191,9 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
          */
         private Optional<String> invalidMonth(Quadrimestre quadrimestre) {
             for (YearMonth month : quadrimestre.months()) {
-                long published =
-                        read.stream().filter(m -> m.month().equals(month)).count();
-                if (published != 1) {
-                    return Optional.of(COMPETENCIA
-                            + month
-                            + (published == 0
-                                    ? " sem resultado mensal publicado"
-                                    : " com mais de um resultado mensal publicado"));
+                Optional<String> unpublished = unpublished(month);
+                if (unpublished.isPresent()) {
+                    return unpublished;
                 }
             }
             String current = rule.descriptor().ruleVersion();
@@ -187,6 +209,23 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
             return Optional.empty();
         }
 
+        /**
+         * A month without exactly one published result. A team without a child completing two years
+         * has no row in a month the municipality published: the "-" month of AMB-C2-03, out of the
+         * mean, not a missing result.
+         */
+        private Optional<String> unpublished(YearMonth month) {
+            long published = read.stream().filter(m -> m.month().equals(month)).count();
+            if (published == 1 || (published == 0 && cohortOnly() && municipalMonths.contains(month))) {
+                return Optional.empty();
+            }
+            return Optional.of(COMPETENCIA
+                    + month
+                    + (published == 0
+                            ? " sem resultado mensal publicado"
+                            : " com mais de um resultado mensal publicado"));
+        }
+
         /** The exact mean of the months that enter it, its band and its factor. */
         private Assessment bandOfMean(List<Monthly> used) {
             Optional<Monthly> noDenominator = used.stream()
@@ -196,13 +235,13 @@ public final class Nt08Consolidation implements ComponentIIIConsolidation {
                 return unavailable(
                         IndicatorStatus.RULE_AMBIGUITY,
                         COMPETENCIA + noDenominator.get().month() + " entra na média sem denominador"
-                                + " (AMB-CIII-07 em C1 e C4–C7; contradição do pacote em C2/C3); a NT 8/2026 não"
-                                + " diz se sai da média — nunca zero");
+                                + " (AMB-CIII-07 em C1 e C4–C7; contradição do pacote em C2/C3); só o mês sem"
+                                + " denominador e não elegível sai da média — nunca zero");
             }
             if (used.isEmpty()) {
                 return unavailable(
                         IndicatorStatus.NO_DENOMINATOR,
-                        "AMB-CIII-06: nenhum mês com evento de coorte no quadrimestre; a Nota Final fica"
+                        "AMB-CIII-06: nenhum mês com resultado a entrar na média no quadrimestre; a Nota Final fica"
                                 + " indisponível");
             }
             ExactRatio mean = ExactRatio.meanOfExactRatios(
