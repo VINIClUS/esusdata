@@ -30,6 +30,8 @@ class SensitivityExtractsTest {
     private static final YearMonth JUNE = YearMonth.of(2026, 6);
     private static final String INE = "0000346268";
     private static final LocalDate LINK = LocalDate.of(2025, 9, 1);
+    private static final YearMonth MARCH = YearMonth.of(2026, 3);
+    private static final String ENCOUNTERS_INE = "0000346268";
 
     @TempDir
     Path extracts;
@@ -63,9 +65,6 @@ class SensitivityExtractsTest {
                 .as("another competência is a different read plan")
                 .isEmpty();
     }
-
-    private static final YearMonth MARCH = YearMonth.of(2026, 3);
-    private static final String ENCOUNTERS_INE = "0000346268";
 
     private static PackInput c1(List<PackInput> inputs) {
         return inputs.stream()

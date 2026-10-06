@@ -107,7 +107,7 @@ class NotaFinalLocalClassesTest {
     @Test
     void aTeamWithOneUnavailableIndicatorHasNoNotaFinalButIsSeen() {
         Map<String, Map<YearMonth, List<TeamResult>>> byPack = everyPack((rule, month) -> {
-            boolean blocked = rule.descriptor().id().equals(C4Pack.ID)
+            boolean blocked = C4Pack.ID.equals(rule.descriptor().id())
                     && month.equals(Q2.months().get(1));
             return List.of(
                     computed(rule, A, Classification.OTIMO),
@@ -125,7 +125,7 @@ class NotaFinalLocalClassesTest {
         // C2 only counts the months with a cohort event: a team without a row in a month the municipality
         // published (team A has it) is out of the mean, not a missing result, as in the product
         Map<String, Map<YearMonth, List<TeamResult>>> byPack = everyPack((rule, month) -> {
-            boolean dash = rule.descriptor().id().equals(C2Pack.ID)
+            boolean dash = C2Pack.ID.equals(rule.descriptor().id())
                     && month.equals(Q2.months().get(2));
             return dash
                     ? List.of(computed(rule, A, Classification.OTIMO))
@@ -140,7 +140,7 @@ class NotaFinalLocalClassesTest {
     @Test
     void aTeamAbsentFromAMonthOfAnotherPackHasNoNotaFinal() {
         Map<String, Map<YearMonth, List<TeamResult>>> byPack = everyPack((rule, month) -> {
-            boolean gone = rule.descriptor().id().equals(C4Pack.ID)
+            boolean gone = C4Pack.ID.equals(rule.descriptor().id())
                     && month.equals(Q2.months().get(2));
             return gone
                     ? List.of(computed(rule, A, Classification.OTIMO))

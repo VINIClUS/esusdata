@@ -88,42 +88,58 @@ public final class SensitivityExtracts {
                     ? competencia
                     : YearMonth.from(
                             LocalDate.parse(manifest.periodEndExclusive()).minusDays(1));
-            ReadPlan plan = ReadPlan.of(rule, month, catalog);
-            if (!accepts(plan, rule, manifest, month)) {
-                continue;
+            Optional<PackInput> input =
+                    inputOf(rule, ReadPlan.of(rule, month, catalog), manifest, manifests, store, month);
+            if (input.isPresent()) {
+                return input;
             }
-            // ADR 0033: a plan that reads a supplement (C1's team) is accepted only with the extract
-            // of the pair, as RunExecutor.runFromExtract reads it; without it the run fails
-            ExtractionManifest supplement = null;
-            if (plan.hasSupplement()) {
-                supplement = acceptedSupplement(plan, manifest, manifests);
-                if (supplement == null) {
-                    continue;
-                }
-            }
-            CanonicalDataset data =
-                    supplement == null ? plan.read(store, manifest) : plan.read(store, manifest, supplement);
-            return Optional.of(
-                    new PackInput(rule, data, EvaluationContext.endOfMonth(manifest.municipalityIbge(), month)));
         }
         return Optional.empty();
+    }
+
+    /** The pack's input from one manifest, if the plan accepts it (with its supplement, when it reads one). */
+    private static Optional<PackInput> inputOf(
+            IndicatorRule rule,
+            ReadPlan plan,
+            ExtractionManifest manifest,
+            List<ExtractionManifest> manifests,
+            FileExtractStore store,
+            YearMonth month)
+            throws IOException {
+        if (!accepts(plan, rule, manifest, month)) {
+            return Optional.empty();
+        }
+        // ADR 0033: a plan that reads a supplement (C1's team) is accepted only with the extract
+        // of the pair, as RunExecutor.runFromExtract reads it; without it the run fails
+        ExtractionManifest supplement = null;
+        if (plan.hasSupplement()) {
+            supplement = acceptedSupplement(plan, manifest, manifests);
+            if (supplement == null) {
+                return Optional.empty();
+            }
+        }
+        CanonicalDataset data =
+                supplement == null ? plan.read(store, manifest) : plan.read(store, manifest, supplement);
+        return Optional.of(new PackInput(rule, data, EvaluationContext.endOfMonth(manifest.municipalityIbge(), month)));
     }
 
     /** The supplementary extract the plan accepts for {@code manifest}, or {@code null}. */
     private static ExtractionManifest acceptedSupplement(
             ReadPlan plan, ExtractionManifest manifest, List<ExtractionManifest> manifests) {
         String id = ReadPlan.supplementExtractionId(manifest.extractionId());
-        for (ExtractionManifest candidate : manifests) {
-            if (candidate.extractionId().equals(id)) {
-                try {
-                    plan.requireSupplementCovers(manifest, candidate);
-                    return candidate;
-                } catch (IllegalStateException notThePlans) {
-                    return null;
-                }
-            }
+        ExtractionManifest candidate = manifests.stream()
+                .filter(listed -> listed.extractionId().equals(id))
+                .findFirst()
+                .orElse(null);
+        if (candidate == null) {
+            return null;
         }
-        return null;
+        try {
+            plan.requireSupplementCovers(manifest, candidate);
+            return candidate;
+        } catch (IllegalStateException notThePlans) {
+            return null;
+        }
     }
 
     private static boolean accepts(ReadPlan plan, IndicatorRule rule, ExtractionManifest manifest, YearMonth month) {

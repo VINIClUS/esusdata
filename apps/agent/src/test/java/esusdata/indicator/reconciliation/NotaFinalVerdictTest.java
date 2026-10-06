@@ -256,7 +256,7 @@ class NotaFinalVerdictTest {
         JsonNode after = MAPPER.readTree(Files.readString(file)).path("packs");
         assertThat(after.size()).isEqualTo(before.size());
         for (int i = 0; i < before.size(); i++) {
-            if (!before.get(i).path("pack").asString().equals(ComponentIII.ID)) {
+            if (!ComponentIII.ID.equals(before.get(i).path("pack").asString())) {
                 assertThat(after.get(i)).isEqualTo(before.get(i));
             }
         }

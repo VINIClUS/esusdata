@@ -66,7 +66,8 @@ public record LocalClasses(Map<String, Classification> byIne, Set<String> seen) 
 
     /**
      * Classifies every team of {@code monthly}. A team absent from a month has no published result
-     * for it, so it gets no class, exactly as in the product.
+     * for it and so gets no class, unless the pack only counts the months with a cohort event (C2,
+     * C3) and the municipality published that month: then it is the "-" month, as in the product.
      *
      * @throws IllegalArgumentException when a month of the quadrimestre is missing altogether
      */
