@@ -172,7 +172,7 @@ class CapabilityEligibilityTest {
 
         assertThat(readers)
                 .extracting(PackDescriptor::code)
-                .containsExactlyInAnyOrder("C2", "C3", "C4", "C5", "C6", "C7");
+                .containsExactlyInAnyOrder("C1", "C2", "C3", "C4", "C5", "C6", "C7");
         for (PackDescriptor pack : readers) {
             assertThat(eligibility.missing(pack.requiredCapabilities(), PEC_5_5_28))
                     .as(pack.id())

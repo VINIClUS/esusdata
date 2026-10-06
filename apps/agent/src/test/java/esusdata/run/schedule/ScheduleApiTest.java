@@ -169,12 +169,13 @@ class ScheduleApiTest extends ApiFixtureSupport {
                 .body();
 
         assertThat(body)
-                .contains("{\"referencePeriod\":\"2026-03\",\"count\":10,\"published\":true,"
+                // no pack is computable on this PEC 5.4.37 source (C1 needs the team type), so nothing is complete
+                .contains("{\"referencePeriod\":\"2026-03\",\"count\":10,\"published\":false,"
                         + "\"publishedPacks\":[\"c1-mais-acesso\"]}")
                 .contains("{\"referencePeriod\":\"2026-02\",\"count\":20,\"published\":false,"
                         + "\"publishedPacks\":[\"c2-desenvolvimento-infantil\"]}")
-                .contains("{\"indicatorPack\":\"c1-mais-acesso\",\"ruleVersion\":\"c1-mais-acesso@0.4.0\","
-                        + "\"availability\":\"AVAILABLE\",\"missingCapabilities\":[]}")
+                .contains("{\"indicatorPack\":\"c1-mais-acesso\",\"ruleVersion\":\"c1-mais-acesso@0.5.0\","
+                        + "\"availability\":\"UNSUPPORTED_SOURCE\",\"missingCapabilities\":[\"team\"]}")
                 .contains("{\"indicatorPack\":\"c2-desenvolvimento-infantil\","
                         + "\"ruleVersion\":\"c2-desenvolvimento-infantil@0.3.0\",\"availability\":\"UNSUPPORTED_SOURCE\","
                         + "\"missingCapabilities\":[\"citizen\",\"individual_registration\",\"care_encounter\"")
@@ -191,7 +192,7 @@ class ScheduleApiTest extends ApiFixtureSupport {
                 "PROGRAMADOS_MAIS_ESPONTANEOS",
                 null,
                 period,
-                "c1-mais-acesso@0.4.0",
+                "c1-mais-acesso@0.5.0",
                 YearMonth.parse(period).atEndOfMonth().toString(),
                 municipality,
                 List.of(),

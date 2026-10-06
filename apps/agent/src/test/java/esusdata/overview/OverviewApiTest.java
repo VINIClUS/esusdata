@@ -75,7 +75,7 @@ class OverviewApiTest extends ApiFixtureSupport {
         String ibge = "3500303";
         String manager = manager(ibge);
         String sourceId = "src-" + System.nanoTime();
-        registerSource(sourceId, ibge);
+        registerSource(sourceId, ibge, "5.5.28"); // C1 needs the team type, validated on 5.5.28
         YearMonth current = YearMonth.now(clock);
         String older = current.minusMonths(3).toString();
         String old = current.minusMonths(2).toString();
@@ -94,14 +94,20 @@ class OverviewApiTest extends ApiFixtureSupport {
 
         String body = overview(manager, ibge, null).body();
 
-        // The current month is not settled, so it is not pending.
+        // The current month is not settled, so it is not pending. On a PEC 5.5.28 source C1 reads only
+        // atendimentos (and the team type), so its competências are the covered ones; the other packs
+        // read more and are due from the oldest covered month on.
+        String allPacks = "[\"c1-mais-acesso\",\"c2-desenvolvimento-infantil\",\"c3-gestacao-puerperio\","
+                + "\"c4-cuidado-diabetes\",\"c5-cuidado-hipertensao\",\"c6-cuidado-pessoa-idosa\","
+                + "\"c7-prevencao-cancer\"]";
         assertThat(body)
-                .contains("\"pendingPeriods\":[{\"sourceId\":\"" + sourceId + "\",\"referencePeriod\":\"" + older
-                        + "\",\"count\":800,\"indicatorPacks\":[\"c1-mais-acesso\"]},{\"sourceId\":\"" + sourceId
-                        + "\",\"referencePeriod\":\"" + old
-                        + "\",\"count\":900,\"indicatorPacks\":[\"c1-mais-acesso\"]}]")
+                .contains("{\"sourceId\":\"" + sourceId + "\",\"referencePeriod\":\"" + older
+                        + "\",\"count\":800,\"indicatorPacks\":" + allPacks + "}")
+                .contains("{\"sourceId\":\"" + sourceId + "\",\"referencePeriod\":\"" + old
+                        + "\",\"count\":900,\"indicatorPacks\":" + allPacks + "}")
+                .doesNotContain("\"referencePeriod\":\"" + current + "\",\"count\":5,")
                 .contains("\"code\":\"PENDING_PERIODS\",\"severity\":\"INFO\",\"subject\":null,\"referencePeriod\":\""
-                        + older + "\",\"sourceId\":\"" + sourceId + "\",\"detail\":\"2\"")
+                        + "2024-10\",\"sourceId\":\"" + sourceId + "\"")
                 .contains("{\"code\":\"PEC_COVERAGE\",\"sourceId\":\"" + sourceId + "\",\"status\":\"OK\"");
     }
 
@@ -116,7 +122,7 @@ class OverviewApiTest extends ApiFixtureSupport {
         String manager = manager(ibge);
 
         assertThat(overview(manager, ibge, null).body())
-                .contains("{\"indicatorPack\":\"c1-mais-acesso\",\"ruleVersion\":\"c1-mais-acesso@0.4.0\","
+                .contains("{\"indicatorPack\":\"c1-mais-acesso\",\"ruleVersion\":\"c1-mais-acesso@0.5.0\","
                         + "\"family\":\"QUALIDADE_ESF_EAP\",\"unit\":\"percentual\",\"code\":\"C1\","
                         + "\"title\":\"Mais acesso\",\"valueKind\":\"PERCENTAGE\",\"runnable\":true,"
                         + "\"availability\":\"NO_SOURCE\",\"missingCapabilities\":[]");
@@ -125,8 +131,9 @@ class OverviewApiTest extends ApiFixtureSupport {
         String body = overview(manager, ibge, null).body();
 
         assertThat(body)
+                // C1 reads the team type (ADR 0033), validated for PEC 5.5.28 only; this source is 5.4.37
                 .contains("\"code\":\"C1\",\"title\":\"Mais acesso\",\"valueKind\":\"PERCENTAGE\",\"runnable\":true,"
-                        + "\"availability\":\"AVAILABLE\",\"missingCapabilities\":[]")
+                        + "\"availability\":\"UNSUPPORTED_SOURCE\",\"missingCapabilities\":[\"team\"]")
                 .contains("\"code\":\"C2\",\"title\":\"Cuidado no desenvolvimento infantil\",\"valueKind\":\"SCORE\","
                         + "\"runnable\":true,\"availability\":\"UNSUPPORTED_SOURCE\",\"missingCapabilities\":"
                         + "[\"citizen\",\"individual_registration\",\"care_encounter\"")
@@ -182,7 +189,7 @@ class OverviewApiTest extends ApiFixtureSupport {
                 "PROGRAMADOS_MAIS_ESPONTANEOS",
                 Classification.BOM,
                 period,
-                "c1-mais-acesso@0.4.0",
+                "c1-mais-acesso@0.5.0",
                 YearMonth.parse(period).atEndOfMonth().toString(),
                 ibge,
                 List.of(),

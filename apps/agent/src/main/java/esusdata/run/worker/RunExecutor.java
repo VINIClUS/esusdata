@@ -57,11 +57,11 @@ import java.util.UUID;
  * job names (ADR 0030): {@link RuleLookup} — {@link IndicatorRuleRegistry#require} in production —
  * turns an unknown pack or rule version into {@code INVALID_REQUEST} before any I/O.
  *
- * <p>C1 is unchanged: the same v1 command and read budget, the same encounters, the same
- * per-encounter evidence and the same input fingerprint; its result also carries the per-team
- * breakdown {@code C1Pack} computes. Its release gates have not all passed (Portões A and D wait
- * for their automated checks, B for the standing limitations), so every C1 result is
- * {@code status=BLOCKED} with exact counts, never a fabricated value.
+ * <p>C1 keeps its v1 command, read budget, encounters and per-encounter evidence. It also reads the
+ * team states as a supplementary canonical v2 extract of the same run ({@link ReadPlan}, ADR 0033),
+ * first, and its input fingerprint names both extracts; its result carries the per-team breakdown
+ * {@code C1Pack} computes. Its Portão D has not passed, so every C1 result is {@code status=BLOCKED}
+ * with exact counts, never a fabricated value.
  *
  * <p>The release gates (ADR 0032) are applied here and nowhere else, to every pack and to the
  * legacy C1 path alike: the rules return ungated outcomes, this class reads A and D from the
@@ -243,14 +243,23 @@ public final class RunExecutor {
 
         ExtractionManifest manifest = extractStore.readManifest(context.extractionId());
         plan.requireCovers(manifest, context);
-        CanonicalDataset data = plan.read(extractStore, manifest);
+        ExtractionManifest supplement = plan.hasSupplement()
+                ? extractStore.readManifest(ReadPlan.supplementExtractionId(manifest.extractionId()))
+                : null;
+        CanonicalDataset data = read(plan, manifest, supplement);
         cancellation.checkCancelled();
 
         PecSourceIdentity identity = sourceRepository
                 .findById(manifest.sourceId())
                 .flatMap(RunExecutor::identityOf)
                 .orElse(null);
-        return computeStageAndPublish(context, rule, plan, manifest, data, identity, cancellation);
+        return computeStageAndPublish(context, rule, plan, manifest, supplement, data, identity, cancellation);
+    }
+
+    /** The extract of the run: with its supplementary extract when the plan reads one (ADR 0033). */
+    private CanonicalDataset read(ReadPlan plan, ExtractionManifest manifest, ExtractionManifest supplement)
+            throws IOException {
+        return supplement == null ? plan.read(extractStore, manifest) : plan.read(extractStore, manifest, supplement);
     }
 
     /**
@@ -282,6 +291,15 @@ public final class RunExecutor {
                     CapabilityEligibility.identityOf(
                                     source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole())
                             .orElse(null));
+        } else if (plan.hasSupplement()) {
+            // ADR 0033: the supplementary capability is checked as a v2 pack's are — before the
+            // guard and before any child; the v1 capability keeps the probe it has always had
+            eligibility.require(
+                    rule.descriptor().id(),
+                    plan.supplementCapabilities(),
+                    CapabilityEligibility.identityOf(
+                                    source.id(), source.pecVersion(), source.readModel(), source.pecInstallationRole())
+                            .orElse(null));
         }
         acquisitionGuard.requireUnblocked(context.sourceId());
 
@@ -298,7 +316,7 @@ public final class RunExecutor {
         String extractionId = "live-" + context.jobId() + "-g" + context.executionGeneration();
         AcquisitionCommand command = plan.command(properties, sourceIdentity, extractionId, SOURCE_ZONE_ID);
 
-        ExtractionManifest manifest = acquisitionPort.acquire(command, cancellation, new AcquisitionListener() {
+        AcquisitionListener listener = new AcquisitionListener() {
             @Override
             public void onProgress() {
                 jobRepository.markProgress(
@@ -312,15 +330,25 @@ public final class RunExecutor {
                 // than only guarding against a process restart (ENG-51).
                 acquisitionGuard.block(context.sourceId(), clock.instant().plus(liveAcquisitionCooldownMargin), reason);
             }
-        });
+        };
+        // The small transactional read first: it fails fast, before the large DW read (ADR 0033).
+        ExtractionManifest supplement = null;
+        if (plan.hasSupplement()) {
+            supplement = acquisitionPort.acquire(
+                    plan.supplementCommand(properties, sourceIdentity, extractionId, SOURCE_ZONE_ID),
+                    cancellation,
+                    listener);
+            cancellation.checkCancelled();
+        }
+        ExtractionManifest manifest = acquisitionPort.acquire(command, cancellation, listener);
         cancellation.checkCancelled();
 
         if (plan.isCanonicalV2()) {
             plan.requireCovers(manifest, context);
         }
-        CanonicalDataset data = plan.read(extractStore, manifest);
+        CanonicalDataset data = read(plan, manifest, supplement);
         PecSourceIdentity identity = identityOf(source).orElse(null);
-        return computeStageAndPublish(context, rule, plan, manifest, data, identity, cancellation);
+        return computeStageAndPublish(context, rule, plan, manifest, supplement, data, identity, cancellation);
     }
 
     private RunOutcome computeStageAndPublish(
@@ -328,6 +356,7 @@ public final class RunExecutor {
             IndicatorRule rule,
             ReadPlan plan,
             ExtractionManifest manifest,
+            ExtractionManifest supplement,
             CanonicalDataset data,
             PecSourceIdentity identity,
             CancellationSignal cancellation) {
@@ -341,7 +370,7 @@ public final class RunExecutor {
         cancellation.checkCancelled();
 
         String stagingId = "stg-" + UUID.randomUUID();
-        String inputFingerprint = computeInputFingerprint(manifest, descriptor.id(), result, plan);
+        String inputFingerprint = computeInputFingerprint(manifest, supplement, descriptor.id(), result, plan);
 
         stagingArea.open(new StagingRequest(
                 stagingId,
@@ -434,7 +463,11 @@ public final class RunExecutor {
     }
 
     private static String computeInputFingerprint(
-            ExtractionManifest manifest, String indicatorPack, IndicatorResult result, ReadPlan plan) {
+            ExtractionManifest manifest,
+            ExtractionManifest supplement,
+            String indicatorPack,
+            IndicatorResult result,
+            ReadPlan plan) {
         SortedMap<String, String> fields = new TreeMap<>();
         fields.put("source_id", manifest.sourceId());
         fields.put("municipality_ibge", manifest.municipalityIbge());
@@ -450,9 +483,14 @@ public final class RunExecutor {
         fields.put("calculation_policy_version", result.calculationPolicyVersion());
         fields.put("adapter_version", manifest.adapterVersion());
         if (plan.isCanonicalV2()) {
-            // C1's fingerprint stays byte-identical: only v2 runs name their schema and parts.
             fields.put("canonical_schema_version", manifest.canonicalSchemaVersion());
             fields.put("parts", partsFingerprint(manifest.parts()));
+        }
+        if (supplement != null) {
+            // ADR 0033: the input is both extracts, so the fingerprint names the second and every part read
+            fields.put("supplement_extraction_id", supplement.extractionId());
+            fields.put("supplement_extraction_checksum", supplement.checksum());
+            fields.put("supplement_parts", partsFingerprint(supplement.parts()));
         }
         return InputFingerprint.compute(fields);
     }

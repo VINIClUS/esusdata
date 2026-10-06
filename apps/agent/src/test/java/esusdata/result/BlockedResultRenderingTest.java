@@ -64,7 +64,7 @@ class BlockedResultRenderingTest extends ApiFixtureSupport {
         // Never a disguised 0% — "value":null above is the honest state; a JSON number 0 here
         // would be exactly the silent-zero failure §4.4 L1802 forbids.
         assertThat(body).doesNotContain("\"value\":0");
-        assertThat(body).contains("Portão B");
+        assertThat(body).contains("Portão D");
     }
 
     private static CanonicalEncounter encounter(int seq, CanonicalModality modality) {

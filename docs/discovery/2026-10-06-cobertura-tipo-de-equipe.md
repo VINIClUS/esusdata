@@ -64,7 +64,6 @@ Os 26 INEs vinculados se dividem em 12 eSF, `<10` eAP (o complemento de 26 dá 2
 - **Limite declarado:** a cobertura é de uma competência (2026-08). Cada execução divulga a contagem
   por motivo (`C*-LIM-xx/contagem`): se uma competência futura trouxer INE sem tipo ou com conflito, as
   pessoas saem com motivo e contagem, e a lacuna reabre como fato de execução, não de regra.
-- **C1 não fecha.** C1 ainda lê o extrato canônico v1 (`individual_encounter_modality`), que não traz a
-  capacidade `team`. A regra de INE do C1 (C1-D2) está implementada e só atua quando o extrato traz a
-  parte `team`; em produção ela não atua, e C1-LIM-03 continua `BLOCKING_GAP`. Fechar exige um contrato
-  v2 de C1 (fatia à parte).
+- **C1 fecha em `c1-mais-acesso@0.5.0`.** C1 lê o tipo de equipe num extrato suplementar `team`, da mesma
+  execução, sem contrato v2 nem Rust novos (ADR 0033); C1-LIM-03 fecha e vale C1-LIM-10. (Nota da primeira
+  versão deste documento: «C1 não fecha», porque então C1 só lia o extrato v1.)

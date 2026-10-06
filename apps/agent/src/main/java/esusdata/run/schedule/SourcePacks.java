@@ -1,6 +1,7 @@
 package esusdata.run.schedule;
 
 import esusdata.indicator.IndicatorRuleRegistry;
+import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.pack.c1.C1Pack;
 import esusdata.source.model.SourceRecord;
@@ -60,13 +61,14 @@ public final class SourcePacks {
 
     /**
      * The packs of {@code rules} that read only atendimentos individuais, the data the coverage
-     * counts (ADR 0028): their competências are the covered ones. Every other pack is due in any
+     * counts (ADR 0028), and the team type, which has no period of its own (ADR 0033): their
+     * competências are the covered ones. Every other pack is due in any
      * month from the oldest covered one on ({@link SchedulePlanner}).
      */
     public static Set<String> attendanceScoped(Collection<IndicatorRule> rules) {
         return rules.stream()
-                .filter(rule ->
-                        List.of(C1Pack.CAPABILITY).containsAll(rule.descriptor().requiredCapabilities()))
+                .filter(rule -> List.of(C1Pack.CAPABILITY, Capabilities.TEAM)
+                        .containsAll(rule.descriptor().requiredCapabilities()))
                 .map(rule -> rule.descriptor().id())
                 .collect(Collectors.toUnmodifiableSet());
     }

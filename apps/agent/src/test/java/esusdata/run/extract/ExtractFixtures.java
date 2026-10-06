@@ -2,8 +2,11 @@ package esusdata.run.extract;
 
 import esusdata.indicator.model.CanonicalEncounter;
 import esusdata.indicator.model.CanonicalModality;
+import esusdata.indicator.model.CanonicalTeam;
 import esusdata.indicator.model.SourceRef;
+import esusdata.indicator.pack.c1.C1Pack;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.YearMonth;
@@ -18,6 +21,8 @@ public final class ExtractFixtures {
 
     public static final String QUERY_CHECKSUM = "sha256:" + "1".repeat(64);
     public static final String ADAPTER_VERSION = "test-adapter@1";
+    private static final String CNES = "2750325";
+    private static final String INE = "0000346268";
 
     private ExtractFixtures() {}
 
@@ -48,14 +53,69 @@ public final class ExtractFixtures {
             for (int i = 0; i < unmapped; i++) {
                 writer.write(encounter(sourceId, municipalityIbge, month, seq++, CanonicalModality.UNMAPPED));
             }
-            return writer.finalizeExtract(
+            ExtractionManifest manifest = writer.finalizeExtract(
                     Instant.parse("2026-09-19T12:00:00Z"),
                     "America/Sao_Paulo",
                     QUERY_CHECKSUM,
                     ADAPTER_VERSION,
                     "COMPLETE",
                     "SNAPSHOT");
+            writeTeams(baseDir, extractionId, sourceId, municipalityIbge, month);
+            return manifest;
         }
+    }
+
+    /**
+     * The supplementary extract C1 reads beside its v1 one (ADR 0033), unless a run already wrote it:
+     * the team of the encounters' INE, of type 70, so the INE filter keeps every fixture encounter
+     * and the golden counts stand.
+     */
+    private static void writeTeams(
+            Path baseDir, String extractionId, String sourceId, String municipalityIbge, YearMonth month)
+            throws IOException {
+        String teamId = extractionId + "-team";
+        if (!Files.exists(baseDir.resolve(teamId + ".manifest.json"))) {
+            writeTeams(baseDir, teamId, sourceId, municipalityIbge, month, INE);
+        }
+    }
+
+    /** A supplementary team extract of {@code teamExtractionId}: each INE a team of type 70 since 2024. */
+    public static ExtractionManifest writeTeams(
+            Path baseDir,
+            String teamExtractionId,
+            String sourceId,
+            String municipalityIbge,
+            YearMonth month,
+            String... ines)
+            throws IOException {
+        return writeTeamsOfType(baseDir, teamExtractionId, sourceId, municipalityIbge, month, "70", ines);
+    }
+
+    /** As above, every INE a team of {@code teamTypeCode}. */
+    public static ExtractionManifest writeTeamsOfType(
+            Path baseDir,
+            String teamExtractionId,
+            String sourceId,
+            String municipalityIbge,
+            YearMonth month,
+            String teamTypeCode,
+            String... ines)
+            throws IOException {
+        ExtractFixturesV2.Builder builder =
+                ExtractFixturesV2.forSupplement(new C1Pack(), month).municipality(municipalityIbge);
+        for (String ine : ines) {
+            builder.add(new CanonicalTeam(
+                    new SourceRef(sourceId, "tb_equipe", "team-" + ine),
+                    municipalityIbge,
+                    ine,
+                    CNES,
+                    teamTypeCode,
+                    "2026-09-19T12:00:00Z",
+                    "2024-01-01",
+                    null,
+                    CanonicalTeam.AUDIT));
+        }
+        return builder.write(baseDir, teamExtractionId, sourceId);
     }
 
     private static CanonicalEncounter encounter(
@@ -67,8 +127,8 @@ public final class ExtractFixtures {
                 municipalityIbge,
                 careDate,
                 modality,
-                "2750325",
-                "0000346268",
+                CNES,
+                INE,
                 "225142");
     }
 }

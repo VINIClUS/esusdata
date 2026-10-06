@@ -45,9 +45,10 @@ class LimitationKindsTest {
     }
 
     @Test
-    void onlyC1KeepsABlockingGapAfterTheTeamTypeWasWired() {
-        // C2-C7 read the team type (L1 closed); C1 still reads the v1 extract that carries no team part
+    void noPackKeepsABlockingGapAfterTheTeamTypeWasWired() {
+        // C2-C7 read the team type in their v2 extract and C1 in a supplementary one (ADR 0033): L1 is closed
         for (String id : List.of(
+                "c1-mais-acesso",
                 "c2-desenvolvimento-infantil",
                 "c3-gestacao-puerperio",
                 "c4-cuidado-diabetes",
@@ -56,9 +57,6 @@ class LimitationKindsTest {
                 "c7-prevencao-cancer")) {
             assertThat(pack(id).blockingLimitations()).as(id).isEmpty();
         }
-        assertThat(pack("c1-mais-acesso").blockingLimitations())
-                .extracting(Limitation::code)
-                .containsExactly("C1-LIM-03");
     }
 
     @Test

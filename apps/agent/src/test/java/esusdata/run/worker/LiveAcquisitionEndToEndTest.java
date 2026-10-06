@@ -3,7 +3,12 @@ package esusdata.run.worker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import esusdata.indicator.model.Capabilities;
+import esusdata.indicator.pack.c1.C1Pack;
 import esusdata.indicator.pack.c1.C1Rule;
+import esusdata.run.acquisition.Acquisition;
+import esusdata.run.acquisition.InProcessAcquisition;
+import esusdata.run.extract.ExtractFixtures;
 import esusdata.run.job.CancellationToken;
 import esusdata.run.job.EnqueueRequest;
 import esusdata.run.job.Job;
@@ -13,9 +18,12 @@ import esusdata.run.job.SourceAcquisitionBlockedException;
 import esusdata.source.model.SourceRecord;
 import esusdata.source.pec.AllowedDestinations;
 import esusdata.source.pec.CompatibilityCatalog;
+import esusdata.source.pec.CompatibilityMatrices;
 import esusdata.source.pec.PecCompatibilityMatrix;
 import esusdata.source.pec.PecDataSourceFactory;
 import esusdata.source.pec.PecSourceIdentity;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,6 +33,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
@@ -72,6 +81,7 @@ class LiveAcquisitionEndToEndTest {
     Path dataDir;
 
     private JobRunnerTestFixture fixture;
+    private RunExecutor executor;
     private Clock clock;
 
     private static boolean fixtureLoaded;
@@ -133,6 +143,33 @@ class LiveAcquisitionEndToEndTest {
                 "PEC_DW",
                 Instant.EPOCH.toString()));
         fixture.registerPrincipal("test-principal", "1100015");
+
+        // C1 reads the teams first, in an extract of their own (ADR 0033). The JDBC test-only
+        // acquisition reads only C1's v1 capability, so the team read is a synthetic extract of the
+        // fixture's one INE, of type 70 — and it honors cancellation as a real acquisition does.
+        InProcessAcquisition jdbc = new InProcessAcquisition(factory, fixture.extractsDir, clock, fixtureCatalog);
+        Acquisition both = (command, cancellation, listener) -> {
+            if (!command.isCanonicalV2()) {
+                return jdbc.acquire(command, cancellation, listener);
+            }
+            try {
+                cancellation.checkCancelled();
+                return ExtractFixtures.writeTeams(
+                        fixture.extractsDir,
+                        command.extractionId(),
+                        "fixture-a",
+                        "1100015",
+                        YearMonth.of(2026, 3),
+                        "0000000001");
+            } catch (JobCancelledException cancelled) {
+                listener.onUncertainOutcome("team read cancelled");
+                throw cancelled;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
+        executor = fixture.executor(
+                CompatibilityMatrices.validated(List.of("5.4.37"), List.of(Capabilities.TEAM)), both, new C1Pack());
     }
 
     @AfterEach
@@ -188,7 +225,7 @@ class LiveAcquisitionEndToEndTest {
     void acquiresFromPostgresAndPublishesABlockedResultWithExactCounts() throws Exception {
         var context = liveContext("job-live-ok", "1100015");
 
-        var outcome = fixture.executor.runLive(context, new CancellationToken());
+        var outcome = executor.runLive(context, new CancellationToken());
 
         // Municipality A in the fixture: 3 programados, 2 espontaneos (see
         // IndividualEncounterModalityCapabilityIsolationTest) -> numerator 3, denominator 5.
@@ -210,8 +247,7 @@ class LiveAcquisitionEndToEndTest {
         CancellationToken cancellation = new CancellationToken();
         cancellation.requestCancel(); // pre-set: the first per-row poll inside stream() throws.
 
-        assertThatThrownBy(() -> fixture.executor.runLive(context, cancellation))
-                .isInstanceOf(JobCancelledException.class);
+        assertThatThrownBy(() -> executor.runLive(context, cancellation)).isInstanceOf(JobCancelledException.class);
 
         assertThat(fixture.jdbc.queryForObject("select count(*) from results", Integer.class))
                 .isZero();
@@ -236,14 +272,13 @@ class LiveAcquisitionEndToEndTest {
         CancellationToken cancellation = new CancellationToken();
         cancellation.requestCancel();
 
-        assertThatThrownBy(() -> fixture.executor.runLive(context, cancellation))
-                .isInstanceOf(JobCancelledException.class);
+        assertThatThrownBy(() -> executor.runLive(context, cancellation)).isInstanceOf(JobCancelledException.class);
         // runLive is called directly here, so nothing plays JobWorker's part of finalizing the
         // cancelled job; while it stays RUNNING, V7 (ADR 0026) refuses the retry's enqueue.
         fixture.jdbc.update("update jobs set state = 'CANCELLED' where job_id = ?", "job-live-cancel-guard");
 
         var retryContext = liveContext("job-live-cancel-guard-retry", "1100015");
-        assertThatThrownBy(() -> fixture.executor.runLive(retryContext, new CancellationToken()))
+        assertThatThrownBy(() -> executor.runLive(retryContext, new CancellationToken()))
                 .isInstanceOf(SourceAcquisitionBlockedException.class);
     }
 }
