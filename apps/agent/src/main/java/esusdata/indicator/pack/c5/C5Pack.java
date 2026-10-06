@@ -19,6 +19,7 @@ import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.PartRequirement;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamResult;
+import esusdata.indicator.model.TeamScope;
 import esusdata.indicator.model.ValueKind;
 import esusdata.indicator.pack.PackSupport;
 import java.time.LocalDate;
@@ -47,7 +48,7 @@ public final class C5Pack implements IndicatorRule {
     private static final String TWELVE_MONTHS = "12 meses";
 
     public static final String ID = "c5-cuidado-hipertensao";
-    public static final String RULE_VERSION = ID + "@0.2.0";
+    public static final String RULE_VERSION = ID + "@0.3.0";
 
     /**
      * C5 has no age criterion and counts its windows in civil months ({@link
@@ -68,10 +69,6 @@ public final class C5Pack implements IndicatorRule {
                     "C5-LIM-03",
                     "O vínculo é reconstruído pela versão do cadastro individual vigente no corte (24 meses "
                             + "lidos); a regra nacional é apurada no SIAPS."),
-            Limitation.blockingGap(
-                    "C5-LIM-04",
-                    "Sem tipo de equipe comprovado, a validação eSF 70 / eAP 76 e o crédito de D para eAP não "
-                            + "são aplicados."),
             Limitation.convention(
                     "C5-LIM-05",
                     "Cadastro individual lido nos 24 meses até a competência; pessoa cuja última versão é "
@@ -142,7 +139,15 @@ public final class C5Pack implements IndicatorRule {
             Limitation.convention(
                     "C5-LIM-23",
                     "O desfecho da visita domiciliar não é filtrado; vale o motivo da visita preenchido por "
-                            + "ACS/TACS."));
+                            + "ACS/TACS."),
+            Limitation.convention(
+                    "C5-LIM-24",
+                    "D creditada integralmente (25 pontos) para as pessoas de equipes eAP 76, conforme o item 24 b; "
+                            + "a contagem creditada e a observada de cada resultado estão nas limitações dele."),
+            Limitation.convention(
+                    "C5-LIM-25",
+                    "Só equipes de tipo 70 ou 76 vigente no fim da competência entram; equipes de outro tipo, "
+                            + "conflitantes ou sem tipo ficam fora, com motivo e contagem."));
 
     private static final PackDescriptor DESCRIPTOR = new PackDescriptor(
             ID,
@@ -154,7 +159,7 @@ public final class C5Pack implements IndicatorRule {
             ValueKind.SCORE,
             "percentual",
             "PESSOAS_COM_HIPERTENSAO_VINCULADAS",
-            "c5-exact-score@1",
+            "c5-exact-score@2",
             List.of(
                     Capabilities.CITIZEN,
                     Capabilities.INDIVIDUAL_REGISTRATION,
@@ -162,7 +167,8 @@ public final class C5Pack implements IndicatorRule {
                     Capabilities.PROCEDURE_PERFORMED,
                     Capabilities.HOME_VISIT,
                     Capabilities.MEASUREMENT_RECORD,
-                    Capabilities.CONDITION_LIST),
+                    Capabilities.CONDITION_LIST,
+                    Capabilities.TEAM),
             List.of(
                     ComponentSpec.practice(
                             "A",
@@ -212,6 +218,7 @@ public final class C5Pack implements IndicatorRule {
         parts.add(part(Capabilities.HOME_VISIT, year, births));
         parts.add(part(Capabilities.MEASUREMENT_RECORD, year, births));
         parts.add(part(Capabilities.CONDITION_LIST, sinceCondition, births));
+        parts.add(PackSupport.teamPart(competencia));
         return new DataRequirements(DataRequirements.V2, parts);
     }
 
@@ -233,20 +240,22 @@ public final class C5Pack implements IndicatorRule {
         C5Practices practices = new C5Practices(data, context);
         List<EvidenceItem> evidence = new ArrayList<>();
         List<C5Results.Scored> eligible = new ArrayList<>();
-        C5Teams teamTypes = C5Teams.of(data.teams());
-        for (C5Cohort.Decision decision :
-                C5Cohort.decide(data, cutoff, teamTypes).values()) {
+        TeamScope teamTypes = TeamScope.of(data.teams(), context.competencia().atEndOfMonth());
+        List<C5Cohort.Decision> decisions =
+                List.copyOf(C5Cohort.decide(data, cutoff, teamTypes).values());
+        for (C5Cohort.Decision decision : decisions) {
             if (decision.eligible()) {
-                C5Results.Scored person =
-                        C5Results.Scored.of(decision, practicesOf(decision, practices, teamTypes), specs);
+                C5Results.Scored person = C5Results.Scored.of(decision, practicesOf(decision, practices), specs);
                 eligible.add(person);
                 evidence.addAll(C5Evidence.eligible(person, specs, cutoff));
             } else {
                 evidence.add(C5Evidence.excluded(decision, cutoff));
             }
         }
+        List<String> municipal = limitations(data, cutoff);
+        C5Results.teamExclusions(decisions).ifPresent(municipal::add);
         return new RuleOutcome(
-                C5Results.of(scope, eligible, limitations(data, cutoff)),
+                C5Results.of(scope, eligible, municipal),
                 teams(scope, eligible, DESCRIPTOR.standingLimitationLines()),
                 evidence);
     }
@@ -267,18 +276,16 @@ public final class C5Pack implements IndicatorRule {
     }
 
     /**
-     * Practices A–D of an eligible person. In an eAP tipo 76 team practice D «não será condicionante
-     * de pontuação» (item 24 b, p. 2), which the ficha does not turn into points (AMB-C5-01, P07,
-     * MET-23): D stays observed but undecided, never credited, dropped or counted as not met.
+     * Practices A–D of an eligible person. In an eAP 76 team practice D «não será condicionante de
+     * pontuação» (item 24 b, p. 2): the person is credited D in full, observed or not (C5-D1).
      */
-    private static List<C5Practices.Outcome> practicesOf(
-            C5Cohort.Decision decision, C5Practices practices, C5Teams teamTypes) {
+    private static List<C5Practices.Outcome> practicesOf(C5Cohort.Decision decision, C5Practices practices) {
         List<C5Practices.Outcome> outcomes = practices.evaluate(decision.personKey());
-        if (!teamTypes.isEap76(decision.ine())) {
+        if (!decision.eap76()) {
             return outcomes;
         }
         return outcomes.stream()
-                .map(o -> C5Practices.D.equals(o.code()) ? o.undecided(C5Results.AMB_C5_01) : o)
+                .map(o -> C5Practices.D.equals(o.code()) && !o.met() ? o.asCredited() : o)
                 .toList();
     }
 

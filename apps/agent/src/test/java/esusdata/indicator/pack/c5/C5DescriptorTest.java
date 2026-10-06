@@ -43,7 +43,8 @@ class C5DescriptorTest {
             Capabilities.PROCEDURE_PERFORMED,
             Capabilities.HOME_VISIT,
             Capabilities.MEASUREMENT_RECORD,
-            Capabilities.CONDITION_LIST);
+            Capabilities.CONDITION_LIST,
+            Capabilities.TEAM);
 
     private static final LocalDate W12_START = LocalDate.of(2025, 4, 1);
     private static final LocalDate APRIL_FIRST = LocalDate.of(2026, 4, 1);
@@ -84,7 +85,7 @@ class C5DescriptorTest {
     // ---- requirements ----
 
     @Test
-    void requirements_march2026ReadsSevenPartsWithTheFichaWindows() {
+    void requirements_march2026ReadsEightPartsWithTheFichaWindows() {
         DataRequirements requirements = new C5Pack().requirements(MARCH_2026);
 
         assertThat(requirements.canonicalSchemaVersion()).isEqualTo(DataRequirements.V2);
@@ -98,6 +99,7 @@ class C5DescriptorTest {
         assertPeriod(part(requirements, Capabilities.HOME_VISIT), W12_START, APRIL_FIRST);
         assertPeriod(part(requirements, Capabilities.MEASUREMENT_RECORD), W12_START, APRIL_FIRST);
         assertPeriod(part(requirements, Capabilities.CONDITION_LIST), LocalDate.of(2013, 1, 1), APRIL_FIRST);
+        assertPeriod(part(requirements, Capabilities.TEAM), LocalDate.of(2026, 3, 1), APRIL_FIRST);
 
         PartRequirement citizen = part(requirements, Capabilities.CITIZEN);
         assertThat(citizen.dateParams().get(PartRequirement.BIRTH_DATE_FROM)).isEqualTo(LocalDate.of(1896, 3, 1));
@@ -194,9 +196,12 @@ class C5DescriptorTest {
 
         assertThat(limitations)
                 .anySatisfy(text -> assertThat(text)
-                        .startsWith("C5-LIM-04:")
-                        .contains("validação eSF 70 / eAP 76")
-                        .contains("crédito de D para eAP"))
+                        .startsWith("C5-LIM-24:")
+                        .contains("D creditada integralmente (25 pontos)")
+                        .contains("eAP 76"))
+                .anySatisfy(text -> assertThat(text)
+                        .startsWith("C5-LIM-25:")
+                        .contains("tipo 70 ou 76 vigente no fim da competência"))
                 .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-03:").contains("24 meses"))
                 .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-06:").contains("SCNES"))
                 .anySatisfy(text -> assertThat(text).startsWith("C5-LIM-07:").contains("CadSUS"))
@@ -219,7 +224,7 @@ class C5DescriptorTest {
     @Test
     void scoring_practicesAreMatchedToTheirSpecByCodeNotByPosition() {
         List<ComponentSpec> specs = new C5Pack().descriptor().components();
-        C5Cohort.Decision decision = new C5Cohort.Decision("pessoa-1", "ELEGIVEL", null, null);
+        C5Cohort.Decision decision = new C5Cohort.Decision("pessoa-1", "ELEGIVEL", null, null, false);
         List<C5Practices.Outcome> reversed = List.of(
                 new C5Practices.Outcome("D", true, "CUMPRIDA", List.of()),
                 new C5Practices.Outcome("C", false, "SEM_REGISTRO_NA_JANELA", List.of()),

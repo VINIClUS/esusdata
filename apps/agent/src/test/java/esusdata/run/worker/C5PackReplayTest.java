@@ -83,7 +83,7 @@ class C5PackReplayTest {
         assertThat(published.denominatorText()).isEqualTo("3");
         assertThat(published.denominatorKind()).isEqualTo("PESSOAS_COM_HIPERTENSAO_VINCULADAS");
         assertThat(published.canonicalSchemaVersion()).isEqualTo("2");
-        assertThat(published.limitationsJson()).contains("Portão A", "Portão D", "C5-LIM-04");
+        assertThat(published.limitationsJson()).contains("Portão A", "Portão D", "C5-LIM-25");
         assertThat(ResultJson.readComponents(published.componentsJson()))
                 .extracting(
                         ResultJson.StoredComponent::code,
@@ -172,6 +172,8 @@ class C5PackReplayTest {
 
     private ExtractionManifest extract(String extractionId) throws Exception {
         ExtractFixturesV2.Builder builder = ExtractFixturesV2.forRule(new C5Pack(), COMPETENCIA);
+        builder.add(CanonicalFixtures.team(TEAM_ONE, CNES_ONE, "70"));
+        builder.add(CanonicalFixtures.team(TEAM_TWO, CNES_TWO, "70"));
         for (String key : List.of("p1", "p2", "p3", "p4")) {
             builder.add(CanonicalFixtures.person(key, LocalDate.of(1960, 5, 10), "FEMININO"));
         }

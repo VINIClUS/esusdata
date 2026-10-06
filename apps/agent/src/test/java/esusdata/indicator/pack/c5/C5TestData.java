@@ -486,6 +486,8 @@ final class C5TestData {
     /** A dataset under construction for competência 2026-03 (or any context given). */
     static final class Scenario {
         private final CanonicalDataset.Builder builder = CanonicalDataset.builder();
+        private final java.util.Map<String, String> linkedIneCnes = new java.util.LinkedHashMap<>();
+        private final java.util.Set<String> teamsGiven = new java.util.HashSet<>();
 
         /** Declares that the run read {@code capability} for {@code window} (§1.6). */
         Scenario window(String capability, DateWindow window) {
@@ -504,6 +506,11 @@ final class C5TestData {
         Scenario add(Record... records) {
             for (Record canonicalRecord : records) {
                 builder.add(canonicalRecord);
+                if (canonicalRecord instanceof CanonicalRegistration r && r.ine() != null) {
+                    linkedIneCnes.putIfAbsent(r.ine(), r.cnes());
+                } else if (canonicalRecord instanceof CanonicalTeam t) {
+                    teamsGiven.add(t.ine());
+                }
             }
             return this;
         }
@@ -562,7 +569,16 @@ final class C5TestData {
             return withPracticesAbc(key).withVisits(key, LocalDate.of(2025, 11, 1), LocalDate.of(2026, 1, 15));
         }
 
+        /**
+         * Every INE a registration names and no test gave a team for is an eSF 70 team, as the
+         * source would have it: a team without a type is left out of the cohort (C5-D2).
+         */
         CanonicalDataset dataset() {
+            linkedIneCnes.forEach((ine, cnes) -> {
+                if (teamsGiven.add(ine)) {
+                    builder.add(team(ine, cnes, "70"));
+                }
+            });
             return builder.build();
         }
 

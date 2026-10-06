@@ -10,6 +10,7 @@ import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.model.ResultComponent;
 import esusdata.indicator.model.Scores;
+import esusdata.indicator.model.TeamScope;
 import esusdata.indicator.pack.PackSupport;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -25,19 +26,21 @@ import java.util.Optional;
  */
 final class C5Results {
 
-    /** AMB-C5-01 (item 24 b, p. 2): the eAP tipo 76 exception is not scored until P07 (MET-23). */
-    static final String EAP76_AMBIGUITY =
-            "AMB-C5-01: prática D não condicionante para eAP tipo 76; resultado sem escore até P07 (MET-23).";
+    /**
+     * C5-LIM-24 (P07, C5-D1): practice D is credited in full to the people of eAP 76 teams, observed
+     * or not (item 24 b).
+     */
+    static final String EAP_CREDIT = "C5-LIM-24/contagem: D creditada integralmente (%d pontos) para %d pessoa(s) de"
+            + " equipes eAP 76, conforme o item 24 b; observada em %d.";
 
-    /** The reason code of the eAP tipo 76 practice D the ficha does not decide (AMB-C5-01). */
-    static final String AMB_C5_01 = "AMB-C5-01";
+    /** C5-LIM-25 (C5-D2): the people left out because their team is not a considered one. */
+    static final String TEAM_EXCLUSIONS = "C5-LIM-25/contagem: %d pessoa(s) vinculada(s) a equipe fora da regra de"
+            + " tipo (70 ou 76 vigente no fim da competência) ficaram fora: %d de equipe sem tipo, %d de tipo"
+            + " conflitante e %d de outro tipo.";
 
     private static final int DISPLAY_SCALE = 4;
 
-    /**
-     * One eligible person with practices A–D and the points earned — {@code null}, never 0, when a
-     * practice is undecided (AMB-C5-01).
-     */
+    /** One eligible person with practices A–D and the points earned (D credited to an eAP 76). */
     record Scored(C5Cohort.Decision decision, List<C5Practices.Outcome> practices, BigInteger points) {
         Scored {
             practices = List.copyOf(practices);
@@ -46,20 +49,12 @@ final class C5Results {
         /** Scores each practice by the descriptor's spec of the same code, never by position. */
         static Scored of(C5Cohort.Decision decision, List<C5Practices.Outcome> practices, List<ComponentSpec> specs) {
             List<ComponentSpec> met = new ArrayList<>();
-            boolean undecided = false;
             for (ComponentSpec spec : specs) {
-                C5Practices.Outcome practice = practice(practices, spec.code());
-                undecided |= practice.ambiguous();
-                if (practice.met()) {
+                if (practice(practices, spec.code()).met()) {
                     met.add(spec);
                 }
             }
-            return new Scored(decision, practices, undecided ? null : Scores.points(met));
-        }
-
-        /** Some practice of this person is undecided by the ficha, so the person has no points. */
-        boolean ambiguous() {
-            return practices.stream().anyMatch(C5Practices.Outcome::ambiguous);
+            return new Scored(decision, practices, Scores.points(met));
         }
 
         /** The decision of practice {@code code}; every practice of the descriptor is decided. */
@@ -81,29 +76,52 @@ final class C5Results {
     private C5Results() {}
 
     /**
-     * The result of {@code people}. When someone has an undecided practice (an eAP tipo 76 team,
-     * AMB-C5-01) the value, band and numerator stay unavailable as {@code RULE_AMBIGUITY}; the
-     * denominator and the components stay, the undecided one as {@code RULE_AMBIGUITY} too.
+     * The result of {@code people}: the mean of their points, or {@code NO_DENOMINATOR} when nobody is
+     * eligible. A person of an eAP 76 team counts D in full (C5-D1), and the result says how many.
      */
     static IndicatorResult of(Scope scope, List<Scored> people, List<String> limitations) {
         BigInteger total = BigInteger.ZERO;
-        boolean ambiguous = false;
         for (Scored person : people) {
-            ambiguous |= person.ambiguous();
-            total = person.points() == null ? total : total.add(person.points());
+            total = total.add(person.points());
         }
         BigInteger eligible = BigInteger.valueOf(people.size());
         List<ResultComponent> components = components(scope.descriptor().components(), people);
+        List<String> shown = new ArrayList<>(limitations);
+        eapCredit(scope.descriptor(), people).ifPresent(shown::add);
         Optional<ExactRatio> mean = Scores.meanPoints(total, eligible);
         if (mean.isEmpty()) {
-            return build(scope, IndicatorStatus.NO_DENOMINATOR, null, total, eligible, limitations, components);
+            return build(scope, IndicatorStatus.NO_DENOMINATOR, null, total, eligible, shown, components);
         }
-        if (ambiguous) {
-            List<String> withAmbiguity = new ArrayList<>(limitations);
-            withAmbiguity.add(EAP76_AMBIGUITY);
-            return build(scope, IndicatorStatus.RULE_AMBIGUITY, null, null, eligible, withAmbiguity, components);
+        return build(scope, IndicatorStatus.COMPUTED, mean.get(), total, eligible, shown, components);
+    }
+
+    private static Optional<String> eapCredit(PackDescriptor descriptor, List<Scored> people) {
+        long eap = people.stream().filter(p -> p.decision().eap76()).count();
+        if (eap == 0) {
+            return Optional.empty();
         }
-        return build(scope, IndicatorStatus.COMPUTED, mean.get(), total, eligible, limitations, components);
+        long observed = people.stream()
+                .filter(p -> p.decision().eap76() && !p.practice(C5Practices.D).credited())
+                .count();
+        BigInteger weight = descriptor.components().stream()
+                .filter(c -> C5Practices.D.equals(c.code()))
+                .findFirst()
+                .orElseThrow()
+                .weight();
+        return Optional.of(EAP_CREDIT.formatted(weight, eap, observed));
+    }
+
+    /** The people the team-type rule left out, by reason, as a disclosure for the municipal result. */
+    static Optional<String> teamExclusions(List<C5Cohort.Decision> decisions) {
+        long without = count(decisions, TeamScope.REASON_WITHOUT_TYPE);
+        long conflict = count(decisions, TeamScope.REASON_CONFLICT);
+        long other = count(decisions, TeamScope.REASON_OUT_OF_SCOPE);
+        long all = without + conflict + other;
+        return all == 0 ? Optional.empty() : Optional.of(TEAM_EXCLUSIONS.formatted(all, without, conflict, other));
+    }
+
+    private static long count(List<C5Cohort.Decision> decisions, String reason) {
+        return decisions.stream().filter(d -> reason.equals(d.reasonCode())).count();
     }
 
     /**
@@ -122,17 +140,9 @@ final class C5Results {
         for (ComponentSpec spec : specs) {
             BigInteger met = BigInteger.valueOf(
                     people.stream().filter(p -> p.practice(spec.code()).met()).count());
-            boolean undecided =
-                    people.stream().anyMatch(p -> p.practice(spec.code()).ambiguous());
-            components.add(undecided ? undecided(spec, met, eligible) : ResultComponent.of(spec, met, eligible));
+            components.add(ResultComponent.of(spec, met, eligible));
         }
         return components;
-    }
-
-    /** A practice the ficha does not decide for someone: exact counts of what was observed, no value. */
-    private static ResultComponent undecided(ComponentSpec spec, BigInteger observed, BigInteger eligible) {
-        return new ResultComponent(
-                spec.code(), spec.kind(), spec.weight(), observed, eligible, null, IndicatorStatus.RULE_AMBIGUITY);
     }
 
     private static IndicatorResult build(

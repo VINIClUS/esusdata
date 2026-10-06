@@ -55,9 +55,6 @@ import org.junit.jupiter.api.Test;
  */
 class C5ResultTest {
 
-    private static final String AMB_C5_01 =
-            "AMB-C5-01: prática D não condicionante para eAP tipo 76; resultado sem escore até P07 (MET-23).";
-
     /** T-C5-06: 100, 50, 25 and 0 points in the default team. */
     private static C5TestData.Scenario fourPeople() {
         return scenario()
@@ -98,11 +95,10 @@ class C5ResultTest {
         assertThat(teamResult.classification()).isEqualTo(Classification.SUFICIENTE);
     }
 
-    // ---- T-C5-20/21, MET-23: eAP tipo 76 (AMB-C5-01) ----
+    // ---- T-C5-20/21, MET-23: eAP tipo 76, D creditada (C5-D1) ----
 
     @Test
-    void tC5_20_eap76TeamResultIsRuleAmbiguityWithoutScore() {
-        // Discriminant values not adopted: X = 100 (i) / 100 (ii) / 75 (iii); Y = 50 / 33,33… / 25.
+    void tC5_20_eap76TeamIsCreditedPracticeDInFullAndComputed() {
         C5TestData.Scenario scenario = scenario()
                 .add(team(INE, CNES, "76"), team(INE_2, CNES_2, "70"))
                 .eligible(P1)
@@ -113,63 +109,35 @@ class C5ResultTest {
                 .withAllPractices(P3);
 
         RuleOutcome ungated = scenario.ungated();
-        assertAmbiguous(ungated.result(), 3);
-        assertComponents(ungated.result(), 3, 3, 2, 2, 1);
-        assertOnlyDAmbiguous(ungated.result());
-        assertAmbiguous(teamOf(ungated, INE).result(), 2);
-        assertComponents(teamOf(ungated, INE).result(), 2, 2, 1, 1, 0);
-        assertOnlyDAmbiguous(teamOf(ungated, INE).result());
+        // P1: A+B+C + credited D = 100; P2: A + credited D = 50; P3 (eSF): 100
+        assertThat(ungated.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertThat(ungated.result().numerator()).isEqualTo(BigInteger.valueOf(250));
+        assertThat(ungated.result().denominator()).isEqualTo(BigInteger.valueOf(3));
+        assertComponents(ungated.result(), 3, 3, 2, 2, 3);
+        IndicatorResult eap = teamOf(ungated, INE).result();
+        assertThat(eap.status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertExactValue(eap.valueExact(), 150, 2);
+        assertThat(eap.components()).extracting(ResultComponent::status).containsOnly(IndicatorStatus.COMPUTED);
         IndicatorResult eSf = teamOf(ungated, INE_2).result();
-        assertThat(eSf.status()).isEqualTo(IndicatorStatus.COMPUTED);
         assertExactValue(eSf.valueExact(), 100, 1);
-        assertThat(eSf.components()).extracting(ResultComponent::status).containsOnly(IndicatorStatus.COMPUTED);
         for (String key : List.of(P1, P2)) {
-            assertUndecidedD(ungated, key, "SEM_REGISTRO_NA_JANELA");
+            EvidenceItem d = practiceOf(ungated, key, "D");
+            assertThat(d.decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+            assertThat(d.reasonCode()).isEqualTo("PRATICA_CREDITADA_EAP76");
+            assertThat(d.points()).isEqualTo(BigInteger.valueOf(25));
         }
+        assertThat(decisionOf(ungated, P1).points()).isEqualTo(BigInteger.valueOf(100));
+        assertThat(decisionOf(ungated, P2).points()).isEqualTo(BigInteger.valueOf(50));
         assertThat(decisionOf(ungated, P3).points()).isEqualTo(BigInteger.valueOf(100));
-        assertThat(practiceOf(ungated, P3, "D").decision()).isEqualTo(EvidenceDecision.PRACTICE_MET);
+        assertThat(practiceOf(ungated, P3, "D").reasonCode()).isEqualTo("CUMPRIDA");
+        assertThat(ungated.result().limitations())
+                .anyMatch(l -> l.startsWith("C5-LIM-24/contagem:") && l.contains("(25 pontos) para 2 pessoa(s)"))
+                .anyMatch(l -> l.endsWith("observada em 0."));
+        assertThat(eSf.limitations()).noneMatch(l -> l.startsWith("C5-LIM-24/contagem"));
 
         RuleOutcome gated = scenario.evaluate();
-        assertThat(gated.result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(teamOf(gated, INE).result().status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(teamOf(gated, INE_2).result().status()).isEqualTo(IndicatorStatus.BLOCKED);
-    }
-
-    /** A, B and C computed; D undecided (AMB-C5-01) with exact counts and no value. */
-    private static void assertOnlyDAmbiguous(IndicatorResult result) {
-        assertThat(result.components()).allSatisfy(component -> {
-            boolean isD = "D".equals(component.code());
-            assertThat(component.status())
-                    .as("status of %s", component.code())
-                    .isEqualTo(isD ? IndicatorStatus.RULE_AMBIGUITY : IndicatorStatus.COMPUTED);
-            assertThat(component.value() == null)
-                    .as("value of %s is null", component.code())
-                    .isEqualTo(isD);
-        });
-    }
-
-    /**
-     * The person's D row is PRACTICE_AMBIGUOUS without points, its reason keeps what was observed
-     * (ENG-36), and the person has no total.
-     */
-    private static void assertUndecidedD(RuleOutcome outcome, String key, String observed) {
-        EvidenceItem practiceD = practiceOf(outcome, key, "D");
-        assertThat(practiceD.decision()).isEqualTo(EvidenceDecision.PRACTICE_AMBIGUOUS);
-        assertThat(practiceD.reasonCode()).isEqualTo("AMB-C5-01:" + observed);
-        assertThat(practiceD.points()).isNull();
-        EvidenceItem decision = decisionOf(outcome, key);
-        assertThat(decision.decision()).isEqualTo(EvidenceDecision.ELIGIBLE);
-        assertThat(decision.points()).isNull();
-    }
-
-    private static void assertAmbiguous(IndicatorResult result, long denominator) {
-        assertThat(result.status()).isEqualTo(IndicatorStatus.RULE_AMBIGUITY);
-        assertThat(result.valueText()).isNull();
-        assertThat(result.valueExact()).isNull();
-        assertThat(result.classification()).isNull();
-        assertThat(result.numerator()).isNull();
-        assertThat(result.denominator()).isEqualTo(BigInteger.valueOf(denominator));
-        assertThat(result.limitations()).contains(AMB_C5_01);
+        assertThat(gated.result().status()).isEqualTo(IndicatorStatus.BLOCKED);
+        assertThat(gated.result().numerator()).isEqualTo(BigInteger.valueOf(250));
     }
 
     @Test
@@ -188,7 +156,7 @@ class C5ResultTest {
     }
 
     @Test
-    void met23_eap76KeepsEveryWeightAndNeitherCreditsNorDropsD() {
+    void met23_eap76CreditsDWhenNotObservedAndKeepsTheVisitsAsSupport() {
         RuleOutcome outcome = scenario()
                 .add(team(INE, CNES, "76"))
                 .eligible(P1)
@@ -198,26 +166,50 @@ class C5ResultTest {
                 .ungated();
 
         IndicatorResult result = outcome.result();
-        assertAmbiguous(result, 2);
-        assertComponents(result, 2, 2, 2, 2, 1); // D numerator: people whose D was observed
-        assertOnlyDAmbiguous(result);
+        assertThat(result.status()).isEqualTo(IndicatorStatus.COMPUTED);
+        assertComponents(result, 2, 2, 2, 2, 2); // D credited to P1, observed for P2
         assertThat(result.components()).extracting(ResultComponent::weight).containsOnly(BigInteger.valueOf(25));
-        assertUndecidedD(outcome, P1, "SEM_REGISTRO_NA_JANELA");
-        assertUndecidedD(outcome, P2, "CUMPRIDA");
-        assertThat(supportingOf(outcome, P2, "D")).hasSize(2); // the visits stay as information
+        assertThat(practiceOf(outcome, P1, "D").reasonCode()).isEqualTo("PRATICA_CREDITADA_EAP76");
+        assertThat(practiceOf(outcome, P2, "D").reasonCode()).isEqualTo("CUMPRIDA"); // observed, not credited
+        assertThat(supportingOf(outcome, P2, "D")).hasSize(2);
+        assertThat(result.limitations()).anyMatch(l -> l.contains("para 2 pessoa(s)") && l.endsWith("observada em 1."));
     }
 
     @Test
-    void met23_withoutTeamTypeVisitsAreRequiredAndTheDescriptorSaysSo() {
-        // Lacuna L1: the source rarely carries the CNES team type; D stays required and the
-        // standing limitation explains it.
-        RuleOutcome outcome = scenario().eligible(P1).withPracticesAbc(P1).ungated();
-        PackDescriptor descriptor = new C5Pack().descriptor();
+    void c5_d2_teamsWithoutTypeConflictingOrOfAnotherTypeLeavePeopleOutWithACount() {
+        RuleOutcome outcome = scenario()
+                .add(
+                        team(INE, CNES, null),
+                        team(INE_2, CNES_2, "70"),
+                        team(INE_2, CNES_2, "76"),
+                        team("0000004444", CNES, "72"))
+                .eligible(P1)
+                .eligible(P2, CNES_2, INE_2)
+                .eligible(P3, CNES, "0000004444")
+                .ungated();
 
-        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.COMPUTED);
-        assertExactValue(outcome.result().valueExact(), 75, 1);
-        assertThat(outcome.result().limitations()).containsAll(descriptor.standingLimitationLines());
-        assertThat(descriptor.standingLimitationLines()).anyMatch(limitation -> limitation.contains("76"));
+        assertThat(decisionOf(outcome, P1).reasonCode()).isEqualTo("EXCLUIDO_EQUIPE_SEM_TIPO");
+        assertThat(decisionOf(outcome, P2).reasonCode()).isEqualTo("EXCLUIDO_TIPO_EQUIPE_CONFLITANTE");
+        assertThat(decisionOf(outcome, P3).reasonCode()).isEqualTo("EXCLUIDO_EQUIPE_FORA_DO_ESCOPO");
+        assertThat(outcome.result().status()).isEqualTo(IndicatorStatus.NO_DENOMINATOR);
+        assertThat(outcome.teams()).isEmpty();
+        assertThat(outcome.result().limitations())
+                .anyMatch(l -> l.startsWith("C5-LIM-25/contagem: 3 pessoa(s)")
+                        && l.contains("1 de equipe sem tipo, 1 de tipo conflitante e 1 de outro tipo"));
+    }
+
+    @Test
+    void met23_withoutTeamTypeThePersonIsLeftOutNotKeptWithDRequired() {
+        RuleOutcome outcome = scenario()
+                .eligible(P1)
+                .withPracticesAbc(P1)
+                .add(team(INE, CNES, null))
+                .ungated();
+
+        assertThat(decisionOf(outcome, P1).reasonCode()).isEqualTo("EXCLUIDO_EQUIPE_SEM_TIPO");
+        PackDescriptor descriptor = new C5Pack().descriptor();
+        assertThat(descriptor.standingLimitationLines()).anyMatch(l -> l.startsWith("C5-LIM-25:"));
+        assertThat(descriptor.blockingLimitations()).isEmpty();
     }
 
     // ---- T-C5-22 / ENG-25: exact bands ----
