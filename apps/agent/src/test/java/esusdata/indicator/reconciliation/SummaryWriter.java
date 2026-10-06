@@ -1,0 +1,127 @@
+package esusdata.indicator.reconciliation;
+
+import esusdata.indicator.reconciliation.Comparison.RowResult;
+import esusdata.indicator.reconciliation.PackVerdict.Mode;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
+import java.util.HexFormat;
+import java.util.Optional;
+
+/**
+ * The summary document of one pack's Portão D result, the evidence the gate points at: one row per
+ * indicator and team type with N_S and N_L (written {@code <10} below 10), D, T and the verdict.
+ * Per-class counts and per-INE classes never appear here (see {@link RawWriter}).
+ */
+public final class SummaryWriter {
+
+    static final String MASKED = "<10";
+    static final int MASK_BELOW = 10;
+
+    private SummaryWriter() {}
+
+    /** A count as the document shows it. */
+    public static String mask(int count) {
+        return count < MASK_BELOW ? MASKED : Integer.toString(count);
+    }
+
+    /** The file name of a verdict's summary. */
+    public static String fileName(PackVerdict verdict) {
+        return (verdict.mode() == Mode.INFORMATIVO ? "informativo-" : "") + "portao-d-"
+                + verdict.pack().packId() + "-" + verdict.quadrimestre() + ".md";
+    }
+
+    /**
+     * Writes the summary of a verdict that compared something into {@code directory}; a pending
+     * verdict without a reference writes nothing (a pending gate carries no evidence).
+     */
+    public static Optional<Path> write(Path directory, PackVerdict verdict, LocalDate date) throws IOException {
+        if (verdict.quadrimestre() == null) {
+            return Optional.empty();
+        }
+        Files.createDirectories(directory);
+        Path file = directory.resolve(fileName(verdict));
+        Files.writeString(file, render(verdict, date), StandardCharsets.UTF_8);
+        return Optional.of(file);
+    }
+
+    public static String render(PackVerdict verdict, LocalDate date) {
+        StringBuilder text = new StringBuilder(2048);
+        text.append("# Portão D: conciliação com o SIAPS, %s (%s)\n\n"
+                .formatted(verdict.pack().code(), verdict.quadrimestre()));
+        if (verdict.mode() == Mode.INFORMATIVO) {
+            text.append("""
+                    > **Modo informativo: não é evidência do Portão D.** O quadrimestre de referência não é
+                    > elegível (ou a execução foi exploratória) e este documento nunca entra no registro de
+                    > portões.
+
+                    """);
+        }
+        String reason = verdict.reason().isEmpty() ? "" : " (" + verdict.reason() + ")";
+        text.append("""
+                - Check: `%s`
+                - Pack: `%s`, regra `%s`
+                - Quadrimestre de referência no SIAPS: %s
+                - Data: %s
+                - Veredito do pack: **%s**%s
+
+                | Indicador | Tipo | N_S | N_L | Sem classe local | D | T | Veredito |
+                |---|---|---|---|---|---|---|---|
+                """.formatted(
+                        Comparison.CHECK_ID,
+                        verdict.pack().packId(),
+                        verdict.ruleVersion(),
+                        verdict.quadrimestre(),
+                        date,
+                        verdict.status(),
+                        reason));
+        for (RowResult row : verdict.rows()) {
+            text.append(tableRow(verdict.pack().code(), row)).append('\n');
+        }
+        text.append("""
+
+                Equipes locais fora da lista do SIAPS (excluídas): %s.
+
+                Contagens por classe e classes por equipe ficam só no diretório local ignorado pelo controle de versão.
+                Regra: `docs/indicadores/portoes/portao-d-conciliacao-siaps.md`.
+                """.formatted(mask(verdict.localNotInSiaps())));
+        return text.toString();
+    }
+
+    private static String tableRow(String code, RowResult row) {
+        String distance = row.evaluated() ? Integer.toString(row.distance()) : "-";
+        String threshold = row.evaluated() ? Integer.toString(row.threshold()) : "-";
+        return "| "
+                + String.join(
+                        " | ",
+                        code,
+                        row.teamType(),
+                        mask(row.siapsTeams()),
+                        mask(row.localTeams()),
+                        mask(row.semClasseLocal()),
+                        distance,
+                        threshold,
+                        verdictOf(row))
+                + " |";
+    }
+
+    private static String verdictOf(RowResult row) {
+        if (row.evaluated()) {
+            return row.passed() ? "passa" : "reprova";
+        }
+        return "não avaliada";
+    }
+
+    /** The lowercase hex SHA-256 of a file. */
+    public static String sha256(Path file) throws IOException {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
+}
