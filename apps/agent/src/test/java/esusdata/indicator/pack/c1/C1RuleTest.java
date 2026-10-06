@@ -193,7 +193,7 @@ class C1RuleTest {
         List<CanonicalEncounter> encounters = List.of(
                 encounterWithCbo("f1", CanonicalModality.PROGRAMADO, "225125", "2025-12-10"),
                 encounterWithCbo("f2", CanonicalModality.ESPONTANEO, "225250", "2025-12-11"));
-        IndicatorResult result = C1Rule.computeEvidenceOnly(encounters, "3541307", "2025-12", "2025-12-31");
+        IndicatorResult result = C1Rule.compute(encounters, "3541307", "2025-12", "2025-12-31");
 
         assertThat(result.numerator()).isEqualTo(BigInteger.ONE);
         assertThat(result.denominator()).isEqualTo(BigInteger.TWO);

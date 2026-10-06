@@ -49,7 +49,7 @@ public interface PackSensitivity {
 
     /**
      * The ambiguity codes the result and each team result mention beyond the pack's standing
-     * limitations and release gates — what fired for this data — one row per code and unit.
+     * limitations — what fired for this data — one row per code and unit.
      */
     static List<ReadingRow> limitationRows(String pack, PackDescriptor descriptor, RuleOutcome outcome) {
         List<ReadingRow> rows = new ArrayList<>();
@@ -65,8 +65,7 @@ public interface PackSensitivity {
     private static List<ReadingRow> limitationRows(
             String pack, PackDescriptor descriptor, String unit, List<String> limitations) {
         return limitations.stream()
-                .filter(text -> !descriptor.standingLimitations().contains(text)
-                        && !descriptor.blockedGates().contains(text))
+                .filter(text -> !descriptor.standingLimitations().contains(text))
                 .flatMap(text -> EvidenceSubjects.codesIn(text).stream())
                 .distinct()
                 .map(code ->

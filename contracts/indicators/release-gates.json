@@ -3,7 +3,7 @@
   "packs": [
     {
       "pack": "c1-mais-acesso",
-      "rule_version": "c1-mais-acesso@0.2.0",
+      "rule_version": "c1-mais-acesso@0.3.0",
       "gates": {
         "A": {
           "status": "PENDING",
@@ -48,7 +48,7 @@
     },
     {
       "pack": "c4-cuidado-diabetes",
-      "rule_version": "c4-cuidado-diabetes@0.1.0",
+      "rule_version": "c4-cuidado-diabetes@0.2.0",
       "gates": {
         "A": {
           "status": "PENDING",
@@ -63,7 +63,7 @@
     },
     {
       "pack": "c5-cuidado-hipertensao",
-      "rule_version": "c5-cuidado-hipertensao@0.1.0",
+      "rule_version": "c5-cuidado-hipertensao@0.2.0",
       "gates": {
         "A": {
           "status": "PENDING",
@@ -78,7 +78,7 @@
     },
     {
       "pack": "c6-cuidado-pessoa-idosa",
-      "rule_version": "c6-cuidado-pessoa-idosa@0.1.0",
+      "rule_version": "c6-cuidado-pessoa-idosa@0.2.0",
       "gates": {
         "A": {
           "status": "PENDING",
@@ -93,7 +93,7 @@
     },
     {
       "pack": "c7-prevencao-cancer",
-      "rule_version": "c7-prevencao-cancer@0.1.0",
+      "rule_version": "c7-prevencao-cancer@0.2.0",
       "gates": {
         "A": {
           "status": "PENDING",
