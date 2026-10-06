@@ -21,9 +21,8 @@ public final class GateChecks {
 
     /**
      * Portão B passes when the pack declares no blocking limitation. A null {@code on} is a read
-     * not tied to a run (the pack catalog). Today every standing limitation
-     * blocks; the split into blocking and disclosed limitations lives in {@link
-     * PackDescriptor#blockingLimitations()} alone.
+     * not tied to a run (the pack catalog). Only a {@code BLOCKING_GAP} blocks: see
+     * {@link PackDescriptor#blockingLimitations()}.
      */
     public static GateCheck calculationModel(PackDescriptor descriptor, LocalDate on) {
         int blocking = descriptor.blockingLimitations().size();

@@ -42,10 +42,10 @@ final class C3Limitations {
                             + " ignorado. Código de parto, puerpério ou aborto não define a data. A contagem de episódios"
                             + " por origem sai dos códigos de motivo das evidências (ELEGIVEL_*). Sem fechamento do W78, a consulta puerperal"
                             + " anterior a DUM+294 conta como gestação."),
-            Limitation.convention(
+            Limitation.outOfReach(
                     "C3-LIM-07",
-                    "A pressão arterial da visita domiciliar não é lida (Quadro 03, p.6; lacuna L6): C"
-                            + " pode ficar abaixo do SIAPS."),
+                    "A pressão arterial da visita domiciliar não está registrada no DW desta instalação"
+                            + " (PEC 5.5.28; Quadro 03, p.6; lacuna L6): C pode ficar abaixo do SIAPS."),
             Limitation.convention(
                     "C3-LIM-08",
                     "As \"Práticas em Saúde\" da ficha seguem a numeração da ficha CDS e são lidas como"
