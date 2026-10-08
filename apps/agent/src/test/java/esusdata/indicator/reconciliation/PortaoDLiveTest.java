@@ -7,7 +7,9 @@ import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.Quadrimestre;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.pack.componente3.ComponentIII;
-import esusdata.indicator.reconciliation.PackVerdict.Mode;
+import esusdata.result.model.InputFingerprint;
+import esusdata.run.extract.ExtractionManifest;
+import esusdata.run.extract.FileExtractStore;
 import esusdata.run.worker.SensitivityExtracts;
 import esusdata.run.worker.SensitivityExtracts.PackInput;
 import esusdata.testsupport.LivePecAssumptions;
@@ -25,7 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -48,16 +52,24 @@ import org.slf4j.LoggerFactory;
  *       calling the SIAPS (up to 10 anonymous requests per quadrimestre, saved to {@code
  *       target/portao-d/snapshot-<quadrimestre>.json}).
  *   <li>{@code observatorio.gate.d.quadrimestre=2026Q1} compares that quadrimestre; one that is not
- *       the pack's reference (most recent eligible published) makes that pack's run informative.
+ *       the pack's reference (most recent eligible published) makes that pack's run a diagnostic.
  *   <li>{@code observatorio.gate.d.uf=SP} (default: derived from the municipality code).
- *   <li>{@code observatorio.gate.d.registry=<release-gates.json>} records the decided, non-
- *       informative D of each pack there. Absent, nothing is recorded.
+ *   <li>{@code observatorio.gate.d.registry=<release-gates.json>} records the D of each pack run
+ *       as the gate there (never a diagnostic one). Absent, nothing is recorded.
  *   <li>{@code observatorio.gate.d.repo-root=<dir>} (default: found from the working directory).
  * </ul>
  *
  * <p>Output: summaries of gate runs in {@code docs/indicadores/portoes} (masked, the evidence);
- * informative summaries and every raw file (class counts, class by INE) in {@code
+ * diagnostic summaries and every raw file (class counts, class by INE) in {@code
  * target/portao-d}, which git ignores.
+ *
+ * <p>This is the public-aggregate flow, kept until the retrospective reconciliation replaces it.
+ * The public SIAPS answer has no historical team universe (its team list is today's directory), so
+ * a run over it is a diagnostic by construction: the comparison fails closed, and a pack run as
+ * the gate over it is PENDING ("o agregado público não traz o universo histórico de equipes"),
+ * never PASSED or FAILED. Only the official team export ({@link OfficialTeamExportCsvParser}) can
+ * give the gate a universe. Each verdict carries the {@code InputFingerprint} of the extracts of
+ * its quadrimestre.
  */
 class PortaoDLiveTest {
 
@@ -72,6 +84,7 @@ class PortaoDLiveTest {
     private static final String BINARY_PROPERTY = "observatorio.execution-plane.binary";
     private static final String ENV_FILE_PROPERTY = "observatorio.execution-plane.live-pec.env-file";
     private static final String EVIDENCE_DIR = "docs/indicadores/portoes";
+    private static final String MANIFEST_SUFFIX = ".manifest.json";
     private static final String UF_CODES =
             "11RO12AC13AM14RR15PA16AP17TO21MA22PI23CE24RN25PB26PE27AL28SE29BA31MG32ES33RJ"
                     + "35SP41PR42SC43RS50MS51MT52GO53DF";
@@ -121,7 +134,8 @@ class PortaoDLiveTest {
             if (reference.isPresent()) {
                 references.put(pack, reference.get());
             } else {
-                verdicts.add(PackVerdict.pending(pack, ruleVersion(pack), Mode.GATE, Eligibility.waitingFor(pack)));
+                verdicts.add(PackVerdict.pending(
+                        pack, ruleVersion(pack), ReferencePurpose.GATE, Eligibility.waitingFor(pack)));
             }
         }
         if (!references.isEmpty()) {
@@ -142,6 +156,7 @@ class PortaoDLiveTest {
             throws IOException {
         Map<Quadrimestre, SiapsSnapshot> snapshots = new LinkedHashMap<>();
         Map<Quadrimestre, Map<String, Map<YearMonth, List<TeamResult>>>> local = new LinkedHashMap<>();
+        Map<Quadrimestre, String> fingerprints = new LinkedHashMap<>();
         for (Quadrimestre quadrimestre : new HashSet<>(references.values())) {
             SiapsSnapshot snapshot = snapshotFile == null
                     ? fetched(client, pec.environment(), SiapsFormats.quadrimestre(quadrimestre), out)
@@ -151,19 +166,21 @@ class PortaoDLiveTest {
                     .isEqualTo(SiapsFormats.quadrimestre(quadrimestre));
             snapshots.put(quadrimestre, snapshot);
             local.put(quadrimestre, acquire(quadrimestre, out, pec));
+            fingerprints.put(quadrimestre, fingerprintOf(out.resolve("extratos"), quadrimestre));
         }
         List<PackVerdict> verdicts = new ArrayList<>();
         for (Map.Entry<GatePack, Quadrimestre> entry : references.entrySet()) {
             GatePack pack = entry.getKey();
             Quadrimestre quadrimestre = entry.getValue();
             SiapsSnapshot snapshot = snapshots.get(quadrimestre);
+            String fingerprint = fingerprints.get(quadrimestre);
             if (pack.isNotaFinal()) {
                 // after the seven pack checks (GatePack.allWithNotaFinal puts it last)
-                verdicts.add(notaFinalVerdict(quadrimestre, published, snapshot, local.get(quadrimestre)));
+                verdicts.add(notaFinalVerdict(quadrimestre, published, snapshot, local.get(quadrimestre), fingerprint));
             } else {
                 Map<YearMonth, List<TeamResult>> months =
                         local.get(quadrimestre).getOrDefault(pack.packId(), Map.of());
-                verdicts.add(verdict(pack, quadrimestre, published, snapshot, months));
+                verdicts.add(verdict(pack, quadrimestre, published, snapshot, months, fingerprint));
             }
         }
         return verdicts;
@@ -174,15 +191,28 @@ class PortaoDLiveTest {
             Quadrimestre quadrimestre,
             List<String> published,
             SiapsSnapshot snapshot,
-            Map<String, Map<YearMonth, List<TeamResult>>> byPack) {
+            Map<String, Map<YearMonth, List<TeamResult>>> byPack,
+            String fingerprint) {
         GatePack pack = GatePack.NOTA_FINAL;
-        Mode mode = Eligibility.isReference(pack, quadrimestre, published) ? Mode.GATE : Mode.INFORMATIVO;
+        ReferencePurpose purpose = purposeOf(pack, quadrimestre, published);
         List<String> missing = LocalClasses.missingNotaFinalInputs(quadrimestre, byPack);
         if (!missing.isEmpty()) {
-            return PackVerdict.pending(pack, ruleVersion(pack), mode, "faltam as entradas locais de " + missing);
+            return PackVerdict.pending(pack, ruleVersion(pack), purpose, "faltam as entradas locais de " + missing);
         }
         return PackVerdict.evaluate(
-                pack, ruleVersion(pack), mode, snapshot, LocalClasses.ofNotaFinal(quadrimestre, byPack));
+                pack,
+                ruleVersion(pack),
+                purpose,
+                ValidatedReference.fromPublicAggregate(snapshot, pack),
+                LocalClasses.ofNotaFinal(quadrimestre, byPack),
+                fingerprint);
+    }
+
+    /** A gate run only for the reference of the pack; any other quadrimestre is a diagnostic. */
+    private static ReferencePurpose purposeOf(GatePack pack, Quadrimestre quadrimestre, List<String> published) {
+        return Eligibility.isReference(pack, quadrimestre, published)
+                ? ReferencePurpose.GATE
+                : ReferencePurpose.DIAGNOSTIC;
     }
 
     private static PackVerdict verdict(
@@ -190,16 +220,47 @@ class PortaoDLiveTest {
             Quadrimestre quadrimestre,
             List<String> published,
             SiapsSnapshot snapshot,
-            Map<YearMonth, List<TeamResult>> months) {
-        Mode mode = Eligibility.isReference(pack, quadrimestre, published) ? Mode.GATE : Mode.INFORMATIVO;
+            Map<YearMonth, List<TeamResult>> months,
+            String fingerprint) {
+        ReferencePurpose purpose = purposeOf(pack, quadrimestre, published);
         IndicatorRule rule = rule(pack);
         List<YearMonth> missing = LocalClasses.missingMonths(quadrimestre, months);
         if (!missing.isEmpty()) {
             return PackVerdict.pending(
-                    pack, rule.descriptor().ruleVersion(), mode, "faltam as entradas locais de " + missing);
+                    pack, rule.descriptor().ruleVersion(), purpose, "faltam as entradas locais de " + missing);
         }
         return PackVerdict.evaluate(
-                pack, rule.descriptor().ruleVersion(), mode, snapshot, LocalClasses.of(rule, quadrimestre, months));
+                pack,
+                rule.descriptor().ruleVersion(),
+                purpose,
+                ValidatedReference.fromPublicAggregate(snapshot, pack),
+                LocalClasses.of(rule, quadrimestre, months),
+                fingerprint);
+    }
+
+    /**
+     * What the local classes of a quadrimestre were computed from: the {@code InputFingerprint} of
+     * the extraction id and checksum of each extract manifest of its four months (C1's {@code -team}
+     * supplement among them) in {@code extracts}.
+     */
+    private static String fingerprintOf(Path extracts, Quadrimestre quadrimestre) throws IOException {
+        FileExtractStore store = new FileExtractStore(extracts);
+        Map<String, String> checksums = new TreeMap<>();
+        try (Stream<Path> files = Files.list(extracts)) {
+            for (Path file : files.sorted().toList()) {
+                String name = file.getFileName().toString();
+                if (!name.endsWith(MANIFEST_SUFFIX)) {
+                    continue;
+                }
+                ExtractionManifest manifest =
+                        store.readManifest(name.substring(0, name.length() - MANIFEST_SUFFIX.length()));
+                if (quadrimestre.months().stream()
+                        .anyMatch(month -> manifest.extractionId().contains(month.toString()))) {
+                    checksums.put(manifest.extractionId(), manifest.checksum());
+                }
+            }
+        }
+        return InputFingerprint.compute(checksums);
     }
 
     private static SiapsSnapshot readSnapshot(String file) throws IOException {
@@ -264,16 +325,16 @@ class PortaoDLiveTest {
         Path root = repoRoot();
         String registry = System.getProperty(REGISTRY);
         for (PackVerdict verdict : verdicts) {
-            Path directory = verdict.isGateEvidence() ? root.resolve(EVIDENCE_DIR) : out.resolve("informativo");
+            Path directory = verdict.isGateEvidence() ? root.resolve(EVIDENCE_DIR) : out.resolve("diagnostico");
             Optional<Path> summary = SummaryWriter.write(directory, verdict, today);
             RawWriter.write(out, verdict);
             log.info(
                     "Portão D {} {}: {}{}",
                     verdict.pack().code(),
-                    verdict.mode(),
+                    verdict.purpose(),
                     verdict.status(),
                     verdict.reason().isEmpty() ? "" : " (" + verdict.reason() + ")");
-            if (registry != null && !registry.isBlank() && verdict.mode() == Mode.GATE) {
+            if (registry != null && !registry.isBlank() && verdict.purpose() == ReferencePurpose.GATE) {
                 String ref = summary.map(
                                 file -> root.relativize(file.toAbsolutePath().normalize())
                                         .toString()

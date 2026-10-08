@@ -17,6 +17,29 @@ nem classe por equipe (ver `docs/discovery/2026-10-06-siaps-publico-componente-q
 INE para eSF/eAP vem de `filtros/equipes`. Códigos: C1 110, C2 108, C3 107, C4 105, C5 104, C6 106,
 C7 109. O código IBGE no SIAPS tem 6 dígitos.
 
+## O que decide o gate e o que é só diagnóstico
+
+O agregado público (`conceitoPorIndicadorQualidade`, mais `filtros/equipes`) **não traz o universo
+histórico de equipes**. `filtros/equipes` é o diretório **atual** e não recebe quadrimestre: usá-lo num
+período passado pode incluir equipes posteriores, omitir equipes encerradas e dar o tipo de hoje a um
+período antigo. Por isso (spec `docs/superpowers/specs/2026-10-08-reconciliacao-siaps-retrospectiva-design.md`,
+§11 e §12), a ferramenta compara falhando fechado:
+
+- o agregado público só roda como **diagnóstico**. A lista atual serve apenas de chave para separar eSF e
+  eAP entre as equipes locais (confiança do universo `UNKNOWN`). Uma rodada de gate sobre ele fica
+  **PENDING** ("o agregado público não traz o universo histórico de equipes"), nunca PASSED nem FAILED;
+- só o arquivo oficial por equipe (exportação "Avaliação do quadrimestre", lida por
+  `OfficialTeamExportCsvParser`) do mesmo município e quadrimestre dá universo ao gate: os INEs eSF e eAP do
+  arquivo, com os tipos dele. Equipes locais fora dele são reportadas, não acrescentadas;
+- **linha oficial ausente nunca é zero.** Equipe do arquivo sem a linha do indicador, linha de tipo ou lista
+  de equipes que o SIAPS não devolveu deixam a referência incompleta e o pack PENDING. Zero só vale quando
+  um universo oficial completo o prova: um tipo sem equipe entre as equipes do arquivo oficial por equipe.
+  Uma linha de zeros do agregado público não prova isso (o agregado não tem universo) e também deixa a
+  referência incompleta.
+
+Isto só endurece a regra de equipes de `@1` (o agregado deixa de produzir D decidido); o id do check
+continua `@1` até a migração para `@2` do plano da reconciliação retrospectiva.
+
 ## Elegibilidade do quadrimestre de referência
 
 Para um pack, o quadrimestre de referência é o **mais recente quadrimestre publicado no SIAPS cujo
@@ -48,12 +71,13 @@ Se nenhum quadrimestre elegível estiver publicado, o resultado é **PENDING** c
 Por indicador e tipo de equipe, os totais do SIAPS são as quatro contagens, e N_S é a soma delas.
 
 Lado local: a classe quadrimestral por equipe (consolidação da NT 8/2026, `Nt08Consolidation`) para
-os INEs que a lista de equipes do SIAPS (`filtros/equipes`, para aquele indicador) rotula com aquele
-`sgEquipe`.
+os INEs do universo oficial com aquele tipo: com o arquivo oficial por equipe, os do arquivo; no
+diagnóstico com o agregado público, os que a lista atual (`filtros/equipes`, para aquele indicador)
+rotula com aquele `sgEquipe`.
 
-- INE da lista do SIAPS sem classe local (BLOCKED, sem denominador, ausente): reportado como "sem
+- INE do universo oficial sem classe local (BLOCKED, sem denominador, ausente): reportado como "sem
   classe local" e simplesmente fora das contagens locais.
-- INE local que não está na lista do SIAPS: reportado e excluído.
+- INE local que não está no universo oficial: reportado e excluído.
 - N_L é o número de equipes locais efetivamente contadas.
 
 ## Métrica
@@ -76,34 +100,41 @@ diferença pequena nos dados) e o SIAPS lê a base nacional do SISAB, cuja compl
 ao PEC local. 15% das equipes (com piso de 2) tolera esse ruído sem aceitar uma distribuição
 sistematicamente deslocada.
 
-Linhas com N_S = 0 e N_L = 0 são ignoradas. Linha presente em só um dos lados é avaliada com a mesma
-fórmula (o lado ausente tem contagens zero).
+Linhas com N_S = 0 e N_L = 0 são ignoradas. Um lado com contagens zero **provadas** por um universo
+oficial completo (tipo sem equipe no arquivo oficial por equipe) é avaliado com a mesma fórmula. Uma linha
+oficial **ausente**, ou uma linha de zeros do agregado público, não é um lado com zeros: o pack fica
+PENDING.
 
 ## Veredito do pack
 
 - **PASSED** se há ao menos uma linha avaliada e toda linha avaliada (eSF e eAP) passa.
 - **FAILED** se alguma linha reprova.
 - **PENDING** se não há quadrimestre de referência elegível publicado, se faltam as entradas locais
-  dos quatro meses do quadrimestre, ou se nenhuma linha é avaliável (todas ignoradas por N_S = 0 e
-  N_L = 0; razão "sem linhas avaliáveis"). Um PASSED sem linhas seria vazio.
+  dos quatro meses do quadrimestre, se a referência oficial está incompleta (equipe do arquivo sem a
+  linha do indicador; linha de tipo, lista de equipes ou linha de zeros que o agregado não prova), se o
+  universo de equipes é desconhecido numa rodada de gate (agregado público), ou se nenhuma linha é
+  avaliável (todas ignoradas por N_S = 0 e N_L = 0; razão "sem linhas avaliáveis"). Um PASSED sem linhas
+  seria vazio.
 
 ## Mascaramento e privacidade
 
 A evidência versionada (documento-resumo) mostra, por linha: indicador, tipo de equipe, N_S e N_L
 (escritos `<10` quando menores que 10), D, T, veredito, quadrimestre de referência, versão da regra,
 id do check e data. **Contagens por classe e classes por INE ficam só em um diretório local ignorado
-pelo git.** Nunca há dado de paciente.
+pelo git.** Nunca há dado de paciente. O resumo traz também o fingerprint da fonte local (um hash dos
+extratos de que as classes locais saíram).
 
 ## Escopo e adiamentos
 
 A importação V13 de relatórios do SIAPS e o bloco "oficial importado" na tela, do plano original,
 ficam adiados: os portões não precisam deles e o produto não chama o SIAPS.
 
-## Modo informativo
+## Modo diagnóstico
 
-A ferramenta também pode rodar contra um quadrimestre inelegível (por exemplo 2026Q1) em modo
-**informativo**. O documento gerado leva a marca "não é evidência do Portão D" e **nunca** é gravado
-no registro de portões. O modo informativo nunca produz PASSED nem FAILED no registro.
+A ferramenta também roda, em modo **diagnóstico**, uma referência que não decide o portão: um
+quadrimestre inelegível (por exemplo 2026Q1) ou o agregado público, que não traz o universo histórico. O
+documento gerado (`diagnostico-portao-d-...md`) leva a marca "não é evidência do Portão D" e **nunca** é
+gravado no registro de portões. O modo diagnóstico nunca produz PASSED nem FAILED no registro.
 
 ## Como o D é gravado
 

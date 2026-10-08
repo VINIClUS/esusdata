@@ -36,7 +36,7 @@ public final class Eligibility {
 
     /**
      * True only when {@code compared} is exactly the pack's reference: the most recent eligible
-     * published quadrimestre. Any other quadrimestre, even an eligible one, is informative: picking
+     * published quadrimestre. Any other quadrimestre, even an eligible one, is diagnostic: picking
      * the one that happens to pass is what the rule forbids.
      */
     public static boolean isReference(GatePack pack, Quadrimestre compared, Collection<String> published) {

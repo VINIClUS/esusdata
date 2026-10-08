@@ -7,20 +7,26 @@ import java.util.regex.Pattern;
 
 /**
  * The spellings the SIAPS and the product disagree on: the quadrimestre ({@code 2026Q2} against
- * {@code 2026-Q2}), the municipality (6 digits, no check digit, against 7) and the INE (10 digits,
- * zero-padded; the PEC may hand it back without the leading zeros).
+ * {@code 2026-Q2}, and {@code Q2/26} in the official team export), the municipality (6 digits, no
+ * check digit, against 7) and the INE (10 digits, zero-padded; the PEC may hand it back without the
+ * leading zeros).
  */
 public final class SiapsFormats {
 
     private static final Pattern SIAPS_QUADRIMESTRE = Pattern.compile("(\\d{4})Q([1-3])");
     private static final Pattern LONG_QUADRIMESTRE = Pattern.compile("([1-3])\\D*Quadrimestre/(\\d{4})");
+    private static final Pattern EXPORT_QUADRIMESTRE = Pattern.compile("Q([1-3])/(\\d{2})");
+    private static final int CENTURY = 2000;
     private static final int IBGE_SIAPS_LENGTH = 6;
     private static final int IBGE_LENGTH = 7;
     private static final int INE_LENGTH = 10;
 
     private SiapsFormats() {}
 
-    /** {@code 2026Q2} or {@code 2º Quadrimestre/2026}, read as the product's quadrimestre. */
+    /**
+     * {@code 2026Q2}, {@code 2º Quadrimestre/2026} or the official export's {@code Q2/26} (a
+     * two-digit year, read as 20yy), read as the product's quadrimestre.
+     */
     public static Quadrimestre quadrimestre(String text) {
         String value = text == null ? "" : text.strip();
         Matcher plain = SIAPS_QUADRIMESTRE.matcher(value);
@@ -30,6 +36,10 @@ public final class SiapsFormats {
         Matcher longForm = LONG_QUADRIMESTRE.matcher(value);
         if (longForm.matches()) {
             return new Quadrimestre(Integer.parseInt(longForm.group(2)), Integer.parseInt(longForm.group(1)));
+        }
+        Matcher export = EXPORT_QUADRIMESTRE.matcher(value);
+        if (export.matches()) {
+            return new Quadrimestre(CENTURY + Integer.parseInt(export.group(2)), Integer.parseInt(export.group(1)));
         }
         throw new IllegalArgumentException("unknown quadrimestre spelling: " + text);
     }

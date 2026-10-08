@@ -77,7 +77,8 @@ class SiapsParserTest {
         assertThat(snapshot.published()).contains("2026Q1");
         assertThat(snapshot.counts(110, "eSF")).contains(new ClassCounts(1, 2, 5, 3));
         assertThat(snapshot.counts(108, "eSF")).isEmpty();
-        assertThat(snapshot.teamsOf(110)).hasSize(2);
+        assertThat(snapshot.teamsOf(110))
+                .hasValueSatisfying(teams -> assertThat(teams).hasSize(2));
         assertThat(snapshot.teamsOf(108)).isEmpty();
     }
 

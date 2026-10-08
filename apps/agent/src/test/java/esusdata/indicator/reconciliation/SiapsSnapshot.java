@@ -70,9 +70,10 @@ public record SiapsSnapshot(
     }
 
     /**
-     * The teams the Nota Final is compared over: those in the list of every one of C1–C7 with the
-     * same type (a team needs all seven indicators to have a note). Empty when the answer lacks
-     * the list of any of the seven.
+     * The teams of the lists of every one of C1–C7 with the same type (a team needs all seven
+     * indicators to have a note). These are today's teams, not the ones the SIAPS counted in the
+     * quadrimestre: they only split the local Nota Final by type in a diagnostic, and are never a
+     * gate universe. Empty when the answer lacks the list of any of the seven.
      */
     public Optional<List<Team>> notaFinalTeams() {
         List<Set<Team>> lists = new ArrayList<>();
@@ -83,7 +84,7 @@ public record SiapsSnapshot(
             lists.add(Set.copyOf(teams.get(pack.siapsCode())));
         }
         List<Team> common = new ArrayList<>();
-        for (Team team : teamsOf(GatePack.all().getFirst().siapsCode())) {
+        for (Team team : teams.get(GatePack.all().getFirst().siapsCode())) {
             if (lists.stream().allMatch(list -> list.contains(team)) && !common.contains(team)) {
                 common.add(team);
             }
@@ -98,7 +99,11 @@ public record SiapsSnapshot(
                 .findFirst();
     }
 
-    public List<Team> teamsOf(int siapsCode) {
-        return teams.getOrDefault(siapsCode, List.of());
+    /**
+     * The current team list the SIAPS gave for an indicator, or nothing when it gave none: an
+     * absent list is not an empty one, and no team is not a team that does not exist.
+     */
+    public Optional<List<Team>> teamsOf(int siapsCode) {
+        return Optional.ofNullable(teams.get(siapsCode));
     }
 }

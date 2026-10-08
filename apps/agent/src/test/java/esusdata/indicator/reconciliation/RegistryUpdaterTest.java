@@ -11,7 +11,6 @@ import esusdata.indicator.model.GateCheck;
 import esusdata.indicator.model.GateId;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.pack.c4.C4Pack;
-import esusdata.indicator.reconciliation.PackVerdict.Mode;
 import esusdata.indicator.reconciliation.PackVerdict.Status;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -34,8 +33,18 @@ class RegistryUpdaterTest {
     private static final GatePack PACK = GatePack.byPackId(DESCRIPTOR.id()).orElseThrow();
     private static final LocalDate DAY = LocalDate.of(2026, 10, 7);
 
-    private static PackVerdict verdict(Mode mode, Status status) {
-        return new PackVerdict(PACK, DESCRIPTOR.ruleVersion(), mode, status, "", "2026Q2", List.of(), 0, List.of());
+    private static PackVerdict verdict(ReferencePurpose purpose, Status status) {
+        return new PackVerdict(
+                PACK,
+                DESCRIPTOR.ruleVersion(),
+                purpose,
+                status,
+                "",
+                "2026Q2",
+                List.of(),
+                0,
+                List.of(),
+                PackVerdict.NO_LOCAL_SOURCE);
     }
 
     private static Path copyOfTheRealRegistry(Path directory) throws IOException {
@@ -63,7 +72,7 @@ class RegistryUpdaterTest {
         Path file = copyOfTheRealRegistry(directory);
         String before = Files.readString(file);
 
-        RegistryUpdater.record(file, REPO, verdict(Mode.GATE, Status.PASSED), DAY, EVIDENCE, sha());
+        RegistryUpdater.record(file, REPO, verdict(ReferencePurpose.GATE, Status.PASSED), DAY, EVIDENCE, sha());
 
         JsonNode d = gateD(file, DESCRIPTOR.id());
         assertThat(d.path("status").asString()).isEqualTo("PASSED");
@@ -101,7 +110,7 @@ class RegistryUpdaterTest {
     void aFailedGateIsValidAndAPendingOneCarriesNoCheckNorDate(@TempDir Path directory) throws Exception {
         Path file = copyOfTheRealRegistry(directory);
 
-        RegistryUpdater.record(file, REPO, verdict(Mode.GATE, Status.FAILED), DAY, EVIDENCE, sha());
+        RegistryUpdater.record(file, REPO, verdict(ReferencePurpose.GATE, Status.FAILED), DAY, EVIDENCE, sha());
         assertThat(gateD(file, DESCRIPTOR.id()).path("status").asString()).isEqualTo("FAILED");
         assertThat(ReleaseGateRegistry.fromJson(Files.readString(file))
                         .statusOf(DESCRIPTOR)
@@ -109,7 +118,7 @@ class RegistryUpdaterTest {
                         .check())
                 .isEqualTo("siaps-distribuicao-por-classe@1");
 
-        RegistryUpdater.record(file, REPO, verdict(Mode.GATE, Status.PENDING), DAY, null, null);
+        RegistryUpdater.record(file, REPO, verdict(ReferencePurpose.GATE, Status.PENDING), DAY, null, null);
         JsonNode d = gateD(file, DESCRIPTOR.id());
         assertThat(d.path("status").asString()).isEqualTo("PENDING");
         assertThat(d.has("check")).isFalse();
@@ -123,16 +132,16 @@ class RegistryUpdaterTest {
     }
 
     @Test
-    void neverRecordsAnInformativeResult(@TempDir Path directory) throws Exception {
+    void neverRecordsADiagnosticResult(@TempDir Path directory) throws Exception {
         Path file = copyOfTheRealRegistry(directory);
         String before = Files.readString(file);
 
         assertThatThrownBy(() -> RegistryUpdater.record(
-                        file, REPO, verdict(Mode.INFORMATIVO, Status.PASSED), DAY, EVIDENCE, sha()))
+                        file, REPO, verdict(ReferencePurpose.DIAGNOSTIC, Status.PASSED), DAY, EVIDENCE, sha()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("informative");
-        assertThatThrownBy(() ->
-                        RegistryUpdater.record(file, REPO, verdict(Mode.INFORMATIVO, Status.PENDING), DAY, null, null))
+                .hasMessageContaining("diagnostic");
+        assertThatThrownBy(() -> RegistryUpdater.record(
+                        file, REPO, verdict(ReferencePurpose.DIAGNOSTIC, Status.PENDING), DAY, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(Files.readString(file)).isEqualTo(before);
     }
@@ -141,7 +150,7 @@ class RegistryUpdaterTest {
     void refusesADecidedGateWhoseEvidenceIsMissingOrDoesNotMatch(@TempDir Path directory) throws Exception {
         Path file = copyOfTheRealRegistry(directory);
         String before = Files.readString(file);
-        PackVerdict passed = verdict(Mode.GATE, Status.PASSED);
+        PackVerdict passed = verdict(ReferencePurpose.GATE, Status.PASSED);
 
         assertThatThrownBy(() -> RegistryUpdater.record(file, REPO, passed, DAY, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -161,7 +170,16 @@ class RegistryUpdaterTest {
         Path file = copyOfTheRealRegistry(directory);
         String before = Files.readString(file);
         PackVerdict otherVersion = new PackVerdict(
-                PACK, PACK.packId() + "@9.9.9", Mode.GATE, Status.PASSED, "", "2026Q2", List.of(), 0, List.of());
+                PACK,
+                PACK.packId() + "@9.9.9",
+                ReferencePurpose.GATE,
+                Status.PASSED,
+                "",
+                "2026Q2",
+                List.of(),
+                0,
+                List.of(),
+                PackVerdict.NO_LOCAL_SOURCE);
 
         assertThatThrownBy(() -> RegistryUpdater.record(file, REPO, otherVersion, DAY, EVIDENCE, sha()))
                 .isInstanceOf(IllegalArgumentException.class)
