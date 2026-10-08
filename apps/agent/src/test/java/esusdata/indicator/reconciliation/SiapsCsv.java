@@ -79,6 +79,7 @@ public final class SiapsCsv {
     private static Row row(List<String> cells, String type) {
         String quadrimestre = SiapsFormats.quadrimestre(SiapsFormats.quadrimestre(cells.get(0)));
         return new Row(
+                cells.get(2).strip(), // "Código IBGE": the municipality the row is about
                 quadrimestre,
                 indicator(cells.get(5)),
                 type,

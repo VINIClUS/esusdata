@@ -28,11 +28,12 @@ class PackVerdictTest {
 
     private static SiapsSnapshot snapshot(ClassCounts esf, ClassCounts eap, List<SiapsSnapshot.Team> teams) {
         return new SiapsSnapshot(
+                "999999",
                 "2026Q2",
                 List.of("2026Q2"),
                 List.of(
-                        new SiapsSnapshot.Row("2026Q2", 110, "eSF", esf),
-                        new SiapsSnapshot.Row("2026Q2", 110, "eAP", eap)),
+                        new SiapsSnapshot.Row("999999", "2026Q2", 110, "eSF", esf),
+                        new SiapsSnapshot.Row("999999", "2026Q2", 110, "eAP", eap)),
                 Map.of(110, teams));
     }
 

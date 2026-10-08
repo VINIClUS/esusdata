@@ -36,16 +36,16 @@ class NotaFinalVerdictTest {
 
     private static final String FILTRO = """
             {"classificacaoFinalComponente":[
-              {"nuQuadrimestre":"2026Q2","sgEquipe":"eSF","tipoOrigem":"QUALIDADE",
+              {"nuQuadrimestre":"2026Q2","coMunicipioIbge":"999999","sgEquipe":"eSF","tipoOrigem":"QUALIDADE",
                "qtdClassificacaoOtimo":3,"qtdClassificacaoBom":5,"qtdClassificacaoSuficiente":2,"qtdClassificacaoRegular":1,
                "totalEquipesValidasParaComponente":11},
-              {"nuQuadrimestre":"2026Q2","sgEquipe":"eAP","tipoOrigem":"QUALIDADE",
+              {"nuQuadrimestre":"2026Q2","coMunicipioIbge":"999999","sgEquipe":"eAP","tipoOrigem":"QUALIDADE",
                "qtdClassificacaoOtimo":0,"qtdClassificacaoBom":1,"qtdClassificacaoSuficiente":0,"qtdClassificacaoRegular":0,
                "totalEquipesValidasParaComponente":1},
-              {"nuQuadrimestre":"2026Q2","sgEquipe":"eSF","tipoOrigem":"CVAT",
+              {"nuQuadrimestre":"2026Q2","coMunicipioIbge":"999999","sgEquipe":"eSF","tipoOrigem":"CVAT",
                "qtdClassificacaoOtimo":9,"qtdClassificacaoBom":9,"qtdClassificacaoSuficiente":9,"qtdClassificacaoRegular":9,
                "totalEquipesValidasParaComponente":36},
-              {"nuQuadrimestre":"2026Q2","sgEquipe":"eSB","tipoOrigem":"QUALIDADE",
+              {"nuQuadrimestre":"2026Q2","coMunicipioIbge":"999999","sgEquipe":"eSB","tipoOrigem":"QUALIDADE",
                "qtdClassificacaoOtimo":8,"qtdClassificacaoBom":8,"qtdClassificacaoSuficiente":8,"qtdClassificacaoRegular":8,
                "totalEquipesValidasParaComponente":32}],
              "conceitoPorIndicadorQualidade":[]}
@@ -56,11 +56,12 @@ class NotaFinalVerdictTest {
     /** A snapshot whose final rows are the given counts and whose seven team lists are {@code lists}. */
     private static SiapsSnapshot snapshot(ClassCounts esf, ClassCounts eap, Map<Integer, List<Team>> lists) {
         return new SiapsSnapshot(
+                "999999",
                 "2026Q2",
                 List.of("2026Q2"),
                 List.of(
-                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eSF", esf),
-                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eAP", eap)),
+                        new Row("999999", "2026Q2", GatePack.NOTA_FINAL_CODE, "eSF", esf),
+                        new Row("999999", "2026Q2", GatePack.NOTA_FINAL_CODE, "eAP", eap)),
                 lists);
     }
 
@@ -81,8 +82,8 @@ class NotaFinalVerdictTest {
 
         assertThat(rows)
                 .containsExactly(
-                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eSF", new ClassCounts(1, 2, 5, 3)),
-                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eAP", new ClassCounts(0, 0, 1, 0)));
+                        new Row("999999", "2026Q2", GatePack.NOTA_FINAL_CODE, "eSF", new ClassCounts(1, 2, 5, 3)),
+                        new Row("999999", "2026Q2", GatePack.NOTA_FINAL_CODE, "eAP", new ClassCounts(0, 0, 1, 0)));
     }
 
     @Test
@@ -104,7 +105,8 @@ class NotaFinalVerdictTest {
                 + FILTRO.replace(
                         "\"conceitoPorIndicadorQualidade\":[]",
                         "\"conceitoPorIndicadorQualidade\":["
-                                + "{\"nuQuadrimestre\":\"2026Q2\",\"sgEquipe\":\"eSF\",\"coTipoIndicador\":110,"
+                                + "{\"nuQuadrimestre\":\"2026Q2\",\"coMunicipioIbge\":\"999999\",\"sgEquipe\":\"eSF\","
+                                + "\"coTipoIndicador\":110,"
                                 + "\"qtdClassificacaoOtimo\":1,\"qtdClassificacaoBom\":0,\"qtdClassificacaoSuficiente\":0,"
                                 + "\"qtdClassificacaoRegular\":0}]")
                 + ",\"equipes\":{}}";
@@ -194,7 +196,8 @@ class NotaFinalVerdictTest {
 
     @Test
     void isPendingWithoutTheFinalRowsOrWithoutOneOfTheSevenLists() {
-        SiapsSnapshot noFinalRows = new SiapsSnapshot("2026Q2", List.of("2026Q2"), List.of(), sameListForEvery(TEAMS));
+        SiapsSnapshot noFinalRows =
+                new SiapsSnapshot("999999", "2026Q2", List.of("2026Q2"), List.of(), sameListForEvery(TEAMS));
         Map<Integer, List<Team>> sixLists = sameListForEvery(TEAMS);
         sixLists.remove(GatePack.all().getLast().siapsCode());
 

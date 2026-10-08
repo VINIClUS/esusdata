@@ -119,8 +119,13 @@ public final class SummaryWriter {
 
     /** The lowercase hex SHA-256 of a file. */
     public static String sha256(Path file) throws IOException {
+        return sha256(Files.readAllBytes(file));
+    }
+
+    /** The lowercase hex SHA-256 of {@code content}. */
+    public static String sha256(byte[] content) {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }

@@ -7,25 +7,56 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * What one read of the public SIAPS gives for one municipality and one quadrimestre: the
- * quadrimestres published, the class counts per indicator and team type, and the team list (INE to
- * eSF/eAP) per indicator. Only team counts by class: no patient, no per-team class.
+ * What one read of the public SIAPS gives for one municipality and one quadrimestre: the class
+ * counts per indicator and team type, the team list (INE to eSF/eAP) per indicator and, as capture
+ * metadata only, the quadrimestres the SIAPS listed as published. Only team counts by class: no
+ * patient, no per-team class.
  *
+ * <p>A snapshot is about exactly one municipality and one quadrimestre, and every {@link Row}
+ * says which: a row of another municipality or period is refused here, not compared. The list of
+ * published quadrimestres is never an authority for anything (which period may decide the gate is
+ * a pre-registered reference, not the newest published one).
+ *
+ * @param municipalityIbge the municipality as the SIAPS spells it: 6 digits, no check digit
  * @param quadrimestre the quadrimestre the rows are about, as the SIAPS spells it ({@code 2026Q2})
- * @param published every quadrimestre the SIAPS lists as published
- * @param teams the team list by SIAPS indicator code
+ * @param published every quadrimestre the SIAPS lists as published (capture metadata)
+ * @param teams the current team list by SIAPS indicator code
  */
 public record SiapsSnapshot(
-        String quadrimestre, List<String> published, List<Row> rows, Map<Integer, List<Team>> teams) {
+        String municipalityIbge,
+        String quadrimestre,
+        List<String> published,
+        List<Row> rows,
+        Map<Integer, List<Team>> teams) {
 
     public SiapsSnapshot {
+        municipalityIbge = SiapsFormats.ibgeOfSiaps(municipalityIbge);
         published = List.copyOf(published);
         rows = List.copyOf(rows);
         teams = Map.copyOf(teams);
+        for (Row row : rows) {
+            if (!row.municipalityIbge().equals(municipalityIbge)
+                    || !row.quadrimestre().equals(quadrimestre)) {
+                throw new IllegalArgumentException("a snapshot holds one municipality and one quadrimestre: "
+                        + row.municipalityIbge() + " " + row.quadrimestre() + " is not " + municipalityIbge + " "
+                        + quadrimestre);
+            }
+        }
     }
 
-    /** The class counts of one indicator and team type (eSF or eAP) in a quadrimestre. */
-    public record Row(String quadrimestre, int siapsCode, String teamType, ClassCounts counts) {}
+    /**
+     * The class counts of one indicator and team type (eSF or eAP) in a quadrimestre of a
+     * municipality.
+     *
+     * @param municipalityIbge the municipality the SIAPS row is about (6 digits)
+     */
+    public record Row(
+            String municipalityIbge, String quadrimestre, int siapsCode, String teamType, ClassCounts counts) {
+
+        public Row {
+            municipalityIbge = SiapsFormats.ibgeOfSiaps(municipalityIbge);
+        }
+    }
 
     /** A team of the SIAPS list: its INE (10 digits) and its type. */
     public record Team(String ine, String teamType) {}
