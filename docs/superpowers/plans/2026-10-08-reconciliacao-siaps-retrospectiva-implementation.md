@@ -26,7 +26,7 @@
 - Compatibilidade metodológica é decidida por perfil normativo e probes; igualdade NM/DN/score/classe local × oficial é diagnóstico do dossiê e só é julgada na reconciliação.
 - O conjunto de gate é derivado: toda referência `ACTIVE` com dossiê `EXACT|EQUIVALENT_FOR_REFERENCE` da `pack + rule_version` é `GATE` obrigatória; não há escolha de subconjunto.
 - Todo veredito de gate carrega a `local_source_fingerprint` da execução e exige igualdade com a do dossiê; divergência → `PENDING`.
-- O repositório faz squash-merge: pré-registro do conjunto de gate e resultado do gate são PRs distintos, mergeados nessa ordem.
+- O repositório faz squash-merge: o PR de evidência real (que também deriva o conjunto de gate) e o PR de resultado do gate são distintos, mergeados nessa ordem.
 - O conjunto de gate usa `ALL_REQUIRED`; não há fallback para outro período que passe.
 - Não adicionar dependência de produção; usar Java padrão e bibliotecas já presentes.
 - Cada tarefa abaixo termina com suíte verde e commit revisável; nenhum commit intermediário pode deixar contratos e catálogos inconsistentes.
@@ -527,7 +527,7 @@ git commit -m "refactor(portao-d): separate capture compatibility and gate runs"
 - Generate: `docs/indicadores/portoes/references/*.json`
 - Generate: `docs/indicadores/portoes/compatibilidade/*.{json,md}`
 - Create: `docs/discovery/2026-10-<day>-siaps-retrospectivo-siha.md`
-- Modify: `contracts/indicators/siaps-reference-policy.json` with real diagnostic references/hashes
+- Modify: `contracts/indicators/siaps-reference-policy.json` with real references/hashes; every reference whose dossier is `EXACT|EQUIVALENT_FOR_REFERENCE` is promoted to `GATE` (`required=true`) in the same commit as its dossier
 
 **Interfaces:**
 - Consumes all prior tasks.
@@ -557,14 +557,18 @@ Generate C1–C7 and Component III dossiers for 2026Q1 and every other covered p
 
 No committed JSON/Markdown may contain INE, CPF, CNS, person key, names, raw per-team values or credentials. Every dossier must list all required probes and a terminal verdict. C1–C7 for 2026Q1 must not all remain `INCONCLUSIVE`; if they do, the implementation is incomplete.
 
-- [ ] **Step 7: Commit real evidence**
+- [ ] **Step 7: Derive the gate set**
+
+In the same change, set `purpose=GATE`, `required=true`, `compatibility` and the dossier hash for **every** `ACTIVE` reference whose dossier is `EXACT|EQUIVALENT_FOR_REFERENCE`; all others stay `DIAGNOSTIC`. No manual choice. `ReferencePolicyConsistencyTest` must pass, and the PR body lists each `gate_set_sha256`. This PR is the pre-registration: the gate runner must not run before it is merged.
+
+- [ ] **Step 8: Commit real evidence**
 
 ```bash
 git add contracts/indicators/siaps-reference-policy.json \
   docs/indicadores/portoes/references \
   docs/indicadores/portoes/compatibilidade \
   docs/discovery/2026-10-*-siaps-retrospectivo-siha.md
-git commit -m "test(portao-d): record retrospective SIAPS evidence from siha"
+git commit -m "test(portao-d): record retrospective SIAPS evidence from siha and derive gate set"
 ```
 
 ### Task 10: Aggregate required references, harden the registry for `@2`, retire date-based eligibility
@@ -608,7 +612,7 @@ The evidence summary names `gate_set_sha256`, every reference/manifest/dossier h
 
 - [ ] **Step 5: Remove date-based authority and update docs**
 
-Delete `firstEligible/reference/isReference/waitingFor`; remove `lastSignature`, `NT8_LAST_SIGNATURE` and `floor()` as selection mechanisms. Dates remain metadata in dossiers. The ADR records the squash-merge pre-registration protocol (Tasks 11–12).
+Delete `firstEligible/reference/isReference/waitingFor`; remove `lastSignature`, `NT8_LAST_SIGNATURE` and `floor()` as selection mechanisms. Dates remain metadata in dossiers. The ADR records the squash-merge pre-registration protocol (Task 9 derives and registers the set; Task 11 records the result).
 
 - [ ] **Step 6: Run full verification**
 
@@ -632,30 +636,7 @@ git add contracts/indicators docs apps/agent/src/test CONTEXT.md
 git commit -m "feat(portao-d): adopt retrospective SIAPS reconciliation v2"
 ```
 
-### Task 11: Pre-register the gate reference set (own PR)
-
-**Files:**
-- Modify only: `contracts/indicators/siaps-reference-policy.json`
-
-- [ ] **Step 1: Promote only decided references**
-
-Promote to `GATE` (`required=true`, `ACTIVE`) **every** active reference whose committed dossier is `EXACT|EQUIVALENT_FOR_REFERENCE`, with manifest and dossier hashes — no subset selection; `ReferencePolicyConsistencyTest` rejects an eligible reference left as `DIAGNOSTIC`. Do not run the gate runner before this PR is merged.
-
-- [ ] **Step 2: Record the gate set hashes in the PR body**
-
-List `gate_set_sha256` per `pack + rule_version`, as printed by `ReferencePolicyConsistencyTest`.
-
-- [ ] **Step 3: Verify and commit**
-
-```bash
-mvn -B -f apps/agent/pom.xml test -Dtest='ReferencePolicy*Test,ReleaseGatesConsistencyTest,PortaoDEvidence*Test'
-git add contracts/indicators/siaps-reference-policy.json
-git commit -m "chore(portao-d): pre-register SIAPS gate references"
-```
-
-The PR must be merged to `main` before Task 12 starts. `release-gates.json` must not change in this PR.
-
-### Task 12: Execute the `@2` gate and record D (own PR)
+### Task 11: Execute the `@2` gate and record D (own PR)
 
 **Files:**
 - Modify: `contracts/indicators/release-gates.json`
@@ -663,7 +644,7 @@ The PR must be merged to `main` before Task 12 starts. `release-gates.json` must
 
 - [ ] **Step 1: Run the gate runner from a clean checkout of `main`**
 
-Use the merge commit of Task 11. The runner refuses to start if the working tree differs from `HEAD` or if any `GATE` declaration differs from `HEAD`. Run from the persisted extracts of the Task 9 campaign so the `local_source_fingerprint` matches each dossier; a re-acquisition with a different fingerprint leaves that reference `PENDING` and requires a new dossier.
+Use a `main` commit that contains both PR C (evidence and derived gate set) and PR D (gate code). The runner refuses to start if the working tree differs from `HEAD` or if any `GATE` declaration differs from `HEAD`. Run from the persisted extracts of the Task 9 campaign so the `local_source_fingerprint` matches each dossier; a re-acquisition with a different fingerprint leaves that reference `PENDING` and requires a new dossier.
 
 - [ ] **Step 2: Record the result**
 
@@ -687,10 +668,9 @@ This PR must not change any `GATE` declaration of the policy; `ReleaseGatesConsi
 2. **PR B — methodology evidence engine:** Tasks 5–8. Depends on PR A.
 3. **PR C — real `siha` evidence:** Task 9 plus only fixes exposed by the campaign. Depends on PR B.
 4. **PR D — gate `@2` code and retirement of date-based eligibility:** Task 10. Depends on PR A and PR B; independent of PR C (all D remain `PENDING`).
-5. **PR E — gate pre-registration:** Task 11. Depends on PR C and PR D.
-6. **PR F — gate result:** Task 12. Depends on PR E merged to `main`.
+5. **PR E — gate result:** Task 11. Depends on PR C and PR D merged to `main`.
 
-The repository squash-merges PRs, so pre-registration and result are separate PRs, never separate commits of one PR. Reviewers prove the set was fixed before the result was observed by the order of the two `main` commits and by the `gate_set_sha256` cited in D.
+The repository squash-merges PRs, so registration of the gate set (PR C) and the result (PR E) are separate PRs, never separate commits of one PR. Reviewers prove the set was fixed before the result was observed by the order of the two `main` commits and by the `gate_set_sha256` cited in D.
 
 ## Completion Definition
 
@@ -701,6 +681,6 @@ The feature is complete only when:
 - dossier replay is reproducible with the `siha` tunnel closed (local opt-in replay, recorded in the campaign document);
 - every required probe executed;
 - no verdict depends solely on date;
-- any promoted reference was pre-registered in a PR merged before the gate-result PR;
+- the gate set was derived deterministically and merged (PR C) before the gate-result PR;
 - `@2` evidence passes consistency and privacy tests;
 - full Java, Rust and web verification is green.

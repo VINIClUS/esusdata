@@ -225,7 +225,7 @@ Regras:
 4. `DIAGNOSTIC` nunca é obrigatório;
 5. uma execução ad hoc não promove a referência;
 6. política e referência são fixadas antes da execução que poderá alterar D;
-7. **o conjunto de gate é derivado, não escolhido:** toda referência `ACTIVE` da mesma `pack + rule_version` cujo dossiê versionado seja `EXACT|EQUIVALENT_FOR_REFERENCE` é obrigatoriamente `GATE` e `required=true`. O teste de consistência falha se uma referência elegível permanecer `DIAGNOSTIC`. Como os dossiês registram a comparação de saída local × oficial antes do pré-registro, permitir a escolha de um subconjunto deixaria omitir as referências compatíveis que falham; a regra determinística elimina essa escolha. Uma referência só sai do conjunto por `SUPERSEDED|RETRACTED` com evidência de drift, ou por novo dossiê decorrente de nova versão do perfil metodológico;
+7. **o conjunto de gate é derivado, não escolhido:** toda referência `ACTIVE` da mesma `pack + rule_version` cujo dossiê versionado seja `EXACT|EQUIVALENT_FOR_REFERENCE` é obrigatoriamente `GATE` e `required=true`. O teste de consistência falha se uma referência elegível permanecer `DIAGNOSTIC`. Como os dossiês registram a comparação de saída local × oficial antes do pré-registro, permitir a escolha de um subconjunto deixaria omitir as referências compatíveis que falham; a regra determinística elimina essa escolha. Uma referência só sai do conjunto por `SUPERSEDED|RETRACTED` com evidência de drift, ou por novo dossiê decorrente de nova versão do perfil metodológico. Por isso a promoção a `GATE` acontece **no mesmo commit** em que o dossiê elegível é versionado: não existe estado intermediário em que um dossiê compatível esteja no repositório com a referência ainda `DIAGNOSTIC`;
 8. remover uma referência `GATE` que falhou muda o hash do conjunto de gate e exige nova evidência; não converte silenciosamente o conjunto em `PASSED`;
 9. o campo `compatibility` da declaração deve ser igual ao `verdict` do dossiê citado; divergência falha o teste de consistência.
 
@@ -581,13 +581,13 @@ Novo quadrimestre publicado não invalida D automaticamente, e acrescentar ou al
 ### 16.2 Promoção a gate
 
 1. captura e manifesto já existem;
-2. dossiê decidido já existe;
-3. política é alterada para `GATE`, com hash do dossiê, para **todas** as referências elegíveis da `pack + rule_version` (regra 7 da seção 8.1), sem escolha de subconjunto;
-4. a alteração entra **em PR próprio, mergeado em `main` antes da execução de gate**;
+2. o dossiê decidido é versionado e, no mesmo commit, a política marca como `GATE` **todas** as referências elegíveis da `pack + rule_version` (regra 7 da seção 8.1), sem escolha de subconjunto;
+3. esse PR (o de evidência real) é o pré-registro e é mergeado em `main` antes da execução de gate;
+4. o PR de resultado não pode alterar declarações `GATE`;
 5. a reconciliação roda exatamente contra o conjunto registrado em `main`, cujo `gate_set_sha256` é citado na evidência;
 6. o resumo e eventual atualização de D entram em PR posterior.
 
-O repositório faz squash-merge; dois commits no mesmo PR seriam fundidos e perderiam a prova de ordem. A prova de pré-registro é o commit de `main` do PR de pré-registro, anterior ao commit de `main` do PR de resultado. O PR de resultado não pode alterar declarações `GATE` da política; o teste de consistência compara o `gate_set_sha256` citado com o da política atual.
+O repositório faz squash-merge; dois commits no mesmo PR seriam fundidos e perderiam a prova de ordem. A prova de pré-registro é o commit de `main` do PR de evidência, anterior ao commit de `main` do PR de resultado. Como o conjunto é derivado das conclusões metodológicas, e não escolhido, ter visto a comparação de saída nos dossiês não abre espaço para cherry-picking. O PR de resultado não pode alterar declarações `GATE` da política; o teste de consistência compara o `gate_set_sha256` citado com o da política atual.
 
 ### 16.3 Drift oficial
 
@@ -727,15 +727,11 @@ Perfis, probes, runner somente leitura, dossiês e execução real de 2026Q1 e d
 
 Conjunto `ALL_REQUIRED`, `gate_set_sha256`, integração com registro, consistência de evidências, documentação e migração de `@1` para `@2`.
 
-### Slice 5 — pré-registro
+### Slice 5 — resultado do gate
 
-Somente a promoção das referências decididas a `GATE` na política. Nenhuma mudança em `release-gates.json`.
+Execução do check `@2` contra o conjunto registrado em `main` pela Slice 3 e gravação de D.
 
-### Slice 6 — resultado do gate
-
-Execução do check `@2` contra o conjunto pré-registrado em `main` e gravação de D.
-
-Cada slice deve ser um PR independente e deixar software testável. O PR de Slice 3 deve conter os dossiês reais mascarados produzidos no `siha`. As slices 5 e 6 são obrigatoriamente PRs distintos, mergeados nessa ordem.
+Cada slice deve ser um PR independente e deixar software testável. O PR de Slice 3 deve conter os dossiês reais mascarados produzidos no `siha` e, no mesmo commit, a promoção determinística das referências elegíveis a `GATE`. As slices 3 e 5 são obrigatoriamente PRs distintos, mergeados nessa ordem.
 
 ## 21. Critérios de aceitação
 
@@ -765,7 +761,7 @@ Cada slice deve ser um PR independente e deixar software testável. O PR de Slic
 24. nova `rule_version` volta D para `PENDING`;
 25. publicação de novo quadrimestre ou nova declaração `DIAGNOSTIC` não invalida automaticamente D existente;
 26. compatibilidade metodológica não depende de igualdade entre saída local e oficial; erro local de cálculo resulta em `FAILED`, não em `PENDING`;
-27. o pré-registro do conjunto de gate é mergeado em `main` antes do PR que grava o resultado;
+27. o conjunto de gate (derivado no PR de evidência) é mergeado em `main` antes do PR que grava o resultado;
 28. o conjunto de gate contém todas as referências ativas metodologicamente compatíveis, sem escolha manual de subconjunto;
 29. cada veredito de referência no gate usa a mesma `local_source_fingerprint` do dossiê que a autorizou.
 
