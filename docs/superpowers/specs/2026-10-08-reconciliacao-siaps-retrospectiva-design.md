@@ -1,259 +1,182 @@
-# Spec de design — reconciliação retrospectiva e versionada com o SIAPS
+# Spec de design — reconciliação retrospectiva e evidência metodológica executável do SIAPS
 
 **Data:** 2026-10-08  
-**Status:** proposta para revisão  
+**Status:** revisada para planejamento e revisão no PR  
 **Escopo:** Portão D de C1–C7 e da Nota Final do Componente III  
 **Base analisada:** `main` em `4489a14` (`v0.2.2`)  
-**Substitui, após implementação:** a seleção temporal de referência de `siaps-distribuicao-por-classe@1` e `siaps-nota-final-por-classe@1`
+**Substitui, após implementação:** a seleção temporal de `siaps-distribuicao-por-classe@1` e `siaps-nota-final-por-classe@1`
 
-## 1. Resumo executivo
+## 1. Decisão
 
-O desenho atual do Portão D espera o primeiro quadrimestre cujo término seja posterior às datas de assinatura das fichas e da NT 8/2026. Para C1–C7, isso fixa 2026Q2 como a primeira referência possível. A regra também escolhe o quadrimestre elegível mais recente publicado no SIAPS.
+O Portão D não deve esperar o primeiro quadrimestre encerrado depois da assinatura das fichas nem escolher automaticamente o quadrimestre publicado mais recente. O encerramento do período, a assinatura da norma, a publicação e o reprocessamento no SIAPS são eventos distintos. A data, isoladamente, não prova compatibilidade nem incompatibilidade metodológica.
 
-Esse desenho mistura três relógios diferentes:
+A implementação adotará uma **reconciliação retrospectiva, versionada e orientada a evidências**:
 
-1. o período em que os eventos de saúde ocorreram;
-2. a data em que uma ficha ou nota técnica foi assinada;
-3. a data e a revisão em que o SIAPS processou ou reprocessou o período.
+1. **2026Q1 e todos os demais quadrimestres publicados devem ser executados imediatamente**, sempre que a instalação local tiver os quatro meses necessários.
+2. Essas execuções nascem como `DIAGNOSTIC`; não alteram `release-gates.json`.
+3. A própria implementação deve gerar **evidência explícita de compatibilidade metodológica** para cada `pack × referência`, usando:
+   - fontes normativas oficiais e releases do SIAPS;
+   - arquivo oficial por equipe/INE quando disponível;
+   - execução somente leitura contra a instalação de teste acessível pelo alias local `ssh siha`;
+   - detectores executáveis para todas as diferenças metodológicas conhecidas.
+4. Nenhuma referência recebe `EXACT`, `EQUIVALENT_FOR_REFERENCE`, `INCOMPATIBLE` ou `INCONCLUSIVE` apenas por sua data.
+5. Um período só pode decidir o Portão D quando estiver pré-registrado como referência `GATE`, possuir revisão imutável e tiver dossiê de compatibilidade decidido.
+6. A implementação desta spec **não termina apenas com a infraestrutura pronta**. Ela termina depois de produzir e revisar os dossiês reais de 2026Q1 e dos demais períodos cobertos no `siha`.
 
-O histórico oficial do SIAPS mostra que competências podem ser publicadas meses depois, que os dados são marcados como preliminares e que períodos antigos podem ser reprocessados após mudanças metodológicas ou correções. Logo, a data final do quadrimestre e a data de assinatura não bastam para determinar qual metodologia gerou um resultado oficial.
-
-A decisão desta spec é substituir a elegibilidade por data por uma **reconciliação retrospectiva orientada a referências versionadas**:
-
-- todo quadrimestre já publicado pode ser capturado e executado imediatamente como **backtest diagnóstico**;
-- um quadrimestre só pode decidir o Portão D quando estiver pré-registrado como referência de portão e houver evidência de que a metodologia oficial é `EXACT` ou `EQUIVALENT` à `rule_version` local;
-- a fonte preferida é um **CSV oficial por equipe/INE**, baixado manualmente do módulo de Transferência de Arquivos ou do Detalhamento por Equipe;
-- a distribuição pública agregada continua útil, mas não usa a lista atual de equipes como se fosse histórica e, sem um universo de equipes do período, não basta sozinha para liberar o portão;
-- cada captura oficial é imutável, identificada por hash e separada da execução local;
-- a escolha do período ocorre antes de se observar o resultado local, impedindo seleção do quadrimestre que “passa”;
-- o Portão D passa a validar uma implementação de regra contra ao menos uma referência oficial compatível. Ele não é um relógio de publicação do quadrimestre mais recente.
-
-Os novos identificadores de verificação serão:
+Novos checks:
 
 - C1–C7: `siaps-distribuicao-por-classe@2`;
 - Nota Final: `siaps-nota-final-por-classe@2`.
 
-## 2. Evidência que motiva a mudança
+## 2. Evidência que invalida a premissa atual
 
-### 2.1 A publicação não acompanha imediatamente o encerramento da competência
+O calendário oficial fixa a data limite de envio municipal, não uma data garantida de processamento ou publicação. O histórico oficial registra cargas posteriores ao fechamento, resultados preliminares, correções e reprocessamentos de períodos antigos. Exemplos incluem reprocessamentos de C2 e C3 de janeiro–abril/2025 após atualização de ficha, reprocessamento dos indicadores de janeiro–outubro/2025 e reprocessamento de Q1/2026 após mudança normativa.
 
-O calendário oficial estabelece o prazo de envio municipal, mas não promete a data de processamento e publicação do resultado. Exemplos no histórico oficial:
-
-- a competência junho/2025 foi disponibilizada em 15/09/2025;
-- agosto/2025 foi disponibilizado em 28/10/2025;
-- setembro e outubro/2025 foram disponibilizados em 25/11/2025;
-- março/2026 foi carregado em 15/05/2026;
-- abril/2026 foi carregado em 23/06/2026;
-- junho/2026 foi disponibilizado em 02/09/2026;
-- julho/2026 foi disponibilizado em 10/09/2026.
-
-Portanto, esperar 2026Q2 pode manter o produto bloqueado por um intervalo que não é controlado pelo projeto e não mede a qualidade da implementação local.
-
-### 2.2 Um período publicado não é uma versão imutável
-
-O SIAPS reprocessa períodos anteriores:
-
-- janeiro–abril/2025 de C3 e C2 foram reprocessados após atualização das fichas;
-- janeiro–outubro/2025 foi reprocessado na versão 1.4;
-- Q1/2026 de indicadores odontológicos foi reprocessado após a NT 8/2026;
-- C1 de outubro/2025 e Q3/2025 foi corrigido em setembro/2026.
-
-Desde setembro/2025, o próprio sistema marca resultados como “Dado preliminar”. Assim, “2026Q1” não identifica sozinho uma referência. É necessário identificar também a revisão oficial capturada.
-
-### 2.3 A assinatura da ficha não determina, por si só, a metodologia usada em um período
-
-As fichas atuais foram assinadas em junho/2026, mas não declaram uma competência geral de início. O histórico do SIAPS mostra tanto atualizações prospectivas quanto reprocessamentos retrospectivos. Logo, estas duas inferências são inválidas sem evidência adicional:
-
-- “o quadrimestre terminou antes da assinatura, então obrigatoriamente usou a regra anterior”;
-- “o quadrimestre estava publicado depois da assinatura, então obrigatoriamente foi reprocessado pela regra atual”.
-
-A compatibilidade precisa ser demonstrada por release oficial, metadado do arquivo, documento metodológico ou análise de equivalência versionada.
-
-### 2.4 Há uma referência oficial mais forte que a API pública agregada
-
-O manual oficial descreve:
-
-- detalhamento da Nota Final por equipe/INE;
-- resultados quadrimestrais no módulo de Transferência de Arquivos;
-- numerador e denominador no arquivo do Componente Qualidade;
-- dados agregados e, conforme o perfil autorizado, dados individualizados.
-
-O produto não deve automatizar login nem chamar endpoint privado. Entretanto, uma pessoa autorizada pode baixar o arquivo oficial e entregá-lo à ferramenta como entrada imutável. Para o Portão D, um arquivo por equipe é metodologicamente superior à distribuição pública agregada porque fornece o universo histórico de equipes do período.
-
-## 3. Problemas concretos no desenho atual
-
-### P1 — O Portão D está acoplado à latência operacional do SIAPS
-
-`Eligibility.firstEligible()` fixa 2026Q2 por data de assinatura. Enquanto o SIAPS não o publicar, todos os packs ficam `PENDING`, mesmo existindo vários períodos oficiais úteis para testar aquisição, consolidação, classificação e universo de equipes.
-
-### P2 — “Publicado” e “compatível” são tratados como a mesma coisa
-
-`Eligibility.reference()` seleciona o quadrimestre mais recente publicado depois do piso temporal. A existência no filtro de competências não prova qual edição metodológica gerou o resultado.
-
-### P3 — A referência não possui identidade de revisão
-
-`SiapsSnapshot` registra o quadrimestre e a lista de publicados, mas não registra de forma obrigatória:
-
-- município normalizado;
-- instante da captura;
-- origem da captura;
-- hash do payload bruto;
-- hash do conteúdo normalizado;
-- release oficial ou evidência metodológica;
-- situação `ACTIVE`, `SUPERSEDED` ou `RETRACTED`.
-
-Uma nova captura do mesmo quadrimestre pode ter números diferentes sem que o sistema perceba que é outra revisão.
-
-### P4 — A lista atual de equipes é usada como universo histórico
-
-O endpoint público `filtros/equipes` não recebe quadrimestre e retorna a lista atual. O desenho atual consulta essa lista e a usa para selecionar os INEs de um quadrimestre passado. Uma equipe criada, encerrada ou alterada depois do período pode entrar ou sair da comparação indevidamente.
-
-### P5 — A captura e a avaliação ocorrem no mesmo fluxo
-
-`PortaoDLiveTest` descobre o período, captura a referência, adquire dados locais, avalia e pode gravar o registro. Isso dificulta provar que a escolha do período e da fonte ocorreu antes de conhecer o resultado.
-
-### P6 — Uma referência incompleta pode parecer zero
-
-Uma linha SIAPS ausente é convertida em `ClassCounts.EMPTY`. Ausência de linha não é evidência de distribuição zero. Com o piso de tolerância atual, uma resposta incompleta pode produzir falso `PASSED`.
-
-### P7 — Snapshot e cache não falham fechados em todas as dimensões
-
-O snapshot não preserva obrigatoriamente o município das linhas; a lista de competências embutida pode ficar desatualizada; e os extratos em `target/portao-d/extratos` não são particionados por município, referência, regra e revisão.
-
-## 4. Objetivos
-
-1. Rodar reconciliações imediatamente sobre períodos já publicados, sem esperar 2026Q2.
-2. Manter separadas a utilidade diagnóstica e a autoridade para liberar o Portão D.
-3. Tornar cada referência oficial imutável e reproduzível por hashes e manifestos.
-4. Impedir seleção retrospectiva do quadrimestre que produz o melhor resultado.
-5. Permitir referência oficial por equipe/INE sem automatizar credenciais do SIAPS.
-6. Parar de usar a lista atual de equipes como universo histórico.
-7. Falhar fechado diante de linha, período, município, tipo, revisão ou arquivo ausente.
-8. Continuar sem chamadas ao SIAPS no produto e sem rede na CI.
-9. Manter o contrato de A–D da ADR 0032: D continua associado a `pack@rule_version` e uma nova versão da regra invalida sua aprovação.
-10. Produzir evidência legível, mascarada e suficiente para auditoria.
-
-## 5. Não objetivos
-
-- Não transformar o agente de produção em cliente do SIAPS.
-- Não automatizar autenticação, scraping de área restrita ou armazenamento de credenciais.
-- Não versionar dados de pessoas, listas nominais ou arquivos brutos potencialmente restritos.
-- Não afirmar que um período antigo usou a metodologia atual apenas porque está disponível hoje.
-- Não implementar versões históricas completas de C1–C7 nesta mudança.
-- Não alterar as fórmulas dos indicadores locais.
-- Não resolver, nesta spec, bugs de packs que não sejam necessários para a integridade da reconciliação.
-- Não exigir que todo novo quadrimestre publicado reabra automaticamente o Portão D já aprovado para a mesma `rule_version`.
-
-## 6. Terminologia
-
-### Referência
-
-Uma observação oficial do SIAPS para um município e quadrimestre, obtida de uma fonte identificada e capturada como uma revisão imutável.
-
-### Revisão
-
-Uma materialização específica da referência. É identificada pelo hash do conteúdo normalizado; duas capturas do mesmo quadrimestre com hashes diferentes são revisões diferentes.
-
-### Propósito
-
-- `GATE`: pode participar do veredito do Portão D.
-- `DIAGNOSTIC`: produz comparação e relatório, mas nunca altera `release-gates.json`.
-
-### Compatibilidade metodológica
-
-- `EXACT`: há evidência oficial explícita de que a referência foi calculada ou reprocessada com o mesmo perfil metodológico que a regra local implementa.
-- `EQUIVALENT`: a edição oficial difere, mas uma análise versionada demonstra que toda diferença capaz de afetar o resultado comparado é ausente, inativa no período ou coberta por equivalência automatizada.
-- `UNKNOWN`: não há evidência suficiente. Só diagnóstico.
-- `INCOMPATIBLE`: existe diferença conhecida capaz de alterar o resultado. A referência não valida a regra atual.
-
-### Fonte
-
-- `OFFICIAL_TEAM_EXPORT_CSV`: arquivo oficial por equipe/INE, obtido manualmente no SIAPS.
-- `PUBLIC_AGGREGATE`: distribuição pública por classe, indicador e tipo de equipe.
-- `PUBLIC_AGGREGATE_WITH_PERIOD_UNIVERSE`: distribuição pública acompanhada de um artefato oficial que identifica o universo de equipes daquele período.
-
-### Conjunto de referências
-
-Lista pré-registrada de referências de um `pack@rule_version`. O conjunto, e não uma escolha feita durante a execução, determina quais evidências são obrigatórias.
-
-## 7. Alternativas consideradas
-
-### A. Manter o desenho atual e aguardar 2026Q2
-
-**Vantagem:** evita comparar conscientemente com metodologia antiga.  
-**Desvantagem:** acopla a liberação do produto a uma publicação sem SLA conhecido; não aproveita períodos já publicados; a inferência por data de assinatura continua sem base suficiente.
-
-**Decisão:** rejeitada.
-
-### B. Usar automaticamente o quadrimestre publicado mais recente, qualquer que seja
-
-**Vantagem:** execução imediata.  
-**Desvantagem:** pode comparar regras diferentes e aprovar uma implementação errada por coincidência agregada.
-
-**Decisão:** rejeitada.
-
-### C. Rodar todos os períodos publicados e deixar o operador escolher o melhor
-
-**Vantagem:** grande volume de evidência exploratória.  
-**Desvantagem:** introduz cherry-picking explícito.
-
-**Decisão:** rejeitada para `GATE`; aceita apenas para `DIAGNOSTIC`.
-
-### D. Dividir o Portão D em dois novos portões
-
-Um portão validaria infraestrutura histórica; outro aguardaria uma referência metodologicamente idêntica.
-
-**Vantagem:** separação conceitual forte.  
-**Desvantagem:** altera o modelo A–D, a API, o banco e a UI, sem necessidade para resolver o problema.
-
-**Decisão:** rejeitada. A distinção será interna ao D por propósito e compatibilidade.
-
-### E. Referências retrospectivas pré-registradas e classificadas por compatibilidade
-
-**Vantagem:** permite backtest imediato, preserva rigor metodológico, suporta fonte por equipe e impede seleção posterior ao resultado.  
-**Desvantagem:** exige contratos e fluxo de captura em duas etapas.
-
-**Decisão:** escolhida.
-
-## 8. Decisão arquitetural
-
-### 8.1 O que o Portão D passa a significar
-
-Para uma `rule_version`, D responde:
-
-> Existe ao menos uma referência oficial pré-registrada, metodologicamente compatível e completa, contra a qual a implementação local foi reconciliada dentro da tolerância definida, e todas as referências obrigatórias desse conjunto passaram?
-
-D deixa de responder:
-
-> O SIAPS já publicou o quadrimestre mais novo posterior à assinatura da ficha?
+O SIAPS também oferece fontes mais fortes que a distribuição pública agregada: visão por equipe/INE, downloads dos dados filtrados e o módulo de Transferência de Arquivos, com resultados de monitoramento e avaliação. Essas fontes permitem identificar o universo histórico de equipes e, em layouts recentes, comparar numerador e denominador.
 
 Consequências:
 
-- uma referência histórica compatível pode liberar D;
-- a publicação de um quadrimestre mais recente não invalida D por si só;
-- uma nova `rule_version`, uma referência oficialmente corrigida ou uma mudança do conjunto pré-registrado pode invalidar D;
-- períodos `UNKNOWN` continuam úteis como regressão diagnóstica.
+- `2026Q1` pode ser útil agora e deve ser executado;
+- a disponibilidade atual de `2026Q1` não demonstra, sozinha, que ele foi calculado com a mesma semântica da regra local;
+- um quadrimestre anterior pode ter sido reprocessado por uma metodologia posterior;
+- a mesma identificação de quadrimestre pode ter revisões oficiais diferentes;
+- um resultado público agregado não é suficiente para reconstruir com segurança o universo histórico de equipes.
 
-### 8.2 Dois fluxos separados: captura e avaliação
+## 3. Problemas do desenho atual
 
-#### Fluxo 1 — captura oficial
+### P1 — Latência do SIAPS bloqueia validação local
 
-A captura lê somente a referência oficial e produz:
+`Eligibility.firstEligible()` fixa 2026Q2 a partir das assinaturas. Enquanto a publicação não ocorre, C1–C7 permanecem `PENDING`, embora existam referências publicadas capazes de exercitar aquisição, coorte, consolidação, classificação e Nota Final.
 
-- artefato bruto em diretório local ignorado pelo Git;
+### P2 — Publicação é confundida com compatibilidade
+
+`Eligibility.reference()` escolhe o quadrimestre publicado mais recente após um piso temporal. A existência no filtro do SIAPS não informa qual edição metodológica ou revisão processou o período.
+
+### P3 — Quadrimestre não identifica uma revisão
+
+O snapshot atual não fixa obrigatoriamente município, instante, origem, hashes bruto e normalizado, release oficial, parser e estado da revisão. Uma recaptura com números diferentes pode substituir conceitualmente a anterior sem que o sistema reconheça o drift.
+
+### P4 — Diretório atual de equipes é tratado como universo histórico
+
+`filtros/equipes` não recebe quadrimestre. Usá-lo em 2025Q3 ou 2026Q1 pode incluir equipes posteriores, omitir equipes encerradas e aplicar tipo atual a um período histórico.
+
+### P5 — Captura, escolha e avaliação estão acopladas
+
+`PortaoDLiveTest` descobre o período, captura SIAPS, adquire o PEC, compara e pode gravar D no mesmo fluxo. Isso dificulta provar que a referência foi escolhida antes de observar o resultado.
+
+### P6 — Ausência pode virar zero
+
+`PackVerdict` usa `ClassCounts.EMPTY` quando uma linha oficial não existe. Uma resposta incompleta pode produzir falso `PASSED`, especialmente com o piso de tolerância igual a 2.
+
+### P7 — Não há prova executável da compatibilidade
+
+A versão anterior desta spec permitia manter referências como `UNKNOWN` até uma etapa posterior. Isso não atende ao objetivo. A implementação deve executar uma avaliação metodológica real no banco de teste e produzir um dossiê por pack e período.
+
+## 4. Objetivos
+
+1. Executar imediatamente 2026Q1 e todos os quadrimestres publicados cobertos pelos dados locais.
+2. Produzir matriz diagnóstica `pack × quadrimestre` sem alterar o Portão D.
+3. Capturar cada referência oficial como revisão imutável, identificada por hashes.
+4. Separar escolha/captura de referência da avaliação local.
+5. Produzir, durante a implementação, dossiês explícitos de compatibilidade para C1–C7 e Nota Final.
+6. Usar `ssh siha` e uma credencial PostgreSQL somente leitura para evidência executável.
+7. Comparar por equipe/INE e NM/DN quando o arquivo oficial disponibilizar esses campos.
+8. Enumerar e executar detectores para toda diferença metodológica conhecida.
+9. Impedir cherry-picking de quadrimestre ou revisão.
+10. Parar de usar a lista contemporânea de equipes como universo histórico de gate.
+11. Falhar fechado diante de linha, município, período, tipo, hash, arquivo ou detector ausente.
+12. Manter o produto sem cliente SIAPS, sem credenciais remotas e sem rede na CI.
+13. Manter a ADR 0032: D continua associado a `pack@rule_version`; nova versão invalida a aprovação.
+14. Versionar somente evidência mascarada e sem pessoas, INEs ou números clínicos detalhados.
+
+## 5. Não objetivos
+
+- Automatizar login ou contornar autenticação do SIAPS.
+- Colocar endereço, usuário, chave SSH ou senha do `siha` no repositório.
+- Escrever no banco PEC: são proibidos `INSERT`, `UPDATE`, `DELETE`, DDL, migrations, tabelas temporárias e qualquer alteração de configuração.
+- Versionar CSV bruto, lista nominal, CPF, CNS, nome, data de nascimento ou detalhe por pessoa.
+- Inferir compatibilidade ou incompatibilidade apenas pela data da ficha, release ou captura.
+- Implementar todas as versões históricas das regras.
+- Alterar fórmulas de C1–C7 nesta mudança.
+- Recalibrar a tolerância após observar os resultados reais.
+- Tornar publicação de novo quadrimestre uma invalidação automática de D já passado para a mesma `rule_version`.
+
+## 6. Terminologia e estados
+
+### 6.1 Referência e revisão
+
+Uma **referência** é um resultado oficial do SIAPS para um município, quadrimestre e fonte. Uma **revisão** é uma materialização específica dessa referência, identificada por hash normalizado. Duas capturas do mesmo período com hashes diferentes são revisões distintas.
+
+### 6.2 Propósito
+
+- `DIAGNOSTIC`: produz comparação e dossiê; nunca grava D.
+- `GATE`: pode participar do veredito do Portão D depois de pré-registro e validação completa.
+
+### 6.3 Compatibilidade metodológica
+
+- `EXACT`: o perfil normativo oficial corresponde ao perfil local e todos os campos oficiais comparáveis coincidem exatamente.
+- `EQUIVALENT_FOR_REFERENCE`: existem diferenças normativas, mas todos os detectores dessas diferenças provam que elas não afetam a revisão específica, e todos os campos oficiais comparáveis coincidem exatamente. A equivalência vale somente para `reference_id + manifest_sha256 + source_fingerprint + rule_version`.
+- `INCOMPATIBLE`: ao menos uma diferença metodológica está ativa na revisão e altera o resultado, ou há divergência oficial explicada por essa diferença.
+- `INCONCLUSIVE`: há evidência produzida, mas falta campo oficial, cobertura local, detector, identidade de revisão ou observabilidade suficiente.
+
+`UNKNOWN` só existe antes da execução da evidência. Depois de processada uma referência, o dossiê deve terminar em um dos quatro estados acima.
+
+### 6.4 Estado da revisão
+
+- `ACTIVE`;
+- `SUPERSEDED`;
+- `RETRACTED`.
+
+Revisões não ativas não podem decidir novo veredito. Se uma revisão citada por D for superseded ou retracted, o teste de consistência deve exigir que D volte a `PENDING` ou seja sustentado por outra referência ativa.
+
+### 6.5 Fontes
+
+- `OFFICIAL_TEAM_EXPORT_CSV`: arquivo oficial por equipe/INE, obtido manualmente.
+- `PUBLIC_AGGREGATE`: distribuição pública por classe, indicador e tipo.
+- `PUBLIC_AGGREGATE_WITH_PERIOD_UNIVERSE`: agregado acompanhado por artefato oficial do universo histórico.
+
+## 7. Arquitetura escolhida
+
+### 7.1 O novo significado de D
+
+Para uma `rule_version`, D responde:
+
+> Todas as referências obrigatórias, pré-registradas, completas e metodologicamente compatíveis com esta regra passaram na reconciliação definida?
+
+D não responde mais se “o quadrimestre posterior à assinatura já foi publicado”.
+
+### 7.2 Três etapas obrigatórias
+
+#### Etapa A — captura
+
+Captura somente a fonte oficial e produz:
+
+- artefato bruto fora do Git;
 - artefato normalizado determinístico;
-- manifesto sem valores sensíveis, com hashes e metadados;
-- nenhuma aquisição do PEC;
-- nenhum veredito de reconciliação;
+- manifesto sem valores sensíveis;
+- hashes bruto e normalizado;
+- nenhuma conexão com o PEC;
+- nenhum veredito local;
 - nenhuma alteração em `release-gates.json`.
 
-#### Fluxo 2 — avaliação local
+#### Etapa B — evidência metodológica
 
-A avaliação recebe uma revisão já capturada e pré-registrada, adquire ou lê os extratos locais, calcula as classes e produz o veredito. Ela não escolhe outra referência se a declarada falhar.
+Usa a referência capturada e a instalação de teste via `ssh siha` para produzir:
 
-Essa separação permite registrar período, fonte e revisão antes de observar a diferença local.
+1. **evidência normativa:** fontes oficiais, ficha/NT/release aplicável e diferenças em relação à `rule_version` local;
+2. **evidência executável:** resultados locais por equipe, NM/DN/score/classe quando comparáveis e detectores de diferenças;
+3. **veredito metodológico:** `EXACT`, `EQUIVALENT_FOR_REFERENCE`, `INCOMPATIBLE` ou `INCONCLUSIVE`;
+4. **dossiê imutável:** JSON legível por máquina e resumo Markdown mascarado.
 
-### 8.3 Contrato de política de referências
+A etapa B é parte da implementação, não uma tarefa operacional adiada.
+
+#### Etapa C — reconciliação de gate
+
+Somente referências pré-registradas como `GATE`, ativas e com dossiê `EXACT|EQUIVALENT_FOR_REFERENCE` podem participar. A avaliação não escolhe uma referência alternativa se a obrigatória falhar.
+
+## 8. Contratos versionados
+
+### 8.1 Política de referências
 
 Adicionar:
 
@@ -277,30 +200,12 @@ Estrutura normativa:
           "quadrimestre": "2026Q1",
           "municipality_ibge": "3541307",
           "source_kind": "OFFICIAL_TEAM_EXPORT_CSV",
-          "purpose": "GATE",
-          "required": true,
-          "status": "ACTIVE",
-          "compatibility": "EXACT",
-          "reference_manifest_sha256": "<64-hex>",
-          "compatibility_evidence": [
-            {
-              "kind": "official-release",
-              "ref": "<documento ou URL oficial>",
-              "sha256": "<64-hex quando o documento estiver arquivado>"
-            }
-          ]
-        },
-        {
-          "reference_id": "sp-3541307-2025q3-c1-public-r2",
-          "quadrimestre": "2025Q3",
-          "municipality_ibge": "3541307",
-          "source_kind": "PUBLIC_AGGREGATE",
           "purpose": "DIAGNOSTIC",
           "required": false,
           "status": "ACTIVE",
           "compatibility": "UNKNOWN",
           "reference_manifest_sha256": "<64-hex>",
-          "compatibility_evidence": []
+          "compatibility_evidence_ref": null
         }
       ]
     }
@@ -310,22 +215,19 @@ Estrutura normativa:
 
 Regras:
 
-1. uma entrada é única por `pack + rule_version`;
-2. um `reference_id` é globalmente único;
-3. `GATE` exige `required=true`, `ACTIVE`, `EXACT|EQUIVALENT`, manifesto fixado e ao menos uma evidência de compatibilidade;
-4. `DIAGNOSTIC` nunca pode ser `required`;
-5. `UNKNOWN|INCOMPATIBLE` nunca pode ter propósito `GATE`;
-6. o conjunto precisa ser alterado por commit anterior ao commit da evidência de resultado;
-7. a ferramenta de avaliação é somente leitura sobre a política;
-8. remover uma referência obrigatória depois de um `FAILED` não transforma o mesmo conjunto em `PASSED`: a mudança gera um novo hash de política e exige nova evidência.
+1. uma entrada por `pack + rule_version`;
+2. `reference_id` globalmente único;
+3. `GATE` exige `required=true`, `ACTIVE`, dossiê `EXACT|EQUIVALENT_FOR_REFERENCE`, hash do manifesto e hash do dossiê;
+4. `DIAGNOSTIC` nunca é obrigatório;
+5. uma execução ad hoc não promove a referência;
+6. política e referência são fixadas antes da execução que poderá alterar D;
+7. remover uma referência que falhou muda o hash da política e exige nova evidência; não converte silenciosamente o conjunto em `PASSED`.
 
-### 8.4 Manifesto da referência capturada
+### 8.2 Manifesto da referência
 
-Cada revisão oficial produz um manifesto JSON determinístico. Para evidência de portão, o manifesto será salvo em:
+Cada revisão produz:
 
 `docs/indicadores/portoes/references/<reference-id>.json`
-
-O arquivo bruto continua fora do Git.
 
 Campos obrigatórios:
 
@@ -337,7 +239,7 @@ Campos obrigatórios:
   "municipality_ibge": "3541307",
   "quadrimestre": "2026Q1",
   "captured_at": "2026-10-08T12:34:56-03:00",
-  "source_description": "SIAPS / Transferência de Arquivos / Avaliação do Quadrimestre",
+  "source_description": "SIAPS / Avaliação do Quadrimestre",
   "source_filename": "arquivo-original.csv",
   "raw_sha256": "<64-hex>",
   "normalized_sha256": "<64-hex>",
@@ -345,519 +247,551 @@ Campos obrigatórios:
   "row_count": 0,
   "indicator_codes": [110],
   "team_types": ["eSF", "eAP"],
-  "contains_person_level_data": false,
-  "release_evidence_refs": []
+  "contains_person_level_data": false
 }
 ```
 
-O manifesto não contém INE, classe por equipe, contagens por classe nem valores. Esses dados permanecem no artefato local content-addressed.
+O manifesto não contém INE, classe individual, NM, DN ou contagens detalhadas. O artefato normalizado permanece em armazenamento local content-addressed.
 
-Se o arquivo contiver CPF, CNS, nome, data de nascimento ou lista nominal de pessoas, o importador deve recusá-lo. O Portão D aceita somente dados por equipe ou agregados.
+### 8.3 Perfil metodológico local
 
-### 8.5 Ciclo de vida da referência
+Adicionar:
 
-- `ACTIVE`: pode ser usada conforme propósito e compatibilidade.
-- `SUPERSEDED`: uma revisão oficial posterior substituiu a captura.
-- `RETRACTED`: a referência foi declarada incorreta ou imprópria.
+- `contracts/indicators/siaps-methodology-profiles.json`;
+- `contracts/indicators/siaps-methodology-profiles.schema.json`.
 
-Uma referência `SUPERSEDED|RETRACTED` não participa de novo veredito. Se ela era a única evidência de um D `PASSED`, `ReleaseGatesConsistencyTest` deve falhar até que o registro volte a `PENDING` ou uma nova referência passe.
+Cada perfil liga uma `rule_version` a:
 
-Uma captura nova nunca sobrescreve a anterior: recebe novo `reference_id` ou sufixo de revisão e novo hash.
+- fontes normativas e hashes;
+- dimensões metodológicas estáveis;
+- IDs de decisões e limitações;
+- lista completa de `probe_ids` necessários para provar equivalência de uma referência.
 
-### 8.6 Seleção de referência
+Uma nova `rule_version` exige novo perfil. O teste de consistência deve falhar se faltar perfil ou detector exigido.
+
+### 8.4 Dossiê de compatibilidade
+
+Para cada `pack × reference_id`, gerar:
+
+- `docs/indicadores/portoes/compatibilidade/<reference-id>-<pack>.json`;
+- `docs/indicadores/portoes/compatibilidade/<reference-id>-<pack>.md`.
+
+Campos mínimos do JSON:
+
+```json
+{
+  "schema_version": "1",
+  "reference_id": "sp-3541307-2026q1-c1-team-r1",
+  "pack": "c1-mais-acesso",
+  "rule_version": "c1-mais-acesso@0.5.0",
+  "reference_manifest_sha256": "<64-hex>",
+  "local_source_fingerprint": "sha256:<64-hex>",
+  "official_methodology_sources": [],
+  "normative_deltas": [],
+  "probe_results": [],
+  "official_field_comparison": {},
+  "coverage": {},
+  "verdict": "EXACT",
+  "reason": ""
+}
+```
+
+O Markdown mostra apenas dados mascarados. O JSON versionado não contém INE nem valor por equipe; resultados detalhados ficam em `target/portao-d/compatibilidade/`.
+
+## 9. Evidência executável no `ssh siha`
+
+### 9.1 Ambiente
+
+A instalação de teste é alcançada pelo alias local `ssh siha`. O repositório não registrará IP, usuário, caminho da chave ou senha. O PostgreSQL permanece acessível somente pelo loopback remoto e por um túnel iniciado na estação.
+
+O runbook usará:
+
+- socket de controle separado, por exemplo `~/.ssh/siha-portao-d.sock`;
+- encaminhamento local para o PostgreSQL de teste;
+- arquivo `0600` fora do repositório, por padrão `~/.config/observatorio-aps/pec-siha.env`;
+- credencial estritamente somente leitura;
+- `default_transaction_read_only=on`, transação `READ ONLY`, timeouts e `ROLLBACK`;
+- fechamento do túnel em `trap`, inclusive em falha.
+
+A aplicação e os testes não executam `ssh` diretamente. Um script/runbook externo abre e fecha o túnel; Java apenas recebe `PEC_DB_HOST` e `PEC_DB_PORT`, como os live tests existentes.
+
+### 9.2 Períodos obrigatórios
+
+Na primeira implementação:
+
+1. `2026Q1` é obrigatório para C1–C7 e Nota Final;
+2. todos os demais quadrimestres publicados pelo SIAPS são capturados e executados quando o `siha` tiver os quatro meses locais;
+3. ausência de cobertura local gera dossiê `INCONCLUSIVE` com a matriz dos meses faltantes; não é omitida;
+4. a lista de períodos executados e não executados entra no resumo de implementação.
+
+### 9.3 Fontes oficiais obrigatórias
+
+A execução metodológica requer arquivo oficial por equipe/INE do mesmo município e período sempre que esse arquivo estiver disponível no SIAPS. O caminho é fornecido por propriedade local; o arquivo bruto nunca entra no Git.
+
+O importador deve recusar:
+
+- arquivo com CPF, CNS, nome, nascimento, telefone ou endereço;
+- município diferente do `PEC_MUNICIPALITY_IBGE`;
+- quadrimestre diferente;
+- cabeçalho desconhecido;
+- duplicata de `INE + indicador + período`;
+- classe ou tipo de equipe desconhecido;
+- arquivo sem identificação suficiente da revisão.
+
+Quando apenas o agregado público estiver disponível, a evidência pode ser produzida, mas tende a `INCONCLUSIVE` para compatibilidade de gate se faltar universo histórico ou campos discriminantes.
+
+### 9.4 Detectores metodológicos
+
+Definir SPI:
+
+```java
+public interface MethodologyProbe {
+    String id();
+    Set<String> packs();
+    ProbeResult evaluate(ProbeContext context);
+}
+```
+
+Cada diferença conhecida entre a fonte oficial da referência e a regra local deve ter detector. O `ProbeResult` registra:
+
+- total de registros/sujeitos potencialmente afetados;
+- total com decisão local divergente da leitura oficial esperada;
+- observabilidade completa ou parcial;
+- razão de inconclusão;
+- contagens mascaradas para evidência versionada;
+- detalhe local não versionado.
+
+Conjunto mínimo de famílias:
+
+- C1: lista de CBO, tipo de equipe, competência civil, atendimento sem INE;
+- C2: coorte de segundo aniversário, presencial/remoto, puericultura, contagem diária, visitas, vacinação e crédito eAP;
+- C3: âncora da DUM, fim da gestação, limites de trimestre, códigos de gestação/puerpério, visitas e crédito eAP;
+- C4/C5: condição ativa, equipe, crédito eAP, PA de visita e fontes não observáveis;
+- C6: idade/aniversário, equipe, visitas, vacinação e crédito eAP;
+- C7: janela de HPV, vigência do procedimento molecular, subgrupos, reescala e equipe;
+- Componente III: meses `-`, versões mensais, pesos, faixas e universo da Nota Final.
+
+Nenhum `probe_id` declarado no perfil pode ficar sem implementação. Um detector não observável produz `INCONCLUSIVE`; nunca assume zero.
+
+### 9.5 Regra de decisão metodológica
+
+#### `EXACT`
+
+Exige cumulativamente:
+
+1. mesma semântica normativa identificada no perfil oficial e local;
+2. todos os probes obrigatórios executados com observabilidade completa;
+3. nenhuma divergência de probe;
+4. igualdade exata de todos os campos oficiais disponíveis por equipe;
+5. universo oficial histórico completo;
+6. hashes e escopo válidos.
+
+#### `EQUIVALENT_FOR_REFERENCE`
+
+Exige cumulativamente:
+
+1. diferenças normativas completamente enumeradas;
+2. todos os probes dessas diferenças executados no `siha`;
+3. nenhum registro/sujeito da revisão afetado, ou ambas as leituras produzindo exatamente o mesmo resultado para todos os afetados;
+4. igualdade exata dos campos oficiais disponíveis;
+5. nenhuma diferença não observável;
+6. escopo limitado ao hash da revisão e fingerprint local.
+
+#### `INCOMPATIBLE`
+
+Ocorre quando ao menos uma diferença ativa altera decisão, NM, DN, score, classe ou Nota Final, ou quando a comparação oficial exata diverge por causa metodológica identificada.
+
+#### `INCONCLUSIVE`
+
+Ocorre com campo oficial insuficiente, detector ausente/parcial, período sem cobertura local, universo histórico ausente, escopo divergente, referência não identificada ou divergência ainda não atribuída.
+
+A tolerância do Portão D não participa dessa decisão. Compatibilidade metodológica exige comparação exata; a tolerância continua sendo aplicada depois, na reconciliação.
+
+### 9.6 Critério de conclusão da implementação
+
+A implementação só pode ser declarada concluída quando:
+
+- 2026Q1 tiver dossiês para C1–C7 e Nota Final;
+- todos os demais períodos publicados tiverem dossiê ou registro explícito de ausência de cobertura local;
+- cada dossiê listar todas as fontes e probes exigidos;
+- C1–C7 em 2026Q1 terminarem em `EXACT`, `EQUIVALENT_FOR_REFERENCE` ou `INCOMPATIBLE`, não todos como `INCONCLUSIVE`;
+- qualquer inconclusão restante tiver razão verificável e teste que impeça promoção a `GATE`;
+- o resumo mascarado da execução no `siha` for revisado e commitado.
+
+Não é requisito que o resultado seja favorável. Evidência explícita de incompatibilidade é um resultado válido e impede a liberação do portão.
+
+## 10. Seleção de referências
 
 Substituir `Eligibility.firstEligible/reference/isReference` por `ReferenceSelector`.
 
-Algoritmo por `pack@rule_version`:
+Algoritmo:
 
-1. carregar o conjunto da política;
-2. separar referências `ACTIVE`;
-3. validar o manifesto e seu hash;
-4. executar todas as referências `required=true`;
-5. executar referências diagnósticas solicitadas, sem autoridade de portão;
-6. não usar data de assinatura como filtro automático;
-7. não usar “mais recente publicado” como escolha automática;
-8. uma propriedade manual de quadrimestre cria apenas execução `DIAGNOSTIC`, salvo se identificar exatamente um `reference_id` já pré-registrado como `GATE`.
+1. carregar a política e os manifestos;
+2. validar hashes, escopo e estado;
+3. executar todas as referências `DIAGNOSTIC` solicitadas;
+4. executar todas as referências `GATE` obrigatórias;
+5. não usar datas de assinatura como filtro automático;
+6. não usar “mais recente publicado” como autoridade automática;
+7. `quadrimestre` passado por propriedade cria diagnóstico ad hoc, salvo quando `reference_id` identificar exatamente uma referência pré-registrada;
+8. não substituir referência que falha por outra que passa.
 
-A data das fichas e da NT permanece na documentação de compatibilidade, não no algoritmo de seleção.
+Datas e releases permanecem dentro do dossiê normativo, não no seletor.
 
-### 8.7 Hierarquia das fontes
+## 11. Universo histórico de equipes
 
-#### 8.7.1 Arquivo oficial por equipe
+### Arquivo oficial por equipe
 
-É a fonte preferida para `GATE` porque identifica o universo histórico de equipes e permite explicar divergências por INE.
+O conjunto de INEs e tipos do arquivo é o universo oficial. Equipes locais fora dele são reportadas, mas não adicionadas.
 
-Requisitos:
+### Agregado com universo oficial acompanhante
 
-- CSV; XLSX fica fora da primeira implementação;
-- download manual por usuário autorizado;
-- quadrimestre e município identificáveis no arquivo ou em metadado acompanhante;
-- uma linha por equipe, indicador e tipo, ou layout equivalente versionado;
-- parser estrito; cabeçalho desconhecido é erro;
-- classes desconhecidas, duplicatas e tipos fora do contrato são erro;
-- nenhuma linha de pessoa.
+Usar o artefato acompanhante e seu hash.
 
-#### 8.7.2 Distribuição pública agregada
+### Agregado sem universo histórico
 
-Pode ser capturada automaticamente pela ferramenta de desenvolvimento.
+Executar apenas como diagnóstico, usando as equipes historicamente classificáveis no lado local e registrando `team_universe_confidence=UNKNOWN`.
 
-Uso:
+### Nota Final
 
-- sempre válida para `DIAGNOSTIC` quando completa;
-- só pode ser `GATE` se acompanhada por universo oficial do período ou se a política trouxer evidência específica de equivalência do universo;
-- não pode usar `filtros/equipes` atual como lista histórica;
-- o endpoint atual de equipes pode ser capturado como diretório contemporâneo diagnóstico, nunca como prova do universo de um quadrimestre anterior.
+Remover a interseção das sete listas contemporâneas do endpoint público. Usar o universo da exportação oficial da Nota Final ou artefato histórico acompanhante. Sem ele, o dossiê é diagnóstico e a compatibilidade fica inconclusiva.
 
-### 8.8 Universo de equipes
+## 12. Validação fail-closed
 
-#### Com arquivo por equipe
+Antes de comparar:
 
-O universo oficial do período é o conjunto de INEs do arquivo, com o tipo oficial daquele período. O lado local é calculado para esses INEs. Equipes locais fora do arquivo são reportadas, mas não adicionadas ao universo oficial.
+1. município do manifesto, arquivo, linhas e PEC;
+2. quadrimestre em todos os artefatos;
+3. hashes bruto, normalizado, política e dossiê;
+4. parser/layout versionado;
+5. ausência de PII;
+6. códigos e tipos esperados;
+7. linhas obrigatórias presentes;
+8. duplicatas ausentes;
+9. números inteiros e não negativos;
+10. universo histórico identificado;
+11. todos os probes obrigatórios executados;
+12. fingerprint da fonte local registrado;
+13. revisão `ACTIVE`;
+14. propósito autorizado.
 
-#### Com agregado público e universo oficial acompanhante
+Linha oficial ausente nunca vira zero. Zero só é aceito quando estiver explicitamente representado.
 
-Usar o conjunto do artefato acompanhante.
+## 13. Cache e artefatos locais
 
-#### Com agregado público sem universo histórico
-
-Usar, apenas para diagnóstico, todas as equipes locais que a regra classifica historicamente. O relatório recebe `team_universe_confidence=UNKNOWN`, e a referência não pode decidir D.
-
-#### Nota Final
-
-Remover a interseção das sete listas atuais do endpoint público. Com arquivo por equipe, usar o universo oficial da Nota Final. Com agregado público, exigir universo histórico acompanhante ou manter a execução diagnóstica.
-
-### 8.9 Validação fail-closed da referência
-
-Antes da comparação, validar:
-
-1. município do manifesto, do payload e da execução local;
-2. quadrimestre do manifesto e de todas as linhas;
-3. hash bruto e normalizado;
-4. `reference_id` e hash fixados na política;
-5. ausência de linhas duplicadas;
-6. presença dos códigos esperados;
-7. presença de toda linha de tipo exigida pelo universo;
-8. contagens inteiras não negativas;
-9. para Nota Final, presença de todas as linhas oficiais exigidas;
-10. layout/parser conhecido;
-11. artefato sem dados de pessoa;
-12. compatibilidade e propósito autorizados.
-
-Uma linha ausente nunca vira `ClassCounts.EMPTY`. O resultado deve ser `PENDING` com razão específica.
-
-### 8.10 Captura pública e frescor
-
-A captura pública não usará a lista `published` embutida para decidir se o snapshot é autoridade de portão. A política decide isso.
-
-O payload normalizado deve preservar:
-
-- código municipal retornado pelo SIAPS;
-- quadrimestre em cada linha;
-- indicador e tipo de equipe;
-- contagens;
-- instante da captura;
-- parâmetros da requisição;
-- hash da resposta de competências separadamente;
-- hash da resposta de resultado.
-
-Se uma recaptura do mesmo período gerar outro hash, a ferramenta relata `REFERENCE_DRIFT` e não substitui a revisão registrada.
-
-### 8.11 Extratos locais e cache
-
-O cache local será content-addressed e particionado por:
+O cache será content-addressed e particionado por:
 
 - município;
 - quadrimestre;
+- `reference_manifest_sha256`;
 - pack;
 - `rule_version`;
-- identidade da fonte PEC;
+- identidade/fingerprint PEC;
 - versão do adaptador;
-- hash da referência oficial;
 - mês.
 
 Exemplo:
 
 `target/portao-d/artifacts/3541307/2026Q1/<reference-sha>/c1-mais-acesso@0.5.0/2026-01/`
 
-A ferramenta deve recusar um extrato cujo manifesto não corresponda integralmente ao contexto esperado. Não basta validar o extrato contra os campos que ele próprio declara.
+Um manifesto é validado contra o contexto esperado, não contra os próprios campos. C1 exige o extrato principal e o suplemento `team`, ambos cobertos pela fingerprint e pela verificação de reprodutibilidade.
 
-### 8.12 Comparação
+## 14. Comparação e veredito de D
 
-A métrica ordenada atual permanece em `@2` para não introduzir um limiar novo sem calibração:
+A métrica `@2` preserva:
 
-`D = Σ |cumL(k) − cumS(k)|`, para `REGULAR < SUFICIENTE < BOM < ÓTIMO`.
+`D = Σ |cumL(k) − cumS(k)|`, com `REGULAR < SUFICIENTE < BOM < ÓTIMO`.
 
 `T = max(2, ceil(0,15 × N_S))`.
 
-Mudanças obrigatórias:
+O relatório separa:
 
-- separar no relatório a distância de classificação e a diferença de cobertura;
-- reportar `N_S`, `N_L`, `sem_classe_local`, `local_fora_do_universo`, `D` e `T`;
-- linha oficial ausente é incompletude, não zero;
-- com arquivo por equipe, gerar também matriz por INE e contagem de classes divergentes; esta matriz é explicativa e fica local;
-- uma linha explicitamente vazia em ambos os lados pode ser ignorada;
-- uma linha vazia em apenas um lado é avaliada, desde que a existência do zero oficial seja explícita.
+- `N_S`;
+- `N_L`;
+- equipes oficiais sem classe local;
+- equipes locais fora do universo;
+- diferença de cobertura;
+- distância de classificação;
+- `D` e `T`;
+- comparação exata de NM/DN/score quando disponível.
 
-A adoção futura de tolerância por equipe, numerador ou denominador exige novo check (`@3`) e calibração pré-registrada. A implementação `@2` não deve escolher um limiar depois de observar os dados reais.
-
-### 8.13 Veredito de uma referência
+Veredito de uma referência:
 
 - `PASSED`: entrada completa e todas as linhas avaliáveis passam;
 - `FAILED`: entrada completa e ao menos uma linha excede o limiar;
-- `PENDING`: entrada ausente, incompleta, hash divergente, universo inadequado, compatibilidade insuficiente ou nenhuma linha avaliável.
-
-Uma referência diagnóstica pode exibir `PASSED|FAILED|PENDING`, mas isso é somente resultado analítico.
-
-### 8.14 Veredito agregado do pack
+- `PENDING`: referência incompleta, hash divergente, compatibilidade insuficiente ou nenhuma linha avaliável.
 
 Com `selection_policy=ALL_REQUIRED`:
 
-1. se não existe referência `GATE` obrigatória e ativa, D é `PENDING`;
-2. se qualquer referência obrigatória está `PENDING`, D é `PENDING`, salvo existência de `FAILED`;
-3. se qualquer referência obrigatória está `FAILED`, D é `FAILED`;
-4. D é `PASSED` somente se todas as referências obrigatórias estão `PASSED`;
-5. referências diagnósticas não alteram o estado;
-6. o resumo registra o hash da política, os hashes dos manifestos e cada veredito individual.
+1. sem referência `GATE` ativa e obrigatória → D `PENDING`;
+2. qualquer obrigatória `FAILED` → D `FAILED`;
+3. alguma obrigatória `PENDING`, sem falha → D `PENDING`;
+4. todas obrigatórias `PASSED` → D `PASSED`;
+5. diagnósticos não alteram D.
 
-Essa regra impede escolher, após a execução, apenas o período favorável.
+## 15. Integração com `release-gates.json`
 
-### 8.15 Integração com `release-gates.json`
-
-O formato geral da ADR 0032 permanece.
+O formato da ADR 0032 permanece.
 
 Ao gravar D:
 
-- `check` será `siaps-distribuicao-por-classe@2` ou `siaps-nota-final-por-classe@2`;
-- a evidência principal será um resumo de conjunto, não um único quadrimestre implícito;
-- o resumo incluirá `policy_sha256`, `reference_id`, `reference_manifest_sha256`, `quadrimestre`, `source_kind`, `compatibility`, `rule_version` e veredito;
-- `RegistryUpdater` recusará qualquer execução diagnóstica, referência `UNKNOWN|INCOMPATIBLE`, hash não fixado ou conjunto incompleto;
-- `ReleaseGatesConsistencyTest` validará a política, os manifestos e os hashes citados.
+- `check` usa `@2`;
+- a evidência principal é o resumo do conjunto;
+- o resumo cita hashes da política, manifestos e dossiês;
+- `RegistryUpdater` recusa diagnóstico, compatibilidade inconclusiva/incompatível, revisão não ativa, hash divergente ou conjunto incompleto;
+- `ReleaseGatesConsistencyTest` valida todos os artefatos e exige que a evidência permaneça ativa.
 
-Nova `rule_version` continua anulando D. Nova publicação do SIAPS não anula D automaticamente. Uma referência `SUPERSEDED|RETRACTED` citada por D invalida a consistência do registro.
+Novo quadrimestre publicado não invalida D automaticamente. Nova `rule_version`, alteração de política, revisão superseded/retracted ou mudança de hash invalida a evidência correspondente.
 
-## 9. Fluxos operacionais
+## 16. Fluxos operacionais
 
-### 9.1 Backtest imediato de todos os períodos publicados
+### 16.1 Backtest imediato
 
-Objetivo: obter evidência diagnóstica agora.
+1. consultar os quadrimestres publicados;
+2. capturar cada revisão explicitamente;
+3. importar exportação oficial por equipe quando disponível;
+4. adquirir os quatro meses no `siha` em modo somente leitura;
+5. executar C1–C7 e Nota Final;
+6. executar todos os probes;
+7. produzir matriz `pack × período` e dossiês;
+8. não tocar D.
 
-1. consultar uma vez os quadrimestres disponíveis;
-2. capturar explicitamente os períodos selecionados para o município, sem laço sobre municípios;
-3. gerar um manifesto por período e revisão;
-4. executar C1–C7 e Nota Final para cada período com dados locais disponíveis;
-5. produzir uma matriz `pack × período`;
-6. marcar todas as referências sem compatibilidade demonstrada como `DIAGNOSTIC/UNKNOWN`;
-7. não tocar `release-gates.json`.
+### 16.2 Promoção a gate
 
-A primeira rodada recomendada inclui, conforme disponibilidade local, 2025Q3 e 2026Q1. O período exato não é codificado na ferramenta; fica no contrato de política.
+1. captura e manifesto já existem;
+2. dossiê decidido já existe;
+3. política é alterada para `GATE`, com hash do dossiê;
+4. a alteração entra antes da execução de gate;
+5. a reconciliação roda exatamente contra o conjunto registrado;
+6. o resumo e eventual atualização de D entram em commit posterior.
 
-### 9.2 Promoção de uma referência a `GATE`
+### 16.3 Drift oficial
 
-1. capturar o artefato oficial sem executar a comparação local;
-2. revisar apenas integridade, layout e proveniência;
-3. produzir ou localizar evidência de compatibilidade metodológica;
-4. adicionar a referência à política como `GATE`, com o hash do manifesto;
-5. commitar a política;
-6. somente depois executar a reconciliação;
-7. commitar resumo e eventual atualização de D em outro commit/PR.
+1. recaptura produz hash diferente;
+2. ferramenta gera `REFERENCE_DRIFT` e preserva a revisão anterior;
+3. política marca a revisão antiga como `SUPERSEDED`;
+4. D volta a `PENDING` se dependia dela;
+5. nova revisão passa por dossiê e reconciliação próprios.
 
-A captura ou o backtest anterior não pode promover automaticamente uma referência.
+## 17. Mudanças de código previstas
 
-### 9.3 Importação de CSV oficial por equipe
+### Remover ou desautorizar
 
-1. usuário baixa o CSV no SIAPS;
-2. fornece o caminho local à ferramenta;
-3. parser valida que é arquivo por equipe, não nominal;
-4. normalizador produz artefato determinístico;
-5. manifesto registra hashes e metadados;
-6. arquivo bruto permanece fora do repositório;
-7. política decide se o uso será diagnóstico ou de portão.
-
-### 9.4 Detecção de revisão posterior
-
-1. uma nova captura do mesmo período produz hash diferente;
-2. ferramenta gera relatório de drift, sem sobrescrever a referência anterior;
-3. release oficial que declare correção/reprocessamento é anexado como evidência;
-4. política marca revisão anterior como `SUPERSEDED`;
-5. D volta a `PENDING` se não houver outra referência obrigatória válida;
-6. nova revisão é pré-registrada e reconciliada.
-
-## 10. Mudanças de código previstas
-
-### Remover ou desautorizar para gate
-
-- `Eligibility.firstEligible()`;
-- `Eligibility.reference()` baseada em data;
-- `Eligibility.isReference()` baseada no mais recente publicado;
-- `GatePack.lastSignature`, `NT8_LAST_SIGNATURE` e `floor()` como mecanismo de decisão;
-- uso de `filtros/equipes` atual para reconstruir universo histórico;
-- `ClassCounts.EMPTY` como fallback de linha ausente;
-- captura e avaliação de gate no mesmo método.
-
-As datas podem continuar em documentação de compatibilidade, mas não no seletor.
+- elegibilidade por assinatura em `Eligibility`;
+- `GatePack.lastSignature`, `NT8_LAST_SIGNATURE` e `floor()` como decisão;
+- lista atual de equipes como universo histórico;
+- `ClassCounts.EMPTY` como fallback de ausência;
+- fluxo único de captura + avaliação + atualização do registro.
 
 ### Adicionar
 
-- `ReferencePolicy` e carregador fail-fast;
-- `ReferenceSet`;
-- `ReferenceDeclaration`;
-- `ReferenceSelector`;
-- `ReferenceCompatibility`;
-- `ReferencePurpose`;
-- `ReferenceStatus`;
-- `SiapsReferenceManifest`;
-- `SiapsReferenceCapture`;
-- `PublicAggregateReferenceParser`;
-- `OfficialTeamExportCsvParser`;
-- `ReferenceArtifactStore` content-addressed;
+- `ReferencePolicy`, `ReferenceSet`, `ReferenceDeclaration`, `ReferenceSelector`;
+- `SiapsReferenceManifest`, `ReferenceArtifactStore`, `ReferenceDrift`;
+- `OfficialTeamExportCsvParser` e `PublicAggregateReferenceParser`;
+- `MethodologyProfileRegistry`, `MethodologyProbe`, `ProbeContext`, `ProbeResult`;
+- probes de C1–C7 e Componente III;
+- `MethodologyCompatibilityEvaluator` e `CompatibilityDossierWriter`;
 - `ReferenceSetVerdict`;
-- verificação de drift;
-- schema e testes de consistência da política.
+- live test opt-in do `siha`;
+- script/runbook de túnel e execução segura.
 
 ### Refatorar
 
-- dividir `PortaoDLiveTest` em captura e avaliação;
-- enriquecer `SiapsSnapshot` com município, captura, origem e revisão;
-- fazer `PackVerdict` receber uma referência já validada, não decidir completude estrutural implicitamente;
+- dividir `PortaoDLiveTest` em captura, evidência metodológica e reconciliação;
+- enriquecer `SiapsSnapshot` com município, revisão, origem e hashes;
+- fazer `PackVerdict` receber entrada já validada;
 - fazer `Comparison` reportar cobertura separada;
 - fazer `RegistryUpdater` operar sobre `ReferenceSetVerdict`;
-- fazer `SummaryWriter` produzir resumo de conjunto;
-- fazer `RawWriter` manter detalhes por equipe apenas no diretório local.
+- gerar resumo de conjunto em `SummaryWriter`.
 
-### Propriedades propostas
+## 18. Propriedades propostas
 
-- `observatorio.gate.d.mode=capture|evaluate|both`;
+- `observatorio.gate.d.mode=capture|compatibility|evaluate|all`;
 - `observatorio.gate.d.policy=<path>`;
 - `observatorio.gate.d.reference=<reference-id>`;
-- `observatorio.gate.d.periods=2025Q3,2026Q1` apenas para diagnóstico ad hoc;
-- `observatorio.gate.d.import=<csv>`;
+- `observatorio.gate.d.periods=2025Q3,2026Q1` para diagnóstico;
+- `observatorio.gate.d.official-export-dir=<dir>`;
 - `observatorio.gate.d.artifact-dir=<dir>`;
-- propriedades existentes de PEC, UF, registry e repo-root permanecem quando aplicáveis.
+- `observatorio.gate.d.compatibility-output=<dir>`;
+- `observatorio.execution-plane.live-pec.env-file=$HOME/.config/observatorio-aps/pec-siha.env`.
 
-`periods` nunca concede autoridade de gate. Só `reference-id` pré-registrado pode fazê-lo.
+`periods` nunca concede autoridade de gate. Apenas `reference-id` pré-registrado pode fazê-lo.
 
-## 11. Testes obrigatórios
+## 19. Testes obrigatórios
 
-### Política e seleção
+### Política
 
-- schema válido e inválido;
-- pack ou regra desconhecida;
-- `GATE` com `UNKNOWN` recusado;
-- `DIAGNOSTIC` obrigatório recusado;
-- referência duplicada recusada;
-- ausência de referência obrigatória deixa D `PENDING`;
-- todas as referências obrigatórias precisam passar;
-- referência manual não pré-registrada permanece diagnóstica;
-- nenhuma seleção depende da data de assinatura;
-- falha em período obrigatório não pode ser contornada escolhendo outro período.
+- schema válido/inválido;
+- duplicatas;
+- `GATE` sem dossiê decidido;
+- `DIAGNOSTIC` obrigatório;
+- regra ou pack desconhecido;
+- remoção de referência que falhou altera o hash e exige nova evidência;
+- seleção não depende de assinatura ou período mais recente.
 
 ### Captura e proveniência
 
-- município divergente;
-- quadrimestre divergente;
-- payload com mais de um município;
-- hash bruto divergente;
-- hash normalizado divergente;
-- captura repetida idêntica gera o mesmo hash;
-- captura alterada gera `REFERENCE_DRIFT`;
-- manifesto sem timestamp, parser ou origem é recusado;
-- arquivo com coluna de pessoa é recusado.
+- município/quadrimestre divergentes;
+- hash bruto/normalizado divergente;
+- captura idêntica reproduz hash;
+- recaptura alterada gera drift;
+- manifesto incompleto;
+- PII recusada.
 
-### Parser público
+### Parsers
 
-- todas as linhas esperadas;
-- linha ausente não vira zero;
-- linha duplicada recusada;
-- tipo desconhecido recusado;
-- contagem negativa ou não inteira recusada;
-- código de indicador desconhecido recusado;
-- município das linhas preservado;
-- lista atual de equipes não entra no universo histórico.
-
-### Parser por equipe
-
+- BOM UTF-8 e `;`;
 - cabeçalho conhecido;
-- BOM UTF-8 e separador `;`;
-- INE com zeros à esquerda;
-- duplicata de INE/indicador/tipo;
-- classe desconhecida;
-- município e quadrimestre inconsistentes;
-- arquivo nominal recusado;
-- normalização determinística;
-- universo oficial do período reproduzido.
+- INE com zeros;
+- duplicatas;
+- classe/tipo desconhecido;
+- linha ausente não vira zero;
+- município preservado;
+- lista contemporânea não vira universo histórico.
 
-### Comparação
+### Probes
 
-- métricas atuais preservadas em casos válidos;
-- cobertura reportada separadamente;
-- equipe oficial sem classe local aparece como lacuna;
-- equipe local fora do universo é reportada;
-- zero oficial explícito aceito;
-- ausência de linha oficial causa `PENDING`;
-- eSF e eAP verificadas conforme universo;
-- Nota Final exige referência final completa;
-- nenhuma interseção com diretório atual de equipes.
+- todo `probe_id` tem implementação;
+- probe sem observabilidade gera inconclusão;
+- zero afetado permite equivalência apenas com igualdade oficial;
+- afetado divergente gera incompatibilidade;
+- detalhes por INE não entram no dossiê versionado.
 
-### Cache e isolamento
+### `siha`
 
-- município diferente nunca reutiliza extrato;
-- referência diferente nunca reutiliza artefato incompatível;
-- `rule_version` diferente nunca reutiliza resultado;
-- identidade PEC/adaptador divergente falha;
-- C1 exige o extrato suplementar `team` e sua proveniência.
+- teste é pulado sem opt-in/arquivo/túnel;
+- sessão começa read-only;
+- nenhum comando de escrita é aceito;
+- conexão fecha antes do cálculo;
+- fingerprint inclui PEC, PostgreSQL, consultas e manifestos;
+- 2026Q1 gera dossiês para todos os packs;
+- períodos sem cobertura geram registro explícito.
 
-### Registro
+### Comparação e registro
 
-- diagnóstico nunca altera D;
-- referência `UNKNOWN` nunca altera D;
-- hash de política divergente impede gravação;
-- manifesto divergente impede gravação;
-- referência `SUPERSEDED` invalida evidência;
-- resumo e `release-gates.json` passam no teste de consistência;
-- check `@1` não é aceito como evidência nova depois da migração para `@2`.
+- linha ausente → `PENDING`;
+- zero explícito aceito;
+- Nota Final completa obrigatória;
+- diagnóstico não grava D;
+- inconclusivo/incompatível não grava D;
+- `ALL_REQUIRED` aplicado;
+- referência superseded invalida consistência;
+- check `@1` não é aceito como nova evidência após a migração.
 
-## 12. Estratégia de implantação
+## 20. Estratégia de entrega
 
-### Fase 1 — contratos e modo diagnóstico
+### Slice 1 — contratos, captura e diagnóstico
 
-- adicionar esta spec e ADR de emenda;
-- adicionar policy/schema;
-- separar captura e avaliação;
-- implementar manifestos e hashes;
-- remover seleção por assinatura do caminho de gate;
-- executar backtests públicos já publicados sem alterar D.
+Política/schema, manifestos, captura imutável, parser agregado, seleção sem datas e execução diagnóstica de todos os períodos.
 
-Resultado: informação diagnóstica imediata e nenhuma redução de rigor.
+### Slice 2 — exportação por equipe e fail-closed
 
-### Fase 2 — integridade fail-closed
+Parser CSV, universo histórico, PII guard, linhas obrigatórias, cache isolado e comparação por equipe.
 
-- validar município, período, linhas e revisão;
-- remover fallback de linha ausente;
-- isolar cache;
-- parar de usar lista atual de equipes historicamente;
-- corrigir Nota Final parcial.
+### Slice 3 — evidência metodológica no `siha`
 
-Resultado: nenhuma referência incompleta pode aprovar.
+Perfis, probes, runner somente leitura, dossiês e execução real de 2026Q1 e demais períodos cobertos. Esta slice não pode ser adiada.
 
-### Fase 3 — importação oficial por equipe
+### Slice 4 — gate `@2`
 
-- obter um CSV real de Avaliação do Quadrimestre;
-- congelar layout e fixture sem valores reais;
-- implementar parser;
-- capturar um período publicado;
-- registrar compatibilidade como `EXACT`, `EQUIVALENT` ou manter `UNKNOWN` conforme evidência.
+Conjunto `ALL_REQUIRED`, integração com registro, consistência de evidências, documentação e migração de `@1` para `@2`.
 
-Resultado: caminho forte para liberar D sem aguardar 2026Q2.
+Cada slice deve ser um PR independente e deixar software testável. O PR de Slice 3 deve conter os dossiês reais mascarados produzidos no `siha`.
 
-### Fase 4 — novo check e migração do registro
+## 21. Critérios de aceitação
 
-- registrar referências obrigatórias antes da comparação;
-- executar `@2`;
-- gerar resumo de conjunto;
-- atualizar D apenas se todos os requisitos passarem;
-- marcar documentação `@1` como superseded, preservando histórico.
+1. nenhum caminho de gate escolhe referência pela data de assinatura;
+2. 2026Q1 é executado imediatamente como diagnóstico;
+3. todos os demais períodos publicados são executados ou registrados como sem cobertura local;
+4. período e revisão são identificados separadamente;
+5. captura e avaliação são processos independentes;
+6. período não pré-registrado nunca grava D;
+7. linha ausente nunca vira zero;
+8. município e quadrimestre divergentes falham antes da aquisição;
+9. lista atual de equipes não participa de gate histórico;
+10. importador aceita arquivo oficial por equipe e recusa PII;
+11. cache é isolado por município, revisão, regra e fonte;
+12. todo perfil possui todos os probes exigidos;
+13. execução no `ssh siha` é somente leitura e reproduzível;
+14. dossiês reais de 2026Q1 existem para C1–C7 e Nota Final;
+15. demais períodos possuem dossiê ou motivo explícito de cobertura ausente;
+16. compatibilidade nunca é decidida só por data;
+17. equivalência é limitada ao hash da referência e fingerprint local;
+18. incompatibilidade explícita é aceita como conclusão e bloqueia promoção;
+19. `RegistryUpdater` cita política, manifesto e dossiê por hash;
+20. C1–C7 usam `siaps-distribuicao-por-classe@2`;
+21. Nota Final usa `siaps-nota-final-por-classe@2`;
+22. produto e CI continuam sem cliente SIAPS e sem rede;
+23. nenhum dado de pessoa ou INE é versionado;
+24. nova `rule_version` volta D para `PENDING`;
+25. publicação de novo quadrimestre não invalida automaticamente D existente.
 
-## 13. Critérios de aceitação
+## 22. Riscos e mitigação
 
-A mudança está concluída quando:
+### Arquivo oficial indisponível
 
-1. nenhum código de gate calcula “primeiro quadrimestre elegível” por data de assinatura;
-2. uma execução diagnóstica consegue comparar ao menos dois quadrimestres já publicados sem tocar o registro;
-3. a ferramenta diferencia período e revisão por hash;
-4. captura e avaliação são etapas independentes;
-5. um período não pré-registrado nunca escreve D;
-6. uma referência `UNKNOWN` nunca escreve D;
-7. uma linha SIAPS ausente nunca é interpretada como zero;
-8. município e quadrimestre divergentes falham antes da aquisição local;
-9. a lista atual de equipes não participa de comparação histórica de gate;
-10. o importador aceita CSV oficial por equipe e rejeita arquivo nominal;
-11. o cache é isolado por município, referência, regra e fonte;
-12. múltiplas referências obrigatórias obedecem `ALL_REQUIRED`;
-13. `RegistryUpdater` cita política e manifestos por hash;
-14. `ReleaseGatesConsistencyTest` invalida referência superseded;
-15. C1–C7 usam `siaps-distribuicao-por-classe@2`;
-16. Nota Final usa `siaps-nota-final-por-classe@2`;
-17. o produto continua sem cliente SIAPS e a CI continua sem rede;
-18. nenhuma contagem por classe, INE ou arquivo bruto é versionado na evidência pública;
-19. uma nova `rule_version` continua voltando D para `PENDING`;
-20. um novo quadrimestre publicado não invalida sozinho uma regra já reconciliada.
+Produzir dossiê `INCONCLUSIVE`, nunca inferir compatibilidade pelo agregado. Registrar exatamente qual campo/universo falta.
 
-## 14. Decisões deliberadamente conservadoras
+### Teste não contém casos discriminantes
 
-- **Não promover automaticamente 2026Q1.** Ele deve ser executado agora, mas só vira referência de gate após comprovação metodológica.
-- **Não considerar data de download como prova de metodologia.** Um arquivo obtido hoje pode conter cálculo antigo ou reprocessado; o hash identifica a revisão, não sua compatibilidade.
-- **Não usar a API pública agregada como substituta silenciosa do detalhe por equipe.** Ela é valiosa, mas tem menor poder de diagnóstico e não fornece universo histórico.
-- **Não alterar a tolerância após observar os resultados.** O `@2` preserva D/T; qualquer nova métrica exige `@3`.
-- **Não buscar automaticamente o período que passa.** O conjunto obrigatório é pré-registrado e todos os itens precisam passar.
+Os probes mostram contagem zero e podem sustentar apenas `EQUIVALENT_FOR_REFERENCE`, nunca equivalência global. Se uma diferença não for observável, o estado é inconclusivo.
 
-## 15. Riscos e mitigação
+### Divergência por corte ou atraso de envio
 
-### Risco: não existir evidência oficial suficiente para declarar `EXACT`
+Registrar corte local, instante/revisão oficial e fingerprint. Compatibilidade metodológica exige igualdade exata dos campos observáveis; o Portão D aplica tolerância em etapa separada.
 
-Mitigação: manter os períodos como diagnósticos; produzir análise `EQUIVALENT` somente com diff metodológico e testes; aguardar uma referência explicitamente reprocessada sem bloquear o trabalho de diagnóstico.
+### Mudança de layout
 
-### Risco: arquivo oficial mudar de layout
+Parser estrito e versionado; novo layout exige nova versão e fixture.
 
-Mitigação: parser versionado e estrito; layout novo exige nova versão e fixture.
+### Referência corrigida depois do `PASSED`
 
-### Risco: diferenças legítimas por corte de envio e correções tardias
+Revisões imutáveis, drift, `SUPERSEDED` e teste de consistência que invalida a evidência antiga.
 
-Mitigação: preservar o corte local, a revisão oficial e os hashes; manter tolerância pré-registrada; explicar divergências por equipe quando houver export oficial.
+### Exposição de dados
 
-### Risco: referência oficial ser corrigida depois do `PASSED`
+Brutos, INEs e resultados por equipe ficam fora do Git. O repositório recebe somente manifestos, hashes, estados, contagens mascaradas e resumos sem pessoas.
 
-Mitigação: revisões imutáveis, detecção de drift e estado `SUPERSEDED`; nunca sobrescrever evidência.
+### Uso indevido do ambiente de teste
 
-### Risco: pré-registro apenas formal, feito depois de observar o resultado
+Alias, IP, usuário, chave e senha ficam fora do repositório. O túnel é efêmero, a sessão é read-only e nenhum serviço é implantado no host de teste.
 
-Mitigação: fluxo obrigatório em dois commits; captura sem cálculo local; política fixada antes da execução; resumo registra hash da política.
+## 23. Fontes oficiais consultadas
 
-### Risco: retenção insegura do CSV oficial
+- histórico de versões do SIAPS, incluindo reprocessamentos e marcação de dado preliminar;
+- calendário oficial de envio de 2026;
+- manual do Módulo Componentes do Cofinanciamento, com visões por competência, equipe e indicador;
+- manual do Módulo Transferência de Arquivos;
+- releases que introduziram Detalhamento por Equipe, ajustes de exportação, NM/DN e reprocessamentos.
 
-Mitigação: aceitar apenas arquivo por equipe, recusar colunas de pessoa, manter bruto fora do Git, usar diretório configurável e hash content-addressed.
+As referências externas completas permanecem no histórico do PR e deverão ser citadas na ADR/runbook da implementação.
 
-## 16. Fontes oficiais consultadas
+## 24. Fontes internas afetadas
 
-- Histórico de versões 1.1: <https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/release/>
-- Versão 1.2: <https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/release-1-2/>
-- Versão 1.3: <https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/release-1-3/>
-- Versão 1.4: <https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/release-1-4/>
-- Versão 1.6: <https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/release-1-6/>
-- Versão 1.7: <https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/release-1-7/>
-- Versão 1.8: <https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/release-1-8/>
-- Versões 2.0–2.1: <https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/release-2-0/>
-- Calendário SIAPS: <https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/calendario-siaps/>
-- Módulo Transferência de Arquivos: <https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/transferencia-arquivos/>
-- Módulo Componentes do Cofinanciamento: <https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/modulo-componentes/>
+- `docs/indicadores/portoes/portao-d-conciliacao-siaps.md`;
+- `docs/indicadores/portoes/portao-d-nota-final-siaps.md`;
+- `docs/discovery/runbook-portao-d.md`;
+- ADR 0032 ou nova ADR de emenda;
+- pacote `esusdata.indicator.reconciliation` na árvore de testes;
+- `SensitivityExtracts` ou seu substituto content-addressed;
+- `contracts/indicators/release-gates.json`;
+- novos contratos de referência e metodologia.
 
-## 17. Fontes internas afetadas
+## 25. Resultado esperado
 
-- `docs/indicadores/portoes/portao-d-conciliacao-siaps.md`
-- `docs/indicadores/portoes/portao-d-nota-final-siaps.md`
-- `docs/discovery/runbook-portao-d.md`
-- `docs/adr/0032-registro-de-portoes-de-liberacao.md` ou nova ADR de emenda
-- `apps/agent/src/test/java/esusdata/indicator/reconciliation/Eligibility.java`
-- `apps/agent/src/test/java/esusdata/indicator/reconciliation/GatePack.java`
-- `apps/agent/src/test/java/esusdata/indicator/reconciliation/SiapsClient.java`
-- `apps/agent/src/test/java/esusdata/indicator/reconciliation/SiapsParser.java`
-- `apps/agent/src/test/java/esusdata/indicator/reconciliation/SiapsSnapshot.java`
-- `apps/agent/src/test/java/esusdata/indicator/reconciliation/PackVerdict.java`
-- `apps/agent/src/test/java/esusdata/indicator/reconciliation/Comparison.java`
-- `apps/agent/src/test/java/esusdata/indicator/reconciliation/PortaoDLiveTest.java`
-- `apps/agent/src/test/java/esusdata/indicator/reconciliation/RegistryUpdater.java`
-- `contracts/indicators/release-gates.json`
+Ao final, o projeto terá duas respostas separadas e auditáveis:
 
-## 18. Resultado esperado
+1. **O que acontece quando a regra atual é executada contra todos os períodos já publicados?** — matriz diagnóstica imediata.
+2. **Há evidência normativa e executável de que uma revisão oficial específica é compatível com esta `rule_version`?** — dossiê produzido no `siha`.
 
-Após a implementação, o projeto poderá executar imediatamente uma bateria retrospectiva contra os quadrimestres já publicados e obter uma visão objetiva das divergências. Ao mesmo tempo, nenhum resultado histórico será usado como justificativa automática para liberar D sem prova de compatibilidade.
+O caminho para liberar D deixa de ser “esperar 2026Q2” e passa a ser:
 
-O caminho preferencial para liberar o portão deixa de ser “esperar o SIAPS publicar 2026Q2” e passa a ser:
+1. capturar as revisões disponíveis;
+2. executar 2026Q1 e os demais períodos como diagnóstico;
+3. comparar com exportação oficial por equipe;
+4. rodar todos os probes no banco de teste via `ssh siha`;
+5. gerar dossiês explícitos;
+6. pré-registrar somente referências decididas e apropriadas;
+7. executar o check `@2`;
+8. liberar D apenas se todo o conjunto obrigatório passar.
 
-1. capturar um período já publicado;
-2. obter, quando possível, o arquivo oficial por equipe;
-3. provar e registrar a compatibilidade metodológica;
-4. pré-registrar a referência e sua revisão;
-5. executar a reconciliação `@2`;
-6. liberar D apenas se todo o conjunto obrigatório passar.
-
-Isso remove a dependência temporal indevida sem reduzir o Portão D a um teste conveniente sobre qualquer dado disponível.
+A ferramenta não presume compatibilidade nem incompatibilidade apenas pela data, e a implementação não pode encerrar sem produzir a evidência metodológica real.
