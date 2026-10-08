@@ -535,6 +535,8 @@ O relatório separa:
 - `D` e `T`;
 - comparação exata de NM/DN/score quando disponível.
 
+**Decisão explícita:** divergência exata de NM/DN/score **não** reprova D por si só nesta versão do check. O corte local do PEC e os envios tardios/reprocessamentos do SIAPS (seção 22) tornam divergências pequenas de NM/DN esperadas mesmo com metodologia idêntica; reprovar por qualquer diferença tornaria D inalcançável e equivaleria a recalibrar a tolerância, o que é não objetivo. A métrica de D continua sendo a distância de classes com limiar `T`. O resumo de D deve, porém, publicar o número de equipes com NM/DN/score divergente e o maior desvio absoluto, para que um erro de cálculo que não mude a classe fique visível na revisão. Tornar essa divergência um critério de falha exige um novo check (`@3`) e nova decisão registrada em ADR.
+
 Veredito de uma referência:
 
 - `PASSED`: entrada completa e todas as linhas avaliáveis passam;
