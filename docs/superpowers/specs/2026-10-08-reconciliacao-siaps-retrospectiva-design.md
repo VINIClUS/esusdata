@@ -114,10 +114,12 @@ Uma **referência** é um resultado oficial do SIAPS para um município, quadrim
 
 ### 6.3 Compatibilidade metodológica
 
-- `EXACT`: o perfil normativo oficial corresponde ao perfil local e todos os campos oficiais comparáveis coincidem exatamente.
-- `EQUIVALENT_FOR_REFERENCE`: existem diferenças normativas, mas todos os detectores dessas diferenças provam que elas não afetam a revisão específica, e todos os campos oficiais comparáveis coincidem exatamente. A equivalência vale somente para `reference_id + manifest_sha256 + source_fingerprint + rule_version`.
-- `INCOMPATIBLE`: ao menos uma diferença metodológica está ativa na revisão e altera o resultado, ou há divergência oficial explicada por essa diferença.
-- `INCONCLUSIVE`: há evidência produzida, mas falta campo oficial, cobertura local, detector, identidade de revisão ou observabilidade suficiente.
+- `EXACT`: o perfil normativo oficial corresponde ao perfil local e todos os probes exigidos foram executados com observabilidade completa, sem divergência.
+- `EQUIVALENT_FOR_REFERENCE`: existem diferenças normativas, mas todos os detectores dessas diferenças provam que elas não afetam a revisão específica. A equivalência vale somente para `reference_id + manifest_sha256 + source_fingerprint + rule_version`.
+- `INCOMPATIBLE`: ao menos uma diferença metodológica está ativa na revisão e altera decisão, NM, DN, score, classe ou Nota Final.
+- `INCONCLUSIVE`: há evidência produzida, mas falta universo histórico, cobertura local, detector, identidade de revisão ou observabilidade suficiente.
+
+Compatibilidade metodológica é decidida **pela semântica normativa e pelos probes**, nunca pela igualdade entre o resultado local e o oficial. Se a compatibilidade exigisse igualdade de saída, um erro de implementação local tornaria a referência inelegível e D ficaria `PENDING` para sempre, em vez de `FAILED`. A comparação de NM/DN/score/classe é registrada no dossiê como informação diagnóstica e decidida apenas na reconciliação (seção 14).
 
 `UNKNOWN` só existe antes da execução da evidência. Depois de processada uma referência, o dossiê deve terminar em um dos quatro estados acima.
 
@@ -221,7 +223,17 @@ Regras:
 4. `DIAGNOSTIC` nunca é obrigatório;
 5. uma execução ad hoc não promove a referência;
 6. política e referência são fixadas antes da execução que poderá alterar D;
-7. remover uma referência que falhou muda o hash da política e exige nova evidência; não converte silenciosamente o conjunto em `PASSED`.
+7. remover uma referência `GATE` que falhou muda o hash do conjunto de gate e exige nova evidência; não converte silenciosamente o conjunto em `PASSED`;
+8. o campo `compatibility` da declaração deve ser igual ao `verdict` do dossiê citado; divergência falha o teste de consistência.
+
+#### Hash do conjunto de gate
+
+A evidência de D **não** cita o hash do arquivo de política inteiro: novos diagnósticos são acrescentados a esse arquivo rotineiramente e não podem invalidar D (seção 15). D cita o `gate_set_sha256` de cada `pack + rule_version`, calculado sobre a serialização canônica (JSON ordenado, UTF-8, sem espaços) de:
+
+- `pack`, `rule_version`, `check` e `selection_policy`;
+- as declarações com `purpose=GATE`, ordenadas por `reference_id`, restritas a `reference_id`, `required`, `status`, `compatibility`, `reference_manifest_sha256` e `compatibility_evidence_ref` com seu hash.
+
+Acrescentar, alterar ou remover uma declaração `DIAGNOSTIC` não altera o `gate_set_sha256`. Qualquer alteração em uma declaração `GATE` altera.
 
 ### 8.2 Manifesto da referência
 
@@ -382,9 +394,8 @@ Exige cumulativamente:
 1. mesma semântica normativa identificada no perfil oficial e local;
 2. todos os probes obrigatórios executados com observabilidade completa;
 3. nenhuma divergência de probe;
-4. igualdade exata de todos os campos oficiais disponíveis por equipe;
-5. universo oficial histórico completo;
-6. hashes e escopo válidos.
+4. universo oficial histórico completo;
+5. hashes e escopo válidos.
 
 #### `EQUIVALENT_FOR_REFERENCE`
 
@@ -393,19 +404,25 @@ Exige cumulativamente:
 1. diferenças normativas completamente enumeradas;
 2. todos os probes dessas diferenças executados no `siha`;
 3. nenhum registro/sujeito da revisão afetado, ou ambas as leituras produzindo exatamente o mesmo resultado para todos os afetados;
-4. igualdade exata dos campos oficiais disponíveis;
-5. nenhuma diferença não observável;
+4. nenhuma diferença não observável;
+5. universo oficial histórico completo;
 6. escopo limitado ao hash da revisão e fingerprint local.
 
 #### `INCOMPATIBLE`
 
-Ocorre quando ao menos uma diferença ativa altera decisão, NM, DN, score, classe ou Nota Final, ou quando a comparação oficial exata diverge por causa metodológica identificada.
+Ocorre quando ao menos um probe com observabilidade completa mostra que uma diferença ativa altera decisão, NM, DN, score, classe ou Nota Final de algum sujeito ou equipe da revisão.
 
 #### `INCONCLUSIVE`
 
-Ocorre com campo oficial insuficiente, detector ausente/parcial, período sem cobertura local, universo histórico ausente, escopo divergente, referência não identificada ou divergência ainda não atribuída.
+Ocorre com universo histórico ausente, detector ausente/parcial, período sem cobertura local, escopo divergente ou referência não identificada.
 
-A tolerância do Portão D não participa dessa decisão. Compatibilidade metodológica exige comparação exata; a tolerância continua sendo aplicada depois, na reconciliação.
+#### O que não decide compatibilidade
+
+- A igualdade ou divergência entre NM/DN/score/classe locais e oficiais não entra na regra acima. Essa comparação é registrada em `official_field_comparison` como diagnóstico e é decidida apenas na reconciliação (Etapa C), onde uma divergência não explicada por probe resulta em `FAILED` se exceder o limiar.
+- Uma divergência de saída que **não** é atribuída a nenhum probe não torna a referência inconclusiva: ela é exatamente o tipo de erro que o Portão D deve reprovar.
+- A tolerância do Portão D não participa da decisão metodológica; ela continua sendo aplicada depois, na reconciliação.
+
+Quando uma divergência de saída revelar uma diferença metodológica ainda não enumerada, o perfil ganha um novo `probe_id` e uma nova versão; o dossiê anterior permanece como evidência histórica e a referência é reavaliada.
 
 ### 9.6 Critério de conclusão da implementação
 
@@ -416,6 +433,7 @@ A implementação só pode ser declarada concluída quando:
 - cada dossiê listar todas as fontes e probes exigidos;
 - C1–C7 em 2026Q1 terminarem em `EXACT`, `EQUIVALENT_FOR_REFERENCE` ou `INCOMPATIBLE`, não todos como `INCONCLUSIVE`;
 - qualquer inconclusão restante tiver razão verificável e teste que impeça promoção a `GATE`;
+- a comparação de saída local × oficial de cada dossiê estiver registrada como diagnóstico, sem influenciar o veredito metodológico;
 - o resumo mascarado da execução no `siha` for revisado e commitado.
 
 Não é requisito que o resultado seja favorável. Evidência explícita de incompatibilidade é um resultado válido e impede a liberação do portão.
@@ -536,11 +554,13 @@ Ao gravar D:
 
 - `check` usa `@2`;
 - a evidência principal é o resumo do conjunto;
-- o resumo cita hashes da política, manifestos e dossiês;
+- o resumo cita o `gate_set_sha256` do `pack + rule_version` e os hashes de cada manifesto e dossiê do conjunto;
 - `RegistryUpdater` recusa diagnóstico, compatibilidade inconclusiva/incompatível, revisão não ativa, hash divergente ou conjunto incompleto;
 - `ReleaseGatesConsistencyTest` valida todos os artefatos e exige que a evidência permaneça ativa.
 
-Novo quadrimestre publicado não invalida D automaticamente. Nova `rule_version`, alteração de política, revisão superseded/retracted ou mudança de hash invalida a evidência correspondente.
+Novo quadrimestre publicado não invalida D automaticamente, e acrescentar ou alterar declarações `DIAGNOSTIC` na política também não. Nova `rule_version`, alteração do conjunto de gate (`gate_set_sha256`), revisão superseded/retracted ou mudança de hash de manifesto/dossiê invalida a evidência correspondente.
+
+`ReleaseGatesConsistencyTest` recalcula o `gate_set_sha256` a partir da política versionada e falha se ele divergir do citado por um D `PASSED|FAILED`. Por isso, a mudança que marca uma revisão `GATE` como `SUPERSEDED|RETRACTED` precisa, no mesmo commit, voltar o D afetado para `PENDING` (ou registrar novo veredito); a CI rejeita o estado intermediário.
 
 ## 16. Fluxos operacionais
 
@@ -560,16 +580,18 @@ Novo quadrimestre publicado não invalida D automaticamente. Nova `rule_version`
 1. captura e manifesto já existem;
 2. dossiê decidido já existe;
 3. política é alterada para `GATE`, com hash do dossiê;
-4. a alteração entra antes da execução de gate;
-5. a reconciliação roda exatamente contra o conjunto registrado;
-6. o resumo e eventual atualização de D entram em commit posterior.
+4. a alteração entra **em PR próprio, mergeado em `main` antes da execução de gate**;
+5. a reconciliação roda exatamente contra o conjunto registrado em `main`, cujo `gate_set_sha256` é citado na evidência;
+6. o resumo e eventual atualização de D entram em PR posterior.
+
+O repositório faz squash-merge; dois commits no mesmo PR seriam fundidos e perderiam a prova de ordem. A prova de pré-registro é o commit de `main` do PR de pré-registro, anterior ao commit de `main` do PR de resultado. O PR de resultado não pode alterar declarações `GATE` da política; o teste de consistência compara o `gate_set_sha256` citado com o da política atual.
 
 ### 16.3 Drift oficial
 
 1. recaptura produz hash diferente;
 2. ferramenta gera `REFERENCE_DRIFT` e preserva a revisão anterior;
 3. política marca a revisão antiga como `SUPERSEDED`;
-4. D volta a `PENDING` se dependia dela;
+4. no mesmo commit, D volta a `PENDING` se dependia dela (o teste de consistência exige);
 5. nova revisão passa por dossiê e reconciliação próprios.
 
 ## 17. Mudanças de código previstas
@@ -625,7 +647,9 @@ Novo quadrimestre publicado não invalida D automaticamente. Nova `rule_version`
 - `GATE` sem dossiê decidido;
 - `DIAGNOSTIC` obrigatório;
 - regra ou pack desconhecido;
-- remoção de referência que falhou altera o hash e exige nova evidência;
+- remoção de referência `GATE` que falhou altera o `gate_set_sha256` e exige nova evidência;
+- acrescentar ou alterar referência `DIAGNOSTIC` não altera o `gate_set_sha256`;
+- `compatibility` da declaração diverge do `verdict` do dossiê → falha;
 - seleção não depende de assinatura ou período mais recente.
 
 ### Captura e proveniência
@@ -652,8 +676,9 @@ Novo quadrimestre publicado não invalida D automaticamente. Nova `rule_version`
 
 - todo `probe_id` tem implementação;
 - probe sem observabilidade gera inconclusão;
-- zero afetado permite equivalência apenas com igualdade oficial;
+- zero afetado com observabilidade completa permite equivalência;
 - afetado divergente gera incompatibilidade;
+- divergência de NM/DN/classe sem probe correspondente não altera o veredito metodológico e chega à reconciliação;
 - detalhes por INE não entram no dossiê versionado.
 
 ### `siha`
@@ -675,6 +700,8 @@ Novo quadrimestre publicado não invalida D automaticamente. Nova `rule_version`
 - inconclusivo/incompatível não grava D;
 - `ALL_REQUIRED` aplicado;
 - referência superseded invalida consistência;
+- D citando `gate_set_sha256` diferente do recalculado falha;
+- evidência versionada é validada offline por estrutura, hashes e renderização determinística JSON → Markdown; a regeneração byte a byte a partir dos artefatos brutos é um teste local opt-in, nunca da CI;
 - check `@1` não é aceito como nova evidência após a migração.
 
 ## 20. Estratégia de entrega
@@ -693,9 +720,17 @@ Perfis, probes, runner somente leitura, dossiês e execução real de 2026Q1 e d
 
 ### Slice 4 — gate `@2`
 
-Conjunto `ALL_REQUIRED`, integração com registro, consistência de evidências, documentação e migração de `@1` para `@2`.
+Conjunto `ALL_REQUIRED`, `gate_set_sha256`, integração com registro, consistência de evidências, documentação e migração de `@1` para `@2`.
 
-Cada slice deve ser um PR independente e deixar software testável. O PR de Slice 3 deve conter os dossiês reais mascarados produzidos no `siha`.
+### Slice 5 — pré-registro
+
+Somente a promoção das referências decididas a `GATE` na política. Nenhuma mudança em `release-gates.json`.
+
+### Slice 6 — resultado do gate
+
+Execução do check `@2` contra o conjunto pré-registrado em `main` e gravação de D.
+
+Cada slice deve ser um PR independente e deixar software testável. O PR de Slice 3 deve conter os dossiês reais mascarados produzidos no `siha`. As slices 5 e 6 são obrigatoriamente PRs distintos, mergeados nessa ordem.
 
 ## 21. Critérios de aceitação
 
@@ -717,13 +752,15 @@ Cada slice deve ser um PR independente e deixar software testável. O PR de Slic
 16. compatibilidade nunca é decidida só por data;
 17. equivalência é limitada ao hash da referência e fingerprint local;
 18. incompatibilidade explícita é aceita como conclusão e bloqueia promoção;
-19. `RegistryUpdater` cita política, manifesto e dossiê por hash;
+19. `RegistryUpdater` cita `gate_set_sha256`, manifesto e dossiê por hash;
 20. C1–C7 usam `siaps-distribuicao-por-classe@2`;
 21. Nota Final usa `siaps-nota-final-por-classe@2`;
 22. produto e CI continuam sem cliente SIAPS e sem rede;
 23. nenhum dado de pessoa ou INE é versionado;
 24. nova `rule_version` volta D para `PENDING`;
-25. publicação de novo quadrimestre não invalida automaticamente D existente.
+25. publicação de novo quadrimestre ou nova declaração `DIAGNOSTIC` não invalida automaticamente D existente;
+26. compatibilidade metodológica não depende de igualdade entre saída local e oficial; erro local de cálculo resulta em `FAILED`, não em `PENDING`;
+27. o pré-registro do conjunto de gate é mergeado em `main` antes do PR que grava o resultado.
 
 ## 22. Riscos e mitigação
 
@@ -737,7 +774,7 @@ Os probes mostram contagem zero e podem sustentar apenas `EQUIVALENT_FOR_REFEREN
 
 ### Divergência por corte ou atraso de envio
 
-Registrar corte local, instante/revisão oficial e fingerprint. Compatibilidade metodológica exige igualdade exata dos campos observáveis; o Portão D aplica tolerância em etapa separada.
+Registrar corte local, instante/revisão oficial e fingerprint. Essa divergência não altera a compatibilidade metodológica; ela aparece na reconciliação, onde o limiar do Portão D decide se é aceitável.
 
 ### Mudança de layout
 

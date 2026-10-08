@@ -22,7 +22,9 @@
 - Produto e CI continuam sem cliente SIAPS, sem PEC e sem rede.
 - Linha oficial ausente nunca significa zero; zero só vale quando explícito na fonte.
 - `filtros/equipes` atual nunca é universo histórico de gate.
-- Mudança de `rule_version`, política, hash ou estado `SUPERSEDED/RETRACTED` invalida a evidência correspondente.
+- Mudança de `rule_version`, do conjunto de gate (`gate_set_sha256`), de hash de manifesto/dossiê ou estado `SUPERSEDED/RETRACTED` invalida a evidência correspondente; declarações `DIAGNOSTIC` novas ou alteradas não invalidam.
+- Compatibilidade metodológica é decidida por perfil normativo e probes; igualdade NM/DN/score/classe local × oficial é diagnóstico do dossiê e só é julgada na reconciliação.
+- O repositório faz squash-merge: pré-registro do conjunto de gate e resultado do gate são PRs distintos, mergeados nessa ordem.
 - O conjunto de gate usa `ALL_REQUIRED`; não há fallback para outro período que passe.
 - Não adicionar dependência de produção; usar Java padrão e bibliotecas já presentes.
 - Cada tarefa abaixo termina com suíte verde e commit revisável; nenhum commit intermediário pode deixar contratos e catálogos inconsistentes.
@@ -72,6 +74,8 @@
 - `PortaoDDiagnosticLiveTest.java`
 - `PortaoDCompatibilityLiveTest.java`
 - `PortaoDGateLiveTest.java`
+- `PortaoDEvidenceReplayLiveTest.java` (opt-in local)
+- `PortaoDEvidenceConsistencyTest.java`, `PortaoDEvidencePrivacyTest.java` (offline, CI)
 - `ReferenceSetVerdict.java`
 - existing `RegistryUpdater`, `SummaryWriter`, `RawWriter`
 
@@ -100,6 +104,7 @@
 - records/enums: `ReferenceSet`, `ReferenceDeclaration`, `ReferencePurpose`, `ReferenceCompatibility`, `ReferenceStatus`, `SelectionPolicy`
 - `ReferenceSelector.diagnostics(ReferenceSet) -> List<ReferenceDeclaration>`
 - `ReferenceSelector.requiredGateReferences(ReferenceSet) -> List<ReferenceDeclaration>`
+- `ReferenceSet.gateSetSha256() -> String` — SHA-256 da serialização canônica de `pack`, `rule_version`, `check`, `selection_policy` e das declarações `GATE` ordenadas por `reference_id` (spec §8.1)
 
 - [ ] **Step 1: Write failing tests**
 
@@ -112,6 +117,9 @@ rejectsDiagnosticReferenceMarkedRequired()
 rejectsDuplicateReferenceIdAcrossSets()
 rejectsUnknownPackOrRuleVersion()
 doesNotSortOrSelectByQuadrimestreDate()
+addingOrChangingDiagnosticDeclarationKeepsGateSetSha256()
+changingOrRemovingGateDeclarationChangesGateSetSha256()
+gateSetSha256IsIndependentOfDeclarationOrderAndWhitespace()
 ```
 
 - [ ] **Step 2: Verify failure**
@@ -208,6 +216,7 @@ git commit -m "feat(portao-d): capture immutable SIAPS revisions"
 - Create: `OfficialTeamExportCsvParserTest.java`
 - Create fixtures: `apps/agent/src/test/resources/esusdata/indicator/reconciliation/siaps-team-export/*.csv`
 - Modify: `PackVerdict.java`, `Comparison.java`, `SiapsSnapshot.java`, `LocalClasses.java`
+- Modify: `PortaoDLiveTest.java` (adapta-se à nova assinatura de `PackVerdict.evaluate`, construindo `ValidatedReference` a partir do agregado; sem isso a árvore de testes não compila)
 - Test: `PackVerdictTest.java`, `NotaFinalVerdictTest.java`, `ComparisonTest.java`
 
 **Interfaces:**
@@ -253,7 +262,7 @@ Use the official Nota Final universe. Aggregate-only input without historical un
 - [ ] **Step 7: Run tests and commit**
 
 ```bash
-git add apps/agent/src/test/java/esusdata/indicator/reconciliation/{OfficialTeamExportCsvParser,OfficialTeamReference,ValidatedReference,OfficialTeamExportCsvParserTest,PackVerdict,Comparison,SiapsSnapshot,LocalClasses,PackVerdictTest,NotaFinalVerdictTest,ComparisonTest}.java \
+git add apps/agent/src/test/java/esusdata/indicator/reconciliation/{OfficialTeamExportCsvParser,OfficialTeamReference,ValidatedReference,OfficialTeamExportCsvParserTest,PackVerdict,Comparison,SiapsSnapshot,LocalClasses,PackVerdictTest,NotaFinalVerdictTest,ComparisonTest,PortaoDLiveTest}.java \
   apps/agent/src/test/resources/esusdata/indicator/reconciliation/siaps-team-export
 git commit -m "fix(portao-d): use historical team exports and fail closed"
 ```
@@ -265,6 +274,7 @@ git commit -m "fix(portao-d): use historical team exports and fail closed"
 - Create: `ReferenceScopedExtractsTest.java`
 - Create: `apps/agent/src/test/java/esusdata/indicator/reconciliation/PublishedPeriodCoverage.java`
 - Create: `PublishedPeriodCoverageTest.java`
+- Create: `PortaoDReferenceCaptureLiveTest.java` (antecipado da Task 8: sem ele o runner diagnóstico do PR A não tem como obter manifestos reais)
 - Create: `PortaoDDiagnosticLiveTest.java`
 - Create: `PortaoDRunnerConfigurationTest.java`
 - Modify: `SensitivityExtracts.java`, `SensitivityExtractsTest.java`
@@ -294,15 +304,15 @@ mvn -B -f apps/agent/pom.xml test \
 
 Use `<root>/<municipality>/<quadrimestre>/<reference-sha>/<pack@version>/<source-fingerprint>/<month>/`. Validate against the external expected context. Reuse `ReadPlan`; do not duplicate SQL.
 
-- [ ] **Step 5: Implement diagnostic-only batch runner**
+- [ ] **Step 5: Implement capture and diagnostic-only batch runners**
 
-The runner accepts captured manifests and PEC inputs but no registry output. It writes a matrix for all periods and explicit missing-month entries.
+The capture runner takes SIAPS inputs and the artifact dir only (no PEC, no registry) and writes manifests through `ReferenceArtifactStore`. The diagnostic runner accepts captured manifests and PEC inputs but no registry output. It writes a matrix for all periods and explicit missing-month entries. `PortaoDRunnerConfigurationTest` asserts both boundaries.
 
 - [ ] **Step 6: Run tests and commit**
 
 ```bash
 git add apps/agent/src/test/java/esusdata/run/worker/{ReferenceScopedExtracts,ReferenceScopedExtractsTest,SensitivityExtracts,SensitivityExtractsTest}.java \
-  apps/agent/src/test/java/esusdata/indicator/reconciliation/{PublishedPeriodCoverage,PublishedPeriodCoverageTest,PortaoDDiagnosticLiveTest,PortaoDRunnerConfigurationTest}.java
+  apps/agent/src/test/java/esusdata/indicator/reconciliation/{PublishedPeriodCoverage,PublishedPeriodCoverageTest,PortaoDReferenceCaptureLiveTest,PortaoDDiagnosticLiveTest,PortaoDRunnerConfigurationTest}.java
 git commit -m "feat(portao-d): run all published periods diagnostically"
 ```
 
@@ -425,11 +435,13 @@ git commit -m "feat(portao-d): add complete methodology probe catalog"
 - [ ] **Step 1: Write failing decision-table tests**
 
 ```java
-exactRequiresCompleteProbesAndExactOfficialFields()
+exactRequiresIdenticalProfileAndCompleteNonDivergentProbes()
 equivalentRequiresEveryDeltaInactiveOrDecisionEquivalent()
 divergentProbeIsIncompatible()
 unobservableRequiredProbeIsInconclusive()
-missingRequiredOfficialFieldIsInconclusive()
+missingHistoricalUniverseIsInconclusive()
+officialOutputMismatchWithoutProbeDoesNotChangeVerdict()
+officialOutputComparisonIsRecordedAsDiagnostic()
 dossierContainsNoIneOrPersonIdentifiers()
 markdownMasksCountsBelowTen()
 ```
@@ -444,7 +456,7 @@ mvn -B -f apps/agent/pom.xml test \
 
 - [ ] **Step 3: Implement the explicit decision table**
 
-Scope/hash failure → inconclusive; complete divergent probe or attributable exact-field mismatch → incompatible; required partial/none → inconclusive; identical profile plus equality → exact; otherwise all deltas proven inactive/equivalent plus equality → equivalent for reference.
+Scope/hash failure or missing historical universe → inconclusive; complete divergent probe → incompatible; required partial/none → inconclusive; identical profile with complete non-divergent probes → exact; otherwise all deltas proven inactive/equivalent → equivalent for reference. The local × official NM/DN/score/class comparison is written to `official_field_comparison` and never enters this table (spec §9.5): a local calculation error must reach the gate as `FAILED`, not hide as `INCONCLUSIVE`.
 
 - [ ] **Step 4: Implement writers and privacy guard**
 
@@ -457,14 +469,14 @@ git add apps/agent/src/test/java/esusdata/indicator/reconciliation/{MethodologyC
 git commit -m "feat(portao-d): generate methodology compatibility dossiers"
 ```
 
-### Task 8: Split capture, compatibility and gate runners; add the `siha` runbook
+### Task 8: Split compatibility and gate runners; add the `siha` runbook
 
 **Files:**
-- Create: `PortaoDReferenceCaptureLiveTest.java`
 - Create: `PortaoDCompatibilityLiveTest.java`
 - Create: `PortaoDGateLiveTest.java`
-- Modify/delete: `PortaoDLiveTest.java`
-- Create: `PortaoDRunnerConfigurationTest.java`
+- Delete: `PortaoDLiveTest.java`
+- Modify: `PortaoDRunnerConfigurationTest.java` (criado na Task 4)
+- Create: `PortaoDEvidenceReplayLiveTest.java` (opt-in local; regenera dossiês a partir dos artefatos content-addressed e compara bytes)
 - Create: `docs/discovery/runbook-portao-d-siha.md`
 
 **Interfaces:**
@@ -474,7 +486,7 @@ git commit -m "feat(portao-d): generate methodology compatibility dossiers"
 
 - [ ] **Step 1: Write failing boundary tests**
 
-Assert capture cannot accept registry/PEC properties, diagnostics cannot update D, compatibility requires manifest/profile, and gate refuses ad hoc periods.
+Assert compatibility requires manifest/profile, gate refuses ad hoc periods and a dirty working tree, and `PortaoDLiveTest` no longer exists (its `Eligibility` calls must be gone before Task 10 deletes the class).
 
 - [ ] **Step 2: Verify failure**
 
@@ -484,9 +496,9 @@ mvn -B -f apps/agent/pom.xml test \
   -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
-- [ ] **Step 3: Extract the three runners**
+- [ ] **Step 3: Extract the compatibility and gate runners**
 
-Reuse existing `SiapsClient`, `ReferenceScopedExtracts` and evaluator. Remove choice of “latest eligible” from every path.
+The capture runner already exists (Task 4). Reuse existing `SiapsClient`, `ReferenceScopedExtracts` and evaluator. Remove choice of “latest eligible” from every path. The gate runner reads the policy from the working tree, requires a clean checkout of `main` and records its `gate_set_sha256`.
 
 - [ ] **Step 4: Write the runbook**
 
@@ -499,6 +511,7 @@ mvn -B -f apps/agent/pom.xml test \
   -Dtest='PortaoDRunnerConfigurationTest,*VerdictTest,*ParserTest,*ComparisonTest' \
   -Dsurefire.failIfNoSpecifiedTests=false
 
+git rm apps/agent/src/test/java/esusdata/indicator/reconciliation/PortaoDLiveTest.java
 git add apps/agent/src/test/java/esusdata/indicator/reconciliation/PortaoD*LiveTest.java \
   apps/agent/src/test/java/esusdata/indicator/reconciliation/PortaoDRunnerConfigurationTest.java \
   docs/discovery/runbook-portao-d-siha.md
@@ -535,7 +548,7 @@ Every published period must appear as `RUN` or `MISSING_LOCAL_MONTHS`.
 
 - [ ] **Step 5: Execute compatibility evidence**
 
-Generate C1–C7 and Component III dossiers for 2026Q1 and every other covered period. Rerun from persisted extracts with the tunnel closed and assert identical dossier hashes.
+Generate C1–C7 and Component III dossiers for 2026Q1 and every other covered period. Close the tunnel and run `PortaoDEvidenceReplayLiveTest` (opt-in) from the persisted content-addressed artifacts; record in the campaign document that every dossier hash was reproduced. This replay is local only: its inputs never enter Git, so CI cannot and must not run it.
 
 - [ ] **Step 6: Review privacy and completeness**
 
@@ -551,57 +564,50 @@ git add contracts/indicators/siaps-reference-policy.json \
 git commit -m "test(portao-d): record retrospective SIAPS evidence from siha"
 ```
 
-### Task 10: Aggregate required references, update D `@2`, retire date-based eligibility, and verify
+### Task 10: Aggregate required references, harden the registry for `@2`, retire date-based eligibility
 
 **Files:**
 - Create: `ReferenceSetVerdict.java`, `ReferenceSetVerdictTest.java`
 - Modify: `RegistryUpdater.java`, `RegistryUpdaterTest.java`
 - Modify: `SummaryWriter.java` and existing writer tests
 - Modify: `ReleaseGatesConsistencyTest.java`
-- Modify only after pre-registration: `contracts/indicators/release-gates.json`
+- Modify: `Comparison.java` (`CHECK_ID`/`CHECK_ID_NOTA_FINAL` → `@2`), `PackVerdictTest.java`, `NotaFinalVerdictTest.java` (removes its `Eligibility` assertions)
 - Create: `docs/adr/0034-referencias-siaps-retrospectivas.md`
 - Modify: ADR 0032, Portão D docs, runbook, `CONTEXT.md`
 - Delete/reduce: `Eligibility.java`, `EligibilityTest.java`
 - Modify: `GatePack.java`
-- Create: `PortaoDEvidencePrivacyTest.java`, `PortaoDEvidenceReproducibilityTest.java`
+- Create: `PortaoDEvidencePrivacyTest.java`, `PortaoDEvidenceConsistencyTest.java`
+- Do **not** modify: `contracts/indicators/release-gates.json`; do **not** promote any declaration to `GATE`
 
 **Interfaces:**
 - `ReferenceSetVerdict.aggregate(ReferenceSet, Map<String, PackVerdict>, Map<String, CompatibilityDossier>) -> ReferenceSetVerdict`
-- `RegistryUpdater.record(Path registry, Path repoRoot, ReferenceSetVerdict, LocalDate, EvidenceBundle)`
+- `RegistryUpdater.record(Path registry, Path repoRoot, ReferenceSetVerdict, LocalDate, EvidenceBundle)` — the bundle carries `gate_set_sha256` and every manifest/dossier hash
 
 - [ ] **Step 1: Write failing `ALL_REQUIRED` tests**
 
-Any failed → failed; otherwise any pending → pending; all passed → passed; diagnostics ignored; missing/incompatible/inconclusive dossier cannot pass; superseded reference invalidates evidence.
+Any failed → failed; otherwise any pending → pending; all passed → passed; diagnostics ignored; missing/incompatible/inconclusive dossier cannot pass; superseded reference invalidates evidence; a local calculation error on an `EXACT` reference yields `FAILED`, not `PENDING`.
 
-- [ ] **Step 2: Write failing consistency/privacy/reproducibility tests**
+- [ ] **Step 2: Write failing consistency/privacy tests**
 
-Require policy/manifest/dossier hashes, active revisions, current rule versions, no `@1` for new D, no forbidden identifiers, byte-identical regenerated evidence.
+Require `gate_set_sha256` recomputed from the current policy to equal the one cited by every decided D; manifest/dossier hashes; active revisions; current rule versions; no `@1` for new D; declaration `compatibility` equal to dossier `verdict`; no forbidden identifiers. `PortaoDEvidenceConsistencyTest` validates committed evidence offline: schema, hashes, and that each committed Markdown is byte-identical to the deterministic rendering of its committed JSON. It does not attempt regeneration from raw artifacts (those live outside Git; see `PortaoDEvidenceReplayLiveTest`, Task 8).
 
 - [ ] **Step 3: Verify failure**
 
 ```bash
 mvn -B -f apps/agent/pom.xml test \
-  -Dtest=ReferenceSetVerdictTest,RegistryUpdaterTest,ReleaseGatesConsistencyTest,PortaoDEvidencePrivacyTest,PortaoDEvidenceReproducibilityTest \
+  -Dtest=ReferenceSetVerdictTest,RegistryUpdaterTest,ReleaseGatesConsistencyTest,PortaoDEvidencePrivacyTest,PortaoDEvidenceConsistencyTest \
   -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 - [ ] **Step 4: Implement aggregation and hardened registry update**
 
-The evidence summary names policy hash and every reference/manifest/dossier hash. `RegistryUpdater` accepts only a fixed gate set and refuses ad hoc period results.
+The evidence summary names `gate_set_sha256` and every reference/manifest/dossier hash. `RegistryUpdater` accepts only a fixed gate set and refuses ad hoc period results.
 
-- [ ] **Step 5: Pre-register gate references in a separate commit**
+- [ ] **Step 5: Remove date-based authority and update docs**
 
-Promote only real `EXACT|EQUIVALENT_FOR_REFERENCE` references. Commit policy before running gate evaluation; do not modify `release-gates.json` in this commit.
+Delete `firstEligible/reference/isReference/waitingFor`; remove `lastSignature`, `NT8_LAST_SIGNATURE` and `floor()` as selection mechanisms. Dates remain metadata in dossiers. The ADR records the squash-merge pre-registration protocol (Tasks 11–12).
 
-- [ ] **Step 6: Execute gate evaluation and commit result separately**
-
-`FAILED` is valid evidence and keeps the pack blocked. `PASSED` requires every mandatory reference passed. Update `release-gates.json` only with `@2` evidence.
-
-- [ ] **Step 7: Remove date-based authority and update docs**
-
-Delete `firstEligible/reference/isReference`; remove `lastSignature`, `NT8_LAST_SIGNATURE` and `floor()` as selection mechanisms. Dates remain metadata in dossiers.
-
-- [ ] **Step 8: Run full verification**
+- [ ] **Step 6: Run full verification**
 
 ```bash
 mvn -B -f apps/agent/pom.xml clean verify -Dsurefire.reuseForks=false
@@ -614,25 +620,74 @@ npm run format:check
 npm run test:data
 ```
 
-Expected: all pass; live tests skip without opt-in.
+Expected: all pass; live tests skip without opt-in; every D stays `PENDING`.
 
-- [ ] **Step 9: Commit final code/docs**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add contracts/indicators docs apps/agent/src/test apps/web CONTEXT.md
+git add contracts/indicators docs apps/agent/src/test CONTEXT.md
 git commit -m "feat(portao-d): adopt retrospective SIAPS reconciliation v2"
 ```
+
+### Task 11: Pre-register the gate reference set (own PR)
+
+**Files:**
+- Modify only: `contracts/indicators/siaps-reference-policy.json`
+
+- [ ] **Step 1: Promote only decided references**
+
+Promote to `GATE` (`required=true`, `ACTIVE`) only real references whose committed dossier is `EXACT|EQUIVALENT_FOR_REFERENCE`, with manifest and dossier hashes. Do not run the gate runner before this PR is merged.
+
+- [ ] **Step 2: Record the gate set hashes in the PR body**
+
+List `gate_set_sha256` per `pack + rule_version`, as printed by `ReferencePolicyConsistencyTest`.
+
+- [ ] **Step 3: Verify and commit**
+
+```bash
+mvn -B -f apps/agent/pom.xml test -Dtest='ReferencePolicy*Test,ReleaseGatesConsistencyTest,PortaoDEvidence*Test'
+git add contracts/indicators/siaps-reference-policy.json
+git commit -m "chore(portao-d): pre-register SIAPS gate references"
+```
+
+The PR must be merged to `main` before Task 12 starts. `release-gates.json` must not change in this PR.
+
+### Task 12: Execute the `@2` gate and record D (own PR)
+
+**Files:**
+- Modify: `contracts/indicators/release-gates.json`
+- Generate: Portão D summary documents cited as evidence
+
+- [ ] **Step 1: Run the gate runner from a clean checkout of `main`**
+
+Use the merge commit of Task 11. The runner refuses to start if the working tree differs from `HEAD` or if any `GATE` declaration differs from `HEAD`.
+
+- [ ] **Step 2: Record the result**
+
+`FAILED` is valid evidence and keeps the pack blocked. `PASSED` requires every mandatory reference passed. Update `release-gates.json` only with `@2` evidence citing `gate_set_sha256`.
+
+- [ ] **Step 3: Verify and commit**
+
+```bash
+mvn -B -f apps/agent/pom.xml test -Dtest='ReleaseGatesConsistencyTest,ReleaseGatesSchemaTest,PortaoDEvidence*Test'
+git add contracts/indicators/release-gates.json docs/indicadores/portoes
+git commit -m "test(portao-d): record SIAPS gate @2 result"
+```
+
+This PR must not change any `GATE` declaration of the policy; `ReleaseGatesConsistencyTest` enforces it through `gate_set_sha256`.
 
 ---
 
 ## Implementation PR Boundaries
 
-1. **PR A — reference contracts and diagnostic execution:** Tasks 1–4.
-2. **PR B — methodology evidence engine:** Tasks 5–8.
-3. **PR C — real `siha` evidence:** Task 9 plus only fixes exposed by the campaign.
-4. **PR D — gate `@2` and retirement of date-based eligibility:** Task 10.
+1. **PR A — reference contracts, capture and diagnostic execution:** Tasks 1–4.
+2. **PR B — methodology evidence engine:** Tasks 5–8. Depends on PR A.
+3. **PR C — real `siha` evidence:** Task 9 plus only fixes exposed by the campaign. Depends on PR B.
+4. **PR D — gate `@2` code and retirement of date-based eligibility:** Task 10. Depends on PR A and PR B; independent of PR C (all D remain `PENDING`).
+5. **PR E — gate pre-registration:** Task 11. Depends on PR C and PR D.
+6. **PR F — gate result:** Task 12. Depends on PR E merged to `main`.
 
-Do not squash the gate-reference pre-registration commit with the later gate-result commit. Reviewers must be able to prove the set was fixed before the result was observed.
+The repository squash-merges PRs, so pre-registration and result are separate PRs, never separate commits of one PR. Reviewers prove the set was fixed before the result was observed by the order of the two `main` commits and by the `gate_set_sha256` cited in D.
 
 ## Completion Definition
 
@@ -640,9 +695,9 @@ The feature is complete only when:
 
 - 2026Q1 has real dossiers for C1–C7 and Component III;
 - every other published period has a dossier or explicit missing-local-month record;
-- dossier replay is reproducible with the `siha` tunnel closed;
+- dossier replay is reproducible with the `siha` tunnel closed (local opt-in replay, recorded in the campaign document);
 - every required probe executed;
 - no verdict depends solely on date;
-- any promoted reference was pre-registered before gate evaluation;
+- any promoted reference was pre-registered in a PR merged before the gate-result PR;
 - `@2` evidence passes consistency and privacy tests;
 - full Java, Rust and web verification is green.
