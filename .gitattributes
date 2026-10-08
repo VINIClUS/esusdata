@@ -15,3 +15,9 @@ contracts/** text eol=lf
 # sha256 of a document under docs/: a CRLF checkout on Windows changed every hash and failed
 # ReleaseGatesConsistencyTest in the Windows package job.
 docs/**/*.md text eol=lf
+
+# The reference policy (contracts/indicators/siaps-reference-policy.json) pins the reference
+# manifests and the compatibility dossiers under docs/ by sha256, and the Portão D hashes the
+# fixtures it replays: a CRLF checkout on Windows would change every hash of that evidence.
+docs/**/*.json text eol=lf
+apps/agent/src/test/resources/** text eol=lf
