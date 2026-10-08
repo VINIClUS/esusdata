@@ -176,6 +176,8 @@ A etapa B é parte da implementação, não uma tarefa operacional adiada.
 
 Somente referências pré-registradas como `GATE`, ativas e com dossiê `EXACT|EQUIVALENT_FOR_REFERENCE` podem participar. A avaliação não escolhe uma referência alternativa se a obrigatória falhar.
 
+A reconciliação de cada referência deve usar exatamente a fonte local autorizada pelo dossiê: o `local_source_fingerprint` da execução de gate (o mesmo da chave do cache content-addressed) precisa ser igual ao do dossiê. Se o PEC mudou entre a campanha de compatibilidade e a execução de gate, o veredito daquela referência é `PENDING` até que um novo dossiê seja produzido para a nova fingerprint. A execução de gate deve preferir os extratos persistidos da campanha, que preservam a fingerprint.
+
 ## 8. Contratos versionados
 
 ### 8.1 Política de referências
@@ -223,8 +225,9 @@ Regras:
 4. `DIAGNOSTIC` nunca é obrigatório;
 5. uma execução ad hoc não promove a referência;
 6. política e referência são fixadas antes da execução que poderá alterar D;
-7. remover uma referência `GATE` que falhou muda o hash do conjunto de gate e exige nova evidência; não converte silenciosamente o conjunto em `PASSED`;
-8. o campo `compatibility` da declaração deve ser igual ao `verdict` do dossiê citado; divergência falha o teste de consistência.
+7. **o conjunto de gate é derivado, não escolhido:** toda referência `ACTIVE` da mesma `pack + rule_version` cujo dossiê versionado seja `EXACT|EQUIVALENT_FOR_REFERENCE` é obrigatoriamente `GATE` e `required=true`. O teste de consistência falha se uma referência elegível permanecer `DIAGNOSTIC`. Como os dossiês registram a comparação de saída local × oficial antes do pré-registro, permitir a escolha de um subconjunto deixaria omitir as referências compatíveis que falham; a regra determinística elimina essa escolha. Uma referência só sai do conjunto por `SUPERSEDED|RETRACTED` com evidência de drift, ou por novo dossiê decorrente de nova versão do perfil metodológico;
+8. remover uma referência `GATE` que falhou muda o hash do conjunto de gate e exige nova evidência; não converte silenciosamente o conjunto em `PASSED`;
+9. o campo `compatibility` da declaração deve ser igual ao `verdict` do dossiê citado; divergência falha o teste de consistência.
 
 #### Hash do conjunto de gate
 
@@ -536,7 +539,7 @@ Veredito de uma referência:
 
 - `PASSED`: entrada completa e todas as linhas avaliáveis passam;
 - `FAILED`: entrada completa e ao menos uma linha excede o limiar;
-- `PENDING`: referência incompleta, hash divergente, compatibilidade insuficiente ou nenhuma linha avaliável.
+- `PENDING`: referência incompleta, hash divergente, compatibilidade insuficiente, fingerprint local diferente da do dossiê ou nenhuma linha avaliável.
 
 Com `selection_policy=ALL_REQUIRED`:
 
@@ -579,7 +582,7 @@ Novo quadrimestre publicado não invalida D automaticamente, e acrescentar ou al
 
 1. captura e manifesto já existem;
 2. dossiê decidido já existe;
-3. política é alterada para `GATE`, com hash do dossiê;
+3. política é alterada para `GATE`, com hash do dossiê, para **todas** as referências elegíveis da `pack + rule_version` (regra 7 da seção 8.1), sem escolha de subconjunto;
 4. a alteração entra **em PR próprio, mergeado em `main` antes da execução de gate**;
 5. a reconciliação roda exatamente contra o conjunto registrado em `main`, cujo `gate_set_sha256` é citado na evidência;
 6. o resumo e eventual atualização de D entram em PR posterior.
@@ -650,6 +653,7 @@ O repositório faz squash-merge; dois commits no mesmo PR seriam fundidos e perd
 - remoção de referência `GATE` que falhou altera o `gate_set_sha256` e exige nova evidência;
 - acrescentar ou alterar referência `DIAGNOSTIC` não altera o `gate_set_sha256`;
 - `compatibility` da declaração diverge do `verdict` do dossiê → falha;
+- referência `ACTIVE` com dossiê `EXACT|EQUIVALENT_FOR_REFERENCE` que permanece `DIAGNOSTIC` → falha;
 - seleção não depende de assinatura ou período mais recente.
 
 ### Captura e proveniência
@@ -701,6 +705,7 @@ O repositório faz squash-merge; dois commits no mesmo PR seriam fundidos e perd
 - `ALL_REQUIRED` aplicado;
 - referência superseded invalida consistência;
 - D citando `gate_set_sha256` diferente do recalculado falha;
+- fingerprint local da execução de gate diferente da do dossiê → referência `PENDING`;
 - evidência versionada é validada offline por estrutura, hashes e renderização determinística JSON → Markdown; a regeneração byte a byte a partir dos artefatos brutos é um teste local opt-in, nunca da CI;
 - check `@1` não é aceito como nova evidência após a migração.
 
@@ -760,7 +765,9 @@ Cada slice deve ser um PR independente e deixar software testável. O PR de Slic
 24. nova `rule_version` volta D para `PENDING`;
 25. publicação de novo quadrimestre ou nova declaração `DIAGNOSTIC` não invalida automaticamente D existente;
 26. compatibilidade metodológica não depende de igualdade entre saída local e oficial; erro local de cálculo resulta em `FAILED`, não em `PENDING`;
-27. o pré-registro do conjunto de gate é mergeado em `main` antes do PR que grava o resultado.
+27. o pré-registro do conjunto de gate é mergeado em `main` antes do PR que grava o resultado;
+28. o conjunto de gate contém todas as referências ativas metodologicamente compatíveis, sem escolha manual de subconjunto;
+29. cada veredito de referência no gate usa a mesma `local_source_fingerprint` do dossiê que a autorizou.
 
 ## 22. Riscos e mitigação
 

@@ -24,6 +24,8 @@
 - `filtros/equipes` atual nunca é universo histórico de gate.
 - Mudança de `rule_version`, do conjunto de gate (`gate_set_sha256`), de hash de manifesto/dossiê ou estado `SUPERSEDED/RETRACTED` invalida a evidência correspondente; declarações `DIAGNOSTIC` novas ou alteradas não invalidam.
 - Compatibilidade metodológica é decidida por perfil normativo e probes; igualdade NM/DN/score/classe local × oficial é diagnóstico do dossiê e só é julgada na reconciliação.
+- O conjunto de gate é derivado: toda referência `ACTIVE` com dossiê `EXACT|EQUIVALENT_FOR_REFERENCE` da `pack + rule_version` é `GATE` obrigatória; não há escolha de subconjunto.
+- Todo veredito de gate carrega a `local_source_fingerprint` da execução e exige igualdade com a do dossiê; divergência → `PENDING`.
 - O repositório faz squash-merge: pré-registro do conjunto de gate e resultado do gate são PRs distintos, mergeados nessa ordem.
 - O conjunto de gate usa `ALL_REQUIRED`; não há fallback para outro período que passe.
 - Não adicionar dependência de produção; usar Java padrão e bibliotecas já presentes.
@@ -118,6 +120,7 @@ rejectsDuplicateReferenceIdAcrossSets()
 rejectsUnknownPackOrRuleVersion()
 doesNotSortOrSelectByQuadrimestreDate()
 addingOrChangingDiagnosticDeclarationKeepsGateSetSha256()
+compatibleActiveReferenceLeftAsDiagnosticIsRejected()
 changingOrRemovingGateDeclarationChangesGateSetSha256()
 gateSetSha256IsIndependentOfDeclarationOrderAndWhitespace()
 ```
@@ -223,7 +226,7 @@ git commit -m "feat(portao-d): capture immutable SIAPS revisions"
 - `OfficialTeamExportCsvParser.parse(Path, ExpectedScope) -> OfficialTeamReference`
 - `OfficialTeamReference.officialUniverse(int indicatorCode, String teamType) -> Set<String>`
 - `ValidatedReference.from(OfficialTeamReference|PublicAggregateReference) -> ValidatedReference`
-- `PackVerdict.evaluate(GatePack, String ruleVersion, Mode, ValidatedReference, LocalClasses) -> PackVerdict`
+- `PackVerdict.evaluate(GatePack, String ruleVersion, Mode, ValidatedReference, LocalClasses, String localSourceFingerprint) -> PackVerdict` (the verdict carries the fingerprint of the extracts it was computed from)
 
 - [ ] **Step 1: Write failing CSV/PII tests**
 
@@ -585,7 +588,7 @@ git commit -m "test(portao-d): record retrospective SIAPS evidence from siha"
 
 - [ ] **Step 1: Write failing `ALL_REQUIRED` tests**
 
-Any failed → failed; otherwise any pending → pending; all passed → passed; diagnostics ignored; missing/incompatible/inconclusive dossier cannot pass; superseded reference invalidates evidence; a local calculation error on an `EXACT` reference yields `FAILED`, not `PENDING`.
+Any failed → failed; otherwise any pending → pending; all passed → passed; diagnostics ignored; missing/incompatible/inconclusive dossier cannot pass; superseded reference invalidates evidence; a local calculation error on an `EXACT` reference yields `FAILED`, not `PENDING`; a `PackVerdict` whose `localSourceFingerprint` differs from the dossier's `local_source_fingerprint` makes that reference `PENDING`.
 
 - [ ] **Step 2: Write failing consistency/privacy tests**
 
@@ -601,7 +604,7 @@ mvn -B -f apps/agent/pom.xml test \
 
 - [ ] **Step 4: Implement aggregation and hardened registry update**
 
-The evidence summary names `gate_set_sha256` and every reference/manifest/dossier hash. `RegistryUpdater` accepts only a fixed gate set and refuses ad hoc period results.
+The evidence summary names `gate_set_sha256`, every reference/manifest/dossier hash and the `local_source_fingerprint` of each reconciled reference. `RegistryUpdater` accepts only a fixed gate set and refuses ad hoc period results.
 
 - [ ] **Step 5: Remove date-based authority and update docs**
 
@@ -636,7 +639,7 @@ git commit -m "feat(portao-d): adopt retrospective SIAPS reconciliation v2"
 
 - [ ] **Step 1: Promote only decided references**
 
-Promote to `GATE` (`required=true`, `ACTIVE`) only real references whose committed dossier is `EXACT|EQUIVALENT_FOR_REFERENCE`, with manifest and dossier hashes. Do not run the gate runner before this PR is merged.
+Promote to `GATE` (`required=true`, `ACTIVE`) **every** active reference whose committed dossier is `EXACT|EQUIVALENT_FOR_REFERENCE`, with manifest and dossier hashes — no subset selection; `ReferencePolicyConsistencyTest` rejects an eligible reference left as `DIAGNOSTIC`. Do not run the gate runner before this PR is merged.
 
 - [ ] **Step 2: Record the gate set hashes in the PR body**
 
@@ -660,7 +663,7 @@ The PR must be merged to `main` before Task 12 starts. `release-gates.json` must
 
 - [ ] **Step 1: Run the gate runner from a clean checkout of `main`**
 
-Use the merge commit of Task 11. The runner refuses to start if the working tree differs from `HEAD` or if any `GATE` declaration differs from `HEAD`.
+Use the merge commit of Task 11. The runner refuses to start if the working tree differs from `HEAD` or if any `GATE` declaration differs from `HEAD`. Run from the persisted extracts of the Task 9 campaign so the `local_source_fingerprint` matches each dossier; a re-acquisition with a different fingerprint leaves that reference `PENDING` and requires a new dossier.
 
 - [ ] **Step 2: Record the result**
 
