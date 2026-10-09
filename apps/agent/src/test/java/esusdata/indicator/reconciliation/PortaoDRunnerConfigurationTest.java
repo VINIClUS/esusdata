@@ -2,6 +2,8 @@ package esusdata.indicator.reconciliation;
 
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.ARTIFACT_DIR;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.BINARY;
+import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.DEFAULT_PROFILES;
+import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.DOSSIER_DIR;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.ENV_FILE;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.GIT;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.MANIFESTS_DIR;
@@ -11,6 +13,7 @@ import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.OFFIC
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.OFFICIAL_EXPORT_IBGE;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.PERIODS;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.POLICY;
+import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.PROFILES;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.REGISTRY;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.REPO_ROOT;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,8 +21,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import esusdata.indicator.model.Quadrimestre;
 import esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.Capture;
+import esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.Compatibility;
 import esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.Diagnostic;
 import esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.Mode;
+import esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.Replay;
 import esusdata.testsupport.LivePecAssumptions;
 import java.io.IOException;
 import java.lang.reflect.RecordComponent;
@@ -35,9 +40,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * The two runners of the Portão D are bounded by their configuration: the capture takes no PEC and
- * no registry, the diagnostic takes no registry, no policy and writes nowhere near {@code docs/},
- * and {@code periods} chooses what the diagnostic runs without ever being an authority for the gate.
+ * The runners of the Portão D are bounded by their configuration: the capture takes no PEC and no
+ * registry, the diagnostic takes no registry, no policy and writes nowhere near {@code docs/}, the
+ * compatibility run writes only dossiers there, the replay takes no PEC and the gate check takes no
+ * period; and {@code periods} chooses what a run covers without ever being an authority for the gate.
  */
 class PortaoDRunnerConfigurationTest {
 
@@ -58,6 +64,25 @@ class PortaoDRunnerConfigurationTest {
             ARTIFACT_DIR, ARTIFACTS.toString(),
             ENV_FILE, "pec.env",
             BINARY, "execplane");
+
+    private static final Map<String, String> COMPATIBILITY = Map.of(
+            MODE, "compatibility",
+            MANIFESTS_DIR, "manifests",
+            ARTIFACT_DIR, ARTIFACTS.toString(),
+            DOSSIER_DIR, "docs/indicadores/portoes/compatibilidade",
+            ENV_FILE, "pec.env",
+            BINARY, "execplane");
+
+    private static final Map<String, String> REPLAY = Map.of(
+            MODE, "replay",
+            MANIFESTS_DIR, "manifests",
+            ARTIFACT_DIR, ARTIFACTS.toString(),
+            DOSSIER_DIR, "dossiers");
+
+    private static final Map<String, String> GATE = Map.of(
+            MODE, "gate",
+            REPO_ROOT, "repo",
+            ARTIFACT_DIR, ARTIFACTS.toString());
 
     private static Map<String, String> plus(Map<String, String> base, String property, String value) {
         Map<String, String> properties = new HashMap<>(base);
@@ -86,13 +111,17 @@ class PortaoDRunnerConfigurationTest {
     }
 
     @Test
-    void captureAndDiagnosticAreTheModes() {
+    void theFiveRunnersAreTheModes() {
         assertThat(PortaoDRunnerConfiguration.modeOf(CAPTURE::get)).contains(Mode.CAPTURE);
         assertThat(PortaoDRunnerConfiguration.modeOf(DIAGNOSTIC::get)).contains(Mode.DIAGNOSTIC);
+        assertThat(PortaoDRunnerConfiguration.modeOf(COMPATIBILITY::get)).contains(Mode.COMPATIBILITY);
+        assertThat(PortaoDRunnerConfiguration.modeOf(REPLAY::get)).contains(Mode.REPLAY);
+        assertThat(PortaoDRunnerConfiguration.modeOf(GATE::get)).contains(Mode.GATE);
     }
 
     @ParameterizedTest(name = "mode \"{0}\" is refused")
-    @ValueSource(strings = {"all", "evaluate", "compatibility", "gate", "CAPTURE", "Diagnostic", "", " capture"})
+    @ValueSource(
+            strings = {"all", "evaluate", "Compatibility", "GATE", "replays", "CAPTURE", "Diagnostic", "", " capture"})
     void anyOtherModeIsRefusedNotIgnored(String mode) {
         Map<String, String> properties = plus(CAPTURE, MODE, mode);
 
@@ -318,5 +347,166 @@ class PortaoDRunnerConfigurationTest {
         Diagnostic diagnostic = Diagnostic.parse(plus(DIAGNOSTIC, PERIODS, periods)::get);
 
         assertThat(diagnostic.purpose()).isEqualTo(ReferencePurpose.DIAGNOSTIC);
+    }
+
+    // ---- the compatibility runner
+
+    @Test
+    void theCompatibilityRunIsParsedIntoItsInputsAndTheDossiersMayGoUnderDocs() {
+        Compatibility compatibility = Compatibility.parse(COMPATIBILITY::get);
+
+        assertThat(compatibility.manifestsDir()).isEqualTo(Path.of("manifests"));
+        assertThat(compatibility.artifactDir()).isEqualTo(ARTIFACTS);
+        assertThat(compatibility.dossierDir()).isEqualTo(Path.of("docs/indicadores/portoes/compatibilidade"));
+        assertThat(compatibility.envFile()).isEqualTo(Path.of("pec.env"));
+        assertThat(compatibility.binary()).isEqualTo("execplane");
+        assertThat(compatibility.periods()).isEmpty();
+    }
+
+    @Test
+    void theProfilesDefaultToTheContractFileAndTheSecretFileToTheOneOfTheOtherLiveTests() {
+        Compatibility compatibility = Compatibility.parse(without(COMPATIBILITY, ENV_FILE)::get);
+
+        assertThat(compatibility.profiles().toString()).endsWith(DEFAULT_PROFILES);
+        assertThat(compatibility.envFile()).isEqualTo(LivePecAssumptions.ENV_FILE);
+        assertThat(Compatibility.parse(plus(COMPATIBILITY, PROFILES, "p.json")::get)
+                        .profiles())
+                .isEqualTo(Path.of("p.json"));
+    }
+
+    @ParameterizedTest(name = "the compatibility run takes no {0}")
+    @ValueSource(strings = {REGISTRY, REPO_ROOT, POLICY, OFFICIAL_EXPORT_DIR, OFFICIAL_EXPORT_IBGE, MANIFEST_OUTPUT})
+    void theCompatibilityRunAcceptsNoRegistryNoPolicyAndNoOutputOfTheCapture(String property) {
+        Map<String, String> properties = plus(COMPATIBILITY, property, "anything");
+
+        assertThatThrownBy(() -> Compatibility.parse(properties::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(property);
+    }
+
+    @ParameterizedTest(name = "the compatibility run needs {0}")
+    @ValueSource(strings = {MANIFESTS_DIR, ARTIFACT_DIR, DOSSIER_DIR, BINARY})
+    void theCompatibilityRunNeedsEachOfItsInputs(String property) {
+        Map<String, String> properties = without(COMPATIBILITY, property);
+
+        assertThatThrownBy(() -> Compatibility.parse(properties::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(property);
+    }
+
+    @Test
+    void theCompatibilityRunSelectsPeriodsAndNeverWritesTheLocalDetailUnderDocsOrInAWorkingTree(@TempDir Path temp)
+            throws IOException {
+        Compatibility compatibility = Compatibility.parse(plus(COMPATIBILITY, PERIODS, "2026Q1")::get);
+        Path repository = Files.createDirectories(temp.resolve("repo"));
+        Files.createDirectory(repository.resolve(GIT));
+
+        assertThat(compatibility.periods()).containsExactly(new Quadrimestre(2026, 1));
+        assertThatThrownBy(() -> Compatibility.parse(plus(COMPATIBILITY, ARTIFACT_DIR, "repo/docs/x")::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("docs/");
+        assertThatThrownBy(() -> Compatibility.parse(plus(
+                        COMPATIBILITY, ARTIFACT_DIR, repository.resolve("a").toString())::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Git working tree");
+    }
+
+    // ---- the replay
+
+    @Test
+    void theReplayIsParsedIntoItsFourInputsAndHasNoRoomForAPecOrAPeriod() {
+        Replay replay = Replay.parse(REPLAY::get);
+
+        assertThat(replay.manifestsDir()).isEqualTo(Path.of("manifests"));
+        assertThat(replay.artifactDir()).isEqualTo(ARTIFACTS);
+        assertThat(replay.dossierDir()).isEqualTo(Path.of("dossiers"));
+        assertThat(componentsOf(Replay.class)).containsExactly("manifestsDir", "artifactDir", "dossierDir", "profiles");
+    }
+
+    @ParameterizedTest(name = "the replay takes no {0}")
+    @ValueSource(strings = {ENV_FILE, BINARY, PERIODS, REGISTRY, REPO_ROOT, POLICY, MANIFEST_OUTPUT})
+    void theReplayCannotBeToldOfAPecAPeriodOrARegistry(String property) {
+        Map<String, String> properties = plus(REPLAY, property, "anything");
+
+        assertThatThrownBy(() -> Replay.parse(properties::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(property);
+    }
+
+    @ParameterizedTest(name = "the replay needs {0}")
+    @ValueSource(strings = {MANIFESTS_DIR, ARTIFACT_DIR, DOSSIER_DIR})
+    void theReplayNeedsEachOfItsInputs(String property) {
+        Map<String, String> properties = without(REPLAY, property);
+
+        assertThatThrownBy(() -> Replay.parse(properties::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(property);
+    }
+
+    @Test
+    void theReplayNeverWritesUnderDocs() {
+        assertThatThrownBy(() -> Replay.parse(plus(REPLAY, ARTIFACT_DIR, "repo/docs/x")::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("docs/");
+    }
+
+    // ---- the gate check
+
+    @Test
+    void theGateCheckIsParsedIntoTheRepositoryAndTheArtifactDirectoryAndNothingElse() {
+        PortaoDRunnerConfiguration.GateRun gate = PortaoDRunnerConfiguration.GateRun.parse(GATE::get);
+
+        assertThat(gate).isEqualTo(new PortaoDRunnerConfiguration.GateRun(Path.of("repo"), ARTIFACTS));
+        assertThat(componentsOf(PortaoDRunnerConfiguration.GateRun.class)).containsExactly("repoRoot", "artifactDir");
+    }
+
+    @ParameterizedTest(name = "the gate check takes no {0}")
+    @ValueSource(
+            strings = {
+                PERIODS,
+                REGISTRY,
+                POLICY,
+                ENV_FILE,
+                BINARY,
+                MANIFESTS_DIR,
+                DOSSIER_DIR,
+                PROFILES,
+                OFFICIAL_EXPORT_DIR,
+                MANIFEST_OUTPUT
+            })
+    void theGateCheckRefusesAnAdHocPeriodAndEverythingTheCompatibilityRunTakes(String property) {
+        Map<String, String> properties = plus(GATE, property, "anything");
+
+        assertThatThrownBy(() -> PortaoDRunnerConfiguration.GateRun.parse(properties::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(property);
+    }
+
+    @ParameterizedTest(name = "the gate check needs {0}")
+    @ValueSource(strings = {REPO_ROOT, ARTIFACT_DIR})
+    void theGateCheckNeedsTheRepositoryAndTheArtifactDirectory(String property) {
+        Map<String, String> properties = without(GATE, property);
+
+        assertThatThrownBy(() -> PortaoDRunnerConfiguration.GateRun.parse(properties::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(property);
+    }
+
+    @Test
+    void theGateCheckNeverWritesItsSummaryUnderDocs() {
+        assertThatThrownBy(() -> PortaoDRunnerConfiguration.GateRun.parse(plus(GATE, ARTIFACT_DIR, "repo/docs/x")::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("docs/");
+    }
+
+    @Test
+    void theSingleFlowRunnerOfTheSignatureEraIsGone() {
+        Path source = Path.of("src", "test", "java")
+                .resolve(PortaoDRunnerConfigurationTest.class.getPackageName().replace('.', '/'));
+
+        assertThat(source.resolve("PortaoDLiveTest.java")).doesNotExist();
+        assertThat(source.resolve("PortaoDCompatibilityLiveTest.java")).exists();
+        assertThat(source.resolve("PortaoDGateLiveTest.java")).exists();
+        assertThat(source.resolve("PortaoDEvidenceReplayLiveTest.java")).exists();
     }
 }

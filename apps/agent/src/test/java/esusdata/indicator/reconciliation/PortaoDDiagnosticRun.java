@@ -73,7 +73,7 @@ final class PortaoDDiagnosticRun {
     private final Function<String, List<MethodologyProbe>> probes;
 
     /** A captured revision of the official reference of one pack, as the run reads it. */
-    private record Reference(SiapsReferenceManifest manifest, GatePack pack, Quadrimestre period, String sha256) {
+    record Reference(SiapsReferenceManifest manifest, GatePack pack, Quadrimestre period, String sha256) {
 
         String id() {
             return manifest.referenceId();
@@ -126,22 +126,8 @@ final class PortaoDDiagnosticRun {
             Clock clock,
             Function<String, List<MethodologyProbe>> probes)
             throws IOException {
-        List<Reference> references = new ArrayList<>();
-        try (Stream<Path> files = Files.list(manifestsDir)) {
-            for (Path file : files.filter(path -> path.getFileName().toString().endsWith(".json"))
-                    .sorted()
-                    .toList()) {
-                references.add(read(file));
-            }
-        }
-        if (references.isEmpty()) {
-            throw new IllegalStateException("the manifests directory has no reference manifest: run the capture first");
-        }
+        List<Reference> references = captured(manifestsDir);
         String municipality = references.getFirst().manifest().municipalityIbge();
-        if (references.stream()
-                .anyMatch(reference -> !municipality.equals(reference.manifest().municipalityIbge()))) {
-            throw new IllegalStateException("the manifests are about more than one municipality");
-        }
         Map<Quadrimestre, List<Reference>> byPeriod = new TreeMap<>();
         for (Reference reference : references) {
             byPeriod.computeIfAbsent(reference.period(), unused -> new ArrayList<>())
@@ -161,7 +147,33 @@ final class PortaoDDiagnosticRun {
                 new ReferenceArtifactStore(artifactDir), extracts, clock, municipality, byPeriod, probes);
     }
 
-    private static Comparator<Reference> order() {
+    /**
+     * Every reference manifest of {@code manifestsDir}, in file order: each {@code .json} file there
+     * must be a team reference manifest named by its reference id, and all must be about one
+     * municipality. The hash of a reference is the one of the bytes of its manifest, which is what
+     * the extracts cache is keyed by.
+     */
+    static List<Reference> captured(Path manifestsDir) throws IOException {
+        List<Reference> references = new ArrayList<>();
+        try (Stream<Path> files = Files.list(manifestsDir)) {
+            for (Path file : files.filter(path -> path.getFileName().toString().endsWith(".json"))
+                    .sorted()
+                    .toList()) {
+                references.add(read(file));
+            }
+        }
+        if (references.isEmpty()) {
+            throw new IllegalStateException("the manifests directory has no reference manifest: run the capture first");
+        }
+        String municipality = references.getFirst().manifest().municipalityIbge();
+        if (references.stream()
+                .anyMatch(reference -> !municipality.equals(reference.manifest().municipalityIbge()))) {
+            throw new IllegalStateException("the manifests are about more than one municipality");
+        }
+        return references;
+    }
+
+    static Comparator<Reference> order() {
         List<GatePack> packs = GatePack.allWithNotaFinal();
         return Comparator.comparingInt((Reference reference) -> packs.indexOf(reference.pack()))
                 .thenComparingInt(reference -> revisionOf(reference.id()));
@@ -175,7 +187,7 @@ final class PortaoDDiagnosticRun {
         return Integer.parseInt(revision.group(1));
     }
 
-    private static Reference read(Path file) throws IOException {
+    static Reference read(Path file) throws IOException {
         String name = file.getFileName().toString();
         if (!MANIFEST_FILE.matcher(name).matches()) {
             throw new IllegalArgumentException(
@@ -409,7 +421,7 @@ final class PortaoDDiagnosticRun {
     }
 
     /** The outcome of the rule on each of the four months, in the order of the quadrimestre. */
-    private static List<RuleOutcome> baseline(QuadrimestreInputs inputs) {
+    static List<RuleOutcome> baseline(QuadrimestreInputs inputs) {
         return inputs.months().stream()
                 .map(input -> input.rule().evaluate(input.data(), input.context()))
                 .toList();
@@ -420,7 +432,7 @@ final class PortaoDDiagnosticRun {
         return monthly(baseline(inputs), period);
     }
 
-    private static Map<YearMonth, List<TeamResult>> monthly(List<RuleOutcome> baseline, Quadrimestre period) {
+    static Map<YearMonth, List<TeamResult>> monthly(List<RuleOutcome> baseline, Quadrimestre period) {
         Map<YearMonth, List<TeamResult>> months = new LinkedHashMap<>();
         List<YearMonth> calendar = period.months();
         for (int at = 0; at < calendar.size(); at++) {
@@ -429,7 +441,7 @@ final class PortaoDDiagnosticRun {
         return months;
     }
 
-    private static IndicatorRule ruleOf(GatePack pack) {
+    static IndicatorRule ruleOf(GatePack pack) {
         return IndicatorRuleRegistry.all().stream()
                 .filter(rule -> rule.descriptor().id().equals(pack.packId()))
                 .findFirst()
