@@ -24,7 +24,6 @@ import org.junit.jupiter.api.io.TempDir;
 class ValidatedReferenceFromStoredTest {
 
     private static final OffsetDateTime CAPTURED = OffsetDateTime.of(2026, 10, 8, 12, 0, 0, 0, ZoneOffset.UTC);
-    private static final String OTHER_FILE_NAME = "export.csv";
 
     @TempDir
     Path artifacts;
@@ -43,8 +42,7 @@ class ValidatedReferenceFromStoredTest {
                         1),
                 CAPTURED,
                 export.officialGeneratedAt(),
-                "SIAPS / Avaliação do Quadrimestre",
-                OTHER_FILE_NAME);
+                "SIAPS / Avaliação do Quadrimestre");
         SiapsReferenceManifest manifest = store.store(raw, subset, metadata);
         return ValidatedReference.fromStored(store.load(manifest), pack);
     }

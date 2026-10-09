@@ -27,7 +27,9 @@ import tools.jackson.databind.node.ObjectNode;
  * the document that is versioned in the repository; the data stays in the artifact store.
  *
  * <p>It never carries what the reference says: no INE, no class, no note, no result, no count per
- * team. {@code row_count} is the number of teams of the subset and nothing else.
+ * team. {@code row_count} is the number of teams of the subset and nothing else. Nor the name the
+ * downloaded file was saved under, which a person chose and may have put an INE or a team in: the
+ * download is called by its raw hash ({@link #sourceFilenameOf}).
  *
  * <p>The JSON is read and written strictly, with snake_case keys in a fixed order, two-space
  * indentation and an explicit {@code "\n"} (Jackson's default pretty printer would use the system
@@ -40,6 +42,8 @@ import tools.jackson.databind.node.ObjectNode;
  * @param quadrimestre the SIAPS spelling, {@code 2026Q1}
  * @param capturedAt when the revision was captured
  * @param officialGeneratedAt when the SIAPS says it generated the data
+ * @param sourceFilename what the download is called here, {@code siaps-<first 12 hex of
+ *     rawSha256>.csv}, and nothing else
  * @param rawSha256 the hash of the downloaded bytes
  * @param normalizedSha256 the hash of the normalized content: the identity of the revision
  * @param parserVersion the layout the file was read with, e.g. {@code siaps-team-export@1}
@@ -98,6 +102,7 @@ record SiapsReferenceManifest(
     private static final String SIBLING_REFERENCE_IDS = "sibling_reference_ids";
     private static final String NOTA_FINAL_CODE = "ciii";
     private static final int PACK_GROUP = 5;
+    private static final int SOURCE_LABEL_HEX = 12;
     private static final Set<String> KEYS = Set.of(
             SCHEMA_VERSION_KEY,
             REFERENCE_ID_KEY,
@@ -126,8 +131,10 @@ record SiapsReferenceManifest(
         Objects.requireNonNull(officialGeneratedAt, OFFICIAL_GENERATED_AT);
         Objects.requireNonNull(officialStatus, OFFICIAL_STATUS);
         requireText(sourceDescription, SOURCE_DESCRIPTION);
-        requireText(sourceFilename, SOURCE_FILENAME);
-        ReferenceFormats.sha256(rawSha256);
+        if (!sourceFilenameOf(rawSha256).equals(sourceFilename)) {
+            throw new IllegalArgumentException(
+                    "source_filename is the label of the raw hash, never the name the file was saved under");
+        }
         ReferenceFormats.sha256(normalizedSha256);
         ReferenceFormats.parserVersion(parserVersion);
         if (rowCount < 0) {
@@ -148,6 +155,16 @@ record SiapsReferenceManifest(
         Set<String> union = new HashSet<>(keys);
         union.add(key);
         return Set.copyOf(union);
+    }
+
+    /**
+     * What a manifest calls the download whose raw bytes hash to {@code rawSha256}: {@code
+     * siaps-<its first 12 hex digits>.csv}, which says nothing the hash does not. Never the name the
+     * file was saved under: a person chose that one, and an INE or a team in it would go wherever the
+     * manifest is versioned.
+     */
+    static String sourceFilenameOf(String rawSha256) {
+        return "siaps-" + ReferenceFormats.sha256(rawSha256).substring(0, SOURCE_LABEL_HEX) + ".csv";
     }
 
     /** True for the id of a Nota Final revision ({@code ...-ciii-...}). */

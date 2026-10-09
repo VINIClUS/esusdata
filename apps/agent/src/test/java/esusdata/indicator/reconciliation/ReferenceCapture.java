@@ -44,7 +44,8 @@ import java.util.stream.Stream;
  * names.
  *
  * <p>The report names files by their position in the directory, and carries counts, reference ids
- * and hashes only: never an INE, a team or a row.
+ * and hashes only: never an INE, a team or a row. A manifest does not name the file either: it calls
+ * the download by its raw hash, whatever name the file was saved under.
  */
 final class ReferenceCapture {
 
@@ -362,7 +363,6 @@ final class ReferenceCapture {
                 OffsetDateTime.now(clock),
                 export.reference().officialGeneratedAt(),
                 SOURCE_DESCRIPTION,
-                export.file().getFileName().toString(),
                 siblings);
     }
 
@@ -372,7 +372,6 @@ final class ReferenceCapture {
                 manifest.capturedAt(),
                 manifest.officialGeneratedAt(),
                 manifest.sourceDescription(),
-                manifest.sourceFilename(),
                 manifest.siblingReferenceIds());
     }
 

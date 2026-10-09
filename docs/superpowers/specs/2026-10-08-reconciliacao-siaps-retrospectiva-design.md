@@ -255,7 +255,7 @@ Campos obrigatórios:
   "quadrimestre": "2026Q1",
   "captured_at": "2026-10-08T12:34:56-03:00",
   "source_description": "SIAPS / Avaliação do Quadrimestre",
-  "source_filename": "arquivo-original.csv",
+  "source_filename": "siaps-<12-hex>.csv",
   "raw_sha256": "<64-hex>",
   "normalized_sha256": "<64-hex>",
   "parser_version": "siaps-team-export@1",
@@ -267,6 +267,8 @@ Campos obrigatórios:
 ```
 
 O manifesto não contém INE, classe individual, NM, DN ou contagens detalhadas. O artefato normalizado permanece em armazenamento local content-addressed.
+
+O manifesto também não guarda o nome com que o arquivo foi salvo, porque quem o salvou pode ter posto nele um INE ou o nome de uma equipe. `source_filename` é um rótulo do download, derivado do `raw_sha256` (`siaps-<12 primeiros hex>.csv`), e um manifesto com outro valor é recusado.
 
 ### 8.3 Perfil metodológico local
 

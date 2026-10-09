@@ -43,6 +43,7 @@ final class ReferenceArtifactStore {
      * ReferenceDrift#compare}) is how a re-capture is classified before anything is written.
      */
     static SiapsReferenceManifest manifestOf(byte[] raw, NormalizedReference normalized, CaptureMetadata metadata) {
+        String rawSha256 = SummaryWriter.sha256(raw);
         return new SiapsReferenceManifest(
                 metadata.referenceId(),
                 normalized.sourceKind(),
@@ -52,8 +53,8 @@ final class ReferenceArtifactStore {
                 metadata.officialGeneratedAt(),
                 normalized.officialStatus(),
                 metadata.sourceDescription(),
-                metadata.sourceFilename(),
-                SummaryWriter.sha256(raw),
+                SiapsReferenceManifest.sourceFilenameOf(rawSha256),
+                rawSha256,
                 normalized.sha256(),
                 normalized.parserVersion(),
                 normalized.rows().size(),

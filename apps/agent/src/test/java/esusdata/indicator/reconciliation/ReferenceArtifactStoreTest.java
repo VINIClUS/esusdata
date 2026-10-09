@@ -78,12 +78,7 @@ class ReferenceArtifactStoreTest {
     }
 
     private static CaptureMetadata metadata() {
-        return new CaptureMetadata(
-                REFERENCE_ID,
-                CAPTURED,
-                GENERATED,
-                "SIAPS / Avaliação do Quadrimestre / Qualidade",
-                "Dado_Agregado_Quadrimestre_Qualidade.csv");
+        return new CaptureMetadata(REFERENCE_ID, CAPTURED, GENERATED, "SIAPS / Avaliação do Quadrimestre / Qualidade");
     }
 
     private static String text(byte[] bytes) {
@@ -107,12 +102,7 @@ class ReferenceArtifactStoreTest {
                 raw(GENERATED_AT_1740),
                 finals,
                 new CaptureMetadata(
-                        NOTA_FINAL_ID,
-                        CAPTURED,
-                        GENERATED,
-                        "SIAPS / Avaliação do Quadrimestre / Qualidade",
-                        "Dado_Agregado_Quadrimestre_Qualidade.csv",
-                        siblings));
+                        NOTA_FINAL_ID, CAPTURED, GENERATED, "SIAPS / Avaliação do Quadrimestre / Qualidade", siblings));
     }
 
     private static void refusesToReadManifest(String json, String message) {
@@ -271,7 +261,7 @@ class ReferenceArtifactStoreTest {
         SiapsReferenceManifest otherPeriod = ReferenceArtifactStore.manifestOf(
                 raw(GENERATED_AT_1740),
                 nextQuadrimestre,
-                new CaptureMetadata("sp-3541307-2026q2-c1-team-r1", CAPTURED, GENERATED, "SIAPS", "Q2.csv"));
+                new CaptureMetadata("sp-3541307-2026q2-c1-team-r1", CAPTURED, GENERATED, "SIAPS"));
         SiapsReferenceManifest registered = theManifest();
 
         assertThatThrownBy(() -> ReferenceDrift.compare(registered, otherPeriod))
@@ -293,7 +283,8 @@ class ReferenceArtifactStoreTest {
         assertThat(manifest.capturedAt()).isEqualTo(CAPTURED);
         assertThat(manifest.officialGeneratedAt()).isEqualTo(GENERATED);
         assertThat(manifest.officialStatus()).isEqualTo(OfficialStatus.PRELIMINARY);
-        assertThat(manifest.sourceFilename()).isEqualTo("Dado_Agregado_Quadrimestre_Qualidade.csv");
+        assertThat(manifest.sourceFilename())
+                .isEqualTo("siaps-" + SummaryWriter.sha256(raw).substring(0, 12) + ".csv");
         assertThat(manifest.rawSha256()).isEqualTo(SummaryWriter.sha256(raw));
         assertThat(manifest.normalizedSha256()).isEqualTo(theReference().sha256());
         assertThat(manifest.parserVersion()).isEqualTo("siaps-team-export@1");
@@ -432,8 +423,7 @@ class ReferenceArtifactStoreTest {
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("sibling_reference_ids");
         }
-        CaptureMetadata ofAPack =
-                new CaptureMetadata(REFERENCE_ID, CAPTURED, GENERATED, "SIAPS", "file.csv", List.of(C2_R1));
+        CaptureMetadata ofAPack = new CaptureMetadata(REFERENCE_ID, CAPTURED, GENERATED, "SIAPS", List.of(C2_R1));
         byte[] raw = raw(GENERATED_AT_1740);
         NormalizedReference reference = theReference();
         assertThatThrownBy(() -> ReferenceArtifactStore.manifestOf(raw, reference, ofAPack))
@@ -476,11 +466,20 @@ class ReferenceArtifactStoreTest {
     }
 
     @Test
-    void aCaptureNamesItsSourceFileNotItsPath() {
-        assertThatThrownBy(() ->
-                        new CaptureMetadata(REFERENCE_ID, CAPTURED, GENERATED, "SIAPS", "/home/someone/export.csv"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("file name");
+    void aManifestCallsTheDownloadByItsRawHashNeverByTheNameItWasSavedUnder() {
+        SiapsReferenceManifest manifest = theManifest();
+        String label = manifest.sourceFilename();
+        assertThat(label).isEqualTo(SiapsReferenceManifest.sourceFilenameOf(manifest.rawSha256()));
+
+        for (String other :
+                List.of("1234567890 ESF Vila Nova.csv", SiapsReferenceManifest.sourceFilenameOf("f".repeat(64)))) {
+            String json = manifest.toJson().replace('"' + label + '"', '"' + other + '"');
+            assertThatThrownBy(() -> SiapsReferenceManifest.fromJson(json))
+                    .as(other)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("never the name the file was saved under")
+                    .hasMessageNotContaining(other);
+        }
     }
 
     @Test
@@ -524,8 +523,8 @@ class ReferenceArtifactStoreTest {
         ReferenceArtifactStore store = new ReferenceArtifactStore(directory);
         byte[] firstDownload = raw(GENERATED_AT_1740);
         byte[] secondDownload = raw("08 de outubro de 2026 - 17:55h");
-        CaptureMetadata later = new CaptureMetadata(
-                REFERENCE_ID, CAPTURED.plusMinutes(20), GENERATED.plusMinutes(15), "SIAPS", "again.csv");
+        CaptureMetadata later =
+                new CaptureMetadata(REFERENCE_ID, CAPTURED.plusMinutes(20), GENERATED.plusMinutes(15), "SIAPS");
 
         SiapsReferenceManifest first = store.store(firstDownload, theReference(), metadata());
         SiapsReferenceManifest candidate = ReferenceArtifactStore.manifestOf(secondDownload, theReference(), later);
@@ -557,7 +556,7 @@ class ReferenceArtifactStoreTest {
                 row(INE_B, "eSF", "80", Classification.OTIMO, "1"),
                 row(INE_C, "eAP", "55.5", Classification.BOM, "0.75"));
         CaptureMetadata next = new CaptureMetadata(
-                "sp-3541307-2026q1-c1-team-r2", CAPTURED.plusDays(1), GENERATED.plusDays(1), "SIAPS", "later.csv");
+                "sp-3541307-2026q1-c1-team-r2", CAPTURED.plusDays(1), GENERATED.plusDays(1), "SIAPS");
 
         SiapsReferenceManifest second = store.store(raw("09 de outubro de 2026 - 09:00h"), changed, next);
 

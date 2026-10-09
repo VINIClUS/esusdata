@@ -211,7 +211,8 @@ class ReferenceCaptureTest {
 
             assertThat(manifest.rawSha256()).isEqualTo(SummaryWriter.sha256(raw));
             assertThat(manifest.sourceDescription()).isEqualTo(ReferenceCapture.SOURCE_DESCRIPTION);
-            assertThat(manifest.sourceFilename()).isEqualTo("team.csv");
+            assertThat(manifest.sourceFilename())
+                    .isEqualTo("siaps-" + SummaryWriter.sha256(raw).substring(0, 12) + ".csv");
             assertThat(manifest.officialStatus()).isEqualTo(OfficialStatus.PRELIMINARY);
             assertThat(store.load(manifest).indicatorCode()).isEqualTo(pack.siapsCode());
         }
@@ -226,6 +227,34 @@ class ReferenceCaptureTest {
         assertThat(text).contains("c1-team-r1").contains("normalized=");
         assertThat(text).doesNotContain(EXPORT_INES.toArray(new String[0])).doesNotContain("team.csv");
         assertThat(text).doesNotContainPattern("\\d{10}");
+    }
+
+    @Test
+    void aFileSavedUnderAnIneAndATeamNameLeavesBothOutOfEveryManifest() throws IOException {
+        String ine = SiapsTeamExportFixtures.ESF_1;
+        write(ine + " - ESF Vila Nova.csv", SiapsTeamExportFixtures.standard().bytes());
+
+        capture();
+
+        List<Path> written = new ArrayList<>();
+        for (Path directory : List.of(manifests(), artifacts)) {
+            try (Stream<Path> paths = Files.walk(directory)) {
+                paths.filter(Files::isRegularFile)
+                        .filter(path -> path.getParent().equals(manifests())
+                                || ReferenceArtifactStore.MANIFEST.equals(
+                                        path.getFileName().toString()))
+                        .forEach(written::add);
+            }
+        }
+        assertThat(written)
+                .as("the manifest directory and the store, eight packs each")
+                .hasSize(16);
+        for (Path manifest : written) {
+            assertThat(Files.readString(manifest, StandardCharsets.UTF_8))
+                    .as("%s", manifest.getFileName())
+                    .doesNotContain(ine)
+                    .doesNotContain("Vila Nova");
+        }
     }
 
     // ---- registered references are never rewritten

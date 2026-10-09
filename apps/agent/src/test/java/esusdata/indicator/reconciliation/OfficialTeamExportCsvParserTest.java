@@ -540,8 +540,7 @@ class OfficialTeamExportCsvParserTest {
                         "zz", MUNICIPALITY_IBGE, QUADRIMESTRE, C1, SourceKind.OFFICIAL_TEAM_EXPORT_CSV, 1),
                 OffsetDateTime.of(2026, 10, 8, 12, 34, 56, 0, ZoneOffset.ofHours(-3)),
                 reference.officialGeneratedAt(),
-                "SIAPS / Avaliação do Quadrimestre / Qualidade",
-                "export.csv");
+                "SIAPS / Avaliação do Quadrimestre / Qualidade");
         ReferenceArtifactStore store = new ReferenceArtifactStore(directory);
 
         SiapsReferenceManifest manifest = store.store(export.bytes(), subset, metadata);
