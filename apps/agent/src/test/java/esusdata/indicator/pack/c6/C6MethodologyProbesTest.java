@@ -15,6 +15,7 @@ import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.Quadrimestre;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamScope;
+import esusdata.indicator.reconciliation.CommonMethodologyProbes;
 import esusdata.indicator.reconciliation.MethodologyProbe;
 import esusdata.indicator.reconciliation.Observability;
 import esusdata.indicator.reconciliation.ProbeResult;
@@ -522,5 +523,29 @@ class C6MethodologyProbesTest {
                 .isEqualTo(C6Scenario.subjectRow(asIs, "em-conflito").reasonCode())
                 .isEqualTo(TeamScope.REASON_CONFLICT);
         assertThat(C6Scenario.points(withoutCredit, "esf")).isEqualTo(C6Scenario.points(asIs, "esf"));
+    }
+
+    // ---- common.team.type-reference-date, measured on C6
+
+    @Test
+    void theTeamTypeProbeRunsTheRuleAgainWithTheTypeOfTheFirstDayWhereATypeChangesInsideAMonth() {
+        // the team is eSF until 15 February and of type 72 from then: on the last day of February the
+        // rule leaves its elder out, on the first day it keeps them; January, March and April read alike
+        CanonicalDataset data = C6Scenario.scenario()
+                .add(C6Scenario.teamState(C6Scenario.INE_A, "70", "2020-01-01", "2026-02-15"))
+                .add(C6Scenario.teamState(C6Scenario.INE_A, "72", "2026-02-15", null))
+                .elder("idoso")
+                .build();
+
+        ProbeResult result = probe(CommonMethodologyProbes.all().getFirst(), data, revisionOfA());
+
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
+        assertThat(result.affected()).hasValue(1);
+        assertThat(result.divergent()).hasValue(1);
+        assertThat(result.localDetail())
+                .filteredOn(line -> line.startsWith(C6Scenario.INE_A + " "))
+                .singleElement()
+                .asString()
+                .contains("2026-02");
     }
 }

@@ -688,13 +688,15 @@ public final class C7MethodologyProbes {
         for (int month = 0; month < baseline.size(); month++) {
             Map<String, Set<String>> was = decisions(baseline.get(month));
             Map<String, Set<String>> is = decisions(alternative.get(month));
-            Map<String, String> teamOf = teamsOf(baseline.get(month));
-            teamOf.putAll(teamsOf(alternative.get(month)));
+            Map<String, String> teamBefore = teamsOf(baseline.get(month));
+            Map<String, String> teamAfter = teamsOf(alternative.get(month));
             Set<String> keys = new TreeSet<>(was.keySet());
             keys.addAll(is.keySet());
             for (String key : keys) {
                 boolean differs = !was.getOrDefault(key, Set.of()).equals(is.getOrDefault(key, Set.of()));
-                if (differs && inRevision(teamOf.get(key), revision)) {
+                // on a team of the revision under either reading: one side's team never hides the other's
+                if (differs
+                        && (inRevision(teamBefore.get(key), revision) || inRevision(teamAfter.get(key), revision))) {
                     changed.add(key);
                 }
             }

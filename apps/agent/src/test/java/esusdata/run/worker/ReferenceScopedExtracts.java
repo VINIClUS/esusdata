@@ -73,6 +73,7 @@ public final class ReferenceScopedExtracts {
     private static final String EXTRACT = "extract/";
     private static final String SUPPLEMENT = "supplement/";
     private static final Pattern IBGE = Pattern.compile("\\d{7}");
+    private static final Pattern MONTH = Pattern.compile("\\d{4}-\\d{2}");
 
     private final Path root;
     private final Clock clock;
@@ -248,9 +249,11 @@ public final class ReferenceScopedExtracts {
             return sources;
         }
         try (Stream<Path> keys = Files.list(rule)) {
-            for (Path key : keys.sorted().toList()) {
+            for (Path key : keys.filter(Files::isDirectory).sorted().toList()) {
                 try (Stream<Path> months = Files.list(key)) {
-                    for (Path month : months.sorted().toList()) {
+                    for (Path month : months.filter(ReferenceScopedExtracts::isPartition)
+                            .sorted()
+                            .toList()) {
                         Path sidecar = month.resolve(PartitionSidecar.FILE);
                         if (Files.isRegularFile(sidecar)) {
                             sources.add(PartitionSidecar.fromJson(Files.readString(sidecar, StandardCharsets.UTF_8))
@@ -261,6 +264,16 @@ public final class ReferenceScopedExtracts {
             }
         }
         return sources;
+    }
+
+    /**
+     * A published partition: a directory named as its month. A staging directory a failed acquisition
+     * could not remove ({@code .staging-*}, removal is best-effort) was never published, so the source
+     * its sidecar names is no source of the revision.
+     */
+    private static boolean isPartition(Path month) {
+        return Files.isDirectory(month)
+                && MONTH.matcher(month.getFileName().toString()).matches();
     }
 
     private Loaded loaded(ReferenceExecutionContext context, AcquisitionInputs acquisition) throws IOException {

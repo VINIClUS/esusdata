@@ -1,14 +1,21 @@
 package esusdata.indicator.reconciliation;
 
+import esusdata.indicator.model.CanonicalDataset;
 import esusdata.indicator.model.CanonicalTeam;
+import esusdata.indicator.model.RecordKind;
+import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamTimeline;
 import esusdata.indicator.model.TeamTimeline.Resolution;
 import esusdata.indicator.reconciliation.ProbeContext.NotaFinalProbeContext;
 import esusdata.indicator.reconciliation.ProbeContext.PackProbeContext;
+import esusdata.indicator.reconciliation.ProbeDiff.Divergence;
 import esusdata.run.worker.SensitivityExtracts.PackInput;
+import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -30,7 +37,9 @@ import java.util.stream.Collectors;
  *       and the probe is complete with zero;
  *   <li>none, but a type read is the team's current type standing in for an unaudited past: a
  *       change inside the month would not show, so zero is a lower bound;
- *   <li>some: the result of the other reading is not computed, and the probe says so.
+ *   <li>some: the rule runs again on each month where one changes, with the type of the first day
+ *       holding through the month ({@link #firstDayTypes}); {@code affected} is the number of those
+ *       teams and {@code divergent} the teams of the revision whose result changes.
  * </ul>
  */
 public final class CommonMethodologyProbes {
@@ -44,10 +53,6 @@ public final class CommonMethodologyProbes {
 
     private static final String NO_TEAM_STATES =
             "The extract carries no team state in some month, so the type of no team can be read on either day.";
-
-    private static final String TYPE_CHANGED =
-            "A team of the revision has another type on the first day of a month than on the last day, and the"
-                    + " result of the reading on the first day is not computed.";
 
     private static final String FALLBACK_READ =
             "The type of a team of the revision is its current type standing in for a past the source did not"
@@ -82,33 +87,119 @@ public final class CommonMethodologyProbes {
     }
 
     private static ProbeResult measure(PackProbeContext context) {
+        if (context.inputs().stream().anyMatch(input -> input.data().teams().isEmpty())) {
+            return ProbeResult.none(TEAM_TYPE_REFERENCE_DATE, NO_TEAM_STATES);
+        }
         Set<String> revision = context.revisionTeams().keySet();
         Set<String> changed = new TreeSet<>();
         Set<String> fallback = new TreeSet<>();
-        for (PackInput input : context.inputs()) {
-            if (input.data().teams().isEmpty()) {
-                return ProbeResult.none(TEAM_TYPE_REFERENCE_DATE, NO_TEAM_STATES);
-            }
+        List<RuleOutcome> alternative = new ArrayList<>();
+        for (int month = 0; month < context.inputs().size(); month++) {
+            PackInput input = context.inputs().get(month);
             TeamTimeline timeline = TeamTimeline.of(input.data().teams());
-            YearMonth month = input.context().competencia();
+            YearMonth competencia = input.context().competencia();
+            Set<String> changedInMonth = new TreeSet<>();
             for (String ine : revision) {
                 sort(
                         ine,
-                        timeline.typeOn(ine, month.atDay(1)),
-                        timeline.typeOn(ine, month.atEndOfMonth()),
-                        changed,
+                        timeline.typeOn(ine, competencia.atDay(1)),
+                        timeline.typeOn(ine, competencia.atEndOfMonth()),
+                        changedInMonth,
                         fallback);
             }
+            changed.addAll(changedInMonth);
+            alternative.add(
+                    changedInMonth.isEmpty()
+                            ? context.baseline().get(month)
+                            : input.rule()
+                                    .evaluate(
+                                            firstDayTypes(input.data(), competencia, changedInMonth), input.context()));
         }
+        Divergence divergence = ProbeDiff.compare(context.baseline(), alternative, context.revisionTeams());
+        List<String> detail = new ArrayList<>(divergence.localDetail());
         if (!changed.isEmpty()) {
-            return ProbeResult.none(TEAM_TYPE_REFERENCE_DATE, TYPE_CHANGED);
+            detail.add(changed.size() + " team(s) of the revision with another type on the first day of some month: "
+                    + String.join(", ", changed));
         }
-        List<String> detail =
-                List.of(fallback.size() + " team(s) of the revision read through their current type in some month: "
-                        + String.join(", ", fallback));
+        if (!fallback.isEmpty()) {
+            detail.add(fallback.size() + " team(s) of the revision read through their current type in some month: "
+                    + String.join(", ", fallback));
+        }
         return fallback.isEmpty()
-                ? ProbeResult.complete(TEAM_TYPE_REFERENCE_DATE, 0, 0, List.of())
-                : ProbeResult.partial(TEAM_TYPE_REFERENCE_DATE, 0, 0, FALLBACK_READ, detail);
+                ? ProbeResult.complete(TEAM_TYPE_REFERENCE_DATE, changed.size(), divergence.teams(), detail)
+                : ProbeResult.partial(
+                        TEAM_TYPE_REFERENCE_DATE, changed.size(), divergence.teams(), FALLBACK_READ, detail);
+    }
+
+    /**
+     * The dataset of {@code month} as the other reading takes it: each team of {@code ines} keeps
+     * through the month the type it has on the first day. The state valid on the first day runs to the
+     * first day of the next month, a state that begins inside the month begins then instead, and one
+     * that lies wholly inside the month is dropped. Every other record, and every other month of a
+     * state, is kept as it is.
+     */
+    static CanonicalDataset firstDayTypes(CanonicalDataset data, YearMonth month, Set<String> ines) {
+        LocalDate first = month.atDay(1);
+        LocalDate next = month.plusMonths(1).atDay(1);
+        CanonicalDataset.Builder builder = CanonicalDataset.builder();
+        data.windows().forEach(builder::window);
+        data.encounters().forEach(builder::encounter);
+        for (RecordKind kind : RecordKind.values()) {
+            for (Record each : recordsOf(data, kind)) {
+                if (each instanceof CanonicalTeam team && ines.contains(team.ine())) {
+                    heldFromFirstDay(team, first, next).ifPresent(state -> builder.add(kind, state));
+                } else {
+                    builder.add(kind, each);
+                }
+            }
+        }
+        return builder.build();
+    }
+
+    private static Optional<CanonicalTeam> heldFromFirstDay(CanonicalTeam state, LocalDate first, LocalDate next) {
+        if (state.validOn(first)) {
+            boolean endsInside =
+                    state.validTo() != null && LocalDate.parse(state.validTo()).isBefore(next);
+            return Optional.of(endsInside ? valid(state, state.validFrom(), next.toString()) : state);
+        }
+        boolean beginsInside = state.validFrom() != null
+                && LocalDate.parse(state.validFrom()).isAfter(first)
+                && LocalDate.parse(state.validFrom()).isBefore(next);
+        if (!beginsInside) {
+            return Optional.of(state);
+        }
+        boolean endsInside =
+                state.validTo() != null && !LocalDate.parse(state.validTo()).isAfter(next);
+        return endsInside ? Optional.empty() : Optional.of(valid(state, next.toString(), state.validTo()));
+    }
+
+    private static CanonicalTeam valid(CanonicalTeam state, String from, String to) {
+        return new CanonicalTeam(
+                state.sourceRef(),
+                state.municipalityIbge(),
+                state.ine(),
+                state.cnes(),
+                state.teamTypeCode(),
+                state.observedAt(),
+                from,
+                to,
+                state.typeSource());
+    }
+
+    /** Every kind, with no default: a new kind of record is a compile error here until it is copied. */
+    private static List<? extends Record> recordsOf(CanonicalDataset data, RecordKind kind) {
+        return switch (kind) {
+            case PERSON -> data.persons();
+            case REGISTRATION -> data.registrations();
+            case TEAM -> data.teams();
+            case CARE_EVENT -> data.careEvents();
+            case PROCEDURE_EVENT -> data.procedureEvents();
+            case HOME_VISIT -> data.homeVisits();
+            case IMMUNIZATION -> data.immunizations();
+            case CONDITION -> data.conditions();
+            case MEASUREMENT -> data.measurements();
+            case PREGNANCY_OUTCOME -> data.pregnancyOutcomes();
+        };
     }
 
     /** Puts {@code ine} in {@code changed} when its two days differ, else in {@code fallback} when either stands in. */

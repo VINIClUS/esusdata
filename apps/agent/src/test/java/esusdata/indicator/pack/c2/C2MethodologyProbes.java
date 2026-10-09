@@ -137,15 +137,24 @@ public final class C2MethodologyProbes {
         }
 
         private ProbeResult measure(PackProbeContext context) {
+            Map<String, String> revision = context.revisionTeams();
             List<RuleOutcome> alternative = new ArrayList<>();
-            Map<String, String> applies = new TreeMap<>();
+            Set<String> applies = new TreeSet<>();
+            Set<String> inRevision = new TreeSet<>();
             List<String> unobserved = new ArrayList<>();
             for (int month = 0; month < context.inputs().size(); month++) {
                 PackInput input = context.inputs().get(month);
                 RuleOutcome baseline = context.baseline().get(month);
                 if (supported(baseline)) {
                     RuleOutcome other = input.rule().evaluate(reading.alternative(input), input.context());
-                    applies.putAll(appliesTo(input, baseline, other));
+                    // A child counts when the reading applies to them on a team of the revision in any
+                    // month: a later month on another team does not take that back.
+                    appliesTo(input, baseline, other).forEach((child, ine) -> {
+                        applies.add(child);
+                        if (ine != null && revision.containsKey(ine)) {
+                            inRevision.add(child);
+                        }
+                    });
                     alternative.add(other);
                 } else {
                     unobserved.add(baseline.result().referencePeriod() + ": no C2 baseline (UNSUPPORTED_SOURCE)");
@@ -155,16 +164,12 @@ public final class C2MethodologyProbes {
             if (unobserved.size() == context.inputs().size()) {
                 return ProbeResult.none(id, NO_BASELINE);
             }
-            Map<String, String> revision = context.revisionTeams();
             Divergence divergence = ProbeDiff.compare(context.baseline(), alternative, revision);
-            int inRevision = (int) applies.values().stream()
-                    .filter(ine -> ine != null && revision.containsKey(ine))
-                    .count();
             List<String> detail = new ArrayList<>(divergence.localDetail());
             detail.addAll(unobserved);
-            detail.add("children the other reading applies to: " + inRevision + " on teams of the revision, "
-                    + (applies.size() - inRevision) + " on other teams (not counted)");
-            return conclude(unobserved.isEmpty(), inRevision, divergence.teams(), detail);
+            detail.add("children the other reading applies to: " + inRevision.size() + " on teams of the revision, "
+                    + (applies.size() - inRevision.size()) + " on other teams (not counted)");
+            return conclude(unobserved.isEmpty(), inRevision.size(), divergence.teams(), detail);
         }
 
         private ProbeResult conclude(boolean everyMonth, int affected, int divergent, List<String> detail) {
