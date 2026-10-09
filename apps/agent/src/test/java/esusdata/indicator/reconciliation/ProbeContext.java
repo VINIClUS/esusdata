@@ -6,8 +6,10 @@ import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.pack.componente3.ComponentIII;
 import esusdata.run.worker.SensitivityExtracts.PackInput;
 import java.time.YearMonth;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Everything a {@link MethodologyProbe} may look at for one reference (spec §9.4): the accepted
@@ -20,11 +22,12 @@ import java.util.Map;
  * pack, quadrimestre or municipality, a malformed fingerprint) is refused when it is built, before
  * a probe can read anything from it.
  *
- * <p>A probe reads the data and the baseline. It does not read the official side: whether a
- * reference is compatible never rests on the local output agreeing with the official one (spec
- * §6.3, §9.5). {@link #reference()} and {@link #manifest()} are for the evaluator, which lives in
- * this package; their types are package-private, so a probe in another package can hold them but
- * not read them.
+ * <p>A probe reads the data and the baseline. Of the official side it reads only {@link
+ * #revisionTeams()}, the teams of the revision, to scope what it counts; never their official
+ * classes, scores or counts: whether a reference is compatible never rests on the local output
+ * agreeing with the official one (spec §6.3, §9.5). {@link #reference()} and {@link #manifest()}
+ * are for the evaluator, which lives in this package; their types are package-private, so a probe
+ * in another package can hold them but not read them.
  */
 public sealed interface ProbeContext {
 
@@ -45,6 +48,18 @@ public sealed interface ProbeContext {
 
     /** The {@code sha256:<64 hex>} fingerprint of the local source the data was read from. */
     String localSourceFingerprint();
+
+    /**
+     * The teams of the revision: INE to {@code eSF} or {@code eAP}, the universe the reference was
+     * validated over. A divergence counts when it touches a subject or team "da revisão" (spec
+     * §9.5): a local team outside this universe is reported and excluded by the comparison, so a
+     * probe does not count it either. The official classes are not here, and a probe never sees them.
+     */
+    default Map<String, String> revisionTeams() {
+        Map<String, String> teams = new TreeMap<>();
+        reference().teams().forEach(team -> teams.put(team.ine(), team.teamType()));
+        return Collections.unmodifiableMap(teams);
+    }
 
     /**
      * The context of C1 to C7: the four monthly inputs of the quadrimestre in order, each with the

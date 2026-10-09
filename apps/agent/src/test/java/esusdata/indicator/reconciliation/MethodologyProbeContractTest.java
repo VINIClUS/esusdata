@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import esusdata.indicator.model.CanonicalDataset;
+import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
@@ -29,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -132,9 +132,7 @@ class MethodologyProbeContractTest {
 
     private static SiapsReferenceManifest manifest(
             GatePack pack, String municipality, String quadrimestre, SourceKind kind) {
-        String source = kind == SourceKind.OFFICIAL_TEAM_EXPORT_CSV ? "team" : "aggregate";
-        String id = "sp-" + municipality + "-" + quadrimestre.toLowerCase(Locale.ROOT) + "-"
-                + pack.code().toLowerCase(Locale.ROOT) + "-" + source + "-r1";
+        String id = SiapsReferenceManifest.referenceId("SP", municipality, quadrimestre, pack, kind, 1);
         return new SiapsReferenceManifest(
                 id,
                 kind,
@@ -203,6 +201,33 @@ class MethodologyProbeContractTest {
 
     private static NotaFinalProbeContext notaFinalContext() {
         return notaFinalContext(monthlyResults(), reference(GatePack.NOTA_FINAL, MUNICIPALITY, SIAPS_Q1_2026));
+    }
+
+    // ---- what a probe sees of the official side
+
+    @Test
+    void aProbeSeesTheTeamsOfTheRevisionButNotTheirOfficialClasses() {
+        IndicatorRule rule = c1();
+        ValidatedReference reference = new ValidatedReference(
+                pack(rule),
+                SourceKind.OFFICIAL_TEAM_EXPORT_CSV,
+                MUNICIPALITY,
+                SIAPS_Q1_2026,
+                UniverseConfidence.OFFICIAL,
+                List.of(),
+                Map.of(
+                        SiapsParser.ESF,
+                        ClassCounts.EMPTY.plus(Classification.OTIMO),
+                        SiapsParser.EAP,
+                        ClassCounts.EMPTY),
+                List.of(new SiapsSnapshot.Team(INE, SiapsParser.ESF)),
+                Map.of(INE, Classification.OTIMO));
+
+        PackProbeContext context =
+                packContext(inputs(rule, MUNICIPALITY), baseline(rule), reference, manifest(pack(rule)), FINGERPRINT);
+
+        assertThat(context.revisionTeams()).containsExactly(Map.entry(INE, SiapsParser.ESF));
+        assertThat(packContext().revisionTeams()).isEmpty();
     }
 
     // ---- the result of a probe
