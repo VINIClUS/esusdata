@@ -1235,13 +1235,25 @@ final class PortaoDCompatibilityRun {
         }
 
         /**
-         * Writes the evidence summary of each decided set and then D of every pack. If the registry
-         * refuses any set, the registry is put back as it was.
+         * Writes the evidence summary of each decided set and then D of every pack, as one change: if
+         * the registry refuses any set, the registry and every summary are put back as they were (the
+         * old bytes, or no file where there was none), so a rerun starts from the committed tree.
          */
         private static void record(Path repoRoot, List<ReferenceSetVerdict> verdicts, LocalDate day)
                 throws IOException {
+            Map<Path, Optional<byte[]>> before = new LinkedHashMap<>();
+            remember(before, repoRoot.resolve(REGISTRY_FILE));
+            for (ReferenceSetVerdict verdict : verdicts) {
+                if (verdict.status() != PackVerdict.Status.PENDING) {
+                    for (String extension : List.of(JSON, MARKDOWN)) {
+                        remember(
+                                before,
+                                repoRoot.resolve(SummaryWriter.SET_SUMMARY_DIR)
+                                        .resolve(SummaryWriter.summaryFileName(verdict.ruleVersion(), extension)));
+                    }
+                }
+            }
             Path registry = repoRoot.resolve(REGISTRY_FILE);
-            byte[] before = Files.readAllBytes(registry);
             boolean recorded = false;
             try {
                 for (ReferenceSetVerdict verdict : verdicts) {
@@ -1250,7 +1262,21 @@ final class PortaoDCompatibilityRun {
                 recorded = true;
             } finally {
                 if (!recorded) {
-                    Files.write(registry, before);
+                    restore(before);
+                }
+            }
+        }
+
+        private static void remember(Map<Path, Optional<byte[]>> before, Path file) throws IOException {
+            before.put(file, Files.isRegularFile(file) ? Optional.of(Files.readAllBytes(file)) : Optional.empty());
+        }
+
+        private static void restore(Map<Path, Optional<byte[]>> before) throws IOException {
+            for (Map.Entry<Path, Optional<byte[]>> file : before.entrySet()) {
+                if (file.getValue().isPresent()) {
+                    Files.write(file.getKey(), file.getValue().get());
+                } else {
+                    Files.deleteIfExists(file.getKey());
                 }
             }
         }

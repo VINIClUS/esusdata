@@ -655,6 +655,43 @@ class PortaoDCompatibilityRunTest {
     }
 
     @Test
+    void aSetTheRegistryRefusesPutsBackTheRegistryAndEverySummaryWrittenBeforeIt() throws IOException {
+        campaign();
+        declareGate("EXACT", null);
+        // no entry for C2: its set is refused after the summary of C1, recorded first, was written
+        Path registry = repo().resolve(RELEASE_GATES);
+        tools.jackson.databind.node.ObjectNode root =
+                (tools.jackson.databind.node.ObjectNode) JSON.readTree(Files.readString(registry));
+        tools.jackson.databind.node.ArrayNode packs = (tools.jackson.databind.node.ArrayNode) root.path("packs");
+        for (int index = 0; index < packs.size(); index++) {
+            if (packs.get(index).path("pack").asString().equals(C2.packId())) {
+                packs.remove(index);
+                break;
+            }
+        }
+        Files.writeString(registry, JSON.writeValueAsString(root));
+        byte[] registryBefore = Files.readAllBytes(registry);
+        String c1Rule = ReleaseGateRegistry.registeredPacks().stream()
+                .filter(descriptor -> descriptor.id().equals(C1.packId()))
+                .findFirst()
+                .orElseThrow()
+                .ruleVersion();
+        Path summaries = Files.createDirectories(repo().resolve(SummaryWriter.SET_SUMMARY_DIR));
+        Path c1Json = summaries.resolve(SummaryWriter.summaryFileName(c1Rule, ".json"));
+        Files.writeString(c1Json, "a summary committed before\n");
+        GateCheck.Repository repository = git(true, committedPolicy());
+
+        assertThatThrownBy(() -> check(repository))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(C2.packId());
+
+        assertThat(Files.readAllBytes(registry)).isEqualTo(registryBefore);
+        assertThat(Files.readString(c1Json)).isEqualTo("a summary committed before\n");
+        assertThat(summaries.resolve(SummaryWriter.summaryFileName(c1Rule, ".md")))
+                .doesNotExist();
+    }
+
+    @Test
     void anEmptyGateSetIsReportedAsEmptyIsPendingAndIsNotAFailure() throws IOException {
         Files.createDirectories(repo().resolve(GateCheck.POLICY_FILE).getParent());
         Files.copy(Path.of("..", "..").resolve(GateCheck.POLICY_FILE), repo().resolve(GateCheck.POLICY_FILE));

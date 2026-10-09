@@ -226,6 +226,11 @@ public final class PortaoDEvidenceChecks {
         return List.of();
     }
 
+    /**
+     * The summary agrees with the dossier it cites: the declared compatibility is the dossier's
+     * verdict and the summary's, and the local source the summary was decided on is the one the
+     * dossier was decided on (another source leaves the reference PENDING, spec §14).
+     */
     private static List<String> compatibilityProblems(
             String what, JsonNode reference, ReferenceDeclaration declaration, Path repoRoot) throws IOException {
         Path file = repoRoot.resolve(String.valueOf(declaration.compatibilityEvidenceRef()));
@@ -237,6 +242,12 @@ public final class PortaoDEvidenceChecks {
         List<String> problems = new ArrayList<>();
         if (dossier.isEmpty() || declaration.compatibility() != dossier.get().verdict()) {
             problems.add(what + ": the declared compatibility is not the verdict of the dossier");
+        }
+        if (dossier.isPresent()
+                && !dossier.get()
+                        .localSourceFingerprint()
+                        .equals(reference.path("local_source_fingerprint").asString(""))) {
+            problems.add(what + ": the local source in the summary is not the one the dossier was decided on");
         }
         if (!declaration
                 .compatibility()

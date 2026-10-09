@@ -190,6 +190,18 @@ class ReleaseGatesConsistencyTest {
     }
 
     @Test
+    void aSummaryThatClaimsAnotherLocalSourceThanItsDossierIsRefused(@TempDir Path workspace) throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.PASSED);
+        editSummary(
+                tree,
+                "\"local_source_fingerprint\": \"" + PortaoDEvidenceFixtures.FINGERPRINT + "\"",
+                "\"local_source_fingerprint\": \"sha256:" + "2".repeat(64) + "\"");
+
+        assertThat(problemsOf(tree))
+                .anyMatch(problem -> problem.contains("local source in the summary is not the one the dossier"));
+    }
+
+    @Test
     void aCitedManifestOrDossierThatIsMissingOrChangedIsRefused(@TempDir Path workspace) throws Exception {
         Tree changed = PortaoDEvidenceFixtures.decided(workspace.resolve("changed"), C4, Status.PASSED);
         PortaoDEvidenceFixtures.replaceIn(changed.manifest(), "\"row_count\"", "\"row_count \"");
