@@ -81,7 +81,7 @@ public final class MethodologyProfileRegistry {
 
     /** Words of a field name that point at a date, a validity window or a "latest": a hint on an unknown field. */
     private static final Pattern DATE_LIKE = Pattern.compile(
-            "(?i).*(date|_at|since|until|after|before|latest|newest|recent|floor|signed|signature|valid|expire|deadline|cutoff|effective|from).*");
+            "(?i)date|_at|since|until|after|before|latest|newest|recent|floor|signed|signature|valid|expire|deadline|cutoff|effective|from");
 
     private final List<MethodologyProfile> profiles;
     private final List<Source> sources;
@@ -320,7 +320,7 @@ public final class MethodologyProfileRegistry {
             this.path = path;
             for (String name : node.propertyNames()) {
                 if (!required.contains(name) && !optional.contains(name)) {
-                    String hint = DATE_LIKE.matcher(name).matches()
+                    String hint = DATE_LIKE.matcher(name).find()
                             ? " (dates are metadata: nothing in a profile is chosen, ordered or validated by one)"
                             : "";
                     throw invalid(path + " has unknown field " + name + hint);
