@@ -367,7 +367,7 @@ class PortaoDRunnerConfigurationTest {
     void theProfilesDefaultToTheContractFileAndTheSecretFileToTheOneOfTheOtherLiveTests() {
         Compatibility compatibility = Compatibility.parse(without(COMPATIBILITY, ENV_FILE)::get);
 
-        assertThat(compatibility.profiles().toString()).endsWith(DEFAULT_PROFILES);
+        assertThat(compatibility.profiles()).endsWithRaw(Path.of(DEFAULT_PROFILES));
         assertThat(compatibility.envFile()).isEqualTo(LivePecAssumptions.ENV_FILE);
         assertThat(Compatibility.parse(plus(COMPATIBILITY, PROFILES, "p.json")::get)
                         .profiles())
