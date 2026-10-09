@@ -7,6 +7,7 @@ import esusdata.indicator.model.IndicatorResult;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamResult;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,17 +35,55 @@ public final class ProbeDiff {
     private ProbeDiff() {}
 
     /**
-     * What the other reading changed.
+     * What the other reading changed. Its parts name teams and subjects, so it stays local: a
+     * probe reports {@link #teams()} as its {@code divergent} count and puts {@link #localDetail()}
+     * in its local detail, and {@link #toString()} says the counts only.
      *
-     * @param teams teams of the revision whose result changed in at least one month
-     * @param subjects subjects (people, episodes, or source records for C1) whose evidence changed
-     *     in at least one month, in any team; local detail only
-     * @param localDetail one line per changed team and month, INEs included; never versioned
+     * @param changedTeams the INEs of the teams of the revision whose result changed in at least
+     *     one month
+     * @param changedSubjects the subjects (people, episodes, or source records for C1) whose
+     *     evidence changed in at least one month, in any team
+     * @param localDetail one line per changed team and month
      */
-    public record Divergence(int teams, int subjects, List<String> localDetail) {
+    public record Divergence(Set<String> changedTeams, Set<String> changedSubjects, List<String> localDetail) {
+
+        /** Nothing changed. */
+        public static final Divergence NONE = new Divergence(Set.of(), Set.of(), List.of());
 
         public Divergence {
+            changedTeams = Collections.unmodifiableSet(new TreeSet<>(changedTeams));
+            changedSubjects = Collections.unmodifiableSet(new TreeSet<>(changedSubjects));
             localDetail = List.copyOf(localDetail);
+        }
+
+        /** The teams of the revision whose result changed: the {@code divergent} count of a probe. */
+        public int teams() {
+            return changedTeams.size();
+        }
+
+        /** The subjects whose evidence changed, in any team; local detail only. */
+        public int subjects() {
+            return changedSubjects.size();
+        }
+
+        /**
+         * What changed under this reading or under {@code other}: a probe with several candidate
+         * readings of the official side diverges wherever any of them does.
+         */
+        public Divergence plus(Divergence other) {
+            Set<String> teams = new TreeSet<>(changedTeams);
+            teams.addAll(other.changedTeams);
+            Set<String> subjects = new TreeSet<>(changedSubjects);
+            subjects.addAll(other.changedSubjects);
+            List<String> detail = new ArrayList<>(localDetail);
+            detail.addAll(other.localDetail);
+            return new Divergence(teams, subjects, detail);
+        }
+
+        /** The counts only: a log line or an assertion message must not carry an INE. */
+        @Override
+        public String toString() {
+            return "Divergence[teams=" + teams() + ", subjects=" + subjects() + "]";
         }
     }
 
@@ -75,7 +114,7 @@ public final class ProbeDiff {
             changedTeams(before, after, revisionTeams.keySet(), period, teams, detail);
             subjects.addAll(changedSubjects(before, after));
         }
-        return new Divergence(teams.size(), subjects.size(), detail);
+        return new Divergence(teams, subjects, detail);
     }
 
     private static void changedTeams(

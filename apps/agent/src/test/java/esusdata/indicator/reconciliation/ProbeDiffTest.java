@@ -123,6 +123,23 @@ class ProbeDiffTest {
     }
 
     @Test
+    void severalCandidateReadingsDivergeWhereverAnyOfThemDoes() {
+        List<RuleOutcome> baseline = List.of(month(
+                JANUARY, List.of(team(REVISION_TEAM, JANUARY, 1, 2), team(OTHER_TEAM, JANUARY, 1, 2)), List.of()));
+        List<RuleOutcome> first = List.of(month(
+                JANUARY, List.of(team(REVISION_TEAM, JANUARY, 2, 2), team(OTHER_TEAM, JANUARY, 1, 2)), List.of()));
+        List<RuleOutcome> second = List.of(month(
+                JANUARY, List.of(team(REVISION_TEAM, JANUARY, 2, 2), team(OTHER_TEAM, JANUARY, 0, 2)), List.of()));
+
+        Divergence either =
+                ProbeDiff.compare(baseline, first, REVISION).plus(ProbeDiff.compare(baseline, second, REVISION));
+
+        assertThat(either.teams()).isEqualTo(2);
+        assertThat(either.toString()).doesNotContain(REVISION_TEAM).contains("teams=2");
+        assertThat(Divergence.NONE.plus(either).changedTeams()).containsExactly(REVISION_TEAM, OTHER_TEAM);
+    }
+
+    @Test
     void readingsOfDifferentMonthsAreRefused() {
         List<RuleOutcome> january = List.of(month(JANUARY, List.of(), List.of()));
         List<RuleOutcome> february = List.of(month(FEBRUARY, List.of(), List.of()));
