@@ -344,6 +344,15 @@ class OfficialTeamExportCsvParserTest {
     }
 
     @Test
+    void refusesAFinalNoteThatIsNotTheSumOfTheNotesOfItsSevenIndicators() {
+        // ESF_2 has seven Ótimo indicators whose notes sum to 10; 9 is still in the band of Ótimo
+        Export shifted = SiapsTeamExportFixtures.standard();
+        shifted.row(ESF_2, TOTAL_NAME)[SiapsTeamExportFixtures.FINAL_NOTE_COLUMN] = "9";
+
+        assertThat(refusal(shifted)).contains("NOTA FINAL DA EQUIPE is not the sum of the NOTA DO INDICADOR");
+    }
+
+    @Test
     void aBomOffTheBandOfTheFinalNoteIsTheClassANewTeamGets() {
         Export newTeam = SiapsTeamExportFixtures.standard();
         newTeam.row(ESF_2, TOTAL_NAME)[SiapsTeamExportFixtures.FINAL_CLASS_COLUMN] = "BOM";
@@ -492,20 +501,22 @@ class OfficialTeamExportCsvParserTest {
     }
 
     @Test
-    void changingOneClassChangesOnlyTheHashOfItsPack() {
+    void changingOneClassChangesTheHashOfItsPackAndOfTheNotaFinalOnly() {
         OfficialTeamReference before = parse(SiapsTeamExportFixtures.standard());
         Export changed = SiapsTeamExportFixtures.standard();
         changed.row(ESF_1, C3_NAME)[CONCEPT_COLUMN] = "ÓTIMO";
         changed.row(ESF_1, C3_NAME)[SiapsTeamExportFixtures.FACTOR_COLUMN] = "1";
         changed.row(ESF_1, C3_NAME)[SiapsTeamExportFixtures.NOTE_COLUMN] = "2";
+        // the final note is the sum of the seven notes: 5.5 + 0.5, still in the band of Bom
+        changed.row(ESF_1, TOTAL_NAME)[SiapsTeamExportFixtures.FINAL_NOTE_COLUMN] = "6";
 
         OfficialTeamReference after = parse(changed);
 
         GatePack c3 = GatePack.bySiapsCode(107).orElseThrow();
         assertThat(after.subset(c3).sha256()).isNotEqualTo(before.subset(c3).sha256());
-        assertThat(after.subset(C1).sha256()).isEqualTo(before.subset(C1).sha256());
         assertThat(after.subset(GatePack.NOTA_FINAL).sha256())
-                .isEqualTo(before.subset(GatePack.NOTA_FINAL).sha256());
+                .isNotEqualTo(before.subset(GatePack.NOTA_FINAL).sha256());
+        assertThat(after.subset(C1).sha256()).isEqualTo(before.subset(C1).sha256());
     }
 
     @Test

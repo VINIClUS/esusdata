@@ -20,6 +20,7 @@ import java.time.DateTimeException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -44,8 +45,9 @@ import java.util.regex.Pattern;
  * <p>The file is refused when it is a person-level export (a column named CPF, CNS, nome,
  * nascimento, telefone or endereço, apart from the team's own name), when its municipality or
  * quadrimestre is not the expected one anywhere, when it repeats a team and indicator, when a team
- * type, an indicator, a class or a number is not one it knows, or when a factor disagrees with its
- * class. Teams of the types outside the Componente de Qualidade of eSF/eAP (eSB, eMulti) are
+ * type, an indicator, a class or a number is not one it knows, when a factor disagrees with its
+ * class, or when the final note of a team with all seven indicator rows is not the sum of their
+ * notes. Teams of the types outside the Componente de Qualidade of eSF/eAP (eSB, eMulti) are
  * counted and left unread. A team that lacks a row is not refused: the reference reports it as
  * incomplete ({@link OfficialTeamReference#isComplete}).
  *
@@ -424,6 +426,7 @@ final class OfficialTeamExportCsvParser {
         private final Map<String, String> typeByIne = new TreeMap<>();
         private final Map<Integer, Map<String, IndicatorRow>> indicators = new TreeMap<>();
         private final Map<String, FinalRow> totals = new TreeMap<>();
+        private final Map<String, Integer> totalRowNumbers = new TreeMap<>();
         private final Map<String, Set<String>> skippedTeams = new TreeMap<>();
         private final Map<String, Integer> skippedRows = new TreeMap<>();
         private int row;
@@ -533,6 +536,37 @@ final class OfficialTeamExportCsvParser {
             if (totals.put(ine, finalRow) != null) {
                 throw fail("a second Total row for one team");
             }
+            totalRowNumbers.put(ine, row);
+        }
+
+        /**
+         * The final note of a team that has a row for each of the seven indicators is the sum of
+         * their notes, each already the factor times the weight: a Total row that contradicts the
+         * rows of its own team is refused, never compared. A team that lacks a row is left to the
+         * completeness of the reference.
+         */
+        private void requireFinalNotesAreTheSumOfTheIndicatorNotes() {
+            for (Map.Entry<String, FinalRow> total : totals.entrySet()) {
+                Optional<BigDecimal> sum = sumOfTheIndicatorNotes(total.getKey());
+                if (sum.isPresent() && sum.get().compareTo(total.getValue().finalNote()) != 0) {
+                    throw new IllegalArgumentException(refusal("table row " + totalRowNumbers.get(total.getKey()) + ": "
+                            + HEADER.get(FINAL_NOTE) + " is not the sum of the " + HEADER.get(NOTE)
+                            + " of the seven indicators of the team"));
+                }
+            }
+        }
+
+        /** The sum of the notes of the team's seven indicators; empty when it lacks the row of one. */
+        private Optional<BigDecimal> sumOfTheIndicatorNotes(String ine) {
+            BigDecimal sum = BigDecimal.ZERO;
+            for (int code : Set.copyOf(INDICATORS.values())) {
+                IndicatorRow indicator = indicators.getOrDefault(code, Map.of()).get(ine);
+                if (indicator == null) {
+                    return Optional.empty();
+                }
+                sum = sum.add(indicator.note());
+            }
+            return Optional.of(sum);
         }
 
         /** A decimal of the file as an exact fraction, for the bands that are never rounded first. */
@@ -588,6 +622,7 @@ final class OfficialTeamExportCsvParser {
         }
 
         OfficialTeamReference reference(String municipalityIbge) {
+            requireFinalNotesAreTheSumOfTheIndicatorNotes();
             Map<String, String> inScope = new TreeMap<>(typeByIne);
             inScope.values().removeIf(OUT_OF_SCOPE::contains);
             if (inScope.isEmpty()) {
