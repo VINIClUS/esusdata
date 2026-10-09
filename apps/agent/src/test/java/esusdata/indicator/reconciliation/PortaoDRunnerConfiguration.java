@@ -75,6 +75,17 @@ final class PortaoDRunnerConfiguration {
      */
     record Capture(Path exportDir, String municipalityIbge, Path artifactDir, Path manifestOutput) {
 
+        /**
+         * The store holds the raw exports, INEs and team names included, so it is never under {@code
+         * docs/}; the manifests, which carry none, may be.
+         */
+        Capture {
+            if (hasSegment(artifactDir, DOCS)) {
+                throw new IllegalArgumentException(
+                        "the capture never writes the raw exports under " + DOCS + "/: " + ARTIFACT_DIR);
+            }
+        }
+
         static Capture parse(Function<String, String> properties) {
             refuse(properties, NOT_FOR_CAPTURE, Mode.CAPTURE);
             return new Capture(

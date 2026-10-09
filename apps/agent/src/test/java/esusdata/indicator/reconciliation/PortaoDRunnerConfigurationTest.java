@@ -142,6 +142,23 @@ class PortaoDRunnerConfigurationTest {
                 .containsExactly("exportDir", "municipalityIbge", "artifactDir", "manifestOutput");
     }
 
+    @ParameterizedTest(name = "the capture does not store the raw exports under {0}")
+    @ValueSource(strings = {"docs", "docs/out", "repo/docs/portoes", "repo/docs/../docs/x", "../docs"})
+    void theCaptureNeverStoresTheRawExportsUnderDocs(String artifactDir) {
+        Map<String, String> properties = plus(CAPTURE, ARTIFACT_DIR, artifactDir);
+
+        assertThatThrownBy(() -> Capture.parse(properties::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("docs/");
+    }
+
+    @Test
+    void theManifestsOfTheCaptureMayBeWrittenUnderDocs() {
+        Capture capture = Capture.parse(plus(CAPTURE, MANIFEST_OUTPUT, "docs/indicadores/portoes/references")::get);
+
+        assertThat(capture.manifestOutput()).isEqualTo(Path.of("docs/indicadores/portoes/references"));
+    }
+
     // ---- the diagnostic runner
 
     @Test
