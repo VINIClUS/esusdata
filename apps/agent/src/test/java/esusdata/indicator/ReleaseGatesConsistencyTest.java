@@ -7,6 +7,7 @@ import esusdata.indicator.model.GateId;
 import esusdata.indicator.model.GateStatus;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.pack.c4.C4Pack;
+import esusdata.indicator.reconciliation.Comparison;
 import esusdata.indicator.reconciliation.PackVerdict.Status;
 import esusdata.indicator.reconciliation.PortaoDEvidenceChecks;
 import esusdata.indicator.reconciliation.PortaoDEvidenceFixtures;
@@ -20,6 +21,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -201,6 +203,16 @@ class ReleaseGatesConsistencyTest {
         PortaoDEvidenceFixtures.replaceIn(tree.registry(), "\"status\": \"FAILED\"", SUMMARY_STATUS);
 
         assertThat(problemsOf(tree)).anyMatch(problem -> problem.contains("does not follow from its rows"));
+    }
+
+    @Test
+    void aRowWhoseThresholdIsNotTheOneItsNsGivesIsRefused(@TempDir Path workspace) throws Exception {
+        // below the mask every count has the same threshold, so a masked n_s still fixes t
+        assertThat(IntStream.range(0, 10).map(Comparison::threshold)).containsOnly(2);
+        Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.PASSED);
+        editSummary(tree, "\"t\": \"2\"", "\"t\": \"9\"");
+
+        assertThat(problemsOf(tree)).anyMatch(problem -> problem.contains("t is not the threshold its n_s gives"));
     }
 
     @Test

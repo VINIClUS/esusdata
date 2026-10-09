@@ -213,19 +213,24 @@ public final class PortaoDEvidenceChecks {
     }
 
     /**
-     * The status of a reference follows from its rows: each row's verdict is the one its d and t give
-     * (within the threshold passes, beyond it fails, no figures is not evaluated); a row that fails
-     * makes the reference FAILED, and PASSED needs an evaluated row and every evaluated one passing. A
-     * PENDING reference has no failing row: a failure is never softened.
+     * The status of a reference follows from its rows: each row's t is the threshold its n_s gives
+     * ({@link Comparison#threshold}), each verdict is the one its d and t give (within the threshold
+     * passes, beyond it fails, no figures is not evaluated); a row that fails makes the reference
+     * FAILED, and PASSED needs an evaluated row and every evaluated one passing. A PENDING reference
+     * has no failing row: a failure is never softened.
      */
     private static List<String> rowProblems(String what, JsonNode reference) {
         List<String> problems = new ArrayList<>();
         boolean fails = false;
         boolean passes = false;
         for (JsonNode row : reference.path("rows")) {
+            String t = row.path("t").asString("");
+            if (!SummaryWriter.DASH.equals(t)
+                    && !t.equals(thresholdOf(row.path("n_s").asString("")))) {
+                problems.add(what + ": a row's t is not the threshold its n_s gives");
+            }
             String verdict = row.path("row_verdict").asString("");
-            if (!verdict.equals(
-                    verdictOf(row.path("d").asString(""), row.path("t").asString("")))) {
+            if (!verdict.equals(verdictOf(row.path("d").asString(""), t))) {
                 problems.add(what + ": a row's verdict is not the one its d and t give");
             }
             fails |= SummaryWriter.ROW_FAILS.equals(verdict);
@@ -238,6 +243,21 @@ public final class PortaoDEvidenceChecks {
             problems.add(what + ": the status " + status + " does not follow from its rows");
         }
         return problems;
+    }
+
+    /**
+     * The threshold of a row from its n_s. Below the mask the formula gives the floor for every count
+     * ({@code max(2, ceil(0.15 × 9)) = 2}), so a masked n_s still fixes it.
+     */
+    static String thresholdOf(String nS) {
+        if (SummaryWriter.MASKED.equals(nS)) {
+            return Integer.toString(Comparison.threshold(SummaryWriter.MASK_BELOW - 1));
+        }
+        try {
+            return Integer.toString(Comparison.threshold(Integer.parseInt(nS)));
+        } catch (NumberFormatException notACount) {
+            return "";
+        }
     }
 
     private static String verdictOf(String d, String t) {

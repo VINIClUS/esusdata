@@ -276,3 +276,10 @@ compatibilidade igual ao veredito do dossiê), `PortaoDEvidenceConsistencyTest` 
 por uma declaração com o mesmo hash; envelope do dossiê; cada `.md` é a renderização do seu `.json`) e
 `PortaoDEvidencePrivacyTest` (nem INE, CNES, UUID, IP, e-mail nem chave de senha). Hoje o registro inteiro está
 `PENDING` e elas passam por vacuidade; o replay a partir dos artefatos brutos continua só local.
+
+O que a CI garante é a coerência interna da evidência: hashes iguais aos fixados pela política, fonte local do
+resumo igual à do dossiê, `t` igual ao limiar que o `n_s` dá, veredito de cada linha igual ao que `d` e `t` dão e
+status de cada referência e do conjunto derivados das linhas. O `d` não é rederivável offline, porque a
+distribuição por classe não é versionada (mascarada abaixo de 10, ela não sustentaria a conta). Quem atesta o
+cálculo é a execução do gate que gera o resumo no PR E, reproduzível localmente sobre os extratos persistidos, e a
+revisão desse PR; uma edição posterior do resumo muda o hash que o registro fixa.
