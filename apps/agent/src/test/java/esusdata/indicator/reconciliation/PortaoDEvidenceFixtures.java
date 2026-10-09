@@ -237,11 +237,13 @@ public final class PortaoDEvidenceFixtures {
 
     /** A local verdict for the one reference: agreeing figures for PASSED, a distribution far off for FAILED. */
     private static PackVerdict localVerdict(PackDescriptor descriptor, Status status) {
-        ClassCounts official = new ClassCounts(10, 0, 0, 0);
-        ClassCounts local = status == Status.PASSED ? official : new ClassCounts(0, 0, 0, 10);
+        // as many teams as the standard export has (two eSF, one eAP); a failed set fails on eSF only
+        ClassCounts esf = new ClassCounts(0, 0, 0, 2);
+        ClassCounts eap = new ClassCounts(0, 0, 1, 0);
+        boolean passed = status == Status.PASSED;
         List<RowResult> rows = new ArrayList<>();
-        rows.add(Comparison.row(SiapsParser.ESF, official, local, 0));
-        rows.add(Comparison.row(SiapsParser.EAP, official, local, 0));
+        rows.add(Comparison.row(SiapsParser.ESF, esf, passed ? esf : new ClassCounts(2, 0, 0, 0), 0));
+        rows.add(Comparison.row(SiapsParser.EAP, eap, passed ? eap : new ClassCounts(0, 1, 0, 0), 0));
         return new PackVerdict(
                 packOf(descriptor),
                 descriptor.ruleVersion(),

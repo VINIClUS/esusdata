@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -272,6 +273,39 @@ class ReleaseGatesConsistencyTest {
                 .anyMatch(problem -> problem.contains("the dossier is of another reference"))
                 .noneMatch(problem -> problem.contains("gate_set_sha256"))
                 .noneMatch(problem -> problem.contains("missing or has changed"));
+    }
+
+    @Test
+    void aSummaryThatLeavesOutAFailingRowIsRefused(@TempDir Path workspace) throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.FAILED);
+        String row = Pattern.quote(rowWith(tree, ROW_FAILS));
+        String before = SummaryWriter.sha256(tree.summaryJson());
+        Files.writeString(
+                tree.summaryJson(),
+                PortaoDEvidenceFixtures.read(tree.summaryJson())
+                        .replaceFirst("(?:" + row + ",\\s*|,\\s*" + row + ")", "")
+                        .replace("\"status\": \"FAILED\"", SUMMARY_STATUS),
+                StandardCharsets.UTF_8);
+        PortaoDEvidenceFixtures.replaceIn(tree.registry(), before, SummaryWriter.sha256(tree.summaryJson()));
+        PortaoDEvidenceFixtures.replaceIn(tree.registry(), "\"status\": \"FAILED\"", SUMMARY_STATUS);
+
+        assertThat(problemsOf(tree)).anyMatch(problem -> problem.contains("not one per team type of the gate"));
+    }
+
+    @Test
+    void anNsRaisedBeyondTheTeamsOfTheManifestIsRefused(@TempDir Path workspace) throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.PASSED);
+        String row = rowWith(tree, ROW_PASSES);
+        // with its threshold, so that only the count is wrong
+        editSummary(
+                tree,
+                row,
+                row.replaceFirst("\"n_s\": \"[^\"]+\"", "\"n_s\": \"99\"")
+                        .replaceFirst("\"t\": \"[0-9]+\"", "\"t\": \"" + Comparison.threshold(99) + "\""));
+
+        assertThat(problemsOf(tree))
+                .anyMatch(problem -> problem.contains("add up to more teams than the manifest has"))
+                .noneMatch(problem -> problem.contains("t is not the threshold"));
     }
 
     /** The JSON object of the first row of the summary with that verdict, as the writer printed it. */

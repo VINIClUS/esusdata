@@ -66,7 +66,8 @@ class SetSummaryWriterTest {
                 .isTrue();
         JsonNode esf = reference.path("rows").get(0);
         assertThat(esf.path("team_type").asString()).isEqualTo(SiapsParser.ESF);
-        assertThat(esf.path("n_s").asString()).isEqualTo("10");
+        // the two eSF teams of the export, below the mask
+        assertThat(esf.path("n_s").asString()).isEqualTo("<10");
         assertThat(esf.path("d").asString()).isEqualTo("0");
         assertThat(esf.path("t").asString()).isEqualTo("2");
         assertThat(esf.path("sem_classe_local").asString()).isEqualTo("<10");

@@ -46,6 +46,9 @@ public final class PortaoDEvidenceChecks {
     private static final String CHECK = "check";
     private static final String PASSED = "PASSED";
     private static final String FAILED = "FAILED";
+    /** The rows of a reference, in the order the verdict makes them ({@code PackVerdict}). */
+    private static final List<String> GATE_TYPES = List.of(SiapsParser.ESF, SiapsParser.EAP);
+
     private static final Pattern HASH = Pattern.compile("[0-9a-f]{64}");
     private static final Pattern MUNICIPALITY = Pattern.compile("(\"municipality_ibge\":\\s*\")\\d{7}\"");
     private static final Pattern IPV4 = Pattern.compile("(?<![\\d.])(?:\\d{1,3}\\.){3}\\d{1,3}(?![\\d.])");
@@ -194,6 +197,7 @@ public final class PortaoDEvidenceChecks {
         }
         ReferenceDeclaration declaration = found.get();
         List<String> problems = new ArrayList<>(rowProblems(who + id, reference));
+        problems.addAll(teamCountProblems(who + id, reference, repoRoot.resolve(ReferencePolicy.manifestPath(id))));
         if (declaration.status() != ReferenceStatus.ACTIVE) {
             problems.add(who + id + " is not ACTIVE");
         }
@@ -228,6 +232,11 @@ public final class PortaoDEvidenceChecks {
         List<String> problems = new ArrayList<>();
         boolean fails = false;
         boolean passes = false;
+        List<String> types = new ArrayList<>();
+        reference.path("rows").forEach(row -> types.add(row.path("team_type").asString("")));
+        if (!types.equals(GATE_TYPES)) {
+            problems.add(what + ": the rows are not one per team type of the gate, " + GATE_TYPES);
+        }
         for (JsonNode row : reference.path("rows")) {
             String verdict = row.path("row_verdict").asString("");
             problems.addAll(figureProblems(what, row, verdict));
@@ -241,6 +250,33 @@ public final class PortaoDEvidenceChecks {
             problems.add(what + ": the status " + status + " does not follow from its rows");
         }
         return problems;
+    }
+
+    /**
+     * The SIAPS teams the rows count fit in the reference: the n_s that are figures add up to no more
+     * than the teams the pinned manifest has ({@code row_count}), so n_s cannot be raised to raise t.
+     */
+    private static List<String> teamCountProblems(String what, JsonNode reference, Path manifest) {
+        if (!Files.isRegularFile(manifest)) {
+            return List.of();
+        }
+        int teams = MAPPER.readTree(manifest.toFile()).path("row_count").asInt(0);
+        int counted = 0;
+        for (JsonNode row : reference.path("rows")) {
+            String nS = row.path("n_s").asString("");
+            counted += SummaryWriter.MASKED.equals(nS) ? 0 : figureOf(nS);
+        }
+        return counted > teams
+                ? List.of(what + ": the n_s of the rows add up to more teams than the manifest has")
+                : List.of();
+    }
+
+    private static int figureOf(String count) {
+        try {
+            return Integer.parseInt(count);
+        } catch (NumberFormatException notACount) {
+            return 0;
+        }
     }
 
     /** What is wrong with the figures of one row against its verdict. */

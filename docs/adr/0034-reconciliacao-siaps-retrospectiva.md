@@ -278,10 +278,11 @@ por uma declaração com o mesmo hash; envelope do dossiê; cada `.md` é a rend
 `PENDING` e elas passam por vacuidade; o replay a partir dos artefatos brutos continua só local.
 
 O que a CI garante é a coerência interna da evidência: hashes iguais aos fixados pela política, dossiê da mesma
-referência, versão de regra e manifesto da declaração, fonte local do resumo igual à do dossiê, `t` igual ao
-limiar que o `n_s` dá, veredito de cada linha igual ao que `d` e `t` dão (número negativo não é veredito), linha
-não avaliada só com as duas contagens abaixo da máscara e status de cada referência e do conjunto derivados das
-linhas. O `d` não é rederivável offline, porque a
-distribuição por classe não é versionada (mascarada abaixo de 10, ela não sustentaria a conta). Quem atesta o
-cálculo é a execução do gate que gera o resumo no PR E, reproduzível localmente sobre os extratos persistidos, e a
-revisão desse PR; uma edição posterior do resumo muda o hash que o registro fixa.
+referência, versão de regra e manifesto da declaração, fonte local do resumo igual à do dossiê, `t` igual ao limiar
+que o `n_s` dá, uma linha por tipo de equipe do gate (eSF e eAP), `n_s` somando no máximo as equipes do manifesto,
+veredito de cada linha igual ao que `d` e `t` dão (número negativo não é veredito), linha não avaliada só com as
+duas contagens abaixo da máscara e status de cada referência e do conjunto derivados das linhas. O `d`, o `n_l` e o
+`n_s` exato não são rederiváveis offline, porque a distribuição por classe não é versionada (mascarada abaixo de
+10, ela não sustentaria a conta). Quem atesta o cálculo é a execução do gate que gera o resumo no PR E,
+reproduzível localmente sobre os extratos persistidos, e a revisão desse PR; uma edição posterior do resumo muda o
+hash que o registro fixa.
