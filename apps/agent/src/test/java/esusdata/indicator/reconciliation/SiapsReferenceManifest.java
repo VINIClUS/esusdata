@@ -269,6 +269,19 @@ record SiapsReferenceManifest(
         return true;
     }
 
+    /**
+     * What the store files this revision under: its normalized hash, and for the Nota Final the
+     * hash of that and of its siblings, since the same final classes beside other pack revisions are
+     * another revision ({@link ReferenceDrift}) and must not share its directory.
+     */
+    String revisionKey() {
+        if (!isNotaFinalId(referenceId)) {
+            return normalizedSha256;
+        }
+        String identity = normalizedSha256 + "\n" + String.join("\n", siblingReferenceIds);
+        return SummaryWriter.sha256(identity.getBytes(StandardCharsets.UTF_8));
+    }
+
     /** The lowercase hex SHA-256 of the manifest file as {@link #toJson()} writes it. */
     String sha256() {
         return SummaryWriter.sha256(toJson().getBytes(StandardCharsets.UTF_8));

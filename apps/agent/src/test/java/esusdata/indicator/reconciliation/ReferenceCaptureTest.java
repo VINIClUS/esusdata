@@ -70,6 +70,18 @@ class ReferenceCaptureTest {
                 .bytes();
     }
 
+    /**
+     * The standard export, generated later, with the C1 result of the first eSF team moved within its
+     * band: C1 changes, its concept, note and the Nota Final do not.
+     */
+    private static byte[] laterWithOnlyAC1ResultChanged() {
+        SiapsTeamExportFixtures.Export export =
+                SiapsTeamExportFixtures.standard().generatedAt(LATER);
+        export.row(SiapsTeamExportFixtures.ESF_1, SiapsTeamExportFixtures.INDICATOR_NAMES.getFirst())[
+                SiapsTeamExportFixtures.RESULT_COLUMN] = "12.75";
+        return export.bytes();
+    }
+
     /** The standard export with the first concept of the first eSF team (C1) changed, generated later. */
     private static byte[] laterWithC1Changed() {
         return SiapsTeamExportFixtures.export()
@@ -313,6 +325,54 @@ class ReferenceCaptureTest {
                         tuple(GatePack.NOTA_FINAL, Action.DRIFT, PREFIX + "ciii-team-r2"));
         Map<String, String> secondRevision = stateOf(manifests());
         assertThat(secondRevision).hasSize(10).containsAllEntriesOf(firstRevision);
+    }
+
+    @Test
+    void aPackThatChangesUnderAnUnchangedNotaFinalMakesANewRevisionOfTheNotaFinalWithItsSiblings() throws IOException {
+        write("team.csv", SiapsTeamExportFixtures.standard().bytes());
+        capture();
+        write("later.csv", laterWithOnlyAC1ResultChanged());
+
+        List<FileReport> reports = capture();
+
+        assertThat(reports)
+                .filteredOn(report -> report.position() == 0)
+                .singleElement()
+                .satisfies(later -> assertThat(later.packs())
+                        .extracting(PackReport::pack, PackReport::action, PackReport::referenceId)
+                        .contains(
+                                tuple(GatePack.all().getFirst(), Action.DRIFT, PREFIX + "c1-team-r2"),
+                                tuple(GatePack.NOTA_FINAL, Action.DRIFT, PREFIX + "ciii-team-r2")));
+        SiapsReferenceManifest first = manifest("ciii-team-r1");
+        SiapsReferenceManifest second = manifest("ciii-team-r2");
+        // the same final classes beside another C1: another revision, filed apart from the first
+        assertThat(second.normalizedSha256()).isEqualTo(first.normalizedSha256());
+        assertThat(second.siblingReferenceIds()).containsExactlyElementsOf(idsOf("r2"));
+        assertThat(first.siblingReferenceIds()).containsExactlyElementsOf(idsOf("r1"));
+        ReferenceArtifactStore store = new ReferenceArtifactStore(artifacts);
+        assertThat(store.directoryOf(second)).isNotEqualTo(store.directoryOf(first));
+        assertThat(store.load(first)).isEqualTo(store.load(second));
+
+        assertThat(capture())
+                .flatExtracting(FileReport::packs)
+                .extracting(PackReport::action)
+                .containsOnly(Action.UNCHANGED);
+    }
+
+    @Test
+    void aJsonFileNotNamedLikeAManifestRefusesTheCaptureBeforeAnythingIsWritten() throws IOException {
+        write("team.csv", SiapsTeamExportFixtures.standard().bytes());
+        capture();
+        Files.move(manifests().resolve(PREFIX + "c3-team-r1.json"), manifests().resolve("backup.json"));
+        Map<String, String> before = stateOf(manifests());
+        Map<String, String> stored = stateOf(artifacts);
+
+        assertThatThrownBy(this::capture)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not named like a team reference manifest");
+
+        assertThat(stateOf(manifests())).isEqualTo(before);
+        assertThat(stateOf(artifacts)).isEqualTo(stored);
     }
 
     @Test

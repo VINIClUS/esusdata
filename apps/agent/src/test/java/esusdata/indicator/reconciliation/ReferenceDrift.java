@@ -6,14 +6,16 @@ package esusdata.indicator.reconciliation;
  * download carries a generation timestamp that changes every time. When the same reference (same
  * municipality, quadrimestre, source and pack) has a different normalized hash, the SIAPS changed
  * the figures, the status of the data or the layout: that is a new revision, never a replacement
- * of the registered one.
+ * of the registered one. A Nota Final is also a new revision when its download holds other revisions
+ * of its packs ({@link SiapsReferenceManifest#siblingReferenceIds}): the same final classes read
+ * beside other pack figures are another reference to reconcile.
  */
 final class ReferenceDrift {
 
     enum DriftStatus {
         /** Same reference, same normalized content (the raw hash may differ). */
         SAME_REVISION,
-        /** Same reference, different normalized content: a new revision of it. */
+        /** Same reference, different normalized content or, for the Nota Final, other siblings: a new revision. */
         REFERENCE_DRIFT
     }
 
@@ -31,6 +33,7 @@ final class ReferenceDrift {
                     "not the same reference: " + registered.referenceId() + " and " + captured.referenceId());
         }
         return registered.normalizedSha256().equals(captured.normalizedSha256())
+                        && registered.siblingReferenceIds().equals(captured.siblingReferenceIds())
                 ? DriftStatus.SAME_REVISION
                 : DriftStatus.REFERENCE_DRIFT;
     }

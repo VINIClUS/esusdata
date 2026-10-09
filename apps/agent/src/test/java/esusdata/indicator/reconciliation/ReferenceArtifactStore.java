@@ -63,12 +63,15 @@ final class ReferenceArtifactStore {
                 metadata.siblingReferenceIds());
     }
 
-    /** The directory of the revision a manifest describes. */
+    /**
+     * The directory of the revision a manifest describes: under its normalized hash, or for the Nota
+     * Final under {@link SiapsReferenceManifest#revisionKey}, which also hashes its siblings.
+     */
     Path directoryOf(SiapsReferenceManifest manifest) {
         return artifactDir
                 .resolve(manifest.municipalityIbge())
                 .resolve(manifest.quadrimestre())
-                .resolve(manifest.normalizedSha256());
+                .resolve(manifest.revisionKey());
     }
 
     /**

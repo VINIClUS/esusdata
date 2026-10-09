@@ -363,7 +363,12 @@ final class ReferenceCapture {
 
     // ---- the manifests already registered
 
-    /** The team manifests in the manifest directory, if it exists; one that is not named by its id is refused. */
+    /**
+     * The team manifests in the manifest directory, if it exists. A {@code .json} file there that is
+     * not named like one, or a manifest not named by its id, is refused before anything is written:
+     * a renamed manifest would otherwise be a revision the capture does not see, and the diagnostic
+     * refuses the directory for it.
+     */
     private List<SiapsReferenceManifest> registered() throws IOException {
         List<SiapsReferenceManifest> manifests = new ArrayList<>();
         if (!Files.isDirectory(manifestOutput)) {
@@ -371,10 +376,15 @@ final class ReferenceCapture {
         }
         List<Path> files;
         try (Stream<Path> listed = Files.list(manifestOutput)) {
-            files = listed.filter(file ->
-                            MANIFEST_FILE.matcher(file.getFileName().toString()).matches())
+            files = listed.filter(file -> file.getFileName().toString().endsWith(JSON))
                     .sorted()
                     .toList();
+        }
+        for (Path file : files) {
+            if (!MANIFEST_FILE.matcher(file.getFileName().toString()).matches()) {
+                throw new IllegalStateException(
+                        "a .json file of the manifest directory is not named like a team reference manifest");
+            }
         }
         for (Path file : files) {
             SiapsReferenceManifest manifest =
