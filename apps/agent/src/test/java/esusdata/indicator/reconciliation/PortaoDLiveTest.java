@@ -164,6 +164,9 @@ class PortaoDLiveTest {
             assertThat(snapshot.quadrimestre())
                     .as("the snapshot file must hold the quadrimestre compared")
                     .isEqualTo(SiapsFormats.quadrimestre(quadrimestre));
+            assertThat(snapshot.municipalityIbge())
+                    .as("the snapshot file must be about the municipality of the PEC")
+                    .isEqualTo(SiapsFormats.ibgeOfSiaps(pec.environment().get("PEC_MUNICIPALITY_IBGE")));
             snapshots.put(quadrimestre, snapshot);
             local.put(quadrimestre, acquire(quadrimestre, out, pec));
             fingerprints.put(quadrimestre, fingerprintOf(out.resolve("extratos"), quadrimestre));
