@@ -150,8 +150,13 @@ public final class PortaoDEvidenceChecks {
             problems.add(who + "the set summary is missing or is not the one cited");
             return problems;
         }
-        problems.addAll(
-                summaryProblems(who, gate.path(STATUS).asString(""), MAPPER.readTree(file.toFile()), set, repoRoot));
+        JsonNode summary = MAPPER.readTree(file.toFile());
+        if (!gate.path("checked_at")
+                .asString("")
+                .equals(summary.path("checked_at").asString(""))) {
+            problems.add(who + "the date of the summary is not the one recorded");
+        }
+        problems.addAll(summaryProblems(who, gate.path(STATUS).asString(""), summary, set, repoRoot));
         return problems;
     }
 
@@ -265,29 +270,38 @@ public final class PortaoDEvidenceChecks {
     }
 
     /**
-     * The SIAPS teams the rows count fit in the reference: the n_s that are figures add up to no more
-     * than the teams the pinned manifest has ({@code row_count}), so n_s cannot be raised to raise t.
+     * The SIAPS teams the rows count fit in the reference: each n_s is masked or a count the mask
+     * lets through (10 or more), and those counts add up to no more than the teams the pinned manifest
+     * has ({@code row_count}), so n_s cannot be raised to raise t.
      */
     private static List<String> teamCountProblems(String what, JsonNode reference, Path manifest) {
         if (!Files.isRegularFile(manifest)) {
             return List.of();
         }
-        int teams = MAPPER.readTree(manifest.toFile()).path("row_count").asInt(0);
-        int counted = 0;
+        long teams = MAPPER.readTree(manifest.toFile()).path("row_count").asLong(0);
+        long counted = 0;
         for (JsonNode row : reference.path("rows")) {
             String nS = row.path("n_s").asString("");
-            counted += SummaryWriter.MASKED.equals(nS) ? 0 : figureOf(nS);
+            if (SummaryWriter.MASKED.equals(nS)) {
+                continue;
+            }
+            long count = countOf(nS);
+            if (count < SummaryWriter.MASK_BELOW) {
+                return List.of(what + ": a row's n_s is neither masked nor a count of 10 or more");
+            }
+            counted += Math.min(count, teams + 1);
         }
         return counted > teams
                 ? List.of(what + ": the n_s of the rows add up to more teams than the manifest has")
                 : List.of();
     }
 
-    private static int figureOf(String count) {
+    /** The count, or -1 when it is not one. */
+    private static long countOf(String count) {
         try {
-            return Integer.parseInt(count);
+            return Long.parseLong(count);
         } catch (NumberFormatException notACount) {
-            return 0;
+            return -1;
         }
     }
 
@@ -319,7 +333,8 @@ public final class PortaoDEvidenceChecks {
             return Integer.toString(Comparison.threshold(SummaryWriter.MASK_BELOW - 1));
         }
         try {
-            return Integer.toString(Comparison.threshold(Integer.parseInt(nS)));
+            int count = Integer.parseInt(nS);
+            return count < 0 ? "" : Integer.toString(Comparison.threshold(count));
         } catch (NumberFormatException notACount) {
             return "";
         }

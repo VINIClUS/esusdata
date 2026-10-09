@@ -358,6 +358,33 @@ class ReleaseGatesConsistencyTest {
     }
 
     @Test
+    void anNsThatOverflowsOrIsAnUnmaskedSmallCountIsRefused(@TempDir Path workspace) throws Exception {
+        Tree overflow = PortaoDEvidenceFixtures.decided(workspace.resolve("overflow"), C4, Status.PASSED);
+        String before = SummaryWriter.sha256(overflow.summaryJson());
+        // two rows whose sum wraps an int
+        replaceAll(overflow.summaryJson(), "\"n_s\": \"<10\"", "\"n_s\": \"1500000000\"");
+        PortaoDEvidenceFixtures.replaceIn(overflow.registry(), before, SummaryWriter.sha256(overflow.summaryJson()));
+        assertThat(problemsOf(overflow))
+                .anyMatch(problem -> problem.contains("add up to more teams than the manifest has"));
+
+        Tree small = PortaoDEvidenceFixtures.decided(workspace.resolve("small"), C4, Status.PASSED);
+        editSummary(small, "\"n_s\": \"<10\"", "\"n_s\": \"-5\"");
+        assertThat(problemsOf(small)).anyMatch(problem -> problem.contains("neither masked nor a count of 10 or more"));
+    }
+
+    @Test
+    void aSummaryDatedOtherwiseThanTheRegistryIsRefused(@TempDir Path workspace) throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.PASSED);
+        editSummary(
+                tree,
+                "\"checked_at\": \"" + PortaoDEvidenceFixtures.DAY + "\"",
+                "\"checked_at\": \"" + PortaoDEvidenceFixtures.DAY.minusDays(8) + "\"");
+
+        assertThat(problemsOf(tree))
+                .anyMatch(problem -> problem.contains("date of the summary is not the one recorded"));
+    }
+
+    @Test
     void aSetSummaryNoDecidedDCitesIsRefused(@TempDir Path workspace) throws Exception {
         Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.PASSED);
         Files.copy(tree.summaryJson(), tree.summaryJson().resolveSibling("c9-outro@0.1.0.json"));
