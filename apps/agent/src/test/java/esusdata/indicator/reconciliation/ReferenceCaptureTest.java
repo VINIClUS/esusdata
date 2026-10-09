@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -117,6 +118,21 @@ class ReferenceCaptureTest {
             }
         }
         return state;
+    }
+
+    private SiapsReferenceManifest manifest(String suffix) throws IOException {
+        return SiapsReferenceManifest.fromJson(Files.readString(manifests().resolve(PREFIX + suffix + ".json")));
+    }
+
+    private static List<String> idsOf(String c1Revision, String... absent) {
+        List<String> ids = new ArrayList<>();
+        for (GatePack pack : GatePack.all()) {
+            String code = pack.code().toLowerCase(Locale.ROOT);
+            if (!List.of(absent).contains(code)) {
+                ids.add(PREFIX + code + "-team-" + ("c1".equals(code) ? c1Revision : "r1"));
+            }
+        }
+        return ids;
     }
 
     private static List<String> namesIn(Path directory) throws IOException {
@@ -300,6 +316,22 @@ class ReferenceCaptureTest {
     }
 
     @Test
+    void theNotaFinalNamesTheRevisionOfEachPackItsDownloadHeldWhetherItChangedOrNot() throws IOException {
+        write("team.csv", SiapsTeamExportFixtures.standard().bytes());
+        capture();
+        write("team.csv", laterWithC1Changed());
+
+        capture();
+
+        assertThat(manifest("ciii-team-r1").siblingReferenceIds()).containsExactlyElementsOf(idsOf("r1"));
+        // the later file changed C1 and the Nota Final: C2 to C7 are the revisions the first file was
+        // captured as, which name the first file's raw hash and not this one's
+        assertThat(manifest("ciii-team-r2").siblingReferenceIds()).containsExactlyElementsOf(idsOf("r2"));
+        assertThat(manifest("c2-team-r1").rawSha256())
+                .isNotEqualTo(manifest("ciii-team-r2").rawSha256());
+    }
+
+    @Test
     void twoExportsOfOneQuadrimestreAreNumberedByWhenTheSiapsGeneratedThemNotByTheirNames() throws IOException {
         write("a-later.csv", laterWithC1Changed());
         write("b-earlier.csv", SiapsTeamExportFixtures.standard().bytes());
@@ -381,6 +413,7 @@ class ReferenceCaptureTest {
                 .containsOnly(Action.CAPTURED);
         assertThat(namesIn(manifests())).hasSize(7);
         assertThat(manifests().resolve(PREFIX + "c1-team-r1.json")).doesNotExist();
+        assertThat(manifest("ciii-team-r1").siblingReferenceIds()).containsExactlyElementsOf(idsOf("r1", "c1"));
     }
 
     @Test

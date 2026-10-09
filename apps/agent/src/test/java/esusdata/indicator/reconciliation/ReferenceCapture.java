@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
@@ -175,7 +176,9 @@ final class ReferenceCapture {
                 .toList()) {
             List<PackReport> packs = new ArrayList<>();
             for (GatePack pack : GatePack.allWithNotaFinal()) {
-                packs.add(capture(export, pack, store, registered));
+                // the Nota Final comes last, and names what this download made of each pack
+                List<String> siblings = pack.isNotaFinal() ? siblingsOf(packs) : List.of();
+                packs.add(capture(export, pack, store, registered, siblings));
             }
             reports.put(
                     export.position(),
@@ -239,10 +242,26 @@ final class ReferenceCapture {
         return false;
     }
 
+    /**
+     * The revisions of C1 to C7 this download holds: captured from it, or registered before with the
+     * same content (unchanged, or with its artifact missing). A pack it left incomplete has none.
+     */
+    private static List<String> siblingsOf(List<PackReport> packs) {
+        return packs.stream()
+                .map(PackReport::referenceId)
+                .filter(Objects::nonNull)
+                .sorted()
+                .toList();
+    }
+
     // ---- capturing one pack
 
     private PackReport capture(
-            Export export, GatePack pack, ReferenceArtifactStore store, List<SiapsReferenceManifest> registered)
+            Export export,
+            GatePack pack,
+            ReferenceArtifactStore store,
+            List<SiapsReferenceManifest> registered,
+            List<String> siblings)
             throws IOException {
         byte[] raw = Files.readAllBytes(export.file());
         if (!SummaryWriter.sha256(raw).equals(export.rawSha256())) {
@@ -258,7 +277,7 @@ final class ReferenceCapture {
                 .filter(manifest -> isRevisionOf(manifest, subset))
                 .toList();
         SiapsReferenceManifest captured = ReferenceArtifactStore.manifestOf(
-                raw, subset, metadataOf(referenceId(pack, subset, nextRevision(sameReference)), export));
+                raw, subset, metadataOf(referenceId(pack, subset, nextRevision(sameReference)), export, siblings));
         Optional<SiapsReferenceManifest> unchanged = sameReference.stream()
                 .filter(known -> ReferenceDrift.compare(known, captured) == DriftStatus.SAME_REVISION)
                 .findFirst();
@@ -298,13 +317,14 @@ final class ReferenceCapture {
                 uf, subset.municipalityIbge(), subset.quadrimestre(), pack, subset.sourceKind(), revision);
     }
 
-    private CaptureMetadata metadataOf(String referenceId, Export export) {
+    private CaptureMetadata metadataOf(String referenceId, Export export, List<String> siblings) {
         return new CaptureMetadata(
                 referenceId,
                 OffsetDateTime.now(clock),
                 export.reference().officialGeneratedAt(),
                 SOURCE_DESCRIPTION,
-                export.file().getFileName().toString());
+                export.file().getFileName().toString(),
+                siblings);
     }
 
     private static CaptureMetadata metadataOf(SiapsReferenceManifest manifest) {
@@ -313,7 +333,8 @@ final class ReferenceCapture {
                 manifest.capturedAt(),
                 manifest.officialGeneratedAt(),
                 manifest.sourceDescription(),
-                manifest.sourceFilename());
+                manifest.sourceFilename(),
+                manifest.siblingReferenceIds());
     }
 
     /** The same municipality, quadrimestre, source and pack: a revision of the reference {@code subset} is. */

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -46,6 +47,11 @@ import tools.jackson.databind.node.ObjectNode;
  * @param indicatorCodes the SIAPS code of the pack ({@code [110]}), or {@code [0]} for the Nota Final
  * @param teamTypes the team types of the subset, sorted
  * @param containsPersonLevelData always false: a person-level file is refused before it is captured
+ * @param siblingReferenceIds for the Nota Final only: the revision of each of C1 to C7 that the same
+ *     download contained, whether it was captured from it or was registered before with the same
+ *     content, sorted; a pack the download left incomplete is not in it. A pack names none, and its
+ *     JSON has no such key. This is what ties a Nota Final to its packs: a later download that
+ *     changes only some of them keeps the revisions of the others, captured from an earlier file
  */
 record SiapsReferenceManifest(
         String referenceId,
@@ -63,7 +69,8 @@ record SiapsReferenceManifest(
         int rowCount,
         List<Integer> indicatorCodes,
         List<String> teamTypes,
-        boolean containsPersonLevelData) {
+        boolean containsPersonLevelData,
+        List<String> siblingReferenceIds) {
 
     static final String SCHEMA_VERSION = "1";
 
@@ -88,6 +95,9 @@ record SiapsReferenceManifest(
     private static final String INDICATOR_CODES = "indicator_codes";
     private static final String TEAM_TYPES = "team_types";
     private static final String CONTAINS_PERSON_LEVEL_DATA = "contains_person_level_data";
+    private static final String SIBLING_REFERENCE_IDS = "sibling_reference_ids";
+    private static final String NOTA_FINAL_CODE = "ciii";
+    private static final int PACK_GROUP = 5;
     private static final Set<String> KEYS = Set.of(
             SCHEMA_VERSION_KEY,
             REFERENCE_ID_KEY,
@@ -106,6 +116,7 @@ record SiapsReferenceManifest(
             INDICATOR_CODES,
             TEAM_TYPES,
             CONTAINS_PERSON_LEVEL_DATA);
+    private static final Set<String> NOTA_FINAL_KEYS = union(KEYS, SIBLING_REFERENCE_IDS);
 
     SiapsReferenceManifest {
         Objects.requireNonNull(sourceKind, SOURCE_KIND);
@@ -129,6 +140,20 @@ record SiapsReferenceManifest(
         }
         requireTeamTypes(teamTypes);
         requireReferenceId(referenceId, sourceKind, municipalityIbge, quadrimestre, indicatorCodes);
+        siblingReferenceIds = List.copyOf(siblingReferenceIds);
+        requireSiblings(referenceId, siblingReferenceIds);
+    }
+
+    private static Set<String> union(Set<String> keys, String key) {
+        Set<String> union = new HashSet<>(keys);
+        union.add(key);
+        return Set.copyOf(union);
+    }
+
+    /** True for the id of a Nota Final revision ({@code ...-ciii-...}). */
+    static boolean isNotaFinalId(String referenceId) {
+        Matcher id = REFERENCE_ID.matcher(referenceId == null ? "" : referenceId);
+        return id.matches() && NOTA_FINAL_CODE.equals(id.group(PACK_GROUP));
     }
 
     /**
@@ -203,12 +228,56 @@ record SiapsReferenceManifest(
         }
     }
 
+    /**
+     * The Nota Final names the revisions of C1 to C7 of its own municipality, period and source, at
+     * most one per pack and sorted; a pack names none.
+     */
+    private static void requireSiblings(String referenceId, List<String> siblings) {
+        Matcher own = REFERENCE_ID.matcher(referenceId);
+        if (!own.matches()) {
+            throw new IllegalStateException("the reference id was checked before its siblings");
+        }
+        if (!NOTA_FINAL_CODE.equals(own.group(PACK_GROUP))) {
+            if (!siblings.isEmpty()) {
+                throw new IllegalArgumentException("only the Nota Final names the revisions of its packs");
+            }
+            return;
+        }
+        Set<String> packs = new HashSet<>();
+        for (String sibling : siblings) {
+            Matcher id = REFERENCE_ID.matcher(sibling == null ? "" : sibling);
+            if (!id.matches()
+                    || NOTA_FINAL_CODE.equals(id.group(PACK_GROUP))
+                    || !sameScope(own, id)
+                    || !packs.add(id.group(PACK_GROUP))) {
+                throw new IllegalArgumentException(SIBLING_REFERENCE_IDS + " must name at most one revision of"
+                        + " each of C1 to C7 of the municipality, period and source of the Nota Final: " + sibling);
+            }
+        }
+        if (!siblings.equals(siblings.stream().sorted().toList())) {
+            throw new IllegalArgumentException(SIBLING_REFERENCE_IDS + " must be sorted");
+        }
+    }
+
+    /** The same state, municipality, period and source. */
+    private static boolean sameScope(Matcher one, Matcher other) {
+        for (int group : new int[] {1, 2, 3, 4, 6}) {
+            if (!one.group(group).equals(other.group(group))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** The lowercase hex SHA-256 of the manifest file as {@link #toJson()} writes it. */
     String sha256() {
         return SummaryWriter.sha256(toJson().getBytes(StandardCharsets.UTF_8));
     }
 
-    /** The manifest file's text: fixed key order, two-space indentation, {@code "\n"} line ends. */
+    /**
+     * The manifest file's text: fixed key order, two-space indentation, {@code "\n"} line ends. The
+     * Nota Final ends with its siblings; a pack has no such key, so its file is what it always was.
+     */
     String toJson() {
         ObjectNode json = MAPPER.createObjectNode();
         json.put(SCHEMA_VERSION_KEY, SCHEMA_VERSION);
@@ -234,6 +303,10 @@ record SiapsReferenceManifest(
             types.add(type);
         }
         json.put(CONTAINS_PERSON_LEVEL_DATA, containsPersonLevelData);
+        if (isNotaFinalId(referenceId)) {
+            ArrayNode siblings = json.putArray(SIBLING_REFERENCE_IDS);
+            siblingReferenceIds.forEach(siblings::add);
+        }
         return MAPPER.writer().with(printer()).writeValueAsString(json) + "\n";
     }
 
@@ -248,8 +321,10 @@ record SiapsReferenceManifest(
 
     /** Reads {@link #toJson()} back; a document with other keys, other types or another schema is refused. */
     static SiapsReferenceManifest fromJson(String json) {
-        JsonNode root = StrictJson.object(
-                StrictJson.parse(json.getBytes(StandardCharsets.UTF_8), "manifest"), KEYS, "manifest");
+        JsonNode parsed = StrictJson.parse(json.getBytes(StandardCharsets.UTF_8), "manifest");
+        JsonNode id = parsed.path(REFERENCE_ID_KEY);
+        boolean notaFinal = id.isString() && isNotaFinalId(id.stringValue());
+        JsonNode root = StrictJson.object(parsed, notaFinal ? NOTA_FINAL_KEYS : KEYS, "manifest");
         String schema = StrictJson.text(root, SCHEMA_VERSION_KEY);
         if (!SCHEMA_VERSION.equals(schema)) {
             throw new IllegalArgumentException("unknown manifest schema_version: " + schema);
@@ -270,7 +345,8 @@ record SiapsReferenceManifest(
                 StrictJson.integer(root, ROW_COUNT),
                 StrictJson.integers(root, INDICATOR_CODES),
                 StrictJson.strings(root, TEAM_TYPES),
-                StrictJson.bool(root, CONTAINS_PERSON_LEVEL_DATA));
+                StrictJson.bool(root, CONTAINS_PERSON_LEVEL_DATA),
+                notaFinal ? StrictJson.strings(root, SIBLING_REFERENCE_IDS) : List.of());
     }
 
     private static OffsetDateTime offset(String text) {

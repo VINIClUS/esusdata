@@ -302,19 +302,20 @@ final class PortaoDDiagnosticRun {
         }
     }
 
-    /** The revision of each of C1 to C7 captured from the same export file as {@code notaFinal}, by pack id. */
+    /**
+     * The revision of each of C1 to C7 the download of {@code notaFinal} contained, as its manifest
+     * names them, by pack id. A revision that was registered before with the same content is one of
+     * them, though its manifest names an earlier file; a pack the download left incomplete, or whose
+     * manifest is not here, is missing.
+     */
     private Map<String, Reference> siblingsOf(Reference notaFinal) {
+        Set<String> named = Set.copyOf(notaFinal.manifest().siblingReferenceIds());
         Map<String, Reference> siblings = new LinkedHashMap<>();
         for (GatePack pack : GatePack.all()) {
-            List<Reference> same = referencesOf(notaFinal.period(), pack).stream()
-                    .filter(reference -> reference
-                            .manifest()
-                            .rawSha256()
-                            .equals(notaFinal.manifest().rawSha256()))
-                    .toList();
-            if (same.size() == 1) {
-                siblings.put(pack.packId(), same.getFirst());
-            }
+            referencesOf(notaFinal.period(), pack).stream()
+                    .filter(reference -> named.contains(reference.id()))
+                    .findFirst()
+                    .ifPresent(reference -> siblings.put(pack.packId(), reference));
         }
         return siblings;
     }

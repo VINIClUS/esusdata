@@ -249,7 +249,7 @@ class PortaoDDiagnosticRunTest {
     }
 
     @Test
-    void everyCapturedRevisionIsItsOwnRowAndTheNotaFinalOfADriftedExportSaysWhatItLacks() throws IOException {
+    void everyCapturedRevisionIsItsOwnRowAndTheNotaFinalOfADriftedExportReadsWhatItsDownloadHeld() throws IOException {
         captureTwoQuadrimestres();
         Files.write(exports().resolve("q1-2026-later.csv"), laterWithC1Changed());
         new ReferenceCapture(artifacts(), manifests(), "zz", CLOCK).capture(exports(), IBGE);
@@ -261,16 +261,15 @@ class PortaoDDiagnosticRunTest {
                 .filteredOn(row -> "C1".equals(row.pack()))
                 .extracting(Row::referenceId)
                 .containsExactly("zz-9999990-2026q1-c1-team-r1", "zz-9999990-2026q1-c1-team-r2");
+        // the later file changed C1 and the Nota Final only: its Nota Final reads C1 r2 and the revisions
+        // of C2 to C7 the first file was captured as, though their manifests name the first file's bytes
         assertThat(first)
-                .filteredOn(row -> CIII.equals(row.pack()) && row.referenceId().endsWith("-r2"))
-                .singleElement()
-                .satisfies(row -> assertThat(row.reason())
-                        .contains("faltam as referências do mesmo export oficial")
-                        .contains("C2"));
+                .filteredOn(row -> CIII.equals(row.pack()))
+                .extracting(Row::referenceId)
+                .contains("zz-9999990-2026q1-ciii-team-r1", "zz-9999990-2026q1-ciii-team-r2");
         assertThat(first)
-                .filteredOn(row -> CIII.equals(row.pack()) && row.referenceId().endsWith("-r1"))
-                .singleElement()
-                .satisfies(row -> assertThat(row.status()).isNotIn(Cell.PENDING, Cell.ERROR));
+                .filteredOn(row -> CIII.equals(row.pack()))
+                .allSatisfy(row -> assertThat(row.status()).isNotIn(Cell.PENDING, Cell.ERROR));
     }
 
     @Test

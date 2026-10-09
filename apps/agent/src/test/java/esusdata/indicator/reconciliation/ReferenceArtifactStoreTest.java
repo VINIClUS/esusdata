@@ -36,6 +36,9 @@ class ReferenceArtifactStoreTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String REFERENCE_ID = "sp-3541307-2026q1-c1-team-r1";
+    private static final String NOTA_FINAL_ID = "sp-3541307-2026q1-ciii-team-r2";
+    private static final String C1_R2 = "sp-3541307-2026q1-c1-team-r2";
+    private static final String C2_R1 = "sp-3541307-2026q1-c2-team-r1";
     private static final String IBGE = "3541307";
     private static final String INE_A = "0000000011";
     private static final String INE_B = "0000000012";
@@ -89,6 +92,27 @@ class ReferenceArtifactStoreTest {
 
     private static SiapsReferenceManifest theManifest() {
         return ReferenceArtifactStore.manifestOf(raw(GENERATED_AT_1740), theReference(), metadata());
+    }
+
+    private static SiapsReferenceManifest notaFinal(List<String> siblings) {
+        NormalizedReference finals = new NormalizedReference(
+                IBGE,
+                "2026Q1",
+                SourceKind.OFFICIAL_TEAM_EXPORT_CSV,
+                "siaps-team-export@1",
+                OfficialStatus.PRELIMINARY,
+                GatePack.NOTA_FINAL_CODE,
+                List.of(new FinalRow(INE_A, "eSF", new BigDecimal("4"), Classification.BOM)));
+        return ReferenceArtifactStore.manifestOf(
+                raw(GENERATED_AT_1740),
+                finals,
+                new CaptureMetadata(
+                        NOTA_FINAL_ID,
+                        CAPTURED,
+                        GENERATED,
+                        "SIAPS / Avaliação do Quadrimestre / Qualidade",
+                        "Dado_Agregado_Quadrimestre_Qualidade.csv",
+                        siblings));
     }
 
     private static void refusesToReadManifest(String json, String message) {
@@ -362,7 +386,10 @@ class ReferenceArtifactStoreTest {
         refusesToReadManifest(
                 json.replace("\"municipality_ibge\": \"3541307\"", "\"municipality_ibge\": \"3541406\""),
                 "does not name the municipality");
-        refusesToReadManifest(json.replace(REFERENCE_ID, "sp-3541307-2026q1-ciii-team-r1"), "indicator_codes");
+        refusesToReadManifest(
+                json.replace(REFERENCE_ID, "sp-3541307-2026q1-ciii-team-r1")
+                        .replace("\n}", ",\n  \"sibling_reference_ids\": [ ]\n}"),
+                "indicator_codes");
         refusesToReadManifest(
                 json.replace(REFERENCE_ID, "sp-3541307-2026q1-c1-agg-r1"),
                 "does not name the municipality, period and source");
@@ -373,6 +400,53 @@ class ReferenceArtifactStoreTest {
         assertThat(SiapsReferenceManifest.referenceId(
                         "SP", IBGE, "2026Q1", GatePack.NOTA_FINAL, SourceKind.PUBLIC_AGGREGATE, 2))
                 .isEqualTo("sp-3541307-2026q1-ciii-agg-r2");
+    }
+
+    @Test
+    void theNotaFinalNamesTheRevisionsOfItsPacksAndAPackNamesNone() {
+        SiapsReferenceManifest notaFinal = notaFinal(List.of(C1_R2, C2_R1));
+        String json = notaFinal.toJson();
+
+        assertThat(notaFinal.siblingReferenceIds()).containsExactly(C1_R2, C2_R1);
+        assertThat(json).contains("\"sibling_reference_ids\"");
+        assertThat(SiapsReferenceManifest.fromJson(json)).isEqualTo(notaFinal);
+        assertThat(SiapsReferenceManifest.fromJson(json).toJson()).isEqualTo(json);
+        assertThat(theManifest().siblingReferenceIds()).isEmpty();
+        assertThat(theManifest().toJson()).doesNotContain("sibling_reference_ids");
+        assertThat(notaFinal(List.of()).siblingReferenceIds()).isEmpty();
+    }
+
+    @Test
+    void theSiblingsOfANotaFinalAreOneRevisionOfEachPackOfItsOwnScopeAndOnlyANotaFinalHasThem() {
+        List<List<String>> refused = List.of(
+                List.of(C1_R2, "sp-3541307-2026q1-c1-team-r1"),
+                List.of("sp-3541307-2025q3-c1-team-r1"),
+                List.of("sp-3541406-2026q1-c1-team-r1"),
+                List.of("sp-3541307-2026q1-c1-agg-r1"),
+                List.of("sp-3541307-2026q1-ciii-team-r1"),
+                List.of("c1-team-r1"),
+                List.of(C2_R1, C1_R2));
+        for (List<String> siblings : refused) {
+            assertThatThrownBy(() -> notaFinal(siblings))
+                    .as("%s", siblings)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("sibling_reference_ids");
+        }
+        CaptureMetadata ofAPack =
+                new CaptureMetadata(REFERENCE_ID, CAPTURED, GENERATED, "SIAPS", "file.csv", List.of(C2_R1));
+        byte[] raw = raw(GENERATED_AT_1740);
+        NormalizedReference reference = theReference();
+        assertThatThrownBy(() -> ReferenceArtifactStore.manifestOf(raw, reference, ofAPack))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only the Nota Final");
+
+        String notaFinal = notaFinal(List.of(C1_R2)).toJson();
+        refusesToReadManifest(
+                notaFinal.replaceAll(",\\s*\"sibling_reference_ids\"\\s*:\\s*\\[[^]]*]", ""),
+                "missing [sibling_reference_ids]");
+        refusesToReadManifest(
+                theManifest().toJson().replace("\n}", ",\n  \"sibling_reference_ids\": [ ]\n}"),
+                "unexpected [sibling_reference_ids]");
     }
 
     @Test

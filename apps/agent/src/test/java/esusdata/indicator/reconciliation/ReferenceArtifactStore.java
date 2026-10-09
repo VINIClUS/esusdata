@@ -59,7 +59,8 @@ final class ReferenceArtifactStore {
                 normalized.rows().size(),
                 List.of(normalized.indicatorCode()),
                 normalized.teamTypes(),
-                false);
+                false,
+                metadata.siblingReferenceIds());
     }
 
     /** The directory of the revision a manifest describes. */

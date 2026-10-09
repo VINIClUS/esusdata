@@ -3,6 +3,7 @@ package esusdata.indicator.reconciliation;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -17,13 +18,16 @@ import java.util.Objects;
  * @param officialGeneratedAt the instant the SIAPS says it generated the file (its "Dado gerado em")
  * @param sourceDescription which SIAPS screen or report the file is
  * @param sourceFilename the downloaded file's name, without its directory
+ * @param siblingReferenceIds for the Nota Final, the revisions of C1 to C7 the same download
+ *     contained ({@link SiapsReferenceManifest#siblingReferenceIds}); empty for a pack
  */
 record CaptureMetadata(
         String referenceId,
         OffsetDateTime capturedAt,
         LocalDateTime officialGeneratedAt,
         String sourceDescription,
-        String sourceFilename) {
+        String sourceFilename,
+        List<String> siblingReferenceIds) {
 
     CaptureMetadata {
         Objects.requireNonNull(referenceId, "referenceId");
@@ -34,6 +38,17 @@ record CaptureMetadata(
         if (sourceFilename.indexOf('/') >= 0 || sourceFilename.indexOf('\\') >= 0) {
             throw new IllegalArgumentException("the source file is named by its file name, not by a path");
         }
+        siblingReferenceIds = List.copyOf(siblingReferenceIds);
+    }
+
+    /** The metadata of a revision that names no sibling: a pack's. */
+    CaptureMetadata(
+            String referenceId,
+            OffsetDateTime capturedAt,
+            LocalDateTime officialGeneratedAt,
+            String sourceDescription,
+            String sourceFilename) {
+        this(referenceId, capturedAt, officialGeneratedAt, sourceDescription, sourceFilename, List.of());
     }
 
     private static void requireText(String value, String what) {
