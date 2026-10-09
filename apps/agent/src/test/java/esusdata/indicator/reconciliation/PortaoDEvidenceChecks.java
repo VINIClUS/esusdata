@@ -359,8 +359,9 @@ public final class PortaoDEvidenceChecks {
      * The summary agrees with the dossier it cites: the dossier stands for the declaration in the set
      * as the gate requires ({@link DossierEvidence#problems}: same reference, rule version and
      * manifest, the declared verdict, one that authorizes the gate), the summary states that
-     * compatibility, and the local source the summary was decided on is the one the dossier was
-     * decided on (another source leaves the reference PENDING, spec §14).
+     * compatibility, the local source the summary was decided on is the one the dossier was decided
+     * on (another source leaves the reference PENDING, spec §14), and the official field comparison
+     * the summary carries is the dossier's, as it is.
      */
     private static List<String> compatibilityProblems(
             String what, JsonNode reference, ReferenceSet set, ReferenceDeclaration declaration, Path repoRoot)
@@ -380,6 +381,9 @@ public final class PortaoDEvidenceChecks {
                 .localSourceFingerprint()
                 .equals(reference.path("local_source_fingerprint").asString(""))) {
             problems.add(what + ": the local source in the summary is not the one the dossier was decided on");
+        }
+        if (!dossier.get().officialFieldComparison().equals(reference.path("official_field_comparison"))) {
+            problems.add(what + ": the official field comparison in the summary is not the dossier's");
         }
         if (!declaration
                 .compatibility()

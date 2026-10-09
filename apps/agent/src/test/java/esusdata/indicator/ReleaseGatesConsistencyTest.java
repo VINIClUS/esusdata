@@ -349,6 +349,15 @@ class ReleaseGatesConsistencyTest {
     }
 
     @Test
+    void anOfficialFieldComparisonThatIsNotTheDossiersIsRefused(@TempDir Path workspace) throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.PASSED);
+        editSummary(tree, "\"max_abs_score_difference\"", "\"max_abs_score_difference_edited\"");
+
+        assertThat(problemsOf(tree))
+                .anyMatch(problem -> problem.contains("official field comparison in the summary is not the dossier's"));
+    }
+
+    @Test
     void aSetSummaryNoDecidedDCitesIsRefused(@TempDir Path workspace) throws Exception {
         Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.PASSED);
         Files.copy(tree.summaryJson(), tree.summaryJson().resolveSibling("c9-outro@0.1.0.json"));
