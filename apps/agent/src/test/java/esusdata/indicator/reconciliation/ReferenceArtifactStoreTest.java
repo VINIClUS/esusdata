@@ -17,6 +17,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -363,7 +364,7 @@ class ReferenceArtifactStoreTest {
                 "does not name the municipality");
         refusesToReadManifest(json.replace(REFERENCE_ID, "sp-3541307-2026q1-ciii-team-r1"), "indicator_codes");
         refusesToReadManifest(
-                json.replace(REFERENCE_ID, "sp-3541307-2026q1-c1-aggregate-r1"),
+                json.replace(REFERENCE_ID, "sp-3541307-2026q1-c1-agg-r1"),
                 "does not name the municipality, period and source");
         refusesToReadManifest(
                 json.replace("\"contains_person_level_data\": false", "\"contains_person_level_data\": true"),
@@ -371,7 +372,33 @@ class ReferenceArtifactStoreTest {
         refusesToReadManifest(json.replace("\"eAP\", \"eSF\"", "\"eSF\", \"eAP\""), "sorted");
         assertThat(SiapsReferenceManifest.referenceId(
                         "SP", IBGE, "2026Q1", GatePack.NOTA_FINAL, SourceKind.PUBLIC_AGGREGATE, 2))
-                .isEqualTo("sp-3541307-2026q1-ciii-aggregate-r2");
+                .isEqualTo("sp-3541307-2026q1-ciii-agg-r2");
+    }
+
+    @Test
+    void theIdAManifestIsCapturedUnderIsTheIdItsPolicyDeclarationAccepts() {
+        // the manifest builds the id and the policy parses it: one spelling of every source and pack
+        for (SourceKind kind : SourceKind.values()) {
+            for (GatePack pack : GatePack.allWithNotaFinal()) {
+                String id = SiapsReferenceManifest.referenceId("SP", IBGE, "2026Q1", pack, kind, 1);
+                ReferenceDeclaration declaration = new ReferenceDeclaration(
+                        id,
+                        "2026Q1",
+                        IBGE,
+                        kind,
+                        ReferencePurpose.DIAGNOSTIC,
+                        false,
+                        ReferenceStatus.ACTIVE,
+                        ReferenceCompatibility.UNKNOWN,
+                        "0".repeat(64),
+                        null,
+                        null,
+                        null);
+
+                assertThat(declaration.violations()).as(id).isEmpty();
+                assertThat(declaration.packCode()).as(id).isEqualTo(pack.code().toLowerCase(Locale.ROOT));
+            }
+        }
     }
 
     @Test

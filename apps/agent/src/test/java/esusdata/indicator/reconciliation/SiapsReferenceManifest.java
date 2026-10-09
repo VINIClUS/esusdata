@@ -68,8 +68,8 @@ record SiapsReferenceManifest(
     static final String SCHEMA_VERSION = "1";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final Pattern REFERENCE_ID = Pattern.compile(
-            "([a-z]{2})-(\\d{7})-(\\d{4})q([1-3])-(c[1-7]|ciii)-(team|aggregate|aggregate-universe)-r([1-9]\\d*)");
+    private static final Pattern REFERENCE_ID =
+            Pattern.compile("([a-z]{2})-(\\d{7})-(\\d{4})q([1-3])-(c[1-7]|ciii)-(team|agg|aggu)-r([1-9]\\d*)");
 
     private static final String SCHEMA_VERSION_KEY = "schema_version";
     private static final String REFERENCE_ID_KEY = "reference_id";
@@ -158,8 +158,8 @@ record SiapsReferenceManifest(
     private static String sourceCode(SourceKind sourceKind) {
         return switch (sourceKind) {
             case OFFICIAL_TEAM_EXPORT_CSV -> "team";
-            case PUBLIC_AGGREGATE -> "aggregate";
-            case PUBLIC_AGGREGATE_WITH_PERIOD_UNIVERSE -> "aggregate-universe";
+            case PUBLIC_AGGREGATE -> "agg";
+            case PUBLIC_AGGREGATE_WITH_PERIOD_UNIVERSE -> "aggu";
         };
     }
 

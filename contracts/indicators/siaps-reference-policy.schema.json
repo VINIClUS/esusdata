@@ -152,7 +152,7 @@
       "properties": {
         "reference_id": {
           "type": "string",
-          "pattern": "^[a-z]{2}-[0-9]{7}-[0-9]{4}q[1-3]-(c[1-7]|ciii)-(team|agg|aggu)-r[0-9]+$",
+          "pattern": "^[a-z]{2}-[0-9]{7}-[0-9]{4}q[1-3]-(c[1-7]|ciii)-(team|agg|aggu)-r[1-9][0-9]*$",
           "description": "<uf>-<ibge>-<year>q<n>-<c1..c7|ciii>-<team|agg|aggu>-r<revision>, e.g. sp-3541307-2026q1-c1-team-r1. Globally unique. The id names the reference; nothing picks one by date."
         },
         "quadrimestre": { "type": "string", "pattern": "^[0-9]{4}Q[1-3]$", "description": "SIAPS spelling, e.g. 2026Q1. Identification only: it never orders or selects." },
@@ -232,18 +232,18 @@
         },
         {
           "if": { "properties": { "source_kind": { "const": "OFFICIAL_TEAM_EXPORT_CSV" } }, "required": ["source_kind"] },
-          "then": { "properties": { "reference_id": { "pattern": "-team-r[0-9]+$" } } }
+          "then": { "properties": { "reference_id": { "pattern": "-team-r[1-9][0-9]*$" } } }
         },
         {
           "if": { "properties": { "source_kind": { "const": "PUBLIC_AGGREGATE" } }, "required": ["source_kind"] },
-          "then": { "properties": { "reference_id": { "pattern": "-agg-r[0-9]+$" } } }
+          "then": { "properties": { "reference_id": { "pattern": "-agg-r[1-9][0-9]*$" } } }
         },
         {
           "if": {
             "properties": { "source_kind": { "const": "PUBLIC_AGGREGATE_WITH_PERIOD_UNIVERSE" } },
             "required": ["source_kind"]
           },
-          "then": { "properties": { "reference_id": { "pattern": "-aggu-r[0-9]+$" } } }
+          "then": { "properties": { "reference_id": { "pattern": "-aggu-r[1-9][0-9]*$" } } }
         }
       ]
     }

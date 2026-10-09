@@ -56,7 +56,7 @@ public record ReferenceDeclaration(
      * The groups are the facts the other fields must repeat.
      */
     static final Pattern ID =
-            Pattern.compile("[a-z]{2}-(?<ibge>[0-9]{7})-" + PERIOD + "-" + PACK + "-" + SOURCE + "-r[0-9]+");
+            Pattern.compile("[a-z]{2}-(?<ibge>[0-9]{7})-" + PERIOD + "-" + PACK + "-" + SOURCE + "-r[1-9][0-9]*");
 
     private static final Map<String, SourceKind> SOURCE_OF_ID_CODE = Map.of(
             "team", SourceKind.OFFICIAL_TEAM_EXPORT_CSV,
