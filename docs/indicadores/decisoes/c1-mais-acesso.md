@@ -118,8 +118,11 @@ Princípios, nesta ordem: **P1** ficha literal; **P2** NT 8/2026 e outros atos o
 | C1-LIM-09 | Atribuição ao participante 1 e CNES não filtrado | DECLARED_CONVENTION | «Atendimento com dois participantes conta uma vez, pelo participante 1; o CNES não é filtrado porque a ficha não lista CNES.» |
 | C1-LIM-10 (nova; após `team` VALIDATED) | Regra de tipo de equipe | DECLARED_CONVENTION | «Só atendimentos de INE com tipo 70 ou 76 vigente no fim da competência entram; atendimentos sem INE ou de equipe de outro tipo, conflitante ou sem tipo ficam fora, com motivo e contagem.» |
 | C1-LIM-11 | Habilitação SIGTAP / SCNES de lotação do profissional (item 24-d «alocado») | OUT_OF_REACH | «A lotação do profissional na equipe (SCNES) não é conferida; vale o INE registrado no atendimento.» |
+| C1-LIM-12 (nova; declarada para o Portão D, entra na lista publicada na próxima `rule_version` de C1) | Período de referência (item 13, «Mensal») | DECLARED_CONVENTION | «O período de referência é a competência civil, do primeiro ao último dia do mês, e não os 30 dias que terminam no fim da competência.» |
 
-Totais: **1 BLOCKING_GAP** (C1-LIM-03, temporária), 3 OUT_OF_REACH (06, 07, 11), 6 DECLARED_CONVENTION (01, 04, 05, 08, 09, 10), 1 item que não é limitação (02). Com `team` VALIDATED e C1-D2 aplicada, C1 não tem nenhuma lacuna bloqueante.
+Totais: **1 BLOCKING_GAP** (C1-LIM-03, temporária), 3 OUT_OF_REACH (06, 07, 11), 7 DECLARED_CONVENTION (01, 04, 05, 08, 09, 10, 12), 1 item que não é limitação (02). Com `team` VALIDATED e C1-D2 aplicada, C1 não tem nenhuma lacuna bloqueante.
+
+C1-LIM-12 (2026-10-09) registra uma convenção que o cálculo já aplica e que nenhum registro dizia: o item 13 da ficha diz «Mensal», igual nas duas edições, e a Figura 2 das NT mostra C1 em «Últimos 30 dias» (nota de edições oficiais, seção 6.1, n3, K3). Nada no cálculo muda. A lista publicada pela regra compilada de C1 a recebe na próxima `rule_version` (subir a versão agora anularia o Portão A, ADR 0032).
 
 ## Resumo
 
