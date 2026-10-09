@@ -331,6 +331,27 @@ class OfficialTeamExportCsvParserTest {
     }
 
     @Test
+    void refusesAFinalClassThatIsNotTheBandOfTheFinalNote() {
+        // ESF_2 has seven Ótimo indicators: final note 10, so Quadro 6 says Ótimo
+        Export below = SiapsTeamExportFixtures.standard();
+        below.row(ESF_2, TOTAL_NAME)[SiapsTeamExportFixtures.FINAL_CLASS_COLUMN] = "REGULAR";
+        // ESF_1 has a final note of 5.5, Bom; Ótimo needs more than 7.5
+        Export above = SiapsTeamExportFixtures.standard();
+        above.row(ESF_1, TOTAL_NAME)[SiapsTeamExportFixtures.FINAL_CLASS_COLUMN] = "ÓTIMO";
+
+        assertThat(refusal(below)).contains("is neither the band of Quadro 6");
+        assertThat(refusal(above)).contains("is neither the band of Quadro 6");
+    }
+
+    @Test
+    void aBomOffTheBandOfTheFinalNoteIsTheClassANewTeamGets() {
+        Export newTeam = SiapsTeamExportFixtures.standard();
+        newTeam.row(ESF_2, TOTAL_NAME)[SiapsTeamExportFixtures.FINAL_CLASS_COLUMN] = "BOM";
+
+        assertThat(parse(newTeam).classes(GatePack.NOTA_FINAL)).containsEntry(ESF_2, Classification.BOM);
+    }
+
+    @Test
     void refusesAnIndicatorRowThatCarriesAFinalNoteOrATotalRowThatCarriesAFigure() {
         Export indicator = SiapsTeamExportFixtures.standard();
         indicator.row(ESF_1, C1_NAME)[SiapsTeamExportFixtures.FINAL_NOTE_COLUMN] = "5";

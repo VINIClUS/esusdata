@@ -1,11 +1,14 @@
 package esusdata.indicator.reconciliation;
 
 import esusdata.indicator.model.Classification;
+import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.pack.componente3.Nt08Tables;
 import esusdata.indicator.reconciliation.NormalizedReference.FinalRow;
 import esusdata.indicator.reconciliation.NormalizedReference.IndicatorRow;
 import esusdata.indicator.reconciliation.OfficialTeamReference.Skipped;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
@@ -520,14 +523,23 @@ final class OfficialTeamExportCsvParser {
             if (DASH.equals(cells.get(FINAL_NOTE)) || DASH.equals(cells.get(FINAL_CLASS))) {
                 throw fail("a Total row without a final note or class");
             }
-            FinalRow finalRow = new FinalRow(
-                    ine,
-                    type,
-                    decimal(cells, FINAL_NOTE),
-                    classification(cells.get(FINAL_CLASS), HEADER.get(FINAL_CLASS)));
+            BigDecimal finalNote = decimal(cells, FINAL_NOTE);
+            Classification finalClass = classification(cells.get(FINAL_CLASS), HEADER.get(FINAL_CLASS));
+            if (finalClass != Nt08Tables.classifyFinalScore(exact(finalNote)) && finalClass != Classification.BOM) {
+                throw fail(HEADER.get(FINAL_CLASS) + " is neither the band of Quadro 6 for " + HEADER.get(FINAL_NOTE)
+                        + " nor the Bom a new team gets (NT 8/2026, item 2.6)");
+            }
+            FinalRow finalRow = new FinalRow(ine, type, finalNote, finalClass);
             if (totals.put(ine, finalRow) != null) {
                 throw fail("a second Total row for one team");
             }
+        }
+
+        /** A decimal of the file as an exact fraction, for the bands that are never rounded first. */
+        private static ExactRatio exact(BigDecimal value) {
+            return value.scale() > 0
+                    ? ExactRatio.of(value.unscaledValue(), BigInteger.TEN.pow(value.scale()))
+                    : ExactRatio.of(value.toBigIntegerExact(), BigInteger.ONE);
         }
 
         private void requireDash(List<String> cells, int column) {
