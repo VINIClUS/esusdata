@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -48,10 +49,12 @@ public final class PortaoDEvidenceChecks {
     private static final Pattern HASH = Pattern.compile("[0-9a-f]{64}");
     private static final Pattern MUNICIPALITY = Pattern.compile("(\"municipality_ibge\":\\s*\")\\d{7}\"");
     private static final Pattern IPV4 = Pattern.compile("(?<![\\d.])(?:\\d{1,3}\\.){3}\\d{1,3}(?![\\d.])");
-    private static final Pattern EMAIL =
-            Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}");
-    private static final Pattern SECRET_KEY =
-            Pattern.compile("(?i)\"[a-z0-9_]*(?:senha|password|token)[a-z0-9_]*\"\\s*:");
+    // an address is a domain with a label then a dot and two letters; the two steps keep the guard
+    // linear (a single pattern over the labels backtracks) and still read "a@b.com." as an address
+    private static final Pattern EMAIL = Pattern.compile("[A-Za-z0-9._%+-]++@([A-Za-z0-9.-]++)");
+    private static final Pattern TOP_LEVEL = Pattern.compile("[A-Za-z0-9-]\\.[A-Za-z]{2}");
+    private static final Pattern JSON_KEY = Pattern.compile("\"([A-Za-z0-9_]++)\"\\s*+:");
+    private static final List<String> SECRET_WORDS = List.of("senha", "password", "token");
 
     /** The fields of a dossier (spec §8.4): none may be missing. */
     private static final List<String> DOSSIER_FIELDS = List.of(
@@ -512,9 +515,10 @@ public final class PortaoDEvidenceChecks {
     private static List<String> commonPrivacyProblems(Path file) throws IOException {
         List<String> problems = new ArrayList<>(addressProblems(file));
         if (file.getFileName().toString().endsWith(JSON)
-                && SECRET_KEY
-                        .matcher(Files.readString(file, StandardCharsets.UTF_8))
-                        .find()) {
+                && JSON_KEY.matcher(Files.readString(file, StandardCharsets.UTF_8))
+                        .results()
+                        .map(key -> key.group(1).toLowerCase(Locale.ROOT))
+                        .anyMatch(key -> SECRET_WORDS.stream().anyMatch(key::contains))) {
             problems.add(file.getFileName() + " has a key named for a password or a token");
         }
         return problems;
@@ -526,7 +530,9 @@ public final class PortaoDEvidenceChecks {
         if (IPV4.matcher(text).find()) {
             problems.add(file.getFileName() + " has an IP address");
         }
-        if (EMAIL.matcher(text).find()) {
+        if (EMAIL.matcher(text)
+                .results()
+                .anyMatch(address -> TOP_LEVEL.matcher(address.group(1)).find())) {
             problems.add(file.getFileName() + " has an e-mail address");
         }
         return problems;

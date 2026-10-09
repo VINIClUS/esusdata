@@ -97,7 +97,7 @@ class PortaoDEvidencePrivacyTest {
 
         Path second = Files.createDirectories(workspace.resolve("second"));
         Tree email = PortaoDEvidenceFixtures.decided(second, new C4Pack().descriptor(), Status.PASSED);
-        PortaoDEvidenceFixtures.append(email.summaryMarkdown(), "contato pessoa@example.org\n");
+        PortaoDEvidenceFixtures.append(email.summaryMarkdown(), "contato: pessoa@example.org.\n");
         assertThat(problemsOf(email)).anyMatch(problem -> problem.contains("has an e-mail address"));
 
         Path third = Files.createDirectories(workspace.resolve("third"));

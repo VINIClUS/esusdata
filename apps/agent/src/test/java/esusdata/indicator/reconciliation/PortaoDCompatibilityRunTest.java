@@ -799,8 +799,9 @@ class PortaoDCompatibilityRunTest {
         byte[] registry = Files.readAllBytes(repo().resolve(RELEASE_GATES));
         // the cache still stands for the dossier's source, but the stored reference to compare with is gone
         deleteTree(artifacts().resolve(IBGE).resolve("2026Q1"));
+        GateCheck.Repository repository = git(true, committedPolicy());
 
-        assertThatThrownBy(() -> check(git(true, committedPolicy()))).isInstanceOf(Exception.class);
+        assertThatThrownBy(() -> check(repository)).isInstanceOf(Exception.class);
 
         assertThat(artifacts().resolve("gate")).doesNotExist();
         assertThat(repo().resolve(SummaryWriter.SET_SUMMARY_DIR)).doesNotExist();
