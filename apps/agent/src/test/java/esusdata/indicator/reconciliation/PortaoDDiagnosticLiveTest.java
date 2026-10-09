@@ -18,6 +18,7 @@ import esusdata.source.pec.EnvFileSecretResolver;
 import esusdata.source.pec.ReadBudget;
 import esusdata.testsupport.LivePecAssumptions;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
@@ -90,6 +91,10 @@ class PortaoDDiagnosticLiveTest {
                 LivePecAssumptions.isReachable(environment.get(HOST_KEY), Integer.parseInt(environment.get(PORT_KEY))),
                 "Skipping: the PEC is not reachable — tunnel likely down");
 
+        // One resolution of the host for the whole run: the preflight, the coverage check and every
+        // acquisition reach the one address it gave, and nothing resolves the name again.
+        environment = AcquisitionInputs.pinned(environment, InetAddress::getAllByName);
+
         Clock clock = Clock.systemUTC();
         PortaoDDiagnosticRun run = PortaoDDiagnosticRun.open(
                 configuration.manifestsDir(),
@@ -121,7 +126,7 @@ class PortaoDDiagnosticLiveTest {
                 .check(
                         live.connection(),
                         live.identity(),
-                        environment.get(HOST_KEY),
+                        live.validatedHost(),
                         periods.getFirst().months().getFirst(),
                         periods.getLast().lastMonth().plusMonths(1),
                         ReadBudget.initialEngineeringProposal());
