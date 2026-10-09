@@ -34,7 +34,10 @@ import java.util.stream.Stream;
  *
  * <p>What it does with a reference that is already registered in the manifest directory: the same
  * normalized content is {@link Action#UNCHANGED} (the manifest is not touched; the artifact is put
- * back in the store if it lacks it), different content is {@link Action#DRIFT} and becomes the next
+ * back in the store if it lacks it, from the very raw bytes the manifest pins), and {@link
+ * Action#ARTIFACT_MISSING} when the store lacks it and the file is another download of it: other raw
+ * bytes stored under the registered manifest would make an artifact that manifest refuses to load,
+ * so nothing is written. Different content is {@link Action#DRIFT} and becomes the next
  * revision, {@code r<k+1>}; no manifest and no revision is ever overwritten. Exports of one
  * quadrimestre are numbered in the order the SIAPS says it generated them, not the order of their
  * names.
@@ -67,7 +70,13 @@ final class ReferenceCapture {
         /** The SIAPS changed the contents of a registered reference: a new revision, the old one kept. */
         DRIFT,
         /** Some team has no row for the pack; nothing about it was captured. */
-        INCOMPLETE
+        INCOMPLETE,
+        /**
+         * The manifest directory has these normalized contents but the store lacks their artifact, and
+         * this file is not the one the manifest pins (another download, with other raw bytes): nothing
+         * was written. The original file puts the artifact back.
+         */
+        ARTIFACT_MISSING
     }
 
     /**
@@ -81,9 +90,10 @@ final class ReferenceCapture {
     record PackReport(GatePack pack, Action action, String referenceId, String normalizedSha256, String detail) {
 
         String line() {
-            return action == Action.INCOMPLETE
-                    ? "  %s INCOMPLETE: %s".formatted(pack.code(), detail)
+            String line = action == Action.INCOMPLETE
+                    ? "  %s INCOMPLETE".formatted(pack.code())
                     : "  %s %s %s normalized=%s".formatted(pack.code(), action, referenceId, normalizedSha256);
+            return detail.isEmpty() ? line : line + ": " + detail;
         }
     }
 
@@ -254,6 +264,15 @@ final class ReferenceCapture {
                 .findFirst();
         if (unchanged.isPresent()) {
             SiapsReferenceManifest known = unchanged.get();
+            if (!Files.exists(store.directoryOf(known)) && !known.rawSha256().equals(captured.rawSha256())) {
+                return new PackReport(
+                        pack,
+                        Action.ARTIFACT_MISSING,
+                        known.referenceId(),
+                        known.normalizedSha256(),
+                        "the store lacks the registered revision and this file has other raw bytes: restore the"
+                                + " original file to put it back");
+            }
             store.store(raw, subset, metadataOf(known));
             return new PackReport(pack, Action.UNCHANGED, known.referenceId(), known.normalizedSha256(), "");
         }

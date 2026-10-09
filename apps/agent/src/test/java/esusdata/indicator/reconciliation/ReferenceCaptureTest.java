@@ -236,6 +236,46 @@ class ReferenceCaptureTest {
     }
 
     @Test
+    void aLostArtifactIsNotPutBackFromAnotherDownloadButFromTheFileItsManifestPins() throws IOException {
+        byte[] original = SiapsTeamExportFixtures.standard().bytes();
+        write("team.csv", original);
+        capture();
+        Map<String, String> manifestsBefore = stateOf(manifests());
+        deleteEverythingIn(artifacts);
+        // the same contents downloaded again: only the generation line, and so the raw hash, differ
+        write("team.csv", SiapsTeamExportFixtures.standard().generatedAt(LATER).bytes());
+
+        List<FileReport> again = capture();
+
+        assertThat(actionsOf(again.getFirst())).containsOnly(Action.ARTIFACT_MISSING);
+        assertThat(textOf(again)).contains("restore the original file");
+        assertThat(stateOf(artifacts)).isEmpty();
+        assertThat(stateOf(manifests())).isEqualTo(manifestsBefore);
+
+        write("team.csv", original);
+        List<FileReport> restored = capture();
+
+        assertThat(actionsOf(restored.getFirst())).containsOnly(Action.UNCHANGED);
+        assertThat(stateOf(manifests())).isEqualTo(manifestsBefore);
+        ReferenceArtifactStore store = new ReferenceArtifactStore(artifacts);
+        for (String name : namesIn(manifests())) {
+            SiapsReferenceManifest manifest =
+                    SiapsReferenceManifest.fromJson(Files.readString(manifests().resolve(name)));
+            assertThat(store.load(manifest)).as(name).isNotNull();
+        }
+    }
+
+    private static void deleteEverythingIn(Path directory) throws IOException {
+        try (Stream<Path> paths = Files.walk(directory)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder())
+                    .filter(path -> !path.equals(directory))
+                    .toList()) {
+                Files.delete(path);
+            }
+        }
+    }
+
+    @Test
     void aChangedExportIsTheNextRevisionOfOnlyTheReferencesThatChangedAndTheOldOnesStay() throws IOException {
         write("team.csv", SiapsTeamExportFixtures.standard().bytes());
         capture();
