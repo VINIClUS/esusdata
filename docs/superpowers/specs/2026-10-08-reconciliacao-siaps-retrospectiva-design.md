@@ -4,7 +4,8 @@
 **Status:** revisada para planejamento e revisão no PR  
 **Escopo:** Portão D de C1–C7 e da Nota Final do Componente III  
 **Base analisada:** `main` em `4489a14` (`v0.2.2`)  
-**Substitui, após implementação:** a seleção temporal de `siaps-distribuicao-por-classe@1` e `siaps-nota-final-por-classe@1`
+**Substitui, após implementação:** a seleção temporal de `siaps-distribuicao-por-classe@1` e `siaps-nota-final-por-classe@1`  
+**Emendas:** 2026-10-08 — leitura oficial por dimensão, precedência do veredito e limitações declaradas (§9.5, ADR 0034)
 
 ## 1. Decisão
 
@@ -421,6 +422,47 @@ Ocorre quando ao menos um probe com observabilidade completa mostra que uma dife
 
 Ocorre com universo histórico ausente, detector ausente/parcial, período sem cobertura local, escopo divergente ou referência não identificada.
 
+#### Leitura oficial, precedência e limitações declaradas (emenda de 2026-10-08)
+
+Decisão do dono da spec depois da pesquisa normativa
+(`docs/indicadores/portoes/edicoes-oficiais-siaps.md`). O detalhe está na ADR 0034.
+
+1. **Leitura oficial por dimensão.** O perfil registra, para cada quadrimestre publicado, a leitura oficial
+   de cada dimensão, com fonte:
+   - `SAME`: igual à local;
+   - `DIFFERENT`: outra, conhecida;
+   - `UNKNOWN`: não se sabe qual o SIAPS aplicou.
+
+   Uma dimensão `SAME` em todo quadrimestre declarado não tem probe. Uma dimensão `DIFFERENT` ou `UNKNOWN`
+   em algum quadrimestre exige o seu.
+2. **Precedência.** Vale a primeira condição verdadeira:
+   1. um probe com observabilidade completa numa dimensão `DIFFERENT` que mostre divergência decide
+      `INCOMPATIBLE`, mesmo que outro probe do perfil seja parcial ou não observável;
+   2. probe exigido parcial ou não observável, universo histórico ausente, ou dimensão `UNKNOWN` com
+      divergência dá `INCONCLUSIVE`, porque não dá para dizer qual leitura vale;
+   3. todas as dimensões `SAME` dão `EXACT`;
+   4. o restante, isto é, toda dimensão `DIFFERENT` ou `UNKNOWN` com probe completo e sem divergência, dá
+      `EQUIVALENT_FOR_REFERENCE`.
+
+   Divergência é contada nas equipes da revisão: status, NM, DN, valor ou classe que muda em algum mês.
+3. **Limitações declaradas.** Um item que nenhum dado local observa não conta como "diferença não
+   observável" nos itens 2 de `EXACT` e 4 de `EQUIVALENT_FOR_REFERENCE` quando cumpre três condições:
+   - a regra oficial depende de dado que a instalação não tem: CadSUS, SCNES, RNDS, RIA, outras
+     instalações, situação administrativa de equipe ou de mês de pagamento, ou campo que a versão do PEC não
+     registra;
+   - a regra local aplica a mesma norma com o dado que tem;
+   - o registro de decisões do pack declara a limitação.
+
+   Como funciona:
+   - a limitação fica no bloco `declared_limitations` do perfil e do dossiê, sem probe;
+   - `EXACT` e `EQUIVALENT_FOR_REFERENCE` passam a valer "dentro das limitações declaradas";
+   - o resíduo dela é julgado na reconciliação pelo limiar T, como a defasagem de dado (§14 e §22);
+   - acrescentar ou retirar uma limitação muda o perfil e obriga a reavaliar os dossiês que o citam.
+
+   Não pode ser limitação declarada:
+   - uma leitura diferente da ficha;
+   - algo cujos registros estão no extrato.
+
 #### O que não decide compatibilidade
 
 - A igualdade ou divergência entre NM/DN/score/classe locais e oficiais não entra na regra acima. Essa comparação é registrada em `official_field_comparison` como diagnóstico e é decidida apenas na reconciliação (Etapa C), onde uma divergência não explicada por probe resulta em `FAILED` se exceder o limiar.
@@ -777,7 +819,7 @@ Produzir dossiê `INCONCLUSIVE`, nunca inferir compatibilidade pelo agregado. Re
 
 ### Teste não contém casos discriminantes
 
-Os probes mostram contagem zero e podem sustentar apenas `EQUIVALENT_FOR_REFERENCE`, nunca equivalência global. Se uma diferença não for observável, o estado é inconclusivo.
+Os probes mostram contagem zero e podem sustentar apenas `EQUIVALENT_FOR_REFERENCE`, nunca equivalência global. Se uma diferença não for observável, o estado é inconclusivo, salvo limitação declarada (emenda do §9.5).
 
 ### Divergência por corte ou atraso de envio
 
