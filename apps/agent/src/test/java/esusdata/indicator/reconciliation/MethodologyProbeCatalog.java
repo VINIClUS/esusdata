@@ -1,5 +1,8 @@
 package esusdata.indicator.reconciliation;
 
+import esusdata.indicator.pack.c1.C1MethodologyProbes;
+import esusdata.indicator.pack.c2.C2MethodologyProbes;
+import esusdata.indicator.pack.c7.C7MethodologyProbes;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,6 +19,9 @@ public final class MethodologyProbeCatalog {
     /** Every probe, in catalog order. */
     public static List<MethodologyProbe> all() {
         List<MethodologyProbe> probes = new ArrayList<>();
+        probes.addAll(C1MethodologyProbes.all());
+        probes.addAll(C2MethodologyProbes.all());
+        probes.addAll(C7MethodologyProbes.all());
         return List.copyOf(probes);
     }
 
