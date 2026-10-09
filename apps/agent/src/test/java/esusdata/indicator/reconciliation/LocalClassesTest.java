@@ -138,6 +138,14 @@ class LocalClassesTest {
     }
 
     @Test
+    void theEncountersOfNoTeamAreNoTeamOfAnyRevision() {
+        LocalClasses classes = LocalClasses.of(C1, Q2, everyMonth(computed("-", 60, 100), computed("11", 60, 100)));
+
+        assertThat(classes.seen()).containsExactly("0000000011");
+        assertThat(classes.byIne()).containsOnlyKeys("0000000011");
+    }
+
+    @Test
     void aMonthMissingAltogetherIsRefused() {
         Map<YearMonth, List<TeamResult>> months = everyMonth(computed("11", 60, 100));
         YearMonth gone = Q2.months().get(1);

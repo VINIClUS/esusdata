@@ -37,6 +37,9 @@ import java.util.TreeSet;
  */
 public record LocalClasses(Map<String, Classification> byIne, Set<String> seen) {
 
+    /** The INE the DW gives the encounters of no team. */
+    static final String NO_TEAM = "-";
+
     public LocalClasses {
         byIne = Map.copyOf(byIne);
         seen = Set.copyOf(seen);
@@ -137,7 +140,7 @@ public record LocalClasses(Map<String, Classification> byIne, Set<String> seen) 
                 }
                 municipal.add(published(pack, version, month));
                 for (TeamResult team : teams) {
-                    if (team.ine() != null) {
+                    if (isTeam(team.ine())) {
                         byTeam.computeIfAbsent(SiapsFormats.ine(team.ine()), ine -> new ArrayList<>())
                                 .add(monthlyOf(pack, version, month, team));
                     }
@@ -150,6 +153,15 @@ public record LocalClasses(Map<String, Classification> byIne, Set<String> seen) 
         ComponentIIIResult result =
                 ComponentIII.consolidation().consolidate(new ComponentIIIInput(null, quadrimestre, units), rules);
         return new Consolidation(result, new TreeSet<>(byTeam.keySet()));
+    }
+
+    /**
+     * Whether a local bucket is a team of some revision. A bucket without an INE is not, and neither
+     * is {@value #NO_TEAM}: the DW's INE of the encounters of no team, which C1 reads as it is (its
+     * frozen query writes {@code nu_ine} unchanged, ADR 0033) where the other queries write null.
+     */
+    private static boolean isTeam(String ine) {
+        return ine != null && !NO_TEAM.equals(ine.strip());
     }
 
     /**
