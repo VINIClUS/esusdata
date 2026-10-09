@@ -61,6 +61,9 @@ public final class ReferencePolicy {
     /** Where the compatibility dossier of each {@code reference_id} and pack lives (spec §8.4). */
     public static final String DOSSIER_DIR = "docs/indicadores/portoes/compatibilidade/";
 
+    /** The {@code schema_version} of the compatibility dossiers the policy reads (Task 7 writes them). */
+    public static final String DOSSIER_SCHEMA_VERSION = "siaps-compatibility-dossier@1";
+
     private static final String PREFIX = "SIAPS reference policy: ";
     private static final String SCHEMA_VERSION = "1";
     private static final String CIII_CODE = "ciii";

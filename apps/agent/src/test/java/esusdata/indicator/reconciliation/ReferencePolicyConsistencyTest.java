@@ -18,11 +18,14 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
@@ -68,6 +71,8 @@ class ReferencePolicyConsistencyTest {
     private static final String TEAM_EXPORT = "OFFICIAL_TEAM_EXPORT_CSV";
     private static final String AGGREGATE = "PUBLIC_AGGREGATE";
     private static final Map<String, String> SOURCE_KIND_OF = Map.of(GATE_ID, TEAM_EXPORT, DIAGNOSTIC_ID, AGGREGATE);
+    private static final Pattern FINGERPRINT = Pattern.compile("sha256:[0-9a-f]{64}");
+    private static final String MANIFEST_SHA = "reference_manifest_sha256";
 
     // ---- the check
 
@@ -82,6 +87,10 @@ class ReferencePolicyConsistencyTest {
      *   <li>a cited dossier exists and has the pinned SHA-256;</li>
      *   <li>any dossier that exists, cited or not, names its reference and pack, carries a decided
      *       verdict, and that verdict is the declared {@code compatibility} (rule 9);</li>
+     *   <li>a decided dossier carries what binds it to its declaration: its schema version, the
+     *       rule version of the set, the manifest the declaration pins, the fingerprint of the local
+     *       source it was decided on, its sources, probes, local × official comparison and coverage.
+     *       A skeletal or stale file decides nothing;</li>
      *   <li>an {@code ACTIVE} reference whose dossier is {@code EXACT} or {@code
      *       EQUIVALENT_FOR_REFERENCE} is a {@code GATE} one (rule 7: the gate set is derived);</li>
      *   <li>no dossier is left without a declaration, or a compatible reference that was never
@@ -177,9 +186,46 @@ class ReferencePolicyConsistencyTest {
             found.add(who + ": the dossier carries no decided verdict (EXACT, EQUIVALENT_FOR_REFERENCE,"
                     + " INCOMPATIBLE or INCONCLUSIVE)");
         } else {
+            found.addAll(bindingViolations(tree, set, declaration, who));
             found.addAll(agreement(who, declaration, verdict.get()));
         }
         return found;
+    }
+
+    /**
+     * The fields of a decided dossier that are missing, or that do not bind it to {@code declaration}:
+     * a verdict counts only from a dossier of the known version, decided for the set's rule version,
+     * on the manifest the declaration pins and on an identified local source, with its sources,
+     * probes, comparison and coverage. The rest of the dossier is the model's (Task 7) to check.
+     */
+    private static List<String> bindingViolations(
+            JsonNode tree, ReferenceSet set, ReferenceDeclaration declaration, String who) {
+        Map<String, Predicate<JsonNode>> binding = new LinkedHashMap<>();
+        binding.put(
+                "schema_version", node -> ReferencePolicy.DOSSIER_SCHEMA_VERSION.equals(text(node, "schema_version")));
+        binding.put("rule_version", node -> set.ruleVersion().equals(text(node, "rule_version")));
+        binding.put(MANIFEST_SHA, node -> declaration.referenceManifestSha256().equals(text(node, MANIFEST_SHA)));
+        binding.put(
+                "local_source_fingerprint",
+                node -> FINGERPRINT
+                        .matcher(text(node, "local_source_fingerprint"))
+                        .matches());
+        binding.put(
+                "methodology_sources",
+                node -> node.path("methodology_sources").isArray()
+                        && !node.path("methodology_sources").isEmpty());
+        binding.put("probes", node -> node.path("probes").isArray());
+        binding.put(
+                "official_field_comparison",
+                node -> node.path("official_field_comparison").isObject());
+        binding.put("coverage", node -> node.path("coverage").isObject());
+        List<String> unbound = binding.entrySet().stream()
+                .filter(field -> !field.getValue().test(tree))
+                .map(Map.Entry::getKey)
+                .toList();
+        return unbound.isEmpty()
+                ? List.of()
+                : List.of(who + ": the dossier lacks, or contradicts, what binds it to its declaration: " + unbound);
     }
 
     private static List<String> agreement(
@@ -281,7 +327,7 @@ class ReferencePolicyConsistencyTest {
                 .put(QUADRIMESTRE, shape.group("year") + "Q" + shape.group("index"))
                 .put(MUNICIPALITY, shape.group("ibge"))
                 .put(SOURCE_KIND, sourceKind)
-                .put("reference_manifest_sha256", manifestSha);
+                .put(MANIFEST_SHA, manifestSha);
     }
 
     /** A GATE declaration of C1 whose dossier says EXACT. */
@@ -336,18 +382,33 @@ class ReferencePolicyConsistencyTest {
         return sha256(file);
     }
 
+    /** A dossier of {@code id} for {@code pack}, bound to the manifest {@link #manifestSha} writes. */
     private static String dossier(String id, String pack, String verdict) {
-        return MAPPER.createObjectNode()
+        return boundDossier(id, pack, verdict).toString();
+    }
+
+    private static ObjectNode boundDossier(String id, String pack, String verdict) {
+        ObjectNode dossier = MAPPER.createObjectNode()
+                .put("schema_version", ReferencePolicy.DOSSIER_SCHEMA_VERSION)
                 .put(REFERENCE_ID, id)
                 .put("pack", pack)
-                .put("verdict", verdict)
-                .toString();
+                .put("rule_version", C1.ruleVersion())
+                .put(
+                        MANIFEST_SHA,
+                        SummaryWriter.sha256(manifestOf(id).toString().getBytes(StandardCharsets.UTF_8)))
+                .put("local_source_fingerprint", "sha256:" + "a".repeat(64))
+                .put("verdict", verdict);
+        dossier.putArray("methodology_sources").add("docs/indicadores/portoes/edicoes-oficiais-siaps.md");
+        dossier.putArray("probes");
+        dossier.putObject("official_field_comparison");
+        dossier.putObject("coverage");
+        return dossier;
     }
 
     /** A manifest with the four facts the declaration of {@code id} repeats; the rest is not read here. */
     private static ObjectNode manifestOf(String id) {
         ObjectNode manifest = base(id, SOURCE_KIND_OF.get(id), "0".repeat(64));
-        manifest.remove("reference_manifest_sha256");
+        manifest.remove(MANIFEST_SHA);
         return manifest;
     }
 
@@ -534,9 +595,47 @@ class ReferencePolicyConsistencyTest {
                 dossier(GATE_ID, "c2-desenvolvimento-infantil", "INCONCLUSIVE"));
         ReferencePolicy policy = policyOf(decided(diagnostic(DIAGNOSTIC_ID, manifest), "INCONCLUSIVE", sha));
 
+        // it also cites the other reference's manifest, which binds it to nothing here
         assertThat(violations(repo, policy))
+                .anySatisfy(violation -> assertThat(violation)
+                        .contains(
+                                "the dossier names reference_id " + GATE_ID + " and pack c2-desenvolvimento-infantil"));
+    }
+
+    @ParameterizedTest(name = "a dossier without its {0} decides nothing")
+    @ValueSource(
+            strings = {
+                "schema_version",
+                "rule_version",
+                MANIFEST_SHA,
+                "local_source_fingerprint",
+                "methodology_sources",
+                "probes",
+                "official_field_comparison",
+                "coverage"
+            })
+    void aDecidedDossierThatIsNotBoundToItsDeclarationIsReported(String field, @TempDir Path repo) throws Exception {
+        String manifest = manifestSha(repo, GATE_ID);
+        ObjectNode skeletal = boundDossier(GATE_ID, C1.id(), "EXACT");
+        skeletal.remove(field);
+        String sha = write(repo, ReferencePolicy.dossierPath(GATE_ID, C1.id()), skeletal.toString());
+
+        assertThat(violations(repo, policyOf(gate(GATE_ID, manifest, sha))))
                 .singleElement(InstanceOfAssertFactories.STRING)
-                .contains("the dossier names reference_id " + GATE_ID + " and pack c2-desenvolvimento-infantil");
+                .contains("what binds it to its declaration", field);
+    }
+
+    @Test
+    void aDossierDecidedOnAnotherManifestOrRuleVersionIsReported(@TempDir Path repo) throws Exception {
+        String manifest = manifestSha(repo, GATE_ID);
+        ObjectNode stale = boundDossier(GATE_ID, C1.id(), "EXACT")
+                .put(MANIFEST_SHA, "5".repeat(64))
+                .put("rule_version", "c1-mais-acesso@0.0.1");
+        String sha = write(repo, ReferencePolicy.dossierPath(GATE_ID, C1.id()), stale.toString());
+
+        assertThat(violations(repo, policyOf(gate(GATE_ID, manifest, sha))))
+                .singleElement(InstanceOfAssertFactories.STRING)
+                .contains("[rule_version, " + MANIFEST_SHA + "]");
     }
 
     @ParameterizedTest
