@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://observatorio-aps.local/contracts/indicators/siaps-methodology-profiles.schema.json",
+  "title": "SIAPS methodology profiles",
+  "description": "Schema for contracts/indicators/siaps-methodology-profiles.json (spec 2026-10-08, §8.3). One profile per compiled pack and rule_version. A profile lists the METHODOLOGY dimensions of the local rule, each proved by exactly one executable probe (probe_id), and the DATA_TIMING items (transmission cutoff, late sending, reprocessing), which are never probed and never enter the compatibility verdict: the reconciliation judges them by tolerance. Per quadrimestre it records the official edition and, for every dimension, whether the official reading is SAME, DIFFERENT (quoting it) or UNKNOWN, with the source it rests on. Compatibility is decided by these readings and the probes, never by a date and never by comparing local and official output: dates are metadata (sources[].published is the only one). Dev tooling of the Portão D: not packaged in the jar. Rules a schema cannot state (unique ids, unique probe_ids, one profile per pack and rule_version, rule_version agreeing with pack, the readings of a quadrimestre being exactly the dimensions of the profile, source references resolving to sources[] and to the sources of their edition, published being a real date) are enforced by MethodologyProfileRegistry.load.",
+  "type": "object",
+  "required": ["schema_version", "sources", "profiles"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "const": "1" },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/source" },
+      "description": "The official documents the readings rest on, by id. Referenced from editions and readings."
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/profile" }
+    }
+  },
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(\\.[a-z0-9]+(-[a-z0-9]+)*)+$",
+      "description": "A stable dotted id such as c2.cohort.second-birthday. Free of any meaning for the verdict."
+    },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "decisionRef": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$",
+      "description": "A decision or limitation record: AMB-C2-03, LACUNA-L3, C1-LIM-03, MET-05."
+    },
+    "decisionRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/decisionRef" }
+    },
+    "text": { "type": "string", "pattern": "\\S", "description": "Free text for people; never blank." },
+    "source": {
+      "type": "object",
+      "required": ["id", "title", "url", "published", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "title": { "$ref": "#/$defs/text" },
+        "url": { "type": "string", "pattern": "^https://[^\\s]+$" },
+        "published": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "ISO date the document was published. Metadata for people: it never selects, orders or validates anything."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["FICHA", "TECHNICAL_NOTE", "ORDINANCE", "SIAPS_RELEASE", "SIAPS_MANUAL", "CALENDAR", "FAQ"]
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "required": ["pack", "rule_version", "dimensions", "data_timing", "official_readings"],
+      "additionalProperties": false,
+      "properties": {
+        "pack": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "rule_version": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+@[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "The compiled rule version this profile belongs to: <pack>@<version>. A new version needs a new profile."
+        },
+        "dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/dimension" },
+          "description": "The METHODOLOGY dimensions. A profile without one would let every reference pass vacuously."
+        },
+        "data_timing": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dataTiming" },
+          "description": "The DATA_TIMING items: recorded for the reconciliation, not probed, never part of the verdict."
+        },
+        "official_readings": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[0-9]{4}Q[1-3]$" },
+          "additionalProperties": { "$ref": "#/$defs/quadrimestreReadings" },
+          "description": "By quadrimestre in the SIAPS spelling (2026Q1). Identification only: nothing orders or selects by it."
+        }
+      }
+    },
+    "dimension": {
+      "type": "object",
+      "required": ["id", "local_reading", "decision_refs", "probe_id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "local_reading": { "$ref": "#/$defs/text" },
+        "decision_refs": { "$ref": "#/$defs/decisionRefs" },
+        "probe_id": {
+          "$ref": "#/$defs/stableId",
+          "description": "The probe that proves, on the data of a reference, whether the other reading changes the result. Unique within the profile."
+        }
+      }
+    },
+    "dataTiming": {
+      "type": "object",
+      "required": ["id", "kind", "local_reading", "decision_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "kind": { "type": "string", "enum": ["TRANSMISSION_CUTOFF", "LATE_SENDING", "REPROCESSING"] },
+        "local_reading": { "$ref": "#/$defs/text" },
+        "decision_refs": { "$ref": "#/$defs/decisionRefs" }
+      },
+      "description": "No probe_id: timing is not a methodology difference and is never probed."
+    },
+    "quadrimestreReadings": {
+      "type": "object",
+      "required": ["edition", "readings"],
+      "additionalProperties": false,
+      "properties": {
+        "edition": {
+          "type": "object",
+          "required": ["id", "source_refs"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "$ref": "#/$defs/slug" },
+            "source_refs": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/slug" },
+              "description": "The official sources of the edition: ids in sources[]."
+            }
+          }
+        },
+        "readings": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/stableId" },
+          "additionalProperties": { "$ref": "#/$defs/reading" },
+          "description": "By dimension id: exactly the dimensions of the profile, none left out."
+        }
+      }
+    },
+    "reading": {
+      "type": "object",
+      "required": ["reading", "source_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "reading": {
+          "type": "string",
+          "enum": ["SAME", "DIFFERENT", "UNKNOWN"],
+          "description": "UNKNOWN is never taken as SAME."
+        },
+        "official_reading_text": {
+          "$ref": "#/$defs/text",
+          "description": "The official reading, quoted. Only with DIFFERENT."
+        },
+        "source_ref": {
+          "$ref": "#/$defs/slug",
+          "description": "An id in sources[], among the sources of the edition."
+        }
+      },
+      "if": { "properties": { "reading": { "const": "DIFFERENT" } }, "required": ["reading"] },
+      "then": { "required": ["official_reading_text"] },
+      "else": { "properties": { "official_reading_text": false } }
+    }
+  }
+}
