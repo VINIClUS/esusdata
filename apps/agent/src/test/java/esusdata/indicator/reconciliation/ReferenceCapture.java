@@ -154,12 +154,14 @@ final class ReferenceCapture {
      * @return one report per {@code .csv} file, in the order of the files
      * @throws IllegalArgumentException if a file is neither a CVAT report nor a team export of that
      *     municipality; nothing has been written then
-     * @throws IllegalStateException if the directory holds no team export at all
+     * @throws IllegalStateException if the directory holds no team export at all, or the manifest
+     *     directory holds a file the capture cannot take as one of its own registered manifests;
+     *     nothing has been written then either
      */
     List<FileReport> capture(Path exportDir, String municipalityIbge) throws IOException {
         List<Export> exports = read(exportDir, ExpectedScope.ofMunicipality(municipalityIbge));
         ReferenceArtifactStore store = new ReferenceArtifactStore(artifactDir);
-        List<SiapsReferenceManifest> registered = registered();
+        List<SiapsReferenceManifest> registered = registered(municipalityIbge);
         Map<Integer, FileReport> reports = new TreeMap<>();
         for (Export export : exports) {
             if (export.isCvat()) {
@@ -365,11 +367,12 @@ final class ReferenceCapture {
 
     /**
      * The team manifests in the manifest directory, if it exists. A {@code .json} file there that is
-     * not named like one, or a manifest not named by its id, is refused before anything is written:
-     * a renamed manifest would otherwise be a revision the capture does not see, and the diagnostic
-     * refuses the directory for it.
+     * not named like one, a manifest not named by its id, or a manifest of another municipality is
+     * refused before anything is written: a renamed manifest would otherwise be a revision the
+     * capture does not see, and the diagnostic refuses the directory for either, since it reads the
+     * references of one municipality.
      */
-    private List<SiapsReferenceManifest> registered() throws IOException {
+    private List<SiapsReferenceManifest> registered(String municipalityIbge) throws IOException {
         List<SiapsReferenceManifest> manifests = new ArrayList<>();
         if (!Files.isDirectory(manifestOutput)) {
             return manifests;
@@ -392,6 +395,10 @@ final class ReferenceCapture {
             if (!file.getFileName().toString().equals(manifest.referenceId() + JSON)) {
                 throw new IllegalStateException(
                         "a manifest in the manifest directory is not named by its reference id");
+            }
+            if (!manifest.municipalityIbge().equals(municipalityIbge)) {
+                throw new IllegalStateException("a manifest in the manifest directory is about another municipality:"
+                        + " one manifest directory holds the references of one municipality");
             }
             manifests.add(manifest);
         }

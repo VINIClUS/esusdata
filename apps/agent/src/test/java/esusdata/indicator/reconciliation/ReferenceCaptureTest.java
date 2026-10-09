@@ -376,6 +376,30 @@ class ReferenceCaptureTest {
     }
 
     @Test
+    void aManifestOfAnotherMunicipalityRefusesTheCaptureBeforeAnythingIsWritten() throws IOException {
+        write("team.csv", SiapsTeamExportFixtures.standard().bytes());
+        capture();
+        String otherIbge = "9999980";
+        String other = Files.readString(manifests().resolve(PREFIX + "c3-team-r1.json"), StandardCharsets.UTF_8)
+                .replace(IBGE, otherIbge);
+        Files.writeString(
+                manifests().resolve(PREFIX.replace(IBGE, otherIbge) + "c3-team-r1.json"),
+                other,
+                StandardCharsets.UTF_8);
+        // a capture that went ahead would register new revisions of C1 and of the Nota Final
+        write("team.csv", laterWithC1Changed());
+        Map<String, String> before = stateOf(manifests());
+        Map<String, String> stored = stateOf(artifacts);
+
+        assertThatThrownBy(this::capture)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("about another municipality");
+
+        assertThat(stateOf(manifests())).isEqualTo(before);
+        assertThat(stateOf(artifacts)).isEqualTo(stored);
+    }
+
+    @Test
     void theNotaFinalNamesTheRevisionOfEachPackItsDownloadHeldWhetherItChangedOrNot() throws IOException {
         write("team.csv", SiapsTeamExportFixtures.standard().bytes());
         capture();
