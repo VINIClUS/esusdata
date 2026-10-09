@@ -253,7 +253,8 @@ Justificativa e confiança:
 
 n1. Item 11 das fichas (igual em E25 e E26): "SCNES: A última competência válida". FAQ Q34: o SIAPS valida equipes
 e profissionais pelos dados do SCNES "da competência equivalente". Nenhum texto diz se o tipo vale no primeiro
-dia, no último ou no fechamento do SCNES; as mudanças de tipo dentro do mês é que separam as leituras.
+dia, no último ou no fechamento do SCNES; as mudanças de tipo dentro do mês é que separam as leituras. Igual
+nas duas edições (K3).
 Alternativa do probe: tipo vigente no primeiro dia da competência.
 
 ## 6. Matrizes por pack
@@ -268,7 +269,8 @@ lançamento); **B** é o texto da edição aplicada (ficha, NT); **C** é infer�
 - K2. Onde as edições diferem e a aplicada é indeterminada ou só provável, a célula é `UNKNOWN`, mesmo que uma
   das candidatas difira da local.
 - K3. Onde o texto oficial é omisso ou ambíguo, igual em E25 e E26, a célula é `UNKNOWN` nos quatro
-  quadrimestres.
+  quadrimestres. Toda dimensão marcada K3 nesta nota é convenção declarada (ADR 0034 §7, decisão de
+  2026-10-09): fica fora do veredito, e o probe só mede o efeito. A marca é a fonte da lista.
 - K4. Premissa P-R: o rodapé de cada ficha de 2026 é a lista completa das mudanças em relação à edição
   revogada. Os rodapés registram até mudanças triviais (um telefone, a numeração de um quadro), o que
   sustenta a premissa. `SAME` por ausência de rodapé vale só sob P-R, porque o texto revogado não foi
@@ -734,6 +736,11 @@ passam a significar equivalência dentro das limitações declaradas. Essa decis
 antes de executar a Etapa B. Ela só altera o resultado de um pack em que todo probe dê zero afetados ou o
 mesmo resultado nas duas leituras.
 
+Decisão: o dono da spec tirou essas limitações de "diferença não observável" (2026-10-08; spec §9.5 item 3,
+ADR 0034 §6) e aprovou a L5 em 2026-10-09. C7 não declarava `oor.scnes-validation` nem
+`oor.cadsus-identification`, e C4 não declarava a segunda; os registros ganharam C7-LIM-16, C7-LIM-17 e
+C4-LIM-21 em 2026-10-09.
+
 ## 8. `data_timing`: o que não é metodologia
 
 Estes itens explicam diferenças de valor sem diferença de método. Não entram na matriz e não geram probe
@@ -909,5 +916,12 @@ Regras gerais de desenho:
 |---|---|---|
 | `D-REV-1` | UNKNOWN | marcar toda referência de C1 2025Q3 com a revisão v2.0.3; nenhuma dimensão de C1 em 2025Q3 pode ser dada como `EXACT` |
 | `D-REV-2` | UNKNOWN | marcar toda referência de C3 com a correção v1.7.2; sem o conteúdo da correção, `c3.abortion.exclusion` fica aberto |
-| `D-REV-3` | UNKNOWN | marcar C2, C3 e C7 com a possibilidade de recálculo retroativo (v1.8.1) |
+| `D-REV-3` | UNKNOWN | marcar C2, C3 e C7 com a possibilidade de recálculo retroativo (v1.8.1); em C7, ver abaixo |
 | `D-REV-4` | UNKNOWN | registrar a data de download (2026-10-08) e o hash da revisão; a reapresentação das equipes válidas mudou em 02/09/2026 |
+
+`D-REV-3` em C7 não abre dimensão nova. As "novas Notas Metodológicas" da v1.8.1 (23/06/2026) são a E26: as
+fichas de C2 a C7 foram assinadas antes, e nenhuma ficha de C7 posterior aparece até a v2.1.1 (seção 4). Entre
+E25 e E26, C7 só difere na n2 (exame molecular). As células de 2025 são `SAME` em qualquer das duas, e o probe de
+2026Q1 mede as duas leituras candidatas em cada mês, o que cobre também a média mista (jan a mar sob a E25, abr
+sob a E26). As demais dimensões de C7 são K3, iguais nas duas edições. O dossiê registra `D-REV-3` como nota de
+revisão.

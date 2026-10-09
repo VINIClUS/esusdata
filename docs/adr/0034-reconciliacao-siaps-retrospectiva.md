@@ -133,6 +133,11 @@ condições:
 2. a regra local aplica a mesma norma com o dado que tem;
 3. o registro de decisões do pack declara a limitação.
 
+O registro de decisões é a fonte da condição 3, e o perfil cita o id dele. A lista que o pack publica com o
+resultado (`STANDING_LIMITATIONS`) pode recebê-la só na próxima `rule_version`, porque subir a versão anula o
+Portão A (ADR 0032): C7-LIM-16, C7-LIM-17 e C4-LIM-21 (2026-10-09) estão nesse caso. A L5
+(`oor.l5.bp-collective-participant`) foi aprovada pelo dono da spec em 2026-10-09.
+
 **Efeito no veredito e no registro.**
 - Uma limitação declarada fica no bloco `declared_limitations` do perfil e do dossiê, sem probe e sem
   leitura.
@@ -151,7 +156,39 @@ condições:
 - Uma leitura diferente da ficha: é uma dimensão.
 - Algo cujos registros estão no extrato: é uma dimensão com probe.
 
-### 7. Defasagem de dado não é metodologia
+### 7. Convenções declaradas (ficha omissa)
+
+Decisão do dono da spec (2026-10-09), depois do reconhecimento em 2026Q1. Pela tabela da seção 5, C1 a C7 de
+2026Q1 ficavam todos `INCONCLUSIVE` com qualquer catálogo: as dimensões em que a ficha é omissa nas duas
+edições (K3 da nota de edições) são `UNKNOWN` para sempre, e as de borda (idade no último dia, janelas civis)
+sempre mudam o DN de alguma equipe. Exemplo: em cada mês de 2026Q1, de 39 a 49 pessoas das equipes eSF e eAP
+fazem 60 anos, em 10 a 14 das 14 equipes.
+
+**Critério.** Uma dimensão `UNKNOWN` é convenção declarada quando:
+
+1. o texto oficial é omisso ou ambíguo do mesmo modo em toda edição candidata (K3);
+2. a leitura local está no registro de decisões do pack como `DECLARED_CONVENTION`;
+3. nenhuma fonte oficial estabelece a leitura.
+
+**Efeito.**
+- A convenção fica fora da tabela da seção 5. O probe roda quando o extrato permite; observabilidade,
+  afetados e equipes divergentes vão para o dossiê.
+- `EXACT` exige todas as dimensões `SAME` e nenhuma convenção. Com convenção, o melhor veredito é
+  `EQUIVALENT_FOR_REFERENCE`, dentro das limitações e convenções declaradas.
+- A lista sai mecanicamente das marcas K3 da nota de edições. Mudar uma marca muda o perfil e reabre os
+  dossiês que o citam. Se o canal do SIAPS ou os campos oficiais estabelecerem a leitura, a convenção volta a
+  ser dimensão.
+
+**O que nunca é convenção.** Dimensão K2 (as edições diferem), dimensão `DIFFERENT` e dimensão de texto
+explícito cujo dado falta no extrato (a condição "desde 2013" de C4 e C5, que segue com probe `NONE` ou
+`PARTIAL`).
+
+**Custo aceito.** Uma leitura oficial diferente de um texto omisso não aparece no veredito metodológico. Aparece
+só na reconciliação, como divergência de saída julgada pelo limiar T, e o dossiê mostra o tamanho que o probe
+mediu em cada convenção. Com isso, o veredito de um pack passa a depender só das dimensões K2 e `DIFFERENT`, do
+universo histórico e das limitações declaradas.
+
+### 8. Defasagem de dado não é metodologia
 
 Corte do 20º dia útil, envio atrasado, reprocessamento e validações do SIAPS não são probes. Vão para
 `data_timing` do dossiê e são julgados na reconciliação pelo limiar T (spec §14 e §22).

@@ -5,7 +5,7 @@
 **Escopo:** Portão D de C1–C7 e da Nota Final do Componente III  
 **Base analisada:** `main` em `4489a14` (`v0.2.2`)  
 **Substitui, após implementação:** a seleção temporal de `siaps-distribuicao-por-classe@1` e `siaps-nota-final-por-classe@1`  
-**Emendas:** 2026-10-08 — leitura oficial por dimensão, precedência do veredito e limitações declaradas (§9.5, ADR 0034)
+**Emendas:** 2026-10-08 — leitura oficial por dimensão, precedência do veredito e limitações declaradas (§9.5, ADR 0034); 2026-10-09 — convenções declaradas (§9.5, ADR 0034)
 
 ## 1. Decisão
 
@@ -439,7 +439,8 @@ Decisão do dono da spec depois da pesquisa normativa
    1. um probe com observabilidade completa numa dimensão `DIFFERENT` que mostre divergência decide
       `INCOMPATIBLE`, mesmo que outro probe do perfil seja parcial ou não observável;
    2. probe exigido parcial ou não observável, universo histórico ausente, ou dimensão `UNKNOWN` com
-      divergência dá `INCONCLUSIVE`, porque não dá para dizer qual leitura vale;
+      divergência dá `INCONCLUSIVE`, porque não dá para dizer qual leitura vale. Convenção declarada (item 4)
+      não entra aqui;
    3. todas as dimensões `SAME` dão `EXACT`;
    4. o restante, isto é, toda dimensão `DIFFERENT` ou `UNKNOWN` com probe completo e sem divergência, dá
       `EQUIVALENT_FOR_REFERENCE`.
@@ -451,7 +452,8 @@ Decisão do dono da spec depois da pesquisa normativa
      instalações, situação administrativa de equipe ou de mês de pagamento, ou campo que a versão do PEC não
      registra;
    - a regra local aplica a mesma norma com o dado que tem;
-   - o registro de decisões do pack declara a limitação.
+   - o registro de decisões do pack declara a limitação. O registro é a fonte: a lista que o pack publica pode
+     recebê-la só na próxima `rule_version`, porque subir a versão anula o Portão A (ADR 0032).
 
    Como funciona:
    - a limitação fica no bloco `declared_limitations` do perfil e do dossiê, sem probe;
@@ -462,6 +464,33 @@ Decisão do dono da spec depois da pesquisa normativa
    Não pode ser limitação declarada:
    - uma leitura diferente da ficha;
    - algo cujos registros estão no extrato.
+4. **Convenções declaradas (emenda de 2026-10-09).** Uma dimensão `UNKNOWN` sai da tabela do item 2 e vira
+   convenção declarada quando cumpre três condições:
+   - a ficha é omissa ou ambígua do mesmo modo em toda edição candidata, logo a leitura oficial é `UNKNOWN` em
+     todo quadrimestre (classificação K3 da nota de edições oficiais);
+   - a leitura local está no registro de decisões do pack como `DECLARED_CONVENTION`;
+   - nenhuma fonte oficial estabelece a leitura.
+
+   Como funciona:
+   - a convenção fica no perfil, com o id da nota de edições e o do registro;
+   - o probe dela roda quando o extrato permite, e o resultado (observabilidade, afetados, equipes divergentes)
+     vai para o dossiê, fora do veredito;
+   - `EXACT` exige todas as dimensões `SAME` e nenhuma convenção; com convenção, o melhor veredito é
+     `EQUIVALENT_FOR_REFERENCE`, "dentro das limitações e convenções declaradas";
+   - a lista de convenções sai das marcas K3 da nota de edições, sem escolha caso a caso; mudar uma marca muda
+     o perfil e obriga a reavaliar os dossiês que o citam;
+   - se uma fonte oficial estabelecer depois a leitura (canal do SIAPS, campos oficiais), a convenção volta a
+     ser dimensão `SAME` ou `DIFFERENT`, e os dossiês são reavaliados.
+
+   Custo aceito: se o SIAPS leu um texto omisso de outro modo, a diferença não aparece no veredito
+   metodológico. Aparece só na reconciliação, como divergência de saída julgada pelo limiar T. O dossiê mostra
+   o tamanho que o probe mediu em cada convenção, para que um `FAILED` possa ser lido contra elas.
+
+   Não pode ser convenção declarada:
+   - dimensão em que as edições candidatas diferem (K2);
+   - dimensão `DIFFERENT`;
+   - dimensão de texto explícito cujo dado falta no extrato (a condição "desde 2013" de C4 e C5): é dimensão
+     com probe, `NONE` ou `PARTIAL` sem o dado.
 
 #### O que não decide compatibilidade
 
