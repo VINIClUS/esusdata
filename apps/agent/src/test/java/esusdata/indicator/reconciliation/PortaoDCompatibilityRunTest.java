@@ -48,8 +48,10 @@ import tools.jackson.databind.ObjectMapper;
  * siblings; a probe that throws or a profile that is missing never takes the run down and never
  * becomes a verdict; a rerun is byte-identical; the local detail never lands under {@code docs/};
  * the replay reproduces the dossiers without a PEC and refuses to acquire; the gate check refuses a
- * dirty tree, a GATE declaration that is not {@code HEAD}'s and a source that is not the decided one,
- * and never touches the registry.
+ * dirty tree, a {@code HEAD} that is not merged, a GATE declaration that is not {@code HEAD}'s and a
+ * source that is not the decided one; it decides every set from the cache alone, aborts without
+ * writing anything when a verdict cannot be computed, and records D with evidence the offline
+ * checks accept.
  */
 class PortaoDCompatibilityRunTest {
 
@@ -556,10 +558,19 @@ class PortaoDCompatibilityRunTest {
     }
 
     private static GateCheck.Repository git(boolean clean, String head) {
+        return git(clean, true, head);
+    }
+
+    private static GateCheck.Repository git(boolean clean, boolean merged, String head) {
         return new GateCheck.Repository() {
             @Override
             public boolean isClean() {
                 return clean;
+            }
+
+            @Override
+            public boolean isMerged() {
+                return merged;
             }
 
             @Override
@@ -570,7 +581,8 @@ class PortaoDCompatibilityRunTest {
     }
 
     private GateCheck.Summary check(GateCheck.Repository repository) throws IOException {
-        return GateCheck.check(repo(), repository, artifacts(), extracts(), ReleaseGateRegistry.registeredPacks());
+        return GateCheck.check(
+                repo(), repository, artifacts(), extracts(), ReleaseGateRegistry.registeredPacks(), CLOCK);
     }
 
     private String committedPolicy() throws IOException {
@@ -582,12 +594,21 @@ class PortaoDCompatibilityRunTest {
         run(new FixturePec(IBGE), profiles(OfficialReading.SAME, OfficialReading.SAME, false), cleanProbes());
     }
 
+    private JsonNode gateD(String pack) throws IOException {
+        for (JsonNode entry :
+                JSON.readTree(Files.readString(repo().resolve(RELEASE_GATES))).path("packs")) {
+            if (entry.path("pack").asString().equals(pack)) {
+                return entry.path("gates").path("D");
+            }
+        }
+        throw new AssertionError(pack);
+    }
+
     @Test
-    void theGateCheckAcceptsAGateReferenceWhoseDossierAndCachedSourceAgreeAndNeverTouchesTheRegistry()
+    void theGateCheckAcceptsAGateReferenceWhoseDossierAndCachedSourceAgreeAndRecordsDWithEvidenceTheChecksAccept()
             throws IOException {
         campaign();
         declareGate("EXACT", null);
-        byte[] registry = Files.readAllBytes(repo().resolve(RELEASE_GATES));
 
         GateCheck.Summary summary = check(git(true, committedPolicy()));
 
@@ -597,21 +618,62 @@ class PortaoDCompatibilityRunTest {
         assertThat(summary.packs().getFirst().gateSetSha256()).matches("[0-9a-f]{64}");
         assertThat(summary.packs().get(1).references()).isEmpty();
         assertThat(Files.readString(artifacts().resolve("gate").resolve("resumo.md")))
-                .contains("Registro de portões: não escrito", "gate_set_sha256")
+                .contains("veredito do conjunto", "gate_set_sha256")
                 .contains("OK `" + C1_REFERENCE + "`");
-        assertThat(Files.readAllBytes(repo().resolve(RELEASE_GATES))).isEqualTo(registry);
+
+        // the set of C1 is decided from the cache, the others have no GATE reference
+        ReferenceSetVerdict verdict = summary.packs().getFirst().verdict();
+        assertThat(verdict.status()).isNotEqualTo(PackVerdict.Status.PENDING);
+        assertThat(verdict.references()).singleElement().satisfies(outcome -> {
+            assertThat(outcome.status()).isEqualTo(verdict.status());
+            assertThat(outcome.localSourceFingerprint()).startsWith("sha256:");
+        });
+        JsonNode d = gateD(C1.packId());
+        assertThat(d.path("status").asString()).isEqualTo(verdict.status().name());
+        assertThat(d.path("check").asString()).isEqualTo("siaps-distribuicao-por-classe@2");
+        assertThat(d.path("checked_at").asString()).isEqualTo("2026-10-08");
+        assertThat(d.path("evidence")).hasSize(1);
+        for (GatePack other : GatePack.allWithNotaFinal().subList(1, 8)) {
+            assertThat(gateD(other.packId()).path("status").asString()).isEqualTo("PENDING");
+        }
+        Path summaryJson = repo().resolve(SummaryWriter.SET_SUMMARY_DIR)
+                .resolve(SummaryWriter.summaryFileName(verdict.ruleVersion(), ".json"));
+        assertThat(summaryJson).exists();
+        assertThat(repo().resolve(SummaryWriter.SET_SUMMARY_DIR).toFile().list())
+                .hasSize(2);
+
+        // what the runner wrote, over what PR B's writers wrote, passes the checks CI runs
+        ReferencePolicy policy = PortaoDEvidenceChecks.policyOf(repo());
+        assertThat(PortaoDEvidenceChecks.registryProblems(
+                        JSON.readTree(Files.readString(repo().resolve(RELEASE_GATES))), policy, repo()))
+                .isEmpty();
+        assertThat(PortaoDEvidenceChecks.privacyProblems(repo())).isEmpty();
+        // the fixture policy declares one reference only: the other manifests and dossiers are uncited
+        assertThat(PortaoDEvidenceChecks.fileProblems(policy, repo()))
+                .isNotEmpty()
+                .allSatisfy(problem -> assertThat(problem).endsWith("is cited by no declaration"));
     }
 
     @Test
-    void anEmptyGateSetIsReportedAsEmptyAndIsNotAFailure() throws IOException {
+    void anEmptyGateSetIsReportedAsEmptyIsPendingAndIsNotAFailure() throws IOException {
         Files.createDirectories(repo().resolve(GateCheck.POLICY_FILE).getParent());
         Files.copy(Path.of("..", "..").resolve(GateCheck.POLICY_FILE), repo().resolve(GateCheck.POLICY_FILE));
+        Files.copy(Path.of("..", "..").resolve(RELEASE_GATES), repo().resolve(RELEASE_GATES));
 
         GateCheck.Summary summary = check(git(true, committedPolicy()));
 
         assertThat(summary.ok()).isTrue();
         assertThat(summary.gateReferences()).isZero();
         assertThat(summary.markdown()).contains("conjunto de gate vazio");
+        assertThat(summary.packs()).allSatisfy(pack -> {
+            assertThat(pack.verdict().status()).isEqualTo(PackVerdict.Status.PENDING);
+            assertThat(pack.verdict().reason()).isEqualTo("sem referência GATE ativa e obrigatória");
+            assertThat(gateD(pack.pack()).path("status").asString()).isEqualTo("PENDING");
+        });
+        assertThat(repo().resolve(SummaryWriter.SET_SUMMARY_DIR)).doesNotExist();
+        // every D is already PENDING in the registry: recording PENDING changes not a byte of it
+        assertThat(Files.readString(repo().resolve(RELEASE_GATES)))
+                .isEqualTo(Files.readString(Path.of("..", "..").resolve(RELEASE_GATES)));
     }
 
     @Test
@@ -623,6 +685,20 @@ class PortaoDCompatibilityRunTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("not clean");
         assertThat(artifacts().resolve("gate")).doesNotExist();
+    }
+
+    @Test
+    void aHeadThatIsNotMergedIntoMainIsRefusedAndNothingIsWritten() throws IOException {
+        campaign();
+        declareGate("EXACT", null);
+        byte[] registry = Files.readAllBytes(repo().resolve(RELEASE_GATES));
+
+        assertThatThrownBy(() -> check(git(true, false, committedPolicy())))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("origin/main");
+        assertThat(artifacts().resolve("gate")).doesNotExist();
+        assertThat(repo().resolve(SummaryWriter.SET_SUMMARY_DIR)).doesNotExist();
+        assertThat(Files.readAllBytes(repo().resolve(RELEASE_GATES))).isEqualTo(registry);
     }
 
     @Test
@@ -649,6 +725,10 @@ class PortaoDCompatibilityRunTest {
         assertThat(summary.ok()).isFalse();
         assertThat(summary.packs().getFirst().references().getFirst().detail())
                 .contains("not the one the dossier was decided on");
+        // a source the dossier never covered decides nothing: the set is pending, not failed
+        assertThat(summary.packs().getFirst().verdict().status()).isEqualTo(PackVerdict.Status.PENDING);
+        assertThat(gateD(C1.packId()).path("status").asString()).isEqualTo("PENDING");
+        assertThat(gateD(C1.packId()).path("evidence")).isEmpty();
     }
 
     @Test
@@ -672,6 +752,22 @@ class PortaoDCompatibilityRunTest {
 
         assertThat(summary.ok()).isFalse();
         assertThat(summary.packs().getFirst().references().getFirst().detail()).contains("cache cannot stand");
+        assertThat(summary.packs().getFirst().verdict().status()).isEqualTo(PackVerdict.Status.PENDING);
+    }
+
+    @Test
+    void aVerdictThatCannotBeComputedAbortsTheWholeRunBeforeAnythingIsWritten() throws IOException {
+        campaign();
+        declareGate("EXACT", null);
+        byte[] registry = Files.readAllBytes(repo().resolve(RELEASE_GATES));
+        // the cache still stands for the dossier's source, but the stored reference to compare with is gone
+        deleteTree(artifacts().resolve(IBGE).resolve("2026Q1"));
+
+        assertThatThrownBy(() -> check(git(true, committedPolicy()))).isInstanceOf(Exception.class);
+
+        assertThat(artifacts().resolve("gate")).doesNotExist();
+        assertThat(repo().resolve(SummaryWriter.SET_SUMMARY_DIR)).doesNotExist();
+        assertThat(Files.readAllBytes(repo().resolve(RELEASE_GATES))).isEqualTo(registry);
     }
 
     @Test

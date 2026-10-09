@@ -344,7 +344,7 @@ class PackVerdictTest {
         assertThat(file.getFileName().toString()).isEqualTo("portao-d-" + C1.packId() + "-2026Q1.md");
         assertThat(text)
                 .contains(
-                        "siaps-distribuicao-por-classe@1",
+                        "siaps-distribuicao-por-classe@2",
                         RULE,
                         "2026Q1",
                         "2026-10-07",
@@ -379,10 +379,10 @@ class PackVerdictTest {
 
     @Test
     void aPendingVerdictWithoutReferenceWritesNothing(@TempDir Path directory) throws IOException {
-        PackVerdict pending = PackVerdict.pending(C1, RULE, ReferencePurpose.GATE, Eligibility.waitingFor(C1));
+        PackVerdict pending = PackVerdict.pending(C1, RULE, ReferencePurpose.GATE, "sem referência para este pack");
 
         assertThat(SummaryWriter.write(directory, pending, DAY)).isEmpty();
         assertThat(RawWriter.write(directory, pending)).isEmpty();
-        assertThat(pending.reason()).isEqualTo("aguardando 2026Q2 no SIAPS");
+        assertThat(pending.reason()).isEqualTo("sem referência para este pack");
     }
 }

@@ -7,16 +7,17 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * The comparison of {@code siaps-distribuicao-por-classe@1}, exactly as {@code
+ * The comparison of {@code siaps-distribuicao-por-classe@2}, exactly as {@code
  * docs/indicadores/portoes/portao-d-conciliacao-siaps.md} fixes it: the distance between the
  * cumulative class counts, the threshold {@code max(2, ceil(0,15 * N_S))} and the verdict per row.
  */
 public final class Comparison {
 
-    public static final String CHECK_ID = "siaps-distribuicao-por-classe@1";
+    /** The check that decides D for C1 to C7: the one the policy declares ({@link ReferencePolicy#CHECK_DISTRIBUTION}). */
+    public static final String CHECK_ID = ReferencePolicy.CHECK_DISTRIBUTION;
 
     /** The Nota Final's check: the same comparison over the final class of each team. */
-    public static final String CHECK_ID_NOTA_FINAL = "siaps-nota-final-por-classe@1";
+    public static final String CHECK_ID_NOTA_FINAL = ReferencePolicy.CHECK_NOTA_FINAL;
 
     private static final int CLASSES = 4;
     private static final int FLOOR = 2;
