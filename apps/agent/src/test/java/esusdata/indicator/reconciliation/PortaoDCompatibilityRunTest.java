@@ -692,6 +692,29 @@ class PortaoDCompatibilityRunTest {
     }
 
     @Test
+    void aDecidedSetThatIsPendingOnTheNextRunTakesItsOldSummaryAwayWithD() throws IOException {
+        campaign();
+        declareGate("EXACT", null);
+        GateCheck.Summary decided = check(git(true, committedPolicy()));
+        assertThat(decided.packs().getFirst().verdict().status()).isNotEqualTo(PackVerdict.Status.PENDING);
+        assertThat(repo().resolve(SummaryWriter.SET_SUMMARY_DIR).toFile().list())
+                .hasSize(2);
+
+        deleteTree(partitionOf(C1, YearMonth.of(2026, 1)));
+        GateCheck.Summary pending = check(git(true, committedPolicy()));
+
+        assertThat(pending.packs().getFirst().verdict().status()).isEqualTo(PackVerdict.Status.PENDING);
+        assertThat(gateD(C1.packId()).path("status").asString()).isEqualTo("PENDING");
+        assertThat(repo().resolve(SummaryWriter.SET_SUMMARY_DIR).toFile().list())
+                .isEmpty();
+        assertThat(PortaoDEvidenceChecks.registryProblems(
+                        JSON.readTree(Files.readString(repo().resolve(RELEASE_GATES))),
+                        PortaoDEvidenceChecks.policyOf(repo()),
+                        repo()))
+                .isEmpty();
+    }
+
+    @Test
     void anEmptyGateSetIsReportedAsEmptyIsPendingAndIsNotAFailure() throws IOException {
         Files.createDirectories(repo().resolve(GateCheck.POLICY_FILE).getParent());
         Files.copy(Path.of("..", "..").resolve(GateCheck.POLICY_FILE), repo().resolve(GateCheck.POLICY_FILE));

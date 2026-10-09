@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -95,16 +96,27 @@ public final class PortaoDEvidenceChecks {
      * {@code gate_set_sha256} recomputed from the current policy, list exactly the GATE references
      * of the set, each with the manifest and the dossier the declaration pins (existing, with their
      * hashes), a declaration {@code ACTIVE} whose compatibility is the dossier's verdict, and a
-     * status that follows from theirs. A pending {@code D} has nothing to check.
+     * status that follows from theirs. A pending {@code D} has nothing to check, and no set summary
+     * is left that no decided {@code D} cites.
      */
     public static List<String> registryProblems(JsonNode registry, ReferencePolicy policy, Path repoRoot)
             throws IOException {
         List<String> problems = new ArrayList<>();
+        Set<String> cited = new TreeSet<>();
         for (JsonNode entry : registry.path("packs")) {
             JsonNode gate = entry.path("gates").path("D");
             String status = gate.path(STATUS).asString("");
             if (PASSED.equals(status) || FAILED.equals(status)) {
                 problems.addAll(decidedProblems(entry, gate, policy, repoRoot));
+                summaryItem(gate).ifPresent(item -> cited.add(item.path("ref").asString("")));
+            }
+        }
+        // a summary no decided D cites is a decision the registry no longer stands on
+        for (Path file : filesOf(repoRoot.resolve(SummaryWriter.SET_SUMMARY_DIR), JSON, MARKDOWN)) {
+            String name = file.getFileName().toString();
+            String json = name.endsWith(MARKDOWN) ? name.substring(0, name.length() - MARKDOWN.length()) + JSON : name;
+            if (!cited.contains(SummaryWriter.SET_SUMMARY_DIR + json)) {
+                problems.add(name + " is a set summary no decided D cites");
             }
         }
         return problems;

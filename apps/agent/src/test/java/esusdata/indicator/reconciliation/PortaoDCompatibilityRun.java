@@ -1235,22 +1235,18 @@ final class PortaoDCompatibilityRun {
         }
 
         /**
-         * Writes the evidence summary of each decided set and then D of every pack, as one change: if
-         * the registry refuses any set, the registry and every summary are put back as they were (the
-         * old bytes, or no file where there was none), so a rerun starts from the committed tree.
+         * Writes the evidence summary of each decided set, takes away the old summary of a pending one,
+         * and then D of every pack, as one change: if the registry refuses any set, the registry and
+         * every summary are put back as they were (the old bytes, or no file where there was none), so a
+         * rerun starts from the committed tree.
          */
         private static void record(Path repoRoot, List<ReferenceSetVerdict> verdicts, LocalDate day)
                 throws IOException {
             Map<Path, Optional<byte[]>> before = new LinkedHashMap<>();
             remember(before, repoRoot.resolve(REGISTRY_FILE));
             for (ReferenceSetVerdict verdict : verdicts) {
-                if (verdict.status() != PackVerdict.Status.PENDING) {
-                    for (String extension : List.of(JSON, MARKDOWN)) {
-                        remember(
-                                before,
-                                repoRoot.resolve(SummaryWriter.SET_SUMMARY_DIR)
-                                        .resolve(SummaryWriter.summaryFileName(verdict.ruleVersion(), extension)));
-                    }
+                for (Path summary : summariesOf(repoRoot, verdict)) {
+                    remember(before, summary);
                 }
             }
             Path registry = repoRoot.resolve(REGISTRY_FILE);
@@ -1265,6 +1261,13 @@ final class PortaoDCompatibilityRun {
                     restore(before);
                 }
             }
+        }
+
+        private static List<Path> summariesOf(Path repoRoot, ReferenceSetVerdict verdict) {
+            Path directory = repoRoot.resolve(SummaryWriter.SET_SUMMARY_DIR);
+            return List.of(
+                    directory.resolve(SummaryWriter.summaryFileName(verdict.ruleVersion(), JSON)),
+                    directory.resolve(SummaryWriter.summaryFileName(verdict.ruleVersion(), MARKDOWN)));
         }
 
         private static void remember(Map<Path, Optional<byte[]>> before, Path file) throws IOException {
@@ -1284,6 +1287,10 @@ final class PortaoDCompatibilityRun {
         private static RegistryUpdater.EvidenceBundle bundleOf(
                 Path repoRoot, ReferenceSetVerdict verdict, LocalDate day) throws IOException {
             if (verdict.status() == PackVerdict.Status.PENDING) {
+                // a set that was decided and is pending now takes its old summary away with D
+                for (Path summary : summariesOf(repoRoot, verdict)) {
+                    Files.deleteIfExists(summary);
+                }
                 return RegistryUpdater.EvidenceBundle.none();
             }
             SummaryWriter.WrittenSetSummary written =

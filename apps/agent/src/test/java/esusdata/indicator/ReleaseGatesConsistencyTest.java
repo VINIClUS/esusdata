@@ -349,6 +349,18 @@ class ReleaseGatesConsistencyTest {
     }
 
     @Test
+    void aSetSummaryNoDecidedDCitesIsRefused(@TempDir Path workspace) throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.PASSED);
+        Files.copy(tree.summaryJson(), tree.summaryJson().resolveSibling("c9-outro@0.1.0.json"));
+        Files.copy(tree.summaryMarkdown(), tree.summaryMarkdown().resolveSibling("c9-outro@0.1.0.md"));
+
+        assertThat(problemsOf(tree))
+                .containsExactlyInAnyOrder(
+                        "c9-outro@0.1.0.json is a set summary no decided D cites",
+                        "c9-outro@0.1.0.md is a set summary no decided D cites");
+    }
+
+    @Test
     void aDThatCitesNoSummaryOrAnotherPathIsRefused(@TempDir Path workspace) throws Exception {
         Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.PASSED);
         PortaoDEvidenceFixtures.replaceIn(tree.registry(), "\"kind\": \"conciliacao-siaps\"", "\"kind\": \"outro\"");
