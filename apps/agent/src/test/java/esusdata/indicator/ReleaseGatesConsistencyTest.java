@@ -44,6 +44,10 @@ class ReleaseGatesConsistencyTest {
     private static final Path SOURCE = REPO.resolve("contracts/indicators/release-gates.json");
     private static final PackDescriptor C4 = new C4Pack().descriptor();
     private static final String SUMMARY_STATUS = "\"status\": \"PASSED\"";
+    // the row verdicts the set summary prints
+    private static final String ROW_PASSES = "passa";
+    private static final String ROW_FAILS = "reprova";
+    private static final String ROW_NOT_EVALUATED = "não avaliada";
 
     static Stream<PackDescriptor> registered() {
         return ReleaseGateRegistry.registeredPacks().stream();
@@ -156,7 +160,7 @@ class ReleaseGatesConsistencyTest {
                 moved.policy(), "\"compatibility\":\"EXACT\"", "\"compatibility\":\"EQUIVALENT_FOR_REFERENCE\"");
         assertThat(problemsOf(moved))
                 .anyMatch(problem -> problem.contains("gate_set_sha256 of the summary"))
-                .anyMatch(problem -> problem.contains("not the verdict of the dossier"));
+                .anyMatch(problem -> problem.contains("dossier verdict is not the declared compatibility"));
     }
 
     @Test
@@ -213,6 +217,73 @@ class ReleaseGatesConsistencyTest {
         editSummary(tree, "\"t\": \"2\"", "\"t\": \"9\"");
 
         assertThat(problemsOf(tree)).anyMatch(problem -> problem.contains("t is not the threshold its n_s gives"));
+    }
+
+    @Test
+    void aNegativeDistanceIsNoVerdict(@TempDir Path workspace) throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.FAILED);
+        String row = rowWith(tree, ROW_FAILS);
+        editSummary(
+                tree,
+                row,
+                row.replaceFirst("\"d\": \"[0-9]+\"", "\"d\": \"-1\"").replace(ROW_FAILS, ROW_PASSES));
+
+        assertThat(problemsOf(tree)).anyMatch(problem -> problem.contains("verdict is not the one its d and t give"));
+    }
+
+    @Test
+    void aRowWithTeamsCannotBeLeftUnevaluated(@TempDir Path workspace) throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.FAILED);
+        String row = rowWith(tree, ROW_FAILS);
+        editSummary(
+                tree,
+                row,
+                row.replaceFirst("\"d\": \"[0-9]+\"", "\"d\": \"-\"")
+                        .replaceFirst("\"t\": \"[0-9]+\"", "\"t\": \"-\"")
+                        .replaceFirst("\"n_s\": \"[^\"]+\"", "\"n_s\": \"10\"")
+                        .replace(ROW_FAILS, ROW_NOT_EVALUATED));
+
+        assertThat(problemsOf(tree)).anyMatch(problem -> problem.contains("a row with teams is not evaluated"));
+    }
+
+    @Test
+    void aPinnedDossierAboutAnotherReferenceIsRefused(@TempDir Path workspace) throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.PASSED);
+        String summary = SummaryWriter.sha256(tree.summaryJson());
+        String dossier = SummaryWriter.sha256(tree.dossierJson());
+        String gateSet = tree.verdict().gateSetSha256();
+        PortaoDEvidenceFixtures.replaceIn(
+                tree.dossierJson(),
+                "\"reference_id\": \"" + tree.referenceId() + "\"",
+                "\"reference_id\": \"zz-other\"");
+        // pinned again in the policy, the summary and the registry, so that only its scope is wrong
+        String repinned = SummaryWriter.sha256(tree.dossierJson());
+        replaceAll(tree.policy(), dossier, repinned);
+        String regated = tree.loadedPolicy()
+                .referenceSet(tree.packId(), tree.verdict().ruleVersion())
+                .gateSetSha256();
+        for (Path file : List.of(tree.summaryJson(), tree.registry())) {
+            replaceAll(file, dossier, repinned);
+            replaceAll(file, gateSet, regated);
+        }
+        replaceAll(tree.registry(), summary, SummaryWriter.sha256(tree.summaryJson()));
+
+        assertThat(problemsOf(tree))
+                .anyMatch(problem -> problem.contains("the dossier is of another reference"))
+                .noneMatch(problem -> problem.contains("gate_set_sha256"))
+                .noneMatch(problem -> problem.contains("missing or has changed"));
+    }
+
+    /** The JSON object of the first row of the summary with that verdict, as the writer printed it. */
+    private static String rowWith(Tree tree, String verdict) throws Exception {
+        String text = PortaoDEvidenceFixtures.read(tree.summaryJson());
+        int end = text.indexOf('}', text.indexOf("\"row_verdict\": \"" + verdict + "\""));
+        return text.substring(text.lastIndexOf('{', end), end + 1);
+    }
+
+    private static void replaceAll(Path file, String target, String replacement) throws Exception {
+        Files.writeString(
+                file, PortaoDEvidenceFixtures.read(file).replace(target, replacement), StandardCharsets.UTF_8);
     }
 
     @Test

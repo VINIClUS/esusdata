@@ -208,14 +208,16 @@ public final class PortaoDEvidenceChecks {
                 reference.path("compatibility_evidence_sha256").asString(""),
                 String.valueOf(declaration.compatibilityEvidenceRef()),
                 String.valueOf(declaration.compatibilityEvidenceSha256())));
-        problems.addAll(compatibilityProblems(who + id, reference, declaration, repoRoot));
+        problems.addAll(compatibilityProblems(who + id, reference, set, declaration, repoRoot));
         return problems;
     }
 
     /**
      * The status of a reference follows from its rows: each row's t is the threshold its n_s gives
      * ({@link Comparison#threshold}), each verdict is the one its d and t give (within the threshold
-     * passes, beyond it fails, no figures is not evaluated); a row that fails makes the reference
+     * passes, beyond it fails, a negative figure is no verdict, no figures is not evaluated), and a row
+     * is not evaluated only when neither side has a team to show (production leaves a row unevaluated
+     * only with no team on either side, so both counts are below the mask); a row that fails makes the reference
      * FAILED, and PASSED needs an evaluated row and every evaluated one passing. A PENDING reference
      * has no failing row: a failure is never softened.
      */
@@ -224,15 +226,8 @@ public final class PortaoDEvidenceChecks {
         boolean fails = false;
         boolean passes = false;
         for (JsonNode row : reference.path("rows")) {
-            String t = row.path("t").asString("");
-            if (!SummaryWriter.DASH.equals(t)
-                    && !t.equals(thresholdOf(row.path("n_s").asString("")))) {
-                problems.add(what + ": a row's t is not the threshold its n_s gives");
-            }
             String verdict = row.path("row_verdict").asString("");
-            if (!verdict.equals(verdictOf(row.path("d").asString(""), t))) {
-                problems.add(what + ": a row's verdict is not the one its d and t give");
-            }
+            problems.addAll(figureProblems(what, row, verdict));
             fails |= SummaryWriter.ROW_FAILS.equals(verdict);
             passes |= SummaryWriter.ROW_PASSES.equals(verdict);
         }
@@ -241,6 +236,25 @@ public final class PortaoDEvidenceChecks {
         boolean consistent = status.equals(follows) || ("PENDING".equals(status) && !fails);
         if (!consistent) {
             problems.add(what + ": the status " + status + " does not follow from its rows");
+        }
+        return problems;
+    }
+
+    /** What is wrong with the figures of one row against its verdict. */
+    private static List<String> figureProblems(String what, JsonNode row, String verdict) {
+        List<String> problems = new ArrayList<>();
+        String t = row.path("t").asString("");
+        if (!SummaryWriter.DASH.equals(t)
+                && !t.equals(thresholdOf(row.path("n_s").asString("")))) {
+            problems.add(what + ": a row's t is not the threshold its n_s gives");
+        }
+        if (!verdict.equals(verdictOf(row.path("d").asString(""), t))) {
+            problems.add(what + ": a row's verdict is not the one its d and t give");
+        }
+        boolean bothBelowMask = SummaryWriter.MASKED.equals(row.path("n_s").asString(""))
+                && SummaryWriter.MASKED.equals(row.path("n_l").asString(""));
+        if (SummaryWriter.ROW_NOT_EVALUATED.equals(verdict) && !bothBelowMask) {
+            problems.add(what + ": a row with teams is not evaluated");
         }
         return problems;
     }
@@ -265,7 +279,12 @@ public final class PortaoDEvidenceChecks {
             return SummaryWriter.ROW_NOT_EVALUATED;
         }
         try {
-            return Integer.parseInt(d) <= Integer.parseInt(t) ? SummaryWriter.ROW_PASSES : SummaryWriter.ROW_FAILS;
+            int distance = Integer.parseInt(d);
+            int threshold = Integer.parseInt(t);
+            if (distance < 0 || threshold < 0) {
+                return "";
+            }
+            return distance <= threshold ? SummaryWriter.ROW_PASSES : SummaryWriter.ROW_FAILS;
         } catch (NumberFormatException notFigures) {
             return "";
         }
@@ -286,26 +305,29 @@ public final class PortaoDEvidenceChecks {
     }
 
     /**
-     * The summary agrees with the dossier it cites: the declared compatibility is the dossier's
-     * verdict and the summary's, and the local source the summary was decided on is the one the
-     * dossier was decided on (another source leaves the reference PENDING, spec §14).
+     * The summary agrees with the dossier it cites: the dossier stands for the declaration in the set
+     * as the gate requires ({@link DossierEvidence#problems}: same reference, rule version and
+     * manifest, the declared verdict, one that authorizes the gate), the summary states that
+     * compatibility, and the local source the summary was decided on is the one the dossier was
+     * decided on (another source leaves the reference PENDING, spec §14).
      */
     private static List<String> compatibilityProblems(
-            String what, JsonNode reference, ReferenceDeclaration declaration, Path repoRoot) throws IOException {
+            String what, JsonNode reference, ReferenceSet set, ReferenceDeclaration declaration, Path repoRoot)
+            throws IOException {
         Path file = repoRoot.resolve(String.valueOf(declaration.compatibilityEvidenceRef()));
         if (!Files.isRegularFile(file)) {
             return List.of();
         }
         Optional<DossierEvidence> dossier =
                 DossierEvidence.read(declaration.compatibilityEvidenceRef(), Files.readAllBytes(file));
-        List<String> problems = new ArrayList<>();
-        if (dossier.isEmpty() || declaration.compatibility() != dossier.get().verdict()) {
-            problems.add(what + ": the declared compatibility is not the verdict of the dossier");
+        if (dossier.isEmpty()) {
+            return List.of(what + ": the dossier is not a JSON object");
         }
-        if (dossier.isPresent()
-                && !dossier.get()
-                        .localSourceFingerprint()
-                        .equals(reference.path("local_source_fingerprint").asString(""))) {
+        List<String> problems = new ArrayList<>();
+        dossier.get().problems(set, declaration).forEach(problem -> problems.add(what + ": " + problem));
+        if (!dossier.get()
+                .localSourceFingerprint()
+                .equals(reference.path("local_source_fingerprint").asString(""))) {
             problems.add(what + ": the local source in the summary is not the one the dossier was decided on");
         }
         if (!declaration
