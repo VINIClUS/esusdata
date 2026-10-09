@@ -192,10 +192,16 @@
         <targetPath>compatibility</targetPath>
       </resource>
       <!-- the release-gate registry is a contract too (ADR 0032); the jar carries the file the
-           application validates at startup, never the evidence documents it points at -->
+           application validates at startup, never the evidence documents it points at. The
+           siaps-* contracts (reference policy, methodology profiles) are dev tooling of the
+           Portão D: the build and its tests read them from the repository, the product never
+           does, so they must not ship -->
       <resource>
         <directory>${project.basedir}/../../contracts/indicators</directory>
         <targetPath>indicators</targetPath>
+        <excludes>
+          <exclude>siaps-*</exclude>
+        </excludes>
       </resource>
     </resources>
     <!-- Build-plugin floors (ADR 0021): the backend-build SBOM is scanned like what ships, and

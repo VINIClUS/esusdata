@@ -1,6 +1,5 @@
 package esusdata.indicator.reconciliation;
 
-import esusdata.indicator.reconciliation.PackVerdict.Mode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -20,7 +19,7 @@ import tools.jackson.databind.node.ObjectNode;
  * checked_at, evidence: [{kind, ref, sha256}]}}; a PENDING one carries only {@code status} and an
  * empty {@code evidence}, as the schema requires. Everything else (gate A, {@code
  * blocking_gaps_closed}, other entries) is left as it was. An entry that does not exist is never
- * created, an informative verdict is never recorded, and the evidence document must exist in the
+ * created, a diagnostic verdict is never recorded, and the evidence document must exist in the
  * repository with the given SHA-256, the same check {@code ReleaseGatesConsistencyTest} runs.
  */
 public final class RegistryUpdater {
@@ -46,8 +45,8 @@ public final class RegistryUpdater {
             String evidenceRef,
             String evidenceSha256)
             throws IOException {
-        if (verdict.mode() == Mode.INFORMATIVO) {
-            throw new IllegalArgumentException("an informative result is never written to the registry");
+        if (verdict.purpose() == ReferencePurpose.DIAGNOSTIC) {
+            throw new IllegalArgumentException("a diagnostic result is never written to the registry");
         }
         boolean decided = verdict.status() != PackVerdict.Status.PENDING;
         if (decided) {

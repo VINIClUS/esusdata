@@ -8,6 +8,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -26,6 +28,8 @@ public final class SiapsParser {
     private static final String CONCEITO = "conceitoPorIndicadorQualidade";
     private static final String FINAL = "classificacaoFinalComponente";
     private static final String QUALIDADE = "QUALIDADE";
+    private static final String MUNICIPALITY = "coMunicipioIbge";
+    private static final String QUADRIMESTRE = "nuQuadrimestre";
 
     private SiapsParser() {}
 
@@ -55,7 +59,7 @@ public final class SiapsParser {
             if (GatePack.bySiapsCode(code).isEmpty() || !(ESF.equals(type) || EAP.equals(type))) {
                 continue;
             }
-            rows.add(new Row(text(entry, "nuQuadrimestre"), code, type, countsOf(entry)));
+            rows.add(new Row(text(entry, MUNICIPALITY), text(entry, QUADRIMESTRE), code, type, countsOf(entry)));
         }
         return List.copyOf(rows);
     }
@@ -83,7 +87,12 @@ public final class SiapsParser {
             if (!types.add(type)) {
                 throw new IllegalArgumentException("SIAPS answer with two QUALIDADE rows of " + type + " in " + FINAL);
             }
-            rows.add(new Row(text(entry, "nuQuadrimestre"), GatePack.NOTA_FINAL_CODE, type, countsOf(entry)));
+            rows.add(new Row(
+                    text(entry, MUNICIPALITY),
+                    text(entry, QUADRIMESTRE),
+                    GatePack.NOTA_FINAL_CODE,
+                    type,
+                    countsOf(entry)));
         }
         return List.copyOf(rows);
     }
@@ -112,7 +121,9 @@ public final class SiapsParser {
 
     /**
      * The snapshot file: {@code {"competencias": [...], "filtro": {...}, "equipes": {"110": [...],
-     * ...}}}, each part exactly as the SIAPS answered it.
+     * ...}}}, each part exactly as the SIAPS answered it. The rows must be about exactly one
+     * municipality and one quadrimestre: a file that mixes them is refused, never merged. The
+     * published quadrimestres are kept as capture metadata only.
      */
     public static SiapsSnapshot snapshot(String json) {
         JsonNode root = MAPPER.readTree(json);
@@ -121,17 +132,23 @@ public final class SiapsParser {
         String filtro = root.path("filtro").toString();
         List<Row> rows = new ArrayList<>(classRows(filtro));
         rows.addAll(finalRows(filtro));
-        Set<String> quadrimestres = new LinkedHashSet<>();
-        rows.forEach(row -> quadrimestres.add(row.quadrimestre()));
-        if (quadrimestres.size() != 1) {
-            throw new IllegalArgumentException("the snapshot must hold exactly one quadrimestre: " + quadrimestres);
-        }
+        String municipality = onlyOne(rows.stream().map(Row::municipalityIbge), "municipality");
+        String quadrimestre = onlyOne(rows.stream().map(Row::quadrimestre), "quadrimestre");
         Map<Integer, List<Team>> teams = new LinkedHashMap<>();
         JsonNode equipes = root.path("equipes");
         for (String key : equipes.propertyNames()) {
             teams.put(Integer.parseInt(key), teams(equipes.path(key).toString()));
         }
-        return new SiapsSnapshot(quadrimestres.iterator().next(), published, rows, teams);
+        return new SiapsSnapshot(municipality, quadrimestre, published, rows, teams);
+    }
+
+    /** The one distinct value, or a refusal naming how many there were. */
+    private static String onlyOne(Stream<String> values, String what) {
+        Set<String> distinct = values.collect(Collectors.toCollection(LinkedHashSet::new));
+        if (distinct.size() != 1) {
+            throw new IllegalArgumentException("the snapshot must hold exactly one " + what + ": " + distinct);
+        }
+        return distinct.iterator().next();
     }
 
     private static void requireArray(JsonNode node, String what) {

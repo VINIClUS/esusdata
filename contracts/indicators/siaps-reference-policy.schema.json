@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://observatorio-aps.local/contracts/indicators/siaps-reference-policy.schema.json",
+  "title": "SIAPS reference policy",
+  "description": "Schema for contracts/indicators/siaps-reference-policy.json (spec 2026-10-08, §8.1). Pre-registers, per compiled pack and rule_version, the official SIAPS references the Portão D may compare against. A reference is chosen by its id, never by a date or by recency: the gate set of a pack is every ACTIVE reference whose compatibility dossier is EXACT or EQUIVALENT_FOR_REFERENCE (selection_policy ALL_REQUIRED), and it is derived from the dossiers, not picked. Dev tooling of the Portão D: not packaged in the jar. Rules a schema cannot state (one set per compiled rule, reference_id unique across sets, the id agreeing with quadrimestre and municipality_ibge, the dossier path agreeing with reference_id and pack) are enforced by ReferencePolicy.load, and SIAPS manifests and dossiers by ReferencePolicyConsistencyTest.",
+  "type": "object",
+  "required": ["schema_version", "reference_sets"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "const": "1" },
+    "reference_sets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/referenceSet" }
+    }
+  },
+  "$defs": {
+    "referenceSet": {
+      "type": "object",
+      "required": ["pack", "rule_version", "check", "selection_policy", "references"],
+      "additionalProperties": false,
+      "properties": {
+        "pack": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "rule_version": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+@[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "The compiled rule version this set belongs to: <pack>@<version>. A new version needs a new set."
+        },
+        "check": {
+          "type": "string",
+          "enum": ["siaps-distribuicao-por-classe@2", "siaps-nota-final-por-classe@2"],
+          "description": "The automated check that decides D: the Nota Final has its own."
+        },
+        "selection_policy": { "type": "string", "enum": ["ALL_REQUIRED"] },
+        "references": { "type": "array", "items": { "$ref": "#/$defs/declaration" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "pack": { "const": "c1-mais-acesso" } }, "required": ["pack"] },
+          "then": {
+            "properties": {
+              "rule_version": { "pattern": "^c1-mais-acesso@" },
+              "check": { "const": "siaps-distribuicao-por-classe@2" },
+              "references": {
+                "items": { "properties": { "reference_id": { "pattern": "^[a-z]{2}-[0-9]{7}-[0-9]{4}q[1-3]-c1-" } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "pack": { "const": "c2-desenvolvimento-infantil" } }, "required": ["pack"] },
+          "then": {
+            "properties": {
+              "rule_version": { "pattern": "^c2-desenvolvimento-infantil@" },
+              "check": { "const": "siaps-distribuicao-por-classe@2" },
+              "references": {
+                "items": { "properties": { "reference_id": { "pattern": "^[a-z]{2}-[0-9]{7}-[0-9]{4}q[1-3]-c2-" } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "pack": { "const": "c3-gestacao-puerperio" } }, "required": ["pack"] },
+          "then": {
+            "properties": {
+              "rule_version": { "pattern": "^c3-gestacao-puerperio@" },
+              "check": { "const": "siaps-distribuicao-por-classe@2" },
+              "references": {
+                "items": { "properties": { "reference_id": { "pattern": "^[a-z]{2}-[0-9]{7}-[0-9]{4}q[1-3]-c3-" } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "pack": { "const": "c4-cuidado-diabetes" } }, "required": ["pack"] },
+          "then": {
+            "properties": {
+              "rule_version": { "pattern": "^c4-cuidado-diabetes@" },
+              "check": { "const": "siaps-distribuicao-por-classe@2" },
+              "references": {
+                "items": { "properties": { "reference_id": { "pattern": "^[a-z]{2}-[0-9]{7}-[0-9]{4}q[1-3]-c4-" } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "pack": { "const": "c5-cuidado-hipertensao" } }, "required": ["pack"] },
+          "then": {
+            "properties": {
+              "rule_version": { "pattern": "^c5-cuidado-hipertensao@" },
+              "check": { "const": "siaps-distribuicao-por-classe@2" },
+              "references": {
+                "items": { "properties": { "reference_id": { "pattern": "^[a-z]{2}-[0-9]{7}-[0-9]{4}q[1-3]-c5-" } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "pack": { "const": "c6-cuidado-pessoa-idosa" } }, "required": ["pack"] },
+          "then": {
+            "properties": {
+              "rule_version": { "pattern": "^c6-cuidado-pessoa-idosa@" },
+              "check": { "const": "siaps-distribuicao-por-classe@2" },
+              "references": {
+                "items": { "properties": { "reference_id": { "pattern": "^[a-z]{2}-[0-9]{7}-[0-9]{4}q[1-3]-c6-" } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "pack": { "const": "c7-prevencao-cancer" } }, "required": ["pack"] },
+          "then": {
+            "properties": {
+              "rule_version": { "pattern": "^c7-prevencao-cancer@" },
+              "check": { "const": "siaps-distribuicao-por-classe@2" },
+              "references": {
+                "items": { "properties": { "reference_id": { "pattern": "^[a-z]{2}-[0-9]{7}-[0-9]{4}q[1-3]-c7-" } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "pack": { "const": "componente-iii-nota-final" } }, "required": ["pack"] },
+          "then": {
+            "properties": {
+              "rule_version": { "pattern": "^componente-iii-nota-final@" },
+              "check": { "const": "siaps-nota-final-por-classe@2" },
+              "references": {
+                "items": { "properties": { "reference_id": { "pattern": "^[a-z]{2}-[0-9]{7}-[0-9]{4}q[1-3]-ciii-" } } }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "declaration": {
+      "type": "object",
+      "required": [
+        "reference_id",
+        "quadrimestre",
+        "municipality_ibge",
+        "source_kind",
+        "purpose",
+        "required",
+        "status",
+        "compatibility",
+        "reference_manifest_sha256",
+        "compatibility_evidence_ref",
+        "compatibility_evidence_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "reference_id": {
+          "type": "string",
+          "pattern": "^[a-z]{2}-[0-9]{7}-[0-9]{4}q[1-3]-(c[1-7]|ciii)-(team|agg|aggu)-r[1-9][0-9]*$",
+          "description": "<uf>-<ibge>-<year>q<n>-<c1..c7|ciii>-<team|agg|aggu>-r<revision>, e.g. sp-3541307-2026q1-c1-team-r1. Globally unique. The id names the reference; nothing picks one by date."
+        },
+        "quadrimestre": { "type": "string", "pattern": "^[0-9]{4}Q[1-3]$", "description": "SIAPS spelling, e.g. 2026Q1. Identification only: it never orders or selects." },
+        "municipality_ibge": { "type": "string", "pattern": "^[0-9]{7}$" },
+        "source_kind": {
+          "type": "string",
+          "enum": ["OFFICIAL_TEAM_EXPORT_CSV", "PUBLIC_AGGREGATE", "PUBLIC_AGGREGATE_WITH_PERIOD_UNIVERSE"],
+          "description": "team, agg and aggu in the reference_id."
+        },
+        "purpose": {
+          "type": "string",
+          "enum": ["DIAGNOSTIC", "GATE"],
+          "description": "DIAGNOSTIC compares and never writes D. GATE takes part in the verdict of D, once pre-registered."
+        },
+        "required": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["ACTIVE", "SUPERSEDED", "RETRACTED"] },
+        "compatibility": {
+          "type": "string",
+          "enum": ["UNKNOWN", "EXACT", "EQUIVALENT_FOR_REFERENCE", "INCOMPATIBLE", "INCONCLUSIVE"],
+          "description": "Equal to the verdict of the cited dossier; UNKNOWN only before a dossier exists."
+        },
+        "reference_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 of docs/indicadores/portoes/references/<reference_id>.json."
+        },
+        "compatibility_evidence_ref": {
+          "type": ["string", "null"],
+          "pattern": "^docs/indicadores/portoes/compatibilidade/[a-z0-9-]+\\.json$",
+          "description": "Repo-relative path of the dossier, docs/indicadores/portoes/compatibilidade/<reference_id>-<pack>.json; null before the dossier exists."
+        },
+        "compatibility_evidence_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 of the dossier; null exactly when compatibility_evidence_ref is."
+        },
+        "note": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "purpose": { "const": "GATE" } }, "required": ["purpose"] },
+          "then": {
+            "properties": {
+              "required": { "const": true },
+              "status": { "const": "ACTIVE" },
+              "compatibility": { "enum": ["EXACT", "EQUIVALENT_FOR_REFERENCE"] },
+              "compatibility_evidence_ref": { "type": "string" },
+              "compatibility_evidence_sha256": { "type": "string" }
+            }
+          },
+          "else": { "properties": { "required": { "const": false } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": { "const": "ACTIVE" },
+              "compatibility": { "enum": ["EXACT", "EQUIVALENT_FOR_REFERENCE"] }
+            },
+            "required": ["status", "compatibility"]
+          },
+          "then": { "properties": { "purpose": { "const": "GATE" } } }
+        },
+        {
+          "if": { "properties": { "compatibility": { "const": "UNKNOWN" } }, "required": ["compatibility"] },
+          "then": {
+            "properties": {
+              "compatibility_evidence_ref": { "type": "null" },
+              "compatibility_evidence_sha256": { "type": "null" }
+            }
+          },
+          "else": {
+            "properties": {
+              "compatibility_evidence_ref": { "type": "string" },
+              "compatibility_evidence_sha256": { "type": "string" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "source_kind": { "const": "OFFICIAL_TEAM_EXPORT_CSV" } }, "required": ["source_kind"] },
+          "then": { "properties": { "reference_id": { "pattern": "-team-r[1-9][0-9]*$" } } }
+        },
+        {
+          "if": { "properties": { "source_kind": { "const": "PUBLIC_AGGREGATE" } }, "required": ["source_kind"] },
+          "then": { "properties": { "reference_id": { "pattern": "-agg-r[1-9][0-9]*$" } } }
+        },
+        {
+          "if": {
+            "properties": { "source_kind": { "const": "PUBLIC_AGGREGATE_WITH_PERIOD_UNIVERSE" } },
+            "required": ["source_kind"]
+          },
+          "then": { "properties": { "reference_id": { "pattern": "-aggu-r[1-9][0-9]*$" } } }
+        }
+      ]
+    }
+  }
+}

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import esusdata.indicator.reconciliation.SiapsSnapshot.Row;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /** Synthetic fixtures only: invented counts and INEs. */
@@ -47,7 +48,7 @@ class SiapsParserTest {
         List<Row> rows = SiapsParser.classRows(FILTRO);
 
         assertThat(rows).hasSize(2);
-        assertThat(rows.getFirst()).isEqualTo(new Row("2026Q1", 110, "eSF", new ClassCounts(1, 2, 5, 3)));
+        assertThat(rows.getFirst()).isEqualTo(new Row("999999", "2026Q1", 110, "eSF", new ClassCounts(1, 2, 5, 3)));
         assertThat(rows.get(1).counts().total()).isEqualTo(1);
     }
 
@@ -60,19 +61,66 @@ class SiapsParserTest {
                 .containsExactly(new SiapsSnapshot.Team("0000000011", "eSF"));
     }
 
+    private static String file(String filtro) {
+        return "{\"competencias\":" + COMPETENCIAS + ",\"filtro\":" + filtro + ",\"equipes\":{\"110\":" + EQUIPES
+                + "}}";
+    }
+
     @Test
     void readsTheSnapshotFile() {
-        String json = "{\"competencias\":" + COMPETENCIAS + ",\"filtro\":" + FILTRO + ",\"equipes\":{\"110\":" + EQUIPES
-                + "}}";
+        SiapsSnapshot snapshot = SiapsParser.snapshot(file(FILTRO));
 
-        SiapsSnapshot snapshot = SiapsParser.snapshot(json);
-
+        assertThat(snapshot.municipalityIbge()).isEqualTo("999999");
         assertThat(snapshot.quadrimestre()).isEqualTo("2026Q1");
+        assertThat(snapshot.rows())
+                .allSatisfy(row -> assertThat(row.municipalityIbge()).isEqualTo("999999"));
         assertThat(snapshot.published()).contains("2026Q1");
         assertThat(snapshot.counts(110, "eSF")).contains(new ClassCounts(1, 2, 5, 3));
         assertThat(snapshot.counts(108, "eSF")).isEmpty();
-        assertThat(snapshot.teamsOf(110)).hasSize(2);
+        assertThat(snapshot.teamsOf(110))
+                .hasValueSatisfying(teams -> assertThat(teams).hasSize(2));
         assertThat(snapshot.teamsOf(108)).isEmpty();
+    }
+
+    @Test
+    void parserRejectsMultipleMunicipalitiesOrQuadrimestres() {
+        String twoMunicipalities =
+                file(FILTRO.replaceFirst("\"coMunicipioIbge\":\"999999\"", "\"coMunicipioIbge\":\"999998\""));
+        String twoQuadrimestres =
+                file(FILTRO.replaceFirst("\"nuQuadrimestre\":\"2026Q1\"", "\"nuQuadrimestre\":\"2026Q2\""));
+
+        assertThatThrownBy(() -> SiapsParser.snapshot(twoMunicipalities))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exactly one municipality");
+        assertThatThrownBy(() -> SiapsParser.snapshot(twoQuadrimestres))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exactly one quadrimestre");
+    }
+
+    @Test
+    void aRowWithoutItsMunicipalityIsRefusedNotAssumed() {
+        String anonymous = FILTRO.replaceFirst("\"coMunicipioIbge\":\"999999\",", "");
+
+        assertThatThrownBy(() -> SiapsParser.classRows(anonymous))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("coMunicipioIbge");
+    }
+
+    @Test
+    void aSnapshotNeverHoldsARowOfAnotherMunicipalityOrPeriod() {
+        Row elsewhere = new Row("999998", "2026Q1", 110, "eSF", ClassCounts.EMPTY);
+        Row otherPeriod = new Row("999999", "2026Q2", 110, "eSF", ClassCounts.EMPTY);
+        List<Row> inAnotherMunicipality = List.of(elsewhere);
+        List<Row> inAnotherPeriod = List.of(otherPeriod);
+
+        assertThatThrownBy(() -> new SiapsSnapshot("999999", "2026Q1", List.of(), inAnotherMunicipality, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("one municipality and one quadrimestre");
+        assertThatThrownBy(() -> new SiapsSnapshot("999999", "2026Q1", List.of(), inAnotherPeriod, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new SiapsSnapshot("3999999", "2026Q1", List.of(), List.of(), Map.of()).municipalityIbge())
+                .as("the SIAPS spells the municipality without its check digit")
+                .isEqualTo("399999");
     }
 
     @Test

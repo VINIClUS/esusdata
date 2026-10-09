@@ -13,7 +13,11 @@ O produto nunca chama o SIAPS. A conferência é ferramenta de desenvolvimento n
 
 Nas versões finais das regras de C1–C7 e da Nota Final, depois que o quadrimestre elegível estiver publicado no
 SIAPS (hoje 2026Q2; sem ele o resultado é PENDING, "aguardando 2026Q2 no SIAPS"). Não rodar contra o
-PEC de produção antes disso, a não ser para o modo informativo combinado.
+PEC de produção antes disso, a não ser para o modo diagnóstico combinado.
+
+O agregado público não decide o gate: ele não traz o universo histórico de equipes, então a rodada de gate
+sobre ele fica PENDING ("o agregado público não traz o universo histórico de equipes") e só o diagnóstico
+mostra números. O universo do gate vem do arquivo oficial por equipe (abaixo, "Arquivo oficial por equipe").
 
 ## Lista antes de rodar
 
@@ -48,7 +52,7 @@ Propriedades opcionais:
 | Propriedade | Efeito |
 |---|---|
 | `observatorio.gate.d.snapshot=<arquivo>` | Lê o SIAPS de um arquivo em vez de chamar a API (formato abaixo). |
-| `observatorio.gate.d.quadrimestre=2026Q1` | Compara esse quadrimestre. Só é rodada de portão se for exatamente o quadrimestre de referência do pack (o mais recente elegível publicado); qualquer outro, elegível ou não, é informativo. |
+| `observatorio.gate.d.quadrimestre=2026Q1` | Compara esse quadrimestre. Só é rodada de portão se for exatamente o quadrimestre de referência do pack (o mais recente elegível publicado); qualquer outro, elegível ou não, é diagnóstico. |
 | `observatorio.gate.d.uf=SP` | UF para o SIAPS (padrão: deduzida do código IBGE do PEC). |
 | `observatorio.gate.d.registry=<release-gates.json>` | Grava o D decidido (modo de portão) de cada pack nesse arquivo. Sem ela, nada é gravado. |
 | `observatorio.gate.d.repo-root=<dir>` | Raiz do repositório (padrão: achada a partir do diretório de trabalho). |
@@ -62,12 +66,36 @@ município; lista de equipes de cada um dos 7 indicadores). O snapshot fica em
 Os extratos dos quatro meses de cada pack são adquiridos pelo mesmo caminho do teste de
 sensibilidade e reaproveitados em `apps/agent/target/portao-d/extratos` numa segunda rodada.
 
+## Arquivo oficial por equipe
+
+O arquivo "Avaliação do quadrimestre" do Componente de Qualidade, baixado à mão do SIAPS, é lido por
+`OfficialTeamExportCsvParser` (layout `siaps-team-export@1`; o bruto nunca entra no Git). O município e o
+quadrimestre vêm do cabeçalho do arquivo e das linhas, nunca do nome do arquivo, e têm de ser os esperados.
+O leitor recusa exportação com coluna de pessoa (CPF, CNS, nome, nascimento, telefone, endereço; só `NOME DA
+EQUIPE` passa), cabeçalho desconhecido, INE e indicador repetidos, tipo, indicador, classe ou número que não
+conhece e arquivo sem a linha "Fonte" final. eSB e eMulti são contadas e não lidas. Nenhuma mensagem de recusa
+traz INE, CNES, nome de estabelecimento ou de equipe.
+
+Conferência do leitor sobre os arquivos reais (opt-in, local; um diretório só com as exportações
+"Qualidade", e o IBGE de 7 dígitos do município):
+
+```
+mvn -f apps/agent/pom.xml test -Dtest=OfficialTeamExportRealFilesLiveTest -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dobservatorio.gate.d.official-export-dir=<diretório> -Dobservatorio.gate.d.official-export-ibge=<IBGE>
+```
+
+O teste espera 4 arquivos com 14 equipes eSF e eAP cada (os da primeira captura);
+`-Dobservatorio.gate.d.official-export-files=<n>` e `-Dobservatorio.gate.d.official-export-teams=<n>` mudam
+esses números. Cada arquivo tem de ler por inteiro (todo INE com os sete indicadores e a linha `Total`) e dar
+o mesmo hash normalizado numa segunda leitura. O log mostra só a posição do arquivo, o quadrimestre, o estado
+(preliminar ou final), as contagens por tipo, o que foi pulado e o hash normalizado de cada pack.
+
 ## Onde saem os arquivos
 
 | O quê | Onde | No controle de versão? |
 |---|---|---|
 | Resumo do portão (evidência): `portao-d-<pack>-<quadrimestre>.md` | `docs/indicadores/portoes/` | sim, mascarado (`<10`) |
-| Resumo informativo: `informativo-portao-d-...md` | `apps/agent/target/portao-d/informativo/` | não |
+| Resumo diagnóstico: `diagnostico-portao-d-...md` | `apps/agent/target/portao-d/diagnostico/` | não |
 | Contagens por classe e classes por INE (`*-contagens.csv`, `*-equipes.csv`) | `apps/agent/target/portao-d/` | não |
 | Snapshot do SIAPS, extratos | `apps/agent/target/portao-d/` | não |
 
@@ -90,7 +118,7 @@ A evidência de cada pack é o resumo: o registro guarda `ref` (caminho relativo
   `release-gates.schema.json`: decidido (PASSED/FAILED) leva `check` (`siaps-distribuicao-por-classe@1`),
   `checked_at` e `evidence` com `kind`, `ref` e `sha256` do resumo; PENDING leva só `status` e
   `evidence` vazia. Recusa evidência que não exista no repositório ou cujo sha256 não confira (a mesma
-  checagem do `ReleaseGatesConsistencyTest`), nunca cria entrada e nunca grava o modo informativo.
+  checagem do `ReleaseGatesConsistencyTest`), nunca cria entrada e nunca grava o modo diagnóstico.
   Foi testado contra uma cópia temporária do arquivo real, e o resultado passa no `ReleaseGateRegistry`
   e no schema. Este PR não altera o arquivo real: o D segue PENDING até existir o quadrimestre 2026Q2.
 - Com o PR do registro, `evaluate()` das regras devolve valores sem o bloqueio (o bloqueio fica no

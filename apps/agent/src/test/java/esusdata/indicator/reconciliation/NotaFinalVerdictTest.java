@@ -9,10 +9,10 @@ import esusdata.indicator.model.GateCheck;
 import esusdata.indicator.model.GateId;
 import esusdata.indicator.model.Quadrimestre;
 import esusdata.indicator.pack.componente3.ComponentIII;
-import esusdata.indicator.reconciliation.PackVerdict.Mode;
 import esusdata.indicator.reconciliation.PackVerdict.Status;
 import esusdata.indicator.reconciliation.SiapsSnapshot.Row;
 import esusdata.indicator.reconciliation.SiapsSnapshot.Team;
+import esusdata.indicator.reconciliation.SiapsTeamExportFixtures.Export;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -33,34 +33,49 @@ class NotaFinalVerdictTest {
     private static final Path REPO = Path.of("..", "..");
     private static final String EVIDENCE = "docs/indicadores/portoes/portao-d-nota-final-siaps.md";
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String FINGERPRINT = "sha256:" + "ab".repeat(32);
 
     private static final String FILTRO = """
             {"classificacaoFinalComponente":[
-              {"nuQuadrimestre":"2026Q2","sgEquipe":"eSF","tipoOrigem":"QUALIDADE",
+              {"nuQuadrimestre":"2026Q2","coMunicipioIbge":"999999","sgEquipe":"eSF","tipoOrigem":"QUALIDADE",
                "qtdClassificacaoOtimo":3,"qtdClassificacaoBom":5,"qtdClassificacaoSuficiente":2,"qtdClassificacaoRegular":1,
                "totalEquipesValidasParaComponente":11},
-              {"nuQuadrimestre":"2026Q2","sgEquipe":"eAP","tipoOrigem":"QUALIDADE",
+              {"nuQuadrimestre":"2026Q2","coMunicipioIbge":"999999","sgEquipe":"eAP","tipoOrigem":"QUALIDADE",
                "qtdClassificacaoOtimo":0,"qtdClassificacaoBom":1,"qtdClassificacaoSuficiente":0,"qtdClassificacaoRegular":0,
                "totalEquipesValidasParaComponente":1},
-              {"nuQuadrimestre":"2026Q2","sgEquipe":"eSF","tipoOrigem":"CVAT",
+              {"nuQuadrimestre":"2026Q2","coMunicipioIbge":"999999","sgEquipe":"eSF","tipoOrigem":"CVAT",
                "qtdClassificacaoOtimo":9,"qtdClassificacaoBom":9,"qtdClassificacaoSuficiente":9,"qtdClassificacaoRegular":9,
                "totalEquipesValidasParaComponente":36},
-              {"nuQuadrimestre":"2026Q2","sgEquipe":"eSB","tipoOrigem":"QUALIDADE",
+              {"nuQuadrimestre":"2026Q2","coMunicipioIbge":"999999","sgEquipe":"eSB","tipoOrigem":"QUALIDADE",
                "qtdClassificacaoOtimo":8,"qtdClassificacaoBom":8,"qtdClassificacaoSuficiente":8,"qtdClassificacaoRegular":8,
                "totalEquipesValidasParaComponente":32}],
              "conceitoPorIndicadorQualidade":[]}
             """;
 
-    private static final List<Team> TEAMS = List.of(new Team("0000000011", "eSF"), new Team("0000000012", "eSF"));
+    private static final Team EAP_TEAM = new Team("0000000013", "eAP");
+    private static final List<Team> TEAMS =
+            List.of(new Team("0000000011", "eSF"), new Team("0000000012", "eSF"), EAP_TEAM);
+
+    /** What the public answer says of the three teams above: two eSF in the top classes, one eAP BOM. */
+    private static final ClassCounts ESF_COUNTS = new ClassCounts(0, 0, 1, 1);
+
+    private static final ClassCounts EAP_COUNTS = new ClassCounts(0, 0, 1, 0);
+
+    /** The local classes that agree with that answer. */
+    private static Map<String, Classification> agreeingLocal() {
+        return Map.of(
+                "0000000011", Classification.BOM, "0000000012", Classification.OTIMO, "0000000013", Classification.BOM);
+    }
 
     /** A snapshot whose final rows are the given counts and whose seven team lists are {@code lists}. */
     private static SiapsSnapshot snapshot(ClassCounts esf, ClassCounts eap, Map<Integer, List<Team>> lists) {
         return new SiapsSnapshot(
+                "999999",
                 "2026Q2",
                 List.of("2026Q2"),
                 List.of(
-                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eSF", esf),
-                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eAP", eap)),
+                        new Row("999999", "2026Q2", GatePack.NOTA_FINAL_CODE, "eSF", esf),
+                        new Row("999999", "2026Q2", GatePack.NOTA_FINAL_CODE, "eAP", eap)),
                 lists);
     }
 
@@ -70,9 +85,35 @@ class NotaFinalVerdictTest {
         return lists;
     }
 
+    /** The public answer is a diagnostic reference: the team lists that come with it are today's directory. */
     private static PackVerdict evaluate(SiapsSnapshot snapshot, Map<String, Classification> local) {
         return PackVerdict.evaluate(
-                NOTA_FINAL, ComponentIII.RULE_VERSION, Mode.GATE, snapshot, new LocalClasses(local, local.keySet()));
+                NOTA_FINAL,
+                ComponentIII.RULE_VERSION,
+                ReferencePurpose.DIAGNOSTIC,
+                ValidatedReference.fromPublicAggregate(snapshot, NOTA_FINAL),
+                new LocalClasses(local, local.keySet()),
+                PackVerdict.NO_LOCAL_SOURCE);
+    }
+
+    /** The Nota Final reference of an official team export of the invented municipality. */
+    private static ValidatedReference official(Export export) {
+        return ValidatedReference.from(
+                OfficialTeamExportCsvParser.parse(
+                        export.bytes(),
+                        new OfficialTeamExportCsvParser.ExpectedScope(
+                                SiapsTeamExportFixtures.MUNICIPALITY_IBGE, SiapsTeamExportFixtures.QUADRIMESTRE)),
+                NOTA_FINAL);
+    }
+
+    private static PackVerdict gate(ValidatedReference reference, Map<String, Classification> local) {
+        return PackVerdict.evaluate(
+                NOTA_FINAL,
+                ComponentIII.RULE_VERSION,
+                ReferencePurpose.GATE,
+                reference,
+                new LocalClasses(local, local.keySet()),
+                FINGERPRINT);
     }
 
     @Test
@@ -81,8 +122,8 @@ class NotaFinalVerdictTest {
 
         assertThat(rows)
                 .containsExactly(
-                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eSF", new ClassCounts(1, 2, 5, 3)),
-                        new Row("2026Q2", GatePack.NOTA_FINAL_CODE, "eAP", new ClassCounts(0, 0, 1, 0)));
+                        new Row("999999", "2026Q2", GatePack.NOTA_FINAL_CODE, "eSF", new ClassCounts(1, 2, 5, 3)),
+                        new Row("999999", "2026Q2", GatePack.NOTA_FINAL_CODE, "eAP", new ClassCounts(0, 0, 1, 0)));
     }
 
     @Test
@@ -104,7 +145,8 @@ class NotaFinalVerdictTest {
                 + FILTRO.replace(
                         "\"conceitoPorIndicadorQualidade\":[]",
                         "\"conceitoPorIndicadorQualidade\":["
-                                + "{\"nuQuadrimestre\":\"2026Q2\",\"sgEquipe\":\"eSF\",\"coTipoIndicador\":110,"
+                                + "{\"nuQuadrimestre\":\"2026Q2\",\"coMunicipioIbge\":\"999999\",\"sgEquipe\":\"eSF\","
+                                + "\"coTipoIndicador\":110,"
                                 + "\"qtdClassificacaoOtimo\":1,\"qtdClassificacaoBom\":0,\"qtdClassificacaoSuficiente\":0,"
                                 + "\"qtdClassificacaoRegular\":0}]")
                 + ",\"equipes\":{}}";
@@ -140,23 +182,23 @@ class NotaFinalVerdictTest {
 
     @Test
     void passesWhenTheDistributionsAgreeWithinTheThresholdPerTeamType() {
-        SiapsSnapshot snapshot = snapshot(new ClassCounts(0, 0, 1, 1), ClassCounts.EMPTY, sameListForEvery(TEAMS));
+        SiapsSnapshot snapshot = snapshot(ESF_COUNTS, EAP_COUNTS, sameListForEvery(TEAMS));
 
-        PackVerdict verdict =
-                evaluate(snapshot, Map.of("0000000011", Classification.BOM, "0000000012", Classification.OTIMO));
+        PackVerdict verdict = evaluate(snapshot, agreeingLocal());
 
         assertThat(verdict.status()).isEqualTo(Status.PASSED);
-        assertThat(verdict.isGateEvidence()).isTrue();
-        assertThat(verdict.rows()).hasSize(2);
-        assertThat(verdict.rows().getFirst().distance()).isZero();
-        assertThat(verdict.rows().get(1).evaluated())
-                .as("eAP: nobody on either side")
+        assertThat(verdict.isGateEvidence())
+                .as("a public answer is a diagnostic")
                 .isFalse();
+        assertThat(verdict.rows()).extracting(Comparison.RowResult::distance).containsExactly(0, 0);
+        assertThat(verdict.rows().get(1).evaluated())
+                .as("eAP: one team on each side")
+                .isTrue();
     }
 
     @Test
     void failsWhenOneTypeIsOverTheThresholdAndAnUnclassifiedTeamIsReportedNotCounted() {
-        SiapsSnapshot snapshot = snapshot(new ClassCounts(0, 0, 1, 1), ClassCounts.EMPTY, sameListForEvery(TEAMS));
+        SiapsSnapshot snapshot = snapshot(ESF_COUNTS, EAP_COUNTS, sameListForEvery(TEAMS));
 
         PackVerdict verdict = evaluate(snapshot, Map.of("0000000011", Classification.REGULAR));
 
@@ -168,17 +210,17 @@ class NotaFinalVerdictTest {
     }
 
     @Test
-    void theComparisonSetIsTheTeamsOfAllSevenLists() {
+    void theDiagnosticSplitKeyIsTheTeamsOfAllSevenCurrentLists() {
         Map<Integer, List<Team>> lists = sameListForEvery(TEAMS);
         lists.put(GatePack.all().get(3).siapsCode(), List.of(new Team("0000000011", "eSF")));
 
-        SiapsSnapshot snapshot = snapshot(new ClassCounts(0, 0, 1, 1), ClassCounts.EMPTY, lists);
+        SiapsSnapshot snapshot = snapshot(ESF_COUNTS, EAP_COUNTS, lists);
 
         assertThat(snapshot.notaFinalTeams()).contains(List.of(new Team("0000000011", "eSF")));
         PackVerdict verdict =
                 evaluate(snapshot, Map.of("0000000011", Classification.BOM, "0000000012", Classification.OTIMO));
         assertThat(verdict.localNotInSiaps())
-                .as("the team missing from one list is outside")
+                .as("the team missing from one current list is outside")
                 .isEqualTo(1);
         assertThat(verdict.rows().getFirst().localTeams()).isEqualTo(1);
     }
@@ -194,14 +236,14 @@ class NotaFinalVerdictTest {
 
     @Test
     void isPendingWithoutTheFinalRowsOrWithoutOneOfTheSevenLists() {
-        SiapsSnapshot noFinalRows = new SiapsSnapshot("2026Q2", List.of("2026Q2"), List.of(), sameListForEvery(TEAMS));
+        SiapsSnapshot noFinalRows =
+                new SiapsSnapshot("999999", "2026Q2", List.of("2026Q2"), List.of(), sameListForEvery(TEAMS));
         Map<Integer, List<Team>> sixLists = sameListForEvery(TEAMS);
         sixLists.remove(GatePack.all().getLast().siapsCode());
 
         PackVerdict first = evaluate(noFinalRows, Map.of("0000000011", Classification.BOM));
-        PackVerdict second = evaluate(
-                snapshot(new ClassCounts(0, 0, 1, 1), ClassCounts.EMPTY, sixLists),
-                Map.of("0000000011", Classification.BOM));
+        PackVerdict second =
+                evaluate(snapshot(ESF_COUNTS, EAP_COUNTS, sixLists), Map.of("0000000011", Classification.BOM));
 
         assertThat(first.status()).isEqualTo(Status.PENDING);
         assertThat(first.reason()).contains("classificação final");
@@ -211,10 +253,63 @@ class NotaFinalVerdictTest {
     }
 
     @Test
+    void aRowOfZerosOfTheFinalClassificationIsAGapNotAStatedZero() {
+        // the public answer cannot prove that no eAP team was counted: only a complete team export can
+        SiapsSnapshot snapshot = snapshot(ESF_COUNTS, ClassCounts.EMPTY, sameListForEvery(TEAMS));
+
+        PackVerdict verdict = evaluate(snapshot, agreeingLocal());
+
+        assertThat(verdict.status()).isEqualTo(Status.PENDING);
+        assertThat(verdict.reason()).contains("referência incompleta", "linha de eAP de CIII", "só de zeros");
+        assertThat(verdict.rows()).isEmpty();
+    }
+
+    @Test
+    void notaFinalRequiresEveryOfficialTypeInItsUniverse() {
+        Map<String, Classification> local = Map.of(
+                SiapsTeamExportFixtures.ESF_1, Classification.BOM,
+                SiapsTeamExportFixtures.ESF_2, Classification.OTIMO,
+                SiapsTeamExportFixtures.EAP_1, Classification.BOM);
+        // every eSF and eAP team of the export has its Total row: that is the universe, by type
+        PackVerdict complete = gate(official(SiapsTeamExportFixtures.standard()), local);
+        // the eAP team is in the export (its seven indicators are there) but has no Total row
+        Export noTotal = SiapsTeamExportFixtures.standard()
+                .dropRow(SiapsTeamExportFixtures.EAP_1, SiapsTeamExportFixtures.TOTAL_NAME);
+        PackVerdict incomplete = gate(official(noTotal), local);
+
+        assertThat(complete.status()).isEqualTo(Status.PASSED);
+        assertThat(complete.isGateEvidence()).isTrue();
+        assertThat(complete.rows()).extracting(Comparison.RowResult::siapsTeams).containsExactly(2, 1);
+        assertThat(complete.localNotInSiaps()).isZero();
+        // the eSF row alone would pass; the Nota Final waits for the eAP team's Total row
+        assertThat(incomplete.status()).isEqualTo(Status.PENDING);
+        assertThat(incomplete.reason()).contains("referência incompleta", "Total (nota final)");
+        assertThat(incomplete.isGateEvidence()).isFalse();
+    }
+
+    @Test
+    void anAggregateOnlyNotaFinalCannotBecomeGateEvidence() {
+        SiapsSnapshot snapshot = snapshot(ESF_COUNTS, EAP_COUNTS, sameListForEvery(TEAMS));
+        Map<String, Classification> local = agreeingLocal();
+
+        PackVerdict verdict = PackVerdict.evaluate(
+                NOTA_FINAL,
+                ComponentIII.RULE_VERSION,
+                ReferencePurpose.GATE,
+                ValidatedReference.fromPublicAggregate(snapshot, NOTA_FINAL),
+                new LocalClasses(local, local.keySet()),
+                FINGERPRINT);
+
+        // the intersection of the seven current lists is no historical universe, however well it agrees
+        assertThat(verdict.status()).isEqualTo(Status.PENDING);
+        assertThat(verdict.reason()).contains("universo histórico");
+        assertThat(verdict.isGateEvidence()).isFalse();
+        assertThat(evaluate(snapshot, local).status()).isEqualTo(Status.PASSED);
+    }
+
+    @Test
     void theSummaryNamesTheNotaFinalCheckAndRuleAndMasksTheCounts() {
-        PackVerdict verdict = evaluate(
-                snapshot(new ClassCounts(0, 0, 1, 1), ClassCounts.EMPTY, sameListForEvery(TEAMS)),
-                Map.of("0000000011", Classification.BOM, "0000000012", Classification.OTIMO));
+        PackVerdict verdict = evaluate(snapshot(ESF_COUNTS, EAP_COUNTS, sameListForEvery(TEAMS)), agreeingLocal());
 
         String text = SummaryWriter.render(verdict, DAY);
 
@@ -224,7 +319,16 @@ class NotaFinalVerdictTest {
                 .contains(ComponentIII.RULE_VERSION)
                 .contains("| CIII | eSF | <10 | <10 |")
                 .doesNotContain("siaps-distribuicao-por-classe@1");
-        assertThat(SummaryWriter.fileName(verdict)).isEqualTo("portao-d-componente-iii-nota-final-2026Q2.md");
+        assertThat(SummaryWriter.fileName(verdict))
+                .isEqualTo("diagnostico-portao-d-componente-iii-nota-final-2026Q2.md");
+        PackVerdict gate = gate(
+                official(SiapsTeamExportFixtures.standard()),
+                Map.of(
+                        SiapsTeamExportFixtures.ESF_1, Classification.BOM,
+                        SiapsTeamExportFixtures.ESF_2, Classification.OTIMO,
+                        SiapsTeamExportFixtures.EAP_1, Classification.BOM));
+        assertThat(SummaryWriter.fileName(gate)).isEqualTo("portao-d-componente-iii-nota-final-2026Q1.md");
+        assertThat(SummaryWriter.render(gate, DAY)).contains("- Fingerprint da fonte local: `" + FINGERPRINT + "`");
     }
 
     @Test
@@ -235,13 +339,14 @@ class NotaFinalVerdictTest {
         PackVerdict passed = new PackVerdict(
                 NOTA_FINAL,
                 ComponentIII.RULE_VERSION,
-                Mode.GATE,
+                ReferencePurpose.GATE,
                 Status.PASSED,
                 "",
                 "2026Q2",
                 List.of(),
                 0,
-                new ArrayList<>());
+                new ArrayList<>(),
+                FINGERPRINT);
 
         RegistryUpdater.record(file, REPO, passed, DAY, EVIDENCE, sha);
 

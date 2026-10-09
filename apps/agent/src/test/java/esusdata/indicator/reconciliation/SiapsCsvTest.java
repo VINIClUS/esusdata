@@ -33,8 +33,8 @@ class SiapsCsvTest {
 
         assertThat(rows)
                 .containsExactly(
-                        new Row("2026Q2", 110, "eSF", new ClassCounts(1, 2, 3, 4)),
-                        new Row("2026Q2", 104, "eAP", new ClassCounts(0, 0, 1, 0)));
+                        new Row("999999", "2026Q2", 110, "eSF", new ClassCounts(1, 2, 3, 4)),
+                        new Row("999999", "2026Q2", 104, "eAP", new ClassCounts(0, 0, 1, 0)));
     }
 
     @Test

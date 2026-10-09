@@ -1,7 +1,6 @@
 package esusdata.indicator.reconciliation;
 
 import esusdata.indicator.reconciliation.Comparison.RowResult;
-import esusdata.indicator.reconciliation.PackVerdict.Mode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -31,7 +30,7 @@ public final class SummaryWriter {
 
     /** The file name of a verdict's summary. */
     public static String fileName(PackVerdict verdict) {
-        return (verdict.mode() == Mode.INFORMATIVO ? "informativo-" : "") + "portao-d-"
+        return (verdict.purpose() == ReferencePurpose.DIAGNOSTIC ? "diagnostico-" : "") + "portao-d-"
                 + verdict.pack().packId() + "-" + verdict.quadrimestre() + ".md";
     }
 
@@ -53,11 +52,11 @@ public final class SummaryWriter {
         StringBuilder text = new StringBuilder(2048);
         text.append("# Portão D: conciliação com o SIAPS, %s (%s)\n\n"
                 .formatted(verdict.pack().code(), verdict.quadrimestre()));
-        if (verdict.mode() == Mode.INFORMATIVO) {
+        if (verdict.purpose() == ReferencePurpose.DIAGNOSTIC) {
             text.append("""
-                    > **Modo informativo: não é evidência do Portão D.** O quadrimestre de referência não é
-                    > elegível (ou a execução foi exploratória) e este documento nunca entra no registro de
-                    > portões.
+                    > **Modo diagnóstico: não é evidência do Portão D.** A referência não decide o portão (não é
+                    > uma referência de gate, ou a execução foi exploratória) e este documento nunca entra no
+                    > registro de portões.
 
                     """);
         }
@@ -67,7 +66,7 @@ public final class SummaryWriter {
                 - Pack: `%s`, regra `%s`
                 - Quadrimestre de referência no SIAPS: %s
                 - Data: %s
-                - Veredito do pack: **%s**%s
+                %s- Veredito do pack: **%s**%s
 
                 | Indicador | Tipo | N_S | N_L | Sem classe local | D | T | Veredito |
                 |---|---|---|---|---|---|---|---|
@@ -77,6 +76,7 @@ public final class SummaryWriter {
                         verdict.ruleVersion(),
                         verdict.quadrimestre(),
                         date,
+                        fingerprintLine(verdict),
                         verdict.status(),
                         reason));
         for (RowResult row : verdict.rows()) {
@@ -91,6 +91,13 @@ public final class SummaryWriter {
                 Regra: `%s`.
                 """.formatted(mask(verdict.localNotInSiaps()), verdict.pack().ruleDocument()));
         return text.toString();
+    }
+
+    /** The line that says which local extracts the figures come from, when the verdict read any. */
+    private static String fingerprintLine(PackVerdict verdict) {
+        return verdict.localSourceFingerprint().isEmpty()
+                ? ""
+                : "- Fingerprint da fonte local: `" + verdict.localSourceFingerprint() + "`\n";
     }
 
     private static String tableRow(String code, RowResult row) {
@@ -119,8 +126,13 @@ public final class SummaryWriter {
 
     /** The lowercase hex SHA-256 of a file. */
     public static String sha256(Path file) throws IOException {
+        return sha256(Files.readAllBytes(file));
+    }
+
+    /** The lowercase hex SHA-256 of {@code content}. */
+    public static String sha256(byte[] content) {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }

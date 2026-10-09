@@ -37,6 +37,36 @@ public final class ExtractFixtures {
             int espontaneo,
             int unmapped)
             throws IOException {
+        return write(
+                baseDir,
+                extractionId,
+                sourceId,
+                municipalityIbge,
+                referencePeriod,
+                programado,
+                espontaneo,
+                unmapped,
+                QUERY_CHECKSUM,
+                ADAPTER_VERSION);
+    }
+
+    /**
+     * As above, published under the given query checksum and adapter version: the ones the
+     * execution plane writes for C1's v1 extract (the constants of {@code
+     * IndividualEncounterModalityContract}), for a test of what a reader expects of production.
+     */
+    public static ExtractionManifest write(
+            Path baseDir,
+            String extractionId,
+            String sourceId,
+            String municipalityIbge,
+            String referencePeriod,
+            int programado,
+            int espontaneo,
+            int unmapped,
+            String queryChecksum,
+            String adapterVersion)
+            throws IOException {
         YearMonth month = YearMonth.parse(referencePeriod);
         String periodStart = month.atDay(1).toString();
         String periodEndExclusive = month.plusMonths(1).atDay(1).toString();
@@ -56,8 +86,8 @@ public final class ExtractFixtures {
             ExtractionManifest manifest = writer.finalizeExtract(
                     Instant.parse("2026-09-19T12:00:00Z"),
                     "America/Sao_Paulo",
-                    QUERY_CHECKSUM,
-                    ADAPTER_VERSION,
+                    queryChecksum,
+                    adapterVersion,
                     "COMPLETE",
                     "SNAPSHOT");
             writeTeams(baseDir, extractionId, sourceId, municipalityIbge, month);

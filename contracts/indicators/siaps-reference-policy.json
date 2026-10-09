@@ -1,0 +1,61 @@
+{
+  "schema_version": "1",
+  "reference_sets": [
+    {
+      "pack": "c1-mais-acesso",
+      "rule_version": "c1-mais-acesso@0.5.0",
+      "check": "siaps-distribuicao-por-classe@2",
+      "selection_policy": "ALL_REQUIRED",
+      "references": []
+    },
+    {
+      "pack": "c2-desenvolvimento-infantil",
+      "rule_version": "c2-desenvolvimento-infantil@0.3.0",
+      "check": "siaps-distribuicao-por-classe@2",
+      "selection_policy": "ALL_REQUIRED",
+      "references": []
+    },
+    {
+      "pack": "c3-gestacao-puerperio",
+      "rule_version": "c3-gestacao-puerperio@0.3.0",
+      "check": "siaps-distribuicao-por-classe@2",
+      "selection_policy": "ALL_REQUIRED",
+      "references": []
+    },
+    {
+      "pack": "c4-cuidado-diabetes",
+      "rule_version": "c4-cuidado-diabetes@0.3.0",
+      "check": "siaps-distribuicao-por-classe@2",
+      "selection_policy": "ALL_REQUIRED",
+      "references": []
+    },
+    {
+      "pack": "c5-cuidado-hipertensao",
+      "rule_version": "c5-cuidado-hipertensao@0.3.0",
+      "check": "siaps-distribuicao-por-classe@2",
+      "selection_policy": "ALL_REQUIRED",
+      "references": []
+    },
+    {
+      "pack": "c6-cuidado-pessoa-idosa",
+      "rule_version": "c6-cuidado-pessoa-idosa@0.3.0",
+      "check": "siaps-distribuicao-por-classe@2",
+      "selection_policy": "ALL_REQUIRED",
+      "references": []
+    },
+    {
+      "pack": "c7-prevencao-cancer",
+      "rule_version": "c7-prevencao-cancer@0.3.0",
+      "check": "siaps-distribuicao-por-classe@2",
+      "selection_policy": "ALL_REQUIRED",
+      "references": []
+    },
+    {
+      "pack": "componente-iii-nota-final",
+      "rule_version": "componente-iii-nota-final@0.3.0",
+      "check": "siaps-nota-final-por-classe@2",
+      "selection_policy": "ALL_REQUIRED",
+      "references": []
+    }
+  ]
+}

@@ -81,8 +81,14 @@ class ComparisonTest {
         assertThat(row.passed()).isFalse();
     }
 
+    /**
+     * The formula for a team type that one side counts and the other has as zero. The zero has to
+     * be proved by a complete official universe: an official row that is absent, or a row of zeros
+     * of the public answer, is never turned into a zero here, the verdict is PENDING before this
+     * runs (PackVerdictTest).
+     */
     @Test
-    void aRowPresentOnOneSideOnlyIsEvaluatedWithTheSameFormula() {
+    void anExplicitZeroOnOneSideIsEvaluatedWithTheSameFormula() {
         RowResult localOnly = Comparison.row("eAP", ClassCounts.EMPTY, new ClassCounts(0, 0, 0, 2), 0);
         RowResult siapsOnly = Comparison.row("eAP", new ClassCounts(1, 0, 0, 2), ClassCounts.EMPTY, 3);
 
