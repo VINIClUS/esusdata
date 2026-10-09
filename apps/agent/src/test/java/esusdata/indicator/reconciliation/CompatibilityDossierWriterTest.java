@@ -160,6 +160,19 @@ class CompatibilityDossierWriterTest {
     }
 
     @Test
+    void theSeiNumberOfAPublicDocumentIsNotTakenForAnIneButADigitRunNextToItStillIs() throws IOException {
+        CompatibilityDossier cited = evidence(profile(DIFFERENT, SAME, false))
+                .dimension(ProbeResult.none(FIRST_PROBE, "read as the NT 8/2026 (SEI 0055690090) says"))
+                .dossier();
+        CompatibilityDossier leaking = evidence(profile(DIFFERENT, SAME, false))
+                .dimension(ProbeResult.none(FIRST_PROBE, "SEI 0055690090 and team " + INE))
+                .dossier();
+
+        assertThat(read(write(cited).json()).toString()).contains("SEI 0055690090");
+        assertThatThrownBy(() -> write(leaking)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void theReferenceIdWithItsMunicipalityCodeIsNotTakenForACnes() throws IOException {
         JsonNode tree = read(write(dossier()).json());
 

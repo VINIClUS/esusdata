@@ -59,6 +59,12 @@ public final class CompatibilityDossierWriter {
 
     private static final Pattern REFERENCE_ID =
             Pattern.compile("[a-z]{2}-\\d{7}-\\d{4}q[1-3]-(c[1-7]|ciii)-(team|agg|aggu)-r[1-9]\\d*");
+    /**
+     * The number of a public document of the Ministry in its SEI system, as the titles of the fichas
+     * and notes cite it ({@code SEI 0055690090}): a document, never a person, a team or a record.
+     */
+    private static final Pattern SEI_DOCUMENT = Pattern.compile("\\bSEI (?:n[º°o] ?)?\\d{7,}");
+
     private static final Pattern DIGIT_RUN = Pattern.compile("\\d{7,}");
     private static final Pattern UUID =
             Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
@@ -289,7 +295,8 @@ public final class CompatibilityDossierWriter {
     }
 
     private static boolean looksLikeIdentifier(String text) {
-        String rest = REFERENCE_ID.matcher(text).replaceAll("");
+        String rest =
+                SEI_DOCUMENT.matcher(REFERENCE_ID.matcher(text).replaceAll("")).replaceAll("");
         return DIGIT_RUN.matcher(rest).find()
                 || UUID.matcher(rest).find()
                 || HEX_DIGEST.matcher(rest).find();
