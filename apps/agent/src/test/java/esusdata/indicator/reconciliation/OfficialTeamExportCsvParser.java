@@ -2,6 +2,7 @@ package esusdata.indicator.reconciliation;
 
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.pack.componente3.ComponentIII;
 import esusdata.indicator.pack.componente3.Nt08Tables;
 import esusdata.indicator.reconciliation.NormalizedReference.FinalRow;
 import esusdata.indicator.reconciliation.NormalizedReference.IndicatorRow;
@@ -46,8 +47,8 @@ import java.util.regex.Pattern;
  * nascimento, telefone or endereço, apart from the team's own name), when its municipality or
  * quadrimestre is not the expected one anywhere, when it repeats a team and indicator, when a team
  * type, an indicator, a class or a number is not one it knows, when a factor disagrees with its
- * class, or when the final note of a team with all seven indicator rows is not the sum of their
- * notes. Teams of the types outside the Componente de Qualidade of eSF/eAP (eSB, eMulti) are
+ * class, when a weight is not the one the NT 8/2026 gives the indicator, or when the final note of
+ * a team with all seven indicator rows is not the sum of their notes. Teams of the types outside the Componente de Qualidade of eSF/eAP (eSB, eMulti) are
  * counted and left unread. A team that lacks a row is not refused: the reference reports it as
  * incomplete ({@link OfficialTeamReference#isComplete}).
  *
@@ -503,6 +504,9 @@ final class OfficialTeamExportCsvParser {
                 throw fail(HEADER.get(FACTOR) + " does not agree with the concept");
             }
             BigDecimal weight = decimal(cells, WEIGHT);
+            if (weight.compareTo(prescribedWeight(code)) != 0) {
+                throw fail(HEADER.get(WEIGHT) + " is not the weight the NT 8/2026 gives the indicator");
+            }
             BigDecimal note = decimal(cells, NOTE);
             if (note.compareTo(factor.multiply(weight)) != 0) {
                 throw fail(HEADER.get(NOTE) + " is not the factor times the weight");
@@ -567,6 +571,16 @@ final class OfficialTeamExportCsvParser {
                 sum = sum.add(indicator.note());
             }
             return Optional.of(sum);
+        }
+
+        /** The weight of the indicator in Quadro 2 of the NT 8/2026: the one the local Nota Final uses. */
+        private static BigDecimal prescribedWeight(int code) {
+            String packId = GatePack.bySiapsCode(code).orElseThrow().packId();
+            return ComponentIII.DESCRIPTOR.components().stream()
+                    .filter(component -> component.code().equals(packId))
+                    .map(component -> new BigDecimal(component.weight()))
+                    .findFirst()
+                    .orElseThrow();
         }
 
         /** A decimal of the file as an exact fraction, for the bands that are never rounded first. */

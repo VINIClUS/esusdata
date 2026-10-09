@@ -344,6 +344,17 @@ class OfficialTeamExportCsvParserTest {
     }
 
     @Test
+    void refusesAWeightThatIsNotTheOneTheNtGivesTheIndicator() {
+        // C1 weighs 1; with 2 the note and the final note still agree with the weight and the sum
+        Export shifted = SiapsTeamExportFixtures.standard();
+        shifted.row(ESF_2, C1_NAME)[SiapsTeamExportFixtures.WEIGHT_COLUMN] = "2";
+        shifted.row(ESF_2, C1_NAME)[SiapsTeamExportFixtures.NOTE_COLUMN] = "2";
+        shifted.row(ESF_2, TOTAL_NAME)[SiapsTeamExportFixtures.FINAL_NOTE_COLUMN] = "11";
+
+        assertThat(refusal(shifted)).contains("PESO DO INDICADOR is not the weight the NT 8/2026 gives the indicator");
+    }
+
+    @Test
     void refusesAFinalNoteThatIsNotTheSumOfTheNotesOfItsSevenIndicators() {
         // ESF_2 has seven Ótimo indicators whose notes sum to 10; 9 is still in the band of Ótimo
         Export shifted = SiapsTeamExportFixtures.standard();
