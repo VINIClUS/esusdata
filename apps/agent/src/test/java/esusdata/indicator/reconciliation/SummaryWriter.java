@@ -34,7 +34,18 @@ public final class SummaryWriter {
     static final String SET_SUMMARY_SCHEMA_VERSION = "1";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final String DASH = "-";
+    /** The d and t of a row that was not evaluated. */
+    static final String DASH = "-";
+
+    /** The verdict of a row whose distance is within the threshold. */
+    static final String ROW_PASSES = "passa";
+
+    /** The verdict of a row whose distance exceeds the threshold. */
+    static final String ROW_FAILS = "reprova";
+
+    /** The verdict of a row with nothing to compare. */
+    static final String ROW_NOT_EVALUATED = "não avaliada";
+
     private static final String STATUS = "status";
     private static final String REASON = "reason";
     private static final String RULE_VERSION = "rule_version";
@@ -144,9 +155,9 @@ public final class SummaryWriter {
 
     private static String verdictOf(RowResult row) {
         if (row.evaluated()) {
-            return row.passed() ? "passa" : "reprova";
+            return row.passed() ? ROW_PASSES : ROW_FAILS;
         }
-        return "não avaliada";
+        return ROW_NOT_EVALUATED;
     }
 
     // ---- the summary of a reference set

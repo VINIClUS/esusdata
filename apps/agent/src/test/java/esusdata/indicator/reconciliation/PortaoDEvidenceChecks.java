@@ -190,7 +190,7 @@ public final class PortaoDEvidenceChecks {
             return List.of();
         }
         ReferenceDeclaration declaration = found.get();
-        List<String> problems = new ArrayList<>();
+        List<String> problems = new ArrayList<>(rowProblems(who + id, reference));
         if (declaration.status() != ReferenceStatus.ACTIVE) {
             problems.add(who + id + " is not ACTIVE");
         }
@@ -210,6 +210,45 @@ public final class PortaoDEvidenceChecks {
                 String.valueOf(declaration.compatibilityEvidenceSha256())));
         problems.addAll(compatibilityProblems(who + id, reference, declaration, repoRoot));
         return problems;
+    }
+
+    /**
+     * The status of a reference follows from its rows: each row's verdict is the one its d and t give
+     * (within the threshold passes, beyond it fails, no figures is not evaluated); a row that fails
+     * makes the reference FAILED, and PASSED needs an evaluated row and every evaluated one passing. A
+     * PENDING reference has no failing row: a failure is never softened.
+     */
+    private static List<String> rowProblems(String what, JsonNode reference) {
+        List<String> problems = new ArrayList<>();
+        boolean fails = false;
+        boolean passes = false;
+        for (JsonNode row : reference.path("rows")) {
+            String verdict = row.path("row_verdict").asString("");
+            if (!verdict.equals(
+                    verdictOf(row.path("d").asString(""), row.path("t").asString("")))) {
+                problems.add(what + ": a row's verdict is not the one its d and t give");
+            }
+            fails |= SummaryWriter.ROW_FAILS.equals(verdict);
+            passes |= SummaryWriter.ROW_PASSES.equals(verdict);
+        }
+        String status = reference.path(STATUS).asString("");
+        String follows = fails ? FAILED : passes ? PASSED : "PENDING";
+        boolean consistent = status.equals(follows) || ("PENDING".equals(status) && !fails);
+        if (!consistent) {
+            problems.add(what + ": the status " + status + " does not follow from its rows");
+        }
+        return problems;
+    }
+
+    private static String verdictOf(String d, String t) {
+        if (SummaryWriter.DASH.equals(d) && SummaryWriter.DASH.equals(t)) {
+            return SummaryWriter.ROW_NOT_EVALUATED;
+        }
+        try {
+            return Integer.parseInt(d) <= Integer.parseInt(t) ? SummaryWriter.ROW_PASSES : SummaryWriter.ROW_FAILS;
+        } catch (NumberFormatException notFigures) {
+            return "";
+        }
     }
 
     /** The summary cites the very file the declaration pins, and that file is there with that hash. */

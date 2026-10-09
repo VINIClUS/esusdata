@@ -190,6 +190,20 @@ class ReleaseGatesConsistencyTest {
     }
 
     @Test
+    void aFailedSummaryRewrittenAsPassedIsRefusedByItsOwnRows(@TempDir Path workspace) throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.FAILED);
+        String before = SummaryWriter.sha256(tree.summaryJson());
+        Files.writeString(
+                tree.summaryJson(),
+                PortaoDEvidenceFixtures.read(tree.summaryJson()).replace("\"status\": \"FAILED\"", SUMMARY_STATUS),
+                StandardCharsets.UTF_8);
+        PortaoDEvidenceFixtures.replaceIn(tree.registry(), before, SummaryWriter.sha256(tree.summaryJson()));
+        PortaoDEvidenceFixtures.replaceIn(tree.registry(), "\"status\": \"FAILED\"", SUMMARY_STATUS);
+
+        assertThat(problemsOf(tree)).anyMatch(problem -> problem.contains("does not follow from its rows"));
+    }
+
+    @Test
     void aSummaryThatClaimsAnotherLocalSourceThanItsDossierIsRefused(@TempDir Path workspace) throws Exception {
         Tree tree = PortaoDEvidenceFixtures.decided(workspace, C4, Status.PASSED);
         editSummary(
