@@ -153,7 +153,12 @@ public record MethodologyProfile(
             /** A municipality sends after the cutoff, and the SIAPS may or may not take it in. */
             LATE_SENDING,
             /** The SIAPS reprocesses a period after it was published. */
-            REPROCESSING
+            REPROCESSING,
+            /**
+             * The SIAPS discards records its validations refuse (CNS, version of the e-SUS APS), which the PEC
+             * keeps; ADR 0034 §8.
+             */
+            VALIDATION
         }
 
         public DataTiming {

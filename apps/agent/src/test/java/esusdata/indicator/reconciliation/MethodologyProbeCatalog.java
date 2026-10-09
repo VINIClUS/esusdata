@@ -31,6 +31,7 @@ public final class MethodologyProbeCatalog {
         probes.addAll(C6MethodologyProbes.all());
         probes.addAll(C7MethodologyProbes.all());
         probes.addAll(CommonMethodologyProbes.all());
+        probes.addAll(PlaceholderProbes.all());
         return List.copyOf(probes);
     }
 

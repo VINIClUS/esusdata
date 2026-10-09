@@ -290,6 +290,17 @@ class MethodologyProfileRegistryTest {
     }
 
     @Test
+    void aValidationTimingItemLoadsAndTheSchemaAcceptsIt() throws Exception {
+        ObjectNode root = fixture();
+        timing(root, 1).put("kind", "VALIDATION");
+        MethodologyProfile profile =
+                MethodologyProfileRegistry.fromJson(root.toString()).profile(PACK, V1);
+
+        assertThat(profile.dataTiming().get(1).kind()).isEqualTo(DataTiming.TimingKind.VALIDATION);
+        assertThat(schema().validate(root)).isEmpty();
+    }
+
+    @Test
     void aConventionWithoutAProbeAddsNoConventionProbe() throws Exception {
         ObjectNode root = fixture();
         convention(root, 0).remove("probe_id");

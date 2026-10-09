@@ -18,6 +18,8 @@ import esusdata.indicator.reconciliation.ProbeContext.PackProbeContext;
 import esusdata.indicator.reconciliation.ProbeDiff;
 import esusdata.indicator.reconciliation.ProbeDiff.Divergence;
 import esusdata.indicator.reconciliation.ProbeResult;
+import esusdata.indicator.reconciliation.StructuralNoneProbe;
+import esusdata.indicator.reconciliation.StructuralNoneProbe.Cause;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +65,9 @@ public final class C5MethodologyProbes {
     /** The probe id the profiles use for the CBO of the blood-pressure record. */
     public static final String BP_MEASUREMENT = "c5.cbo.bp-measurement";
 
+    /** The probe id for the entry by encounters since 2013: the extract reads twelve months. */
+    public static final String CONDITION_ENTRY_HISTORY = "c5.condition.entry-history";
+
     /**
      * The CBO the ACS record is re-attributed to: a family (2241) that Quadros 03 and 04 list and
      * that Quadro 02 does not, so it is accepted for B and C and refused for A, as the ACS is for A
@@ -88,7 +93,7 @@ public final class C5MethodologyProbes {
      * The declared limitations whose forms carry the pressure the ACS writes: the home visit (L6)
      * and the collective-activity participant (L5).
      */
-    static final List<String> LIMITATIONS = List.of("oor.l5.bp-collective-participant", "oor.l6.bp-home-visit");
+    public static final List<String> LIMITATIONS = List.of("oor.l5.bp-collective-participant", "oor.l6.bp-home-visit");
 
     private static final String FORMS_OUTSIDE =
             "The blood pressure of a home visit (MIVDT) and of a participant of a collective activity (MIAC) is not"
@@ -99,7 +104,8 @@ public final class C5MethodologyProbes {
 
     /** The probes of C5, in the order of the research table. */
     public static List<MethodologyProbe> all() {
-        return List.of(new BpMeasurement());
+        return List.of(
+                new BpMeasurement(), new StructuralNoneProbe(CONDITION_ENTRY_HISTORY, C5Pack.ID, Cause.ENTRY_HISTORY));
     }
 
     /** The CBO that count for the blood-pressure record: the ACS in and 3224 out. */

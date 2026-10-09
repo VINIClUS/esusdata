@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import esusdata.indicator.model.CanonicalCondition;
 import esusdata.indicator.model.CanonicalDataset;
+import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.Quadrimestre;
 import esusdata.indicator.reconciliation.MethodologyProbe;
 import esusdata.indicator.reconciliation.Observability;
@@ -96,8 +97,10 @@ class C3MethodologyProbesTest {
     }
 
     @Test
-    void theProbeIsTheEndDateOfC3AndTheOnlyOneOfThePack() {
-        assertThat(C3MethodologyProbes.all()).hasSize(1);
+    void theFirstProbeIsTheEndDateOfC3() {
+        assertThat(C3MethodologyProbes.all())
+                .extracting(MethodologyProbe::id)
+                .containsExactly("c3.episode.end-date", "c3.codes.pregnancy-puerperium", "c3.miac.counting-rule");
         assertThat(PROBE.id()).isEqualTo("c3.episode.end-date");
         assertThat(PROBE.packs()).containsExactly(C3Pack.ID);
     }
@@ -235,5 +238,49 @@ class C3MethodologyProbesTest {
                     .extracting(CanonicalCondition::resolvedDate)
                     .containsExactly(RESOLVED.plusDays(1).toString());
         }
+    }
+
+    @Test
+    void theCodeListsIsAStructuralNoneBecauseTheRevokedTextWasNotAccessed() {
+        MethodologyProbe probe = probeById("c3.codes.pregnancy-puerperium");
+
+        ProbeResult result = probe.evaluate(emptyContext());
+
+        assertThat(probe.packs()).containsExactly(C3Pack.ID);
+        assertThat(result.probeId()).isEqualTo("c3.codes.pregnancy-puerperium");
+        assertThat(result.observability()).isEqualTo(Observability.NONE);
+        assertThat(result.affected()).isEmpty();
+        assertThat(result.reason()).contains("revoked edition").contains("not accessed");
+    }
+
+    @Test
+    void theMiacCountingRuleIsAStructuralNoneBecauseTheRevokedTextWasNotAccessed() {
+        MethodologyProbe probe = probeById("c3.miac.counting-rule");
+
+        ProbeResult result = probe.evaluate(emptyContext());
+
+        assertThat(probe.packs()).containsExactly(C3Pack.ID);
+        assertThat(result.probeId()).isEqualTo("c3.miac.counting-rule");
+        assertThat(result.observability()).isEqualTo(Observability.NONE);
+        assertThat(result.affected()).isEmpty();
+        assertThat(result.reason()).contains("revoked edition").contains("not accessed");
+    }
+
+    private static MethodologyProbe probeById(String id) {
+        return C3MethodologyProbes.all().stream()
+                .filter(probe -> probe.id().equals(id))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private static PackProbeContext contextOf(CanonicalDataset data) {
+        List<PackInput> inputs = Q1.months().stream()
+                .map(month -> new PackInput(PACK, data, EvaluationContext.endOfMonth("3541307", month)))
+                .toList();
+        return SyntheticProbeContexts.pack(inputs, Map.of());
+    }
+
+    private static PackProbeContext emptyContext() {
+        return contextOf(CanonicalDataset.builder().build());
     }
 }

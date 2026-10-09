@@ -13,6 +13,7 @@ import esusdata.indicator.model.EvaluationContext;
 import esusdata.indicator.model.Quadrimestre;
 import esusdata.indicator.reconciliation.MethodologyProbe;
 import esusdata.indicator.reconciliation.Observability;
+import esusdata.indicator.reconciliation.ProbeContext.PackProbeContext;
 import esusdata.indicator.reconciliation.ProbeResult;
 import esusdata.indicator.reconciliation.SyntheticProbeContexts;
 import esusdata.run.worker.SensitivityExtracts.PackInput;
@@ -57,8 +58,10 @@ class C4MethodologyProbesTest {
     }
 
     @Test
-    void theProbeIsTheBloodPressureCboOfC4AndTheOnlyOneOfThePack() {
-        assertThat(C4MethodologyProbes.all()).hasSize(1);
+    void theFirstProbeIsTheBloodPressureCboOfC4() {
+        assertThat(C4MethodologyProbes.all())
+                .extracting(MethodologyProbe::id)
+                .containsExactly("c4.cbo.bp-measurement", "c4.condition.code-list", "c4.condition.entry-history");
         assertThat(PROBE.id()).isEqualTo("c4.cbo.bp-measurement");
         assertThat(PROBE.packs()).containsExactly(C4Pack.ID);
     }
@@ -227,5 +230,60 @@ class C4MethodologyProbesTest {
         assertThat(rewritten.teams()).isEqualTo(data.teams());
         assertThat(rewritten.persons()).isEqualTo(data.persons());
         assertThat(rewritten.windows()).isEqualTo(data.windows());
+    }
+
+    @Test
+    void theConditionCodeListIsAStructuralNoneBecauseTheRevokedTextWasNotAccessed() {
+        MethodologyProbe probe = probeById("c4.condition.code-list");
+
+        ProbeResult result = probe.evaluate(emptyContext());
+
+        assertThat(probe.packs()).containsExactly(C4Pack.ID);
+        assertThat(result.probeId()).isEqualTo("c4.condition.code-list");
+        assertThat(result.observability()).isEqualTo(Observability.NONE);
+        assertThat(result.affected()).isEmpty();
+        assertThat(result.reason()).contains("revoked edition").contains("not accessed");
+    }
+
+    @Test
+    void theEntryHistoryIsAStructuralNoneWhileTheExtractReadsTheEncountersOfTwelveMonthsOnly() {
+        MethodologyProbe probe = probeById("c4.condition.entry-history");
+
+        ProbeResult result = probe.evaluate(emptyContext());
+
+        assertThat(probe.packs()).containsExactly(C4Pack.ID);
+        assertThat(result.observability()).isEqualTo(Observability.NONE);
+        assertThat(result.affected()).isEmpty();
+        assertThat(result.reason()).contains("since 2013").contains("shorter window");
+    }
+
+    @Test
+    void anExtractThatReaches2013IsStillNoneWithAnotherReasonAndNeverZero() {
+        CanonicalDataset data = CanonicalDataset.builder()
+                .window(Capabilities.CARE_ENCOUNTER, new DateWindow(LocalDate.of(2013, 1, 1), LocalDate.of(2026, 5, 1)))
+                .build();
+
+        ProbeResult result = probeById("c4.condition.entry-history").evaluate(contextOf(data));
+
+        assertThat(result.observability()).isEqualTo(Observability.NONE);
+        assertThat(result.reason()).contains("not implemented");
+    }
+
+    private static MethodologyProbe probeById(String id) {
+        return C4MethodologyProbes.all().stream()
+                .filter(probe -> probe.id().equals(id))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private static PackProbeContext contextOf(CanonicalDataset data) {
+        List<PackInput> inputs = Q1.months().stream()
+                .map(month -> new PackInput(PACK, data, EvaluationContext.endOfMonth("3541307", month)))
+                .toList();
+        return SyntheticProbeContexts.pack(inputs, Map.of());
+    }
+
+    private static PackProbeContext emptyContext() {
+        return contextOf(CanonicalDataset.builder().build());
     }
 }

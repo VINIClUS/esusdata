@@ -15,6 +15,8 @@ import esusdata.indicator.reconciliation.ProbeContext.PackProbeContext;
 import esusdata.indicator.reconciliation.ProbeDiff;
 import esusdata.indicator.reconciliation.ProbeDiff.Divergence;
 import esusdata.indicator.reconciliation.ProbeResult;
+import esusdata.indicator.reconciliation.StructuralNoneProbe;
+import esusdata.indicator.reconciliation.StructuralNoneProbe.Cause;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +55,12 @@ public final class C3MethodologyProbes {
     /** The probe id the profiles use for the end of the pregnancy. */
     public static final String END_DATE = "c3.episode.end-date";
 
+    /** The probe id for the lists of codes of pregnancy and puerperium: the revoked lists were not accessed. */
+    public static final String CODES_PREGNANCY_PUERPERIUM = "c3.codes.pregnancy-puerperium";
+
+    /** The probe id for the counting rule of the MIAC: the revoked text was not accessed. */
+    public static final String MIAC_COUNTING_RULE = "c3.miac.counting-rule";
+
     private static final String NOT_A_PACK =
             "The end of a pregnancy is read from the source records of the pack, which the Nota Final context does"
                     + " not carry.";
@@ -62,7 +70,7 @@ public final class C3MethodologyProbes {
                     + " nothing can be compared with the other reading.";
 
     /** The declared limitation of the outcome date field (items 17 and 4.1 of the E26 ficha). */
-    static final String LIMITATION = "oor.c3.outcome-date-field";
+    public static final String LIMITATION = "oor.c3.outcome-date-field";
 
     private static final String OUTCOME_OUTSIDE =
             "The registered outcome date of the pregnancy (items 17 and 4.1 of the E26 ficha) is not in the data of"
@@ -73,7 +81,10 @@ public final class C3MethodologyProbes {
 
     /** The probes of C3, in the order of the research table. */
     public static List<MethodologyProbe> all() {
-        return List.of(new EndDate());
+        return List.of(
+                new EndDate(),
+                new StructuralNoneProbe(CODES_PREGNANCY_PUERPERIUM, C3Pack.ID, Cause.NOT_SPECIFIABLE),
+                new StructuralNoneProbe(MIAC_COUNTING_RULE, C3Pack.ID, Cause.NOT_SPECIFIABLE));
     }
 
     /** The end of the pregnancy: the recorded outcome and the W78 resolution against DUM + 294. */
