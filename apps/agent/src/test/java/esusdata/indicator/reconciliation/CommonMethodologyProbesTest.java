@@ -157,6 +157,26 @@ class CommonMethodologyProbesTest {
     }
 
     @Test
+    void aChangeFromAStandInToAnAuditedTypeIsCountedButOnlyAsALowerBound() {
+        CanonicalTeam standIn = new CanonicalTeam(
+                CanonicalFixtures.ref("tb_equipe"),
+                IBGE,
+                INE,
+                CNES,
+                ESF_TYPE,
+                null,
+                null,
+                "2026-02-15",
+                CanonicalTeam.CURRENT_FALLBACK);
+
+        ProbeResult result = probe(states(standIn, state(INE, EAP_TYPE, "2026-02-15", null)), INE);
+
+        assertThat(result.observability()).isEqualTo(Observability.PARTIAL);
+        assertThat(result.affected()).hasValue(1);
+        assertThat(result.reason()).contains("current type standing in");
+    }
+
+    @Test
     void anExtractWithoutTeamStatesCannotBeRead() {
         ProbeResult result = probe(CanonicalDataset.builder().build(), INE);
 

@@ -70,9 +70,16 @@ final class PortaoDRunnerConfiguration {
     static final String GIT = ".git";
 
     private static final List<String> NOT_FOR_CAPTURE =
-            List.of(ENV_FILE, BINARY, REGISTRY, REPO_ROOT, POLICY, MANIFESTS_DIR, PERIODS);
-    private static final List<String> NOT_FOR_DIAGNOSTIC =
-            List.of(REGISTRY, REPO_ROOT, POLICY, OFFICIAL_EXPORT_DIR, OFFICIAL_EXPORT_IBGE, MANIFEST_OUTPUT);
+            List.of(ENV_FILE, BINARY, REGISTRY, REPO_ROOT, POLICY, MANIFESTS_DIR, PERIODS, DOSSIER_DIR, PROFILES);
+    private static final List<String> NOT_FOR_DIAGNOSTIC = List.of(
+            REGISTRY,
+            REPO_ROOT,
+            POLICY,
+            OFFICIAL_EXPORT_DIR,
+            OFFICIAL_EXPORT_IBGE,
+            MANIFEST_OUTPUT,
+            DOSSIER_DIR,
+            PROFILES);
 
     private static final List<String> NOT_FOR_COMPATIBILITY =
             List.of(REGISTRY, REPO_ROOT, POLICY, OFFICIAL_EXPORT_DIR, OFFICIAL_EXPORT_IBGE, MANIFEST_OUTPUT);

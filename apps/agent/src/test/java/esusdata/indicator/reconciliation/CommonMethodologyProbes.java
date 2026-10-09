@@ -202,11 +202,13 @@ public final class CommonMethodologyProbes {
         };
     }
 
-    /** Puts {@code ine} in {@code changed} when its two days differ, else in {@code fallback} when either stands in. */
+    /**
+     * Puts {@code ine} in {@code changed} when its two days differ, and in {@code fallback} when either
+     * day stands in: a change read through a stand-in is still only a lower bound.
+     */
     private static void sort(String ine, Resolution first, Resolution last, Set<String> changed, Set<String> fallback) {
         if (!sameType(first, last)) {
             changed.add(ine);
-            return;
         }
         if (standsIn(first) || standsIn(last)) {
             fallback.add(ine);

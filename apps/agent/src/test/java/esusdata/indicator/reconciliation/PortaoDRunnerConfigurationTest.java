@@ -140,7 +140,8 @@ class PortaoDRunnerConfigurationTest {
     }
 
     @ParameterizedTest(name = "the capture takes no {0}")
-    @ValueSource(strings = {ENV_FILE, BINARY, REGISTRY, REPO_ROOT, POLICY, MANIFESTS_DIR, PERIODS})
+    @ValueSource(
+            strings = {ENV_FILE, BINARY, REGISTRY, REPO_ROOT, POLICY, MANIFESTS_DIR, PERIODS, DOSSIER_DIR, PROFILES})
     void theCaptureAcceptsNoPecNoExecutionPlaneNoRegistryAndNoPolicy(String property) {
         Map<String, String> properties = plus(CAPTURE, property, "anything");
 
@@ -216,7 +217,17 @@ class PortaoDRunnerConfigurationTest {
     }
 
     @ParameterizedTest(name = "the diagnostic takes no {0}")
-    @ValueSource(strings = {REGISTRY, REPO_ROOT, POLICY, OFFICIAL_EXPORT_DIR, OFFICIAL_EXPORT_IBGE, MANIFEST_OUTPUT})
+    @ValueSource(
+            strings = {
+                REGISTRY,
+                REPO_ROOT,
+                POLICY,
+                OFFICIAL_EXPORT_DIR,
+                OFFICIAL_EXPORT_IBGE,
+                MANIFEST_OUTPUT,
+                DOSSIER_DIR,
+                PROFILES
+            })
     void theDiagnosticAcceptsNoRegistryNoPolicyAndNoOutputOfTheCapture(String property) {
         Map<String, String> properties = plus(DIAGNOSTIC, property, "anything");
 
