@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.Test;
@@ -439,13 +440,31 @@ class ReferenceScopedExtractsTest {
         Map<String, String> fingerprints = acquireAll(pec);
         int requests = pec.requests().size();
 
-        NotaFinalInputs inputs = cache().loadNotaFinal(notaFinal(pec));
+        NotaFinalInputs<Integer> inputs =
+                cache().loadNotaFinal(notaFinal(pec), pack -> pack.months().size());
 
         assertThat(inputs.byPack().keySet()).isEqualTo(fingerprints.keySet());
-        assertThat(inputs.byPack().values())
-                .allSatisfy(pack -> assertThat(pack.months()).hasSize(4));
+        assertThat(inputs.byPack().values()).containsOnly(4);
         assertThat(inputs.localSourceFingerprint()).isEqualTo(InputFingerprint.compute(fingerprints));
         assertThat(pec.requests()).as("the Nota Final reads no source").hasSize(requests);
+    }
+
+    @Test
+    void eachPackOfTheNotaFinalIsKeptOnlyAsWhatItWasReducedToInTheOrderOfTheRegistry() throws Exception {
+        acquireAll(pec);
+        List<String> reduced = new ArrayList<>();
+
+        NotaFinalInputs<String> inputs = cache().loadNotaFinal(notaFinal(pec), pack -> {
+            String id = pack.months().getFirst().rule().descriptor().id();
+            reduced.add(id);
+            return id;
+        });
+
+        assertThat(reduced)
+                .containsExactlyElementsOf(IndicatorRuleRegistry.all().stream()
+                        .map(rule -> rule.descriptor().id())
+                        .toList());
+        assertThat(inputs.byPack()).allSatisfy((pack, kept) -> assertThat(kept).isEqualTo(pack));
     }
 
     @Test
@@ -457,7 +476,7 @@ class ReferenceScopedExtractsTest {
         ReferenceScopedExtracts cache = cache();
         NotaFinalContext context = notaFinal(pec);
 
-        assertThatThrownBy(() -> cache.loadNotaFinal(context))
+        assertThatThrownBy(() -> cache.loadNotaFinal(context, Function.identity()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(C3Pack.ID)
                 .hasMessageContaining(NOTHING_MAY_BE_ACQUIRED);
@@ -471,7 +490,7 @@ class ReferenceScopedExtractsTest {
         assertThat(Arrays.stream(ReferenceScopedExtracts.class.getMethods())
                         .filter(method -> "loadNotaFinal".equals(method.getName()))
                         .flatMap(method -> Arrays.stream(method.getParameterTypes())))
-                .containsExactly(NotaFinalContext.class);
+                .containsExactly(NotaFinalContext.class, Function.class);
     }
 
     @Test

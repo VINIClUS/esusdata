@@ -279,10 +279,10 @@ final class PortaoDDiagnosticRun {
         try {
             Map<String, String> shas = new TreeMap<>();
             siblings.forEach((packId, sibling) -> shas.put(packId, sibling.sha256()));
-            NotaFinalInputs inputs =
-                    extracts.loadNotaFinal(new NotaFinalContext(municipalityIbge, reference.period(), source, shas));
-            Map<String, Map<YearMonth, List<TeamResult>>> byPack = new LinkedHashMap<>();
-            inputs.byPack().forEach((packId, months) -> byPack.put(packId, monthly(months, reference.period())));
+            // Each pack is reduced to its monthly team results before the next is loaded.
+            NotaFinalInputs<Map<YearMonth, List<TeamResult>>> inputs = extracts.loadNotaFinal(
+                    new NotaFinalContext(municipalityIbge, reference.period(), source, shas),
+                    months -> monthly(months, reference.period()));
             ValidatedReference official =
                     ValidatedReference.fromStored(store.load(reference.manifest()), reference.pack());
             PackVerdict verdict = PackVerdict.evaluate(
@@ -290,7 +290,7 @@ final class PortaoDDiagnosticRun {
                     ComponentIII.RULE_VERSION,
                     ReferencePurpose.DIAGNOSTIC,
                     official,
-                    LocalClasses.ofNotaFinal(reference.period(), byPack),
+                    LocalClasses.ofNotaFinal(reference.period(), inputs.byPack()),
                     inputs.localSourceFingerprint());
             return Row.of(reference.period(), reference.id(), verdict);
         } catch (IOException

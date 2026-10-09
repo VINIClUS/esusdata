@@ -35,6 +35,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -127,10 +128,11 @@ public final class ReferenceScopedExtracts {
     /**
      * The inputs of the Nota Final.
      *
-     * @param byPack the four months of each of C1 to C7, by pack id
+     * @param byPack what was kept of the four months of each of C1 to C7, by pack id
      * @param localSourceFingerprint {@code InputFingerprint} of the seven pack fingerprints
+     * @param <T> what is kept of one pack's four months
      */
-    public record NotaFinalInputs(Map<String, QuadrimestreInputs> byPack, String localSourceFingerprint) {
+    public record NotaFinalInputs<T>(Map<String, T> byPack, String localSourceFingerprint) {
 
         public NotaFinalInputs {
             byPack = Map.copyOf(byPack);
@@ -196,9 +198,16 @@ public final class ReferenceScopedExtracts {
      * The inputs of the Nota Final: the partitions of C1 to C7 that exist for the references of
      * {@code context}. It takes no {@link AcquisitionInputs}, so it cannot read the PEC: a partition
      * that is missing or does not match is a refusal.
+     *
+     * <p>Each pack's four months go to {@code reduce} as soon as they are loaded, and only what it
+     * returns is kept: the datasets of the seven packs are never in memory together, which a real
+     * quadrimestre does not fit in, and the Nota Final reads only the monthly team results of each.
+     *
+     * @param reduce what to keep of one pack's four months; it must not keep the inputs themselves
      */
-    public NotaFinalInputs loadNotaFinal(NotaFinalContext context) throws IOException {
-        Map<String, QuadrimestreInputs> byPack = new LinkedHashMap<>();
+    public <T> NotaFinalInputs<T> loadNotaFinal(NotaFinalContext context, Function<QuadrimestreInputs, T> reduce)
+            throws IOException {
+        Map<String, T> byPack = new LinkedHashMap<>();
         Map<String, String> fingerprints = new TreeMap<>();
         for (IndicatorRule rule : IndicatorRuleRegistry.all()) {
             String pack = rule.descriptor().id();
@@ -211,10 +220,10 @@ public final class ReferenceScopedExtracts {
                             rule.descriptor().ruleVersion(),
                             context.sourceIdentity()),
                     AcquisitionInputs.none());
-            byPack.put(pack, inputs);
+            byPack.put(pack, reduce.apply(inputs));
             fingerprints.put(pack, inputs.localSourceFingerprint());
         }
-        return new NotaFinalInputs(byPack, InputFingerprint.compute(fingerprints));
+        return new NotaFinalInputs<>(byPack, InputFingerprint.compute(fingerprints));
     }
 
     private Loaded loaded(ReferenceExecutionContext context, AcquisitionInputs acquisition) throws IOException {
