@@ -128,7 +128,8 @@ public final class CompatibilityDossierWriter {
         }
     }
 
-    private static DefaultPrettyPrinter printer() {
+    /** The printer every versioned JSON of the Portão D uses: two spaces and an explicit {@code "\n"}. */
+    static DefaultPrettyPrinter printer() {
         DefaultPrettyPrinter printer = new DefaultPrettyPrinter(Separators.createDefaultInstance()
                 .withObjectNameValueSpacing(Separators.Spacing.AFTER)
                 .withObjectEmptySeparator("")
@@ -244,13 +245,22 @@ public final class CompatibilityDossierWriter {
     // The privacy guard
 
     private static void requireNoIdentifiers(JsonNode root) {
-        List<String> found = new ArrayList<>();
-        scan(root, "$", found);
+        List<String> found = identifiersIn(root);
         if (!found.isEmpty()) {
             throw new IllegalArgumentException(
                     "the dossier would expose an identifier (an INE, a CNES, a person key or a raw record id) at "
                             + String.join(", ", found));
         }
+    }
+
+    /**
+     * Where {@code root} would expose an identifier, by path in the document; empty when it is
+     * clean. The check the writer applies before it writes, for the checks that read a dossier back.
+     */
+    static List<String> identifiersIn(JsonNode root) {
+        List<String> found = new ArrayList<>();
+        scan(root, "$", found);
+        return List.copyOf(found);
     }
 
     private static void scan(JsonNode node, String path, List<String> found) {
@@ -294,7 +304,8 @@ public final class CompatibilityDossierWriter {
         return DIGIT_RUN.matcher(value).replaceAll("0");
     }
 
-    private static boolean looksLikeIdentifier(String text) {
+    /** True when {@code text} holds a long digit run, a UUID or a hex digest, once reference ids and SEI numbers are set aside. */
+    static boolean looksLikeIdentifier(String text) {
         String rest =
                 SEI_DOCUMENT.matcher(REFERENCE_ID.matcher(text).replaceAll("")).replaceAll("");
         return DIGIT_RUN.matcher(rest).find()
@@ -303,6 +314,14 @@ public final class CompatibilityDossierWriter {
     }
 
     // The Markdown
+
+    /**
+     * The Markdown of a dossier's JSON bytes, as {@link #write} wrote it beside them: what a check
+     * compares a committed {@code .md} with.
+     */
+    static String renderMarkdown(byte[] json) {
+        return markdown(MAPPER.readTree(json));
+    }
 
     private static String markdown(JsonNode root) {
         List<String> lines = new ArrayList<>();

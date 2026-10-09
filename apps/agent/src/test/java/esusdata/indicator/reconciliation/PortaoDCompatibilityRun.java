@@ -30,6 +30,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,8 +49,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * The compatibility run of the Portão D (ADR 0034 §5, spec 2026-10-08 §7.2 stage B): for every
@@ -81,8 +81,9 @@ import tools.jackson.databind.ObjectMapper;
  * period the local source lacks months of is a {@link Kind#GAP} with the months it lacks. The local
  * detail (INEs) and the local log go to a separate directory that is never under {@code docs/}.
  *
- * <p>{@link GateCheck} is the third stage's precondition check; it reads these dossiers, writes a summary
- * and nothing else. It does not write the registry yet: that comes with {@code ReferenceSetVerdict}.
+ * <p>{@link GateCheck} is the third stage: it reads these dossiers, computes the gate verdict of every
+ * GATE reference from the cache, decides each reference set ({@link ReferenceSetVerdict}) and records
+ * D in the registry.
  */
 final class PortaoDCompatibilityRun {
 
@@ -737,35 +738,80 @@ final class PortaoDCompatibilityRun {
      */
     String cachedFingerprint(Reference reference, Sources sources) throws IOException {
         if (reference.pack().isNotaFinal()) {
-            Map<String, Reference> siblings = siblingsOf(reference);
-            if (siblings.size() != GatePack.all().size()) {
-                throw new IllegalStateException("the cache cannot stand for the Nota Final: siblings are missing");
-            }
-            Reference first = siblings.get(GatePack.all().getFirst().packId());
-            Map<String, String> shas = new TreeMap<>();
-            siblings.forEach((packId, sibling) -> shas.put(packId, sibling.sha256()));
-            SourceIdentity source = sources.of(
-                    municipalityIbge,
-                    reference.period(),
-                    first.sha256(),
-                    PortaoDDiagnosticRun.ruleOf(first.pack()).descriptor().ruleVersion());
-            return extracts.loadNotaFinal(
-                            new NotaFinalContext(municipalityIbge, reference.period(), source, shas),
-                            months -> NOT_AVAILABLE)
-                    .localSourceFingerprint();
+            return cachedNotaFinal(reference, sources, months -> NOT_AVAILABLE).localSourceFingerprint();
         }
+        return cachedPack(reference, sources).localSourceFingerprint();
+    }
+
+    /**
+     * The Portão D verdict of one reference against the cache alone: the same comparison as the
+     * diagnostic run, with {@link ReferencePurpose#GATE}. The Nota Final goes through the same derived
+     * fingerprint as its dossier, the one of the seven packs' partitions. Nothing is acquired and no
+     * PEC is read; whatever the cache lacks is a refusal, which the caller does not catch.
+     *
+     * @throws IllegalStateException when the cache lacks any partition of it or holds more than one source
+     */
+    PackVerdict gateVerdict(Reference reference, Sources sources) throws IOException {
+        ValidatedReference official = ValidatedReference.fromStored(store.load(reference.manifest()), reference.pack());
+        if (reference.pack().isNotaFinal()) {
+            NotaFinalInputs<Map<YearMonth, List<TeamResult>>> inputs = cachedNotaFinal(
+                    reference,
+                    sources,
+                    months -> PortaoDDiagnosticRun.monthly(PortaoDDiagnosticRun.baseline(months), reference.period()));
+            return PackVerdict.evaluate(
+                    reference.pack(),
+                    ComponentIII.RULE_VERSION,
+                    ReferencePurpose.GATE,
+                    official,
+                    LocalClasses.ofNotaFinal(reference.period(), inputs.byPack()),
+                    inputs.localSourceFingerprint());
+        }
+        IndicatorRule rule = PortaoDDiagnosticRun.ruleOf(reference.pack());
+        QuadrimestreInputs inputs = cachedPack(reference, sources);
+        LocalClasses local = LocalClasses.of(
+                rule,
+                reference.period(),
+                PortaoDDiagnosticRun.monthly(PortaoDDiagnosticRun.baseline(inputs), reference.period()));
+        return PackVerdict.evaluate(
+                reference.pack(),
+                rule.descriptor().ruleVersion(),
+                ReferencePurpose.GATE,
+                official,
+                local,
+                inputs.localSourceFingerprint());
+    }
+
+    /** The four months of one of C1 to C7 as the cache holds them, with {@link AcquisitionInputs#none()}. */
+    private QuadrimestreInputs cachedPack(Reference reference, Sources sources) throws IOException {
         String ruleVersion =
                 PortaoDDiagnosticRun.ruleOf(reference.pack()).descriptor().ruleVersion();
         return extracts.loadOrAcquireQuadrimestre(
-                        new QuadrimestreContext(
-                                municipalityIbge,
-                                reference.period(),
-                                reference.sha256(),
-                                reference.pack().packId(),
-                                ruleVersion,
-                                sources.of(municipalityIbge, reference.period(), reference.sha256(), ruleVersion)),
-                        AcquisitionInputs.none())
-                .localSourceFingerprint();
+                new QuadrimestreContext(
+                        municipalityIbge,
+                        reference.period(),
+                        reference.sha256(),
+                        reference.pack().packId(),
+                        ruleVersion,
+                        sources.of(municipalityIbge, reference.period(), reference.sha256(), ruleVersion)),
+                AcquisitionInputs.none());
+    }
+
+    /** The partitions of the seven packs the Nota Final reads, as the cache holds them. */
+    private <T> NotaFinalInputs<T> cachedNotaFinal(
+            Reference reference, Sources sources, Function<QuadrimestreInputs, T> reduce) throws IOException {
+        Map<String, Reference> siblings = siblingsOf(reference);
+        if (siblings.size() != GatePack.all().size()) {
+            throw new IllegalStateException("the cache cannot stand for the Nota Final: siblings are missing");
+        }
+        Reference first = siblings.get(GatePack.all().getFirst().packId());
+        Map<String, String> shas = new TreeMap<>();
+        siblings.forEach((packId, sibling) -> shas.put(packId, sibling.sha256()));
+        SourceIdentity source = sources.of(
+                municipalityIbge,
+                reference.period(),
+                first.sha256(),
+                PortaoDDiagnosticRun.ruleOf(first.pack()).descriptor().ruleVersion());
+        return extracts.loadNotaFinal(new NotaFinalContext(municipalityIbge, reference.period(), source, shas), reduce);
     }
 
     /** The captured reference with this id. */
@@ -909,27 +955,36 @@ final class PortaoDCompatibilityRun {
         return files.stream().map(file -> file.getFileName().toString()).collect(Collectors.toCollection(TreeSet::new));
     }
 
-    // ---- the gate's precondition check
+    // ---- the gate
 
     /**
-     * The check that comes before the third stage (spec §7.2 stage C): the GATE declarations of the
-     * policy in the working tree, each with the dossier that authorizes it and the local source that
-     * dossier was decided on. It decides nothing, <b>does not write the registry</b> (that comes with
-     * {@code ReferenceSetVerdict}, PR D) and writes only its summary to the artifact directory.
+     * The third stage (spec §7.2 stage C and §16.2): the GATE declarations of the policy in the
+     * working tree, each with the dossier that authorizes it and the local source that dossier was
+     * decided on, then the Portão D verdict of every reference set, recorded in the registry.
      *
      * <p>It refuses a working tree that is not clean (the evidence that pre-registers the set is a
-     * commit, and the run is against that commit) and a GATE declaration that differs from the one
-     * {@code HEAD} holds. There is no period to give it: the references are the declarations, and
-     * nothing else.
+     * commit, and the run is against that commit), a {@code HEAD} that is not an ancestor of {@code
+     * origin/main} (the set must have been merged before D is decided) and a GATE declaration that
+     * differs from the one {@code HEAD} holds. There is no period to give it: the references are the
+     * declarations, and nothing else.
+     *
+     * <p>The verdict of each GATE reference is computed from the cache alone ({@link
+     * PortaoDCompatibilityRun#gateVerdict}); a reference whose declaration, manifest, dossier or cached
+     * source does not check out gets none and is {@code PENDING} in its set. An evaluation that throws
+     * (a partition gone, a source the cache holds twice) aborts the whole run: every verdict is
+     * computed before a single file is written, so there is never a partial registry. Then it writes
+     * its summary to the artifact directory, the evidence summary of each decided set under {@code
+     * docs/indicadores/portoes/resultado-d/} and {@code D} of every registered pack in {@code
+     * contracts/indicators/release-gates.json}. A set with no GATE reference is {@code PENDING}, which
+     * is every set until the evidence PR.
      */
     static final class GateCheck {
 
         /** The policy, relative to the repository root. */
         static final String POLICY_FILE = "contracts/indicators/siaps-reference-policy.json";
 
-        private static final ObjectMapper MAPPER = new ObjectMapper();
-        private static final String VERDICT = "verdict";
-        private static final String FINGERPRINT = "local_source_fingerprint";
+        /** The release-gate registry, relative to the repository root. */
+        static final String REGISTRY_FILE = "contracts/indicators/release-gates.json";
 
         private GateCheck() {}
 
@@ -939,6 +994,9 @@ final class PortaoDCompatibilityRun {
             /** True when there is nothing modified, staged or untracked. */
             boolean isClean() throws IOException;
 
+            /** True when {@code HEAD} is an ancestor of {@code origin/main}, as last fetched. */
+            boolean isMerged() throws IOException;
+
             /** The content of a file at {@code HEAD}, if it exists there. */
             Optional<String> committed(String repositoryPath) throws IOException;
         }
@@ -946,8 +1004,16 @@ final class PortaoDCompatibilityRun {
         /** One GATE reference. */
         record ReferenceCheck(String referenceId, boolean ok, String detail) {}
 
-        /** One reference set: the hash D would cite and the check of each of its GATE references. */
-        record PackCheck(String pack, String ruleVersion, String gateSetSha256, List<ReferenceCheck> references) {
+        /**
+         * One reference set: the hash D would cite, the check of each of its GATE references and the
+         * verdict of the set.
+         */
+        record PackCheck(
+                String pack,
+                String ruleVersion,
+                String gateSetSha256,
+                List<ReferenceCheck> references,
+                ReferenceSetVerdict verdict) {
 
             PackCheck {
                 references = List.copyOf(references);
@@ -978,12 +1044,16 @@ final class PortaoDCompatibilityRun {
                 List<String> lines = new ArrayList<>();
                 lines.add("# Conferência do conjunto de gate");
                 lines.add("");
-                lines.add("Registro de portões: não escrito (ele vem com o veredito do conjunto).");
+                lines.add("Registro de portões: D de cada pack escrito com o veredito do seu conjunto.");
                 lines.add("");
                 for (PackCheck pack : packs) {
                     lines.add("## " + pack.ruleVersion());
                     lines.add("");
                     lines.add("- gate_set_sha256: `" + pack.gateSetSha256() + "`");
+                    lines.add("- veredito do conjunto: **" + pack.verdict().status() + "**"
+                            + (pack.verdict().reason().isEmpty()
+                                    ? ""
+                                    : " (" + pack.verdict().reason() + ")"));
                     if (pack.references().isEmpty()) {
                         lines.add("- conjunto de gate vazio: nenhuma referência GATE declarada");
                     }
@@ -1000,24 +1070,31 @@ final class PortaoDCompatibilityRun {
         }
 
         /**
-         * Checks every GATE reference of the policy of {@code repoRoot} and writes {@code
-         * <artifactDir>/gate/resumo.md}.
+         * Checks every GATE reference of the policy of {@code repoRoot}, decides every set and
+         * records the result.
          *
          * @param extracts the cache of the compatibility campaign, read without a PEC
          * @param compiled the rules of this release
-         * @throws IllegalStateException when the working tree is not clean, or a GATE declaration of the
-         *     working tree is not that of {@code HEAD}
+         * @param clock the day D is recorded as checked on
+         * @throws IllegalStateException when the working tree is not clean, {@code HEAD} is not merged,
+         *     a GATE declaration of the working tree is not that of {@code HEAD}, or the cache cannot
+         *     stand for a reference whose declaration, manifest and dossier check out
          */
         static Summary check(
                 Path repoRoot,
                 Repository repository,
                 Path artifactDir,
                 ReferenceScopedExtracts extracts,
-                Collection<PackDescriptor> compiled)
+                Collection<PackDescriptor> compiled,
+                Clock clock)
                 throws IOException {
             if (!repository.isClean()) {
                 throw new IllegalStateException("the working tree is not clean: commit the evidence first,"
                         + " the gate runs against the committed set");
+            }
+            if (!repository.isMerged()) {
+                throw new IllegalStateException("HEAD is not an ancestor of origin/main: the set must be merged"
+                        + " (and fetched) before D is decided against it");
             }
             ReferencePolicy working = ReferencePolicy.load(repoRoot.resolve(POLICY_FILE), compiled);
             ReferencePolicy head = ReferencePolicy.fromJson(
@@ -1029,18 +1106,14 @@ final class PortaoDCompatibilityRun {
             PortaoDCompatibilityRun run = hasGateReferences(working) ? open(repoRoot, artifactDir, extracts) : null;
             List<PackCheck> packs = new ArrayList<>();
             for (ReferenceSet set : working.referenceSets()) {
-                List<ReferenceCheck> checks = new ArrayList<>();
-                for (ReferenceDeclaration declaration : set.references()) {
-                    if (declaration.purpose() == ReferencePurpose.GATE) {
-                        checks.add(check(repoRoot, run, extracts, set, declaration));
-                    }
-                }
-                packs.add(new PackCheck(set.pack(), set.ruleVersion(), set.gateSetSha256(), checks));
+                packs.add(examine(repoRoot, run, extracts, set));
             }
+            // Every verdict exists: from here on files are written.
             Summary summary = new Summary(packs);
             Path summaryFile = artifactDir.resolve("gate").resolve("resumo.md");
             Files.createDirectories(summaryFile.getParent());
             Files.writeString(summaryFile, summary.markdown());
+            record(repoRoot, packs.stream().map(PackCheck::verdict).toList(), LocalDate.now(clock));
             return summary;
         }
 
@@ -1072,21 +1145,46 @@ final class PortaoDCompatibilityRun {
                     packId -> List.of());
         }
 
-        private static ReferenceCheck check(
-                Path repoRoot,
-                PortaoDCompatibilityRun run,
-                ReferenceScopedExtracts extracts,
-                ReferenceSet set,
-                ReferenceDeclaration declaration)
+        /** Checks the GATE references of one set and decides it. */
+        private static PackCheck examine(
+                Path repoRoot, PortaoDCompatibilityRun run, ReferenceScopedExtracts extracts, ReferenceSet set)
                 throws IOException {
-            List<String> problems = new ArrayList<>(manifestProblems(repoRoot, declaration));
-            JsonNode dossier = dossierOf(repoRoot, declaration, problems);
-            if (dossier != null) {
-                problems.addAll(dossierProblems(set, declaration, dossier));
-                problems.addAll(sourceProblems(
-                        run, extracts, declaration, dossier.path(FINGERPRINT).asString("")));
+            List<ReferenceCheck> checks = new ArrayList<>();
+            Map<String, DossierEvidence> dossiers = new LinkedHashMap<>();
+            Map<String, PackVerdict> verdicts = new LinkedHashMap<>();
+            for (ReferenceDeclaration declaration : set.references()) {
+                if (declaration.purpose() != ReferencePurpose.GATE) {
+                    continue;
+                }
+                List<String> problems = new ArrayList<>(manifestProblems(repoRoot, declaration));
+                Optional<DossierEvidence> dossier = dossierOf(repoRoot, declaration, problems);
+                if (dossier.isPresent()) {
+                    dossiers.put(declaration.referenceId(), dossier.get());
+                    problems.addAll(dossier.get().problems(set, declaration));
+                    problems.addAll(sourceProblems(
+                            run, extracts, declaration, dossier.get().localSourceFingerprint()));
+                }
+                checks.add(
+                        new ReferenceCheck(declaration.referenceId(), problems.isEmpty(), String.join("; ", problems)));
+                if (problems.isEmpty()) {
+                    verdicts.put(declaration.referenceId(), gateVerdict(run, extracts, declaration));
+                }
             }
-            return new ReferenceCheck(declaration.referenceId(), problems.isEmpty(), String.join("; ", problems));
+            return new PackCheck(
+                    set.pack(),
+                    set.ruleVersion(),
+                    set.gateSetSha256(),
+                    checks,
+                    ReferenceSetVerdict.aggregate(set, verdicts, dossiers));
+        }
+
+        private static PackVerdict gateVerdict(
+                PortaoDCompatibilityRun run, ReferenceScopedExtracts extracts, ReferenceDeclaration declaration)
+                throws IOException {
+            Reference reference = run.reference(declaration.referenceId())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "the manifest of " + declaration.referenceId() + " is not among the captured ones"));
+            return run.gateVerdict(reference, Sources.recorded(extracts));
         }
 
         private static List<String> manifestProblems(Path repoRoot, ReferenceDeclaration declaration)
@@ -1100,51 +1198,20 @@ final class PortaoDCompatibilityRun {
                     : List.of("the manifest is not the one the declaration pins");
         }
 
-        /** The dossier the declaration cites, once it is there and is the one pinned; else a problem. */
-        private static JsonNode dossierOf(Path repoRoot, ReferenceDeclaration declaration, List<String> problems)
-                throws IOException {
+        /** The dossier the declaration cites, as committed; else a problem. */
+        private static Optional<DossierEvidence> dossierOf(
+                Path repoRoot, ReferenceDeclaration declaration, List<String> problems) throws IOException {
             String ref = declaration.compatibilityEvidenceRef();
             Path file = ref == null ? null : repoRoot.resolve(ref);
             if (file == null || !Files.isRegularFile(file)) {
                 problems.add("the cited dossier is missing");
-                return null;
+                return Optional.empty();
             }
-            byte[] bytes = Files.readAllBytes(file);
-            if (!SummaryWriter.sha256(bytes).equals(declaration.compatibilityEvidenceSha256())) {
-                problems.add("the dossier is not the one the declaration pins");
-                return null;
+            Optional<DossierEvidence> dossier = DossierEvidence.read(ref, Files.readAllBytes(file));
+            if (dossier.isEmpty()) {
+                problems.add("the cited dossier is not a JSON object");
             }
-            return MAPPER.readTree(bytes);
-        }
-
-        private static List<String> dossierProblems(
-                ReferenceSet set, ReferenceDeclaration declaration, JsonNode dossier) {
-            List<String> problems = new ArrayList<>();
-            if (!declaration.referenceId().equals(dossier.path("reference_id").asString(""))) {
-                problems.add("the dossier is of another reference");
-            }
-            if (!set.ruleVersion().equals(dossier.path("rule_version").asString(""))) {
-                problems.add("the dossier is of another rule version");
-            }
-            if (!declaration
-                    .referenceManifestSha256()
-                    .equals(dossier.path("reference_manifest_sha256").asString(""))) {
-                problems.add("the dossier is of another manifest");
-            }
-            String verdict = dossier.path(VERDICT).asString("");
-            if (!declaration.compatibility().name().equals(verdict)) {
-                problems.add("the dossier verdict is not the declared compatibility");
-            }
-            if (!isAuthorizing(verdict)) {
-                problems.add("the dossier verdict does not authorize the gate");
-            }
-            return problems;
-        }
-
-        private static boolean isAuthorizing(String verdict) {
-            return Stream.of(ReferenceCompatibility.values())
-                    .filter(candidate -> candidate.name().equals(verdict))
-                    .anyMatch(ReferenceCompatibility::authorizesGate);
+            return dossier;
         }
 
         /** The fingerprint of the extracts the cache holds is the one the dossier was decided on. */
@@ -1165,6 +1232,80 @@ final class PortaoDCompatibilityRun {
             } catch (IOException | IllegalStateException | IllegalArgumentException | UncheckedIOException failure) {
                 return List.of("the cache cannot stand for the reference: " + Row.redacted(failure.getMessage()));
             }
+        }
+
+        /**
+         * Writes the evidence summary of each decided set, takes away the old summary of a pending one,
+         * and then D of every pack, as one change: if the registry refuses any set, the registry and
+         * every summary are put back as they were (the old bytes, or no file where there was none), so a
+         * rerun starts from the committed tree.
+         */
+        private static void record(Path repoRoot, List<ReferenceSetVerdict> verdicts, LocalDate day)
+                throws IOException {
+            Map<Path, Optional<byte[]>> before = new LinkedHashMap<>();
+            remember(before, repoRoot.resolve(REGISTRY_FILE));
+            for (ReferenceSetVerdict verdict : verdicts) {
+                for (Path summary : summariesOf(repoRoot, verdict)) {
+                    remember(before, summary);
+                }
+            }
+            Path registry = repoRoot.resolve(REGISTRY_FILE);
+            boolean recorded = false;
+            try {
+                for (ReferenceSetVerdict verdict : verdicts) {
+                    RegistryUpdater.record(registry, repoRoot, verdict, day, bundleOf(repoRoot, verdict, day));
+                }
+                recorded = true;
+            } finally {
+                if (!recorded) {
+                    restore(before);
+                }
+            }
+        }
+
+        private static List<Path> summariesOf(Path repoRoot, ReferenceSetVerdict verdict) {
+            Path directory = repoRoot.resolve(SummaryWriter.SET_SUMMARY_DIR);
+            return List.of(
+                    directory.resolve(SummaryWriter.summaryFileName(verdict.ruleVersion(), JSON)),
+                    directory.resolve(SummaryWriter.summaryFileName(verdict.ruleVersion(), MARKDOWN)));
+        }
+
+        private static void remember(Map<Path, Optional<byte[]>> before, Path file) throws IOException {
+            before.put(file, Files.isRegularFile(file) ? Optional.of(Files.readAllBytes(file)) : Optional.empty());
+        }
+
+        private static void restore(Map<Path, Optional<byte[]>> before) throws IOException {
+            for (Map.Entry<Path, Optional<byte[]>> file : before.entrySet()) {
+                if (file.getValue().isPresent()) {
+                    Files.write(file.getKey(), file.getValue().get());
+                } else {
+                    Files.deleteIfExists(file.getKey());
+                }
+            }
+        }
+
+        private static RegistryUpdater.EvidenceBundle bundleOf(
+                Path repoRoot, ReferenceSetVerdict verdict, LocalDate day) throws IOException {
+            if (verdict.status() == PackVerdict.Status.PENDING) {
+                // a set that was decided and is pending now takes its old summary away with D
+                for (Path summary : summariesOf(repoRoot, verdict)) {
+                    Files.deleteIfExists(summary);
+                }
+                return RegistryUpdater.EvidenceBundle.none();
+            }
+            SummaryWriter.WrittenSetSummary written =
+                    SummaryWriter.writeSet(repoRoot.resolve(SummaryWriter.SET_SUMMARY_DIR), verdict, day);
+            List<RegistryUpdater.CitedFile> cited = new ArrayList<>();
+            for (ReferenceSetVerdict.ReferenceOutcome outcome : verdict.references()) {
+                cited.add(new RegistryUpdater.CitedFile(
+                        ReferencePolicy.manifestPath(outcome.referenceId()), outcome.referenceManifestSha256()));
+                cited.add(new RegistryUpdater.CitedFile(outcome.dossierRef(), outcome.dossierSha256()));
+            }
+            return new RegistryUpdater.EvidenceBundle(
+                    SummaryWriter.SET_SUMMARY_DIR + SummaryWriter.summaryFileName(verdict.ruleVersion(), JSON),
+                    written.jsonSha256(),
+                    verdict.gateSetSha256(),
+                    cited);
         }
     }
 }

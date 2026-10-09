@@ -14,6 +14,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Assumptions;
@@ -27,16 +28,19 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Inputs: {@code -Dobservatorio.gate.d.repo-root=<dir>} (a clean working tree whose {@code HEAD}
  * holds the pre-registration) and {@code -Dobservatorio.gate.d.artifact-dir=<dir>} (the campaign's
- * store and cache; the summary goes to {@code <dir>/gate/resumo.md}). There is no period, no PEC and
- * no registry: the references are the GATE declarations of {@code
+ * store and cache; the summary goes to {@code <dir>/gate/resumo.md}). There is no period and no PEC: the references are the GATE declarations of {@code
  * contracts/indicators/siaps-reference-policy.json}, which must be exactly those of {@code HEAD}.
- * For each pack it computes {@code gate_set_sha256} and checks that every GATE reference has a
+ * For each pack it computes {@code gate_set_sha256}, checks that every GATE reference has a
  * dossier whose verdict authorizes the gate and whose {@code local_source_fingerprint} is that of
- * the extracts in the cache.
+ * the extracts in the cache, computes the verdict of each from the cache alone and decides the set
+ * ({@code ReferenceSetVerdict}, {@code ALL_REQUIRED}).
  *
- * <p><b>It does not write the registry.</b> {@code release-gates.json} is untouched; the verdict of
- * the set and the update of D come with {@code ReferenceSetVerdict} (PR D). An empty gate set, which
- * is every set until the evidence PR, is reported as empty and is not a failure.
+ * <p><b>It writes.</b> The set summaries of the decided sets go to {@code
+ * docs/indicadores/portoes/resultado-d/} and {@code D} of every registered pack to {@code
+ * contracts/indicators/release-gates.json} of the repository root, dated today. Nothing is written
+ * unless every verdict could be computed. Run it on a clean checkout whose {@code HEAD} is merged
+ * into {@code origin/main} (fetch first), then review and commit the diff. An empty gate set, which
+ * is every set until the evidence PR, is {@code PENDING} and is not a failure of the run.
  */
 class PortaoDGateLiveTest {
 
@@ -57,15 +61,17 @@ class PortaoDGateLiveTest {
                 new GitRepository(configuration.repoRoot()),
                 configuration.artifactDir(),
                 new ReferenceScopedExtracts(configuration.artifactDir().resolve("extratos"), Clock.systemUTC()),
-                ReleaseGateRegistry.registeredPacks());
+                ReleaseGateRegistry.registeredPacks(),
+                Clock.system(ZoneId.of("America/Sao_Paulo")));
 
         for (PackCheck pack : summary.packs()) {
             log.info(
-                    "gate: {} gate_set_sha256 {}: {} GATE references, {}",
+                    "gate: {} gate_set_sha256 {}: {} GATE references, {}, D {}",
                     pack.ruleVersion(),
                     pack.gateSetSha256(),
                     pack.references().size(),
-                    pack.ok() ? "all checked" : "some failed");
+                    pack.ok() ? "all checked" : "some failed",
+                    pack.verdict().status());
         }
         log.info("summary in {}", configuration.artifactDir().resolve("gate"));
 
@@ -83,11 +89,36 @@ class PortaoDGateLiveTest {
         }
 
         @Override
+        public boolean isMerged() throws IOException {
+            return exitCode("merge-base", "--is-ancestor", "HEAD", "origin/main") == 0;
+        }
+
+        @Override
         public Optional<String> committed(String repositoryPath) {
             try {
                 return Optional.of(output("show", "HEAD:" + repositoryPath));
             } catch (IOException notThere) {
                 return Optional.empty();
+            }
+        }
+
+        /** The exit code of git: 0 and 1 are answers (as for {@code merge-base --is-ancestor}), anything else a failure. */
+        private int exitCode(String... arguments) throws IOException {
+            List<String> command = new java.util.ArrayList<>(List.of("git", "-C", root.toString()));
+            command.addAll(List.of(arguments));
+            Process process = new ProcessBuilder(command)
+                    .redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            try {
+                int code = process.waitFor();
+                if (code > 1) {
+                    throw new IOException("git " + arguments[0] + " failed");
+                }
+                return code;
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IOException("interrupted while waiting for git", interrupted);
             }
         }
 

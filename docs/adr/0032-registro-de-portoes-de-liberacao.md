@@ -137,3 +137,12 @@ da V12), com `{"legacy":true}` ou ilegível não cobre. Assim, registrar o D com
 são reavaliados em cada execução e o registro os guarda como `PENDING`, então um resultado preso por
 eles seria recalculado a cada tick. Competências nunca calculadas e obsoletas seguem a mesma ordem do
 planejador (mais antiga primeiro, um job por tick).
+
+## Nota de 2026-10-09: o D vem do conjunto de referências pré-registrado (`@2`)
+
+O D de C1–C7 é decidido por `siaps-distribuicao-por-classe@2`, e o da Nota Final por
+`siaps-nota-final-por-classe@2`, sobre o conjunto de referências pré-registrado na política (ADR 0034,
+emenda de 2026-10-09). A evidência é o resumo do conjunto em
+`docs/indicadores/portoes/resultado-d/<rule_version>.json`, que cita o `gate_set_sha256`. O `@1` não é mais
+aceito como evidência nova de D; o teste de consistência recusa um D decidido com outro check. Nada muda no
+carregador, no esquema nem na aplicação dos portões.

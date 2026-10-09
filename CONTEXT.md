@@ -116,7 +116,8 @@ assinatura de uma pessoa. A (fonte e vigência) e D (reconciliação) vêm do re
 `pack@rule_version`; B (nenhuma lacuna bloqueante) e C (capacidades `VALIDATED` na fonte) são avaliados
 a cada resultado. Só o `RunExecutor` aplica os portões; enquanto algum não passou, o resultado sai
 `BLOCKED` com as contagens, e o instantâneo dos portões fica gravado com ele. Versão de regra nova
-anula as verificações antigas.
+anula as verificações antigas. O D vem do conjunto de referências oficiais do SIAPS pré-registrado na
+política (check `@2`, ADR 0034), e não de um quadrimestre escolhido por data.
 _Avoid_: aprovação humana, Portão E
 
 **Capacidade** (`CapabilityContract`, descritor `capabilities/<id>@<versão>.json`):

@@ -1,5 +1,8 @@
 # Runbook: conferência do Portão D com o SIAPS
 
+> **Superado** por [`runbook-portao-d-retrospectivo.md`](runbook-portao-d-retrospectivo.md) (ADR 0034,
+> check `@2`). Este texto descreve o fluxo `@1` e fica só como registro; não o siga para decidir o D.
+
 O Portão D deixou de esperar o quadrimestre 2026Q2 do SIAPS: ele reconcilia retrospectivamente, com a
 exportação oficial por equipe e um dossiê de compatibilidade metodológica por referência
 ([ADR 0034](../adr/0034-reconciliacao-siaps-retrospectiva.md)). **Como rodar (captura, diagnóstico,

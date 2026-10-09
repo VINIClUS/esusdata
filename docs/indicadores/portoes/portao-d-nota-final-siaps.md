@@ -1,14 +1,16 @@
-# Portão D: Nota Final do Componente III contra o SIAPS público (`siaps-nota-final-por-classe@1`)
+# Portão D: Nota Final do Componente III contra o SIAPS (`siaps-nota-final-por-classe@2`)
 
 Esta é a regra do Portão D da entrada `componente-iii-nota-final` do registro de portões
-(`contracts/indicators/release-gates.json`). Ela espelha `siaps-distribuicao-por-classe@1`
+(`contracts/indicators/release-gates.json`). Ela espelha `siaps-distribuicao-por-classe@2`
 (`docs/indicadores/portoes/portao-d-conciliacao-siaps.md`) e foi fixada **antes** de existir qualquer
-dado para a comparação. Qualquer mudança de métrica, limiar, elegibilidade ou conjunto de equipes
-exige uma nova versão do check (`@2`, ...) e um motivo que não seja "o resultado reprovou".
+dado para a comparação. Qualquer mudança de métrica, limiar ou conjunto de equipes exige uma nova versão
+do check (`@3`, ...) e um motivo que não seja "o resultado reprovou". O `@1` (o quadrimestre mais recente
+publicado e elegível pela data das fichas) foi aposentado
+([ADR 0034](../../adr/0034-reconciliacao-siaps-retrospectiva.md)) e não é mais aceito como evidência nova.
 
 O produto nunca chama o SIAPS. A conferência é a mesma ferramenta de desenvolvimento do Portão D de
-C1–C7 (árvore de testes, sob demanda); a saída dela (documento-resumo mais o sha256) vira a evidência
-de `gates.D` da entrada do Componente III. FAILED mantém a Nota Final bloqueada, e isso é o
+C1–C7 (árvore de testes, sob demanda); a saída dela (o resumo do conjunto, em JSON, mais o sha256) vira
+a evidência de `gates.D` da entrada do Componente III. FAILED mantém a Nota Final bloqueada, e isso é o
 comportamento correto.
 
 ## O que o SIAPS anônimo oferece
@@ -21,16 +23,16 @@ Esta regra usa só as linhas `tipoOrigem = QUALIDADE` de `sgEquipe` eSF e eAP. A
 eMulti ficam fora (outros quadros da NT 8/2026, fora do escopo do Componente III de eSF/eAP). Não há
 nota nem classe por equipe.
 
-## Elegibilidade do quadrimestre de referência
+## Referências: o conjunto pré-registrado
 
-O quadrimestre de referência é o **mais recente quadrimestre publicado no SIAPS**, e ele só vale se for
-elegível para **cada um** de C1–C7 pela regra de `siaps-distribuicao-por-classe@1`: seu último dia é
-posterior à maior data de assinatura SEI entre as sete fichas e a NT 8/2026. Hoje essa data é
-24/06/2026 (ficha do C1; a NT 8/2026 foi assinada por último em 01/06/2026), então o primeiro
-quadrimestre elegível é 2026Q2 (termina 31/08/2026). Se o mais recente publicado não for elegível, ou
-nenhum for, o resultado é **PENDING** com a razão "aguardando <quadrimestre> no SIAPS". Comparar um
-quadrimestre mais antigo que o mais recente publicado, ou um inelegível, só é possível em modo
-diagnóstico (mesmo tratamento de `@1`).
+Como em C1–C7, nenhuma data escolhe ou exclui uma referência. As referências da Nota Final são as
+declarações da entrada `componente-iii-nota-final` de `contracts/indicators/siaps-reference-policy.json`
+(`reference_id` com `ciii`), cada uma de um export oficial por equipe e com o dossiê de compatibilidade
+metodológica que a fixa. A seleção é `ALL_REQUIRED` e o hash do conjunto (`gate_set_sha256`) é o que o D cita;
+as regras de conjunto vazio, de referência apta e de FAILED que nunca se amacia são as de
+`portao-d-conciliacao-siaps.md`. A Nota Final de uma referência é calculada sobre os mesmos sete conjuntos de
+partições que o dossiê usou, e o `local_source_fingerprint` dela é derivado das partições dos sete packs: se
+for diferente do que consta no dossiê, a referência fica PENDING.
 
 ## Conjunto de comparação
 
@@ -49,7 +51,7 @@ classificação final") no arquivo, por tipo; todo INE eSF ou eAP do arquivo pre
 resultado é PENDING. Com o agregado público (só diagnóstico), a lista usada é a **interseção** das listas
 atuais de C1–C7 (mesmo INE e mesmo tipo nas sete, porque a Nota Final só existe para equipe com os sete
 indicadores), apenas como chave de separação: o agregado não traz o universo histórico e não vira
-evidência do gate (ver "O que decide o gate e o que é só diagnóstico" em `@1`). Se a resposta do SIAPS
+evidência do gate (ver "O que decide o gate e o que é só diagnóstico" em `siaps-distribuicao-por-classe@2`). Se a resposta do SIAPS
 não trouxer alguma das sete listas, o resultado é PENDING.
 
 - INE do universo sem Nota Final local (algum indicador bloqueado, ambíguo, sem denominador ou ausente em
@@ -59,7 +61,7 @@ não trouxer alguma das sete listas, o resultado é PENDING.
 
 ## Métrica e limiar
 
-Os mesmos de `@1`. Classes ordenadas REGULAR < SUFICIENTE < BOM < ÓTIMO; com as contagens acumuladas
+Os mesmos de `siaps-distribuicao-por-classe@2`. Classes ordenadas REGULAR < SUFICIENTE < BOM < ÓTIMO; com as contagens acumuladas
 cumL(k) e cumS(k) para k = 1..4,
 
     D = Σ_{k=1..4} |cumL(k) − cumS(k)|
@@ -73,7 +75,7 @@ PENDING).
 
 - **PASSED** se há ao menos uma linha avaliada e toda linha avaliada (eSF e eAP) passa.
 - **FAILED** se alguma linha reprova.
-- **PENDING** se não há quadrimestre de referência elegível publicado, se faltam as entradas locais
+- **PENDING** se a referência não está apta, se faltam as entradas locais
   (algum dos sete packs, em algum dos quatro meses), se o SIAPS não devolveu a linha QUALIDADE de
   `classificacaoFinalComponente` ou alguma das sete listas de equipes, se alguma equipe do arquivo
   oficial não tem a linha `Total`, se o universo é desconhecido numa rodada de gate (agregado público), ou
@@ -81,7 +83,7 @@ PENDING).
 
 ## Mascaramento e privacidade
 
-Como em `@1`: a evidência versionada mostra, por linha, tipo de equipe, N_S e N_L (escritos `<10`
+Como em `siaps-distribuicao-por-classe@2`: a evidência versionada mostra, por linha, tipo de equipe, N_S e N_L (escritos `<10`
 quando menores que 10), "sem classe local", D, T e veredito, mais quadrimestre, versão da regra, id do
 check e data. Contagens por classe e classes por INE ficam só no diretório local ignorado pelo git.
 Nunca há dado de paciente.
@@ -89,8 +91,8 @@ Nunca há dado de paciente.
 ## Como o D é gravado e a relação com C1–C7
 
 A ferramenta grava `gates.D` da entrada `componente-iii-nota-final` da `rule_version` vigente, com o
-check `siaps-nota-final-por-classe@1`, a data e a evidência (`kind` `conciliacao-siaps`, `ref` e
-`sha256` do resumo). O D da Nota Final é independente dos D dos sete packs: a Nota Final só aparece
+check `siaps-nota-final-por-classe@2`, a data e a evidência (`kind` `conciliacao-siaps`, `ref` e
+`sha256` do resumo do conjunto em JSON, `docs/indicadores/portoes/resultado-d/<rule_version>.json`). O D da Nota Final é independente dos D dos sete packs: a Nota Final só aparece
 quando os portões dela (A e D) passam **e** os resultados mensais de C1–C7 que ela lê não chegam
 bloqueados pelos portões de cada pack (`QualityComponentService`, `Nt08Consolidation`). O modo
 diagnóstico nunca é gravado no registro.

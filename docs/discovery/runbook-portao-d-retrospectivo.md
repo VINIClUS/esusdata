@@ -9,7 +9,7 @@ toca PEC, rede nem arquivos reais.
 ## As cinco etapas
 
 Cada etapa é um teste vivo com o seu `-Dobservatorio.gate.d.mode`. Uma propriedade que não é da etapa é
-recusada (não ignorada), e é por isso que nenhuma etapa escreve o registro de portões.
+recusada (não ignorada).
 
 | Etapa | `mode` | Teste | Lê | Escreve |
 |---|---|---|---|---|
@@ -17,10 +17,10 @@ recusada (não ignorada), e é por isso que nenhuma etapa escreve o registro de 
 | Diagnóstico | `diagnostic` | `PortaoDDiagnosticLiveTest` | manifestos, PEC | matriz mascarada (local) |
 | Compatibilidade | `compatibility` | `PortaoDCompatibilityLiveTest` | manifestos, perfis, PEC | um dossiê por referência |
 | Replay | `replay` | `PortaoDEvidenceReplayLiveTest` | manifestos, perfis, cache; sem PEC | nada (compara bytes) |
-| Gate | `gate` | `PortaoDGateLiveTest` | política, dossiês e cache do repositório; sem PEC | resumo local |
+| Gate | `gate` | `PortaoDGateLiveTest` | política, dossiês e cache do repositório; sem PEC | `release-gates.json`, resumos do conjunto, resumo local |
 
-O gate ainda **não** escreve `release-gates.json`: o veredito do conjunto e a atualização de D chegam com
-`ReferenceSetVerdict` (PR D).
+O gate é a única etapa que escreve o registro: calcula o veredito do conjunto (`ReferenceSetVerdict`, `ALL_REQUIRED`)
+e grava `release-gates.json` e os resumos do conjunto (veja o passo 4).
 
 ## Onde saem os arquivos
 
@@ -30,6 +30,7 @@ O gate ainda **não** escreve `release-gates.json`: o veredito do conjunto e a a
 | Artefatos da captura, cache de extratos, matriz do diagnóstico, detalhe por equipe, registro local | `~/.local/share/observatorio-aps/portao-d/` | nunca |
 | Manifestos | `docs/indicadores/portoes/references/` | sim |
 | Dossiês (`<reference-id>-<pack>.json` e `.md`) | `docs/indicadores/portoes/compatibilidade/` | sim, só contagens mascaradas (`<10`) |
+| Resumo do conjunto (`<rule_version>.json` e `.md`) | `docs/indicadores/portoes/resultado-d/` | sim, só contagens mascaradas (`<10`) |
 
 O diretório de artefatos nunca pode estar sob `docs/` nem dentro de uma árvore Git: os runners recusam. O
 detalhe por equipe (INEs) e o registro local (`compatibilidade/registro.txt`, com as sondas que falharam) ficam
@@ -151,14 +152,15 @@ adquire: se faltar uma partição, falha. Uma referência de um período reprodu
 
 Registre na nota da campanha que todos os dossiês foram reproduzidos.
 
-### 4. Gate (só depois da evidência no `main`)
+### 4. Gate e registro do D (só depois da evidência no `main`)
 
-O gate exige árvore limpa (nada modificado, preparado ou não rastreado) e recusa uma declaração `GATE`
-diferente da do `HEAD`: a política com os dossiês e a promoção a `GATE` já está commitada (e, pelo protocolo da
-spec §16.2, mergeada no `main` antes). Não há período para dar; as referências são as declarações `GATE` de
-`contracts/indicators/siaps-reference-policy.json`.
+O gate exige árvore limpa (nada modificado, preparado ou não rastreado), um `HEAD` que seja ancestral de
+`origin/main` (faça `git fetch origin` antes) e recusa uma declaração `GATE` diferente da do `HEAD`: a política
+com os dossiês e a promoção a `GATE` já está commitada e mergeada no `main` (spec §16.2). Não há período para
+dar; as referências são as declarações `GATE` de `contracts/indicators/siaps-reference-policy.json`.
 
 ```bash
+/usr/bin/git fetch -q origin
 "${MVN[@]}" -Dtest=PortaoDGateLiveTest \
   -Dobservatorio.gate.d.mode=gate \
   -Dobservatorio.gate.d.repo-root="$PWD" \
@@ -167,8 +169,20 @@ spec §16.2, mergeada no `main` antes). Não há período para dar; as referênc
 
 Para cada pack ele calcula o `gate_set_sha256` e confere que toda referência `GATE` tem o manifesto fixado, o
 dossiê fixado com veredito `EXACT` ou `EQUIVALENT_FOR_REFERENCE`, e `local_source_fingerprint` igual ao dos
-extratos do cache. Escreve `"$ARTEFATOS"/gate/resumo.md`. Um conjunto vazio é dito vazio, não é falha. Não
-toca `release-gates.json`.
+extratos do cache. Depois calcula o veredito de cada referência **só a partir do cache** (nunca o PEC, nunca
+adquire) e decide o conjunto. Uma referência cuja conferência falha fica sem veredito e o conjunto fica `PENDING`;
+uma avaliação que lança exceção (partição que sumiu, cache com duas fontes) aborta a rodada inteira **antes** de
+escrever qualquer arquivo. Só então escreve:
+
+- `"$ARTEFATOS"/gate/resumo.md` (local, com o veredito de cada conjunto e o motivo);
+- `docs/indicadores/portoes/resultado-d/<rule_version>.json` e `.md` de cada conjunto decidido (a evidência);
+- `contracts/indicators/release-gates.json`: `gates.D` de **cada** pack registrado, com a data de hoje. Um
+  conjunto sem referência `GATE` grava `{status: PENDING, evidence: []}`. Se o registro recusar algum conjunto,
+  o arquivo volta ao que era.
+
+Um conjunto vazio é dito vazio, não é falha da rodada. Revise o diff (`git diff`) e abra o PR que registra o D
+(PR E); o CI recalcula as conferências offline. O teste falha se alguma referência `GATE` não passou na
+conferência, depois de ter escrito o registro com `PENDING` para ela.
 
 ## Se algo sair errado
 

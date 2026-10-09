@@ -7,7 +7,6 @@ import esusdata.indicator.ReleaseGateRegistry;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.GateCheck;
 import esusdata.indicator.model.GateId;
-import esusdata.indicator.model.Quadrimestre;
 import esusdata.indicator.pack.componente3.ComponentIII;
 import esusdata.indicator.reconciliation.PackVerdict.Status;
 import esusdata.indicator.reconciliation.SiapsSnapshot.Row;
@@ -16,7 +15,6 @@ import esusdata.indicator.reconciliation.SiapsTeamExportFixtures.Export;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +23,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** {@code siaps-nota-final-por-classe@1} end to end on invented data: parser, eligibility, verdict, record. */
+/** {@code siaps-nota-final-por-classe@2} end to end on invented data: parser, verdict, record. */
 class NotaFinalVerdictTest {
 
     private static final GatePack NOTA_FINAL = GatePack.NOTA_FINAL;
@@ -158,25 +156,6 @@ class NotaFinalVerdictTest {
         assertThat(snapshot.counts(110, "eSF")).contains(new ClassCounts(0, 0, 0, 1));
         assertThat(SiapsParser.snapshot(file.replace("classificacaoFinalComponente", "outra"))
                         .hasFinalRows())
-                .isFalse();
-    }
-
-    @Test
-    void theEligibilityIsThatOfTheLatestOfTheSevenFichasAndOnlyTheLatestPublishedIsTheReference() {
-        assertThat(NOTA_FINAL.floor()).isEqualTo(LocalDate.of(2026, 6, 24));
-        assertThat(GatePack.all())
-                .allSatisfy(pack -> assertThat(NOTA_FINAL.floor()).isAfterOrEqualTo(pack.floor()));
-        assertThat(Eligibility.firstEligible(NOTA_FINAL)).isEqualTo(new Quadrimestre(2026, 2));
-        assertThat(GatePack.all()).doesNotContain(NOTA_FINAL);
-
-        assertThat(Eligibility.reference(NOTA_FINAL, List.of("2026Q1"))).isEmpty();
-        assertThat(Eligibility.waitingFor(NOTA_FINAL)).isEqualTo("aguardando 2026Q2 no SIAPS");
-        List<String> published = List.of("2026Q1", "2026Q2", "2026Q3");
-        assertThat(Eligibility.reference(NOTA_FINAL, published)).contains(new Quadrimestre(2026, 3));
-        assertThat(Eligibility.isReference(NOTA_FINAL, new Quadrimestre(2026, 3), published))
-                .isTrue();
-        assertThat(Eligibility.isReference(NOTA_FINAL, new Quadrimestre(2026, 2), published))
-                .as("eligible, but not the most recent published")
                 .isFalse();
     }
 
@@ -314,11 +293,11 @@ class NotaFinalVerdictTest {
         String text = SummaryWriter.render(verdict, DAY);
 
         assertThat(text)
-                .contains("`siaps-nota-final-por-classe@1`")
+                .contains("`siaps-nota-final-por-classe@2`")
                 .contains("`" + EVIDENCE + "`")
                 .contains(ComponentIII.RULE_VERSION)
                 .contains("| CIII | eSF | <10 | <10 |")
-                .doesNotContain("siaps-distribuicao-por-classe@1");
+                .doesNotContain("siaps-distribuicao-por-classe@2");
         assertThat(SummaryWriter.fileName(verdict))
                 .isEqualTo("diagnostico-portao-d-componente-iii-nota-final-2026Q2.md");
         PackVerdict gate = gate(
@@ -333,28 +312,15 @@ class NotaFinalVerdictTest {
 
     @Test
     void theRegistryRecordsTheNotaFinalCheckInItsOwnEntry(@TempDir Path directory) throws Exception {
-        Path file = directory.resolve("release-gates.json");
-        Files.copy(REPO.resolve("contracts/indicators/release-gates.json"), file);
-        String sha = SummaryWriter.sha256(REPO.resolve(EVIDENCE));
-        PackVerdict passed = new PackVerdict(
-                NOTA_FINAL,
-                ComponentIII.RULE_VERSION,
-                ReferencePurpose.GATE,
-                Status.PASSED,
-                "",
-                "2026Q2",
-                List.of(),
-                0,
-                new ArrayList<>(),
-                FINGERPRINT);
-
-        RegistryUpdater.record(file, REPO, passed, DAY, EVIDENCE, sha);
+        PortaoDEvidenceFixtures.Tree tree =
+                PortaoDEvidenceFixtures.decided(directory, ComponentIII.DESCRIPTOR, Status.PASSED);
+        Path file = tree.registry();
 
         GateCheck d = ReleaseGateRegistry.fromJson(Files.readString(file))
                 .statusOf(ComponentIII.DESCRIPTOR)
                 .check(GateId.D);
         assertThat(d.isPassed()).isTrue();
-        assertThat(d.check()).isEqualTo("siaps-nota-final-por-classe@1");
+        assertThat(d.check()).isEqualTo("siaps-nota-final-por-classe@2");
         // every other entry is untouched: the seven packs keep their own D
         JsonNode before = MAPPER.readTree(Files.readString(REPO.resolve("contracts/indicators/release-gates.json")))
                 .path("packs");

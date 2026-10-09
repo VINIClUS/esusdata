@@ -1,12 +1,16 @@
-# Portão D: conciliação com o SIAPS público (`siaps-distribuicao-por-classe@1`)
+# Portão D: conciliação com o SIAPS (`siaps-distribuicao-por-classe@2`)
 
 Esta é a regra do Portão D para os packs C1–C7. Ela foi fixada **antes** de qualquer comparação ser
 vista. Qualquer mudança de métrica, limiar ou regra de equipes exige uma nova versão do check
-(`@2`, ...) e um motivo que não seja "o resultado reprovou".
+(`@3`, ...) e um motivo que não seja "o resultado reprovou". O `@1` (uma referência escolhida pela data de
+assinatura das fichas) foi aposentado pela reconciliação retrospectiva
+([ADR 0034](../../adr/0034-reconciliacao-siaps-retrospectiva.md)): o `@2` mantém a métrica e o limiar e
+troca só a escolha da referência, que agora é um conjunto pré-registrado. O `@1` não é mais aceito como
+evidência nova de D.
 
 O produto nunca chama o SIAPS. A conferência é ferramenta de desenvolvimento (árvore de testes),
-executada sob demanda. A saída dela (documento-resumo mais o sha256) vira a evidência do Portão D em
-`contracts/indicators/release-gates.json`. FAILED mantém o pack BLOCKED, e isso é o comportamento
+executada sob demanda. A saída dela (o resumo do conjunto, em JSON, mais o sha256) vira a evidência do
+Portão D em `contracts/indicators/release-gates.json`. FAILED mantém o pack BLOCKED, e isso é o comportamento
 correto.
 
 ## O que o SIAPS anônimo oferece
@@ -37,34 +41,42 @@ período antigo. Por isso (spec `docs/superpowers/specs/2026-10-08-reconciliacao
   Uma linha de zeros do agregado público não prova isso (o agregado não tem universo) e também deixa a
   referência incompleta.
 
-Isto só endurece a regra de equipes de `@1` (o agregado deixa de produzir D decidido); o id do check
-continua `@1` até a migração para `@2` do plano da reconciliação retrospectiva.
+O agregado público nunca produz D decidido. A lista atual de equipes serve só de chave de separação em
+diagnóstico.
 
-## Elegibilidade do quadrimestre de referência
+## Referências: um conjunto pré-registrado, sem data
 
-Para um pack, o quadrimestre de referência é o **mais recente quadrimestre publicado no SIAPS cujo
-último dia é posterior à maior data de assinatura SEI entre a ficha do pack e a NT 8/2026**. Motivo:
-as edições vigentes revogam as anteriores, e o SIAPS público ainda cita a NT 6/2025. Um quadrimestre
-que terminou antes da assinatura foi calculado, muito provavelmente, pelas edições antigas e não
-serve de referência para as nossas regras.
+Nenhuma data escolhe ou exclui uma referência (spec §17, ADR 0034). O que decide o D de uma
+`rule_version` está **pré-registrado** em `contracts/indicators/siaps-reference-policy.json`: um conjunto
+por `pack + rule_version`, com uma declaração por revisão do arquivo oficial por equipe, escolhida só pelo
+seu `reference_id`. Uma declaração `GATE` é obrigatória, `ACTIVE` e fixa por hash o manifesto
+(`docs/indicadores/portoes/references/`) e o dossiê de compatibilidade metodológica
+(`docs/indicadores/portoes/compatibilidade/`), cujo veredito é `EXACT` ou `EQUIVALENT_FOR_REFERENCE`. As
+demais são `DIAGNOSTIC` e nunca decidem. Uma declaração `GATE` `SUPERSEDED` ou `RETRACTED` é recusada pelo
+carregador da política, antes de qualquer cálculo.
 
+O hash do conjunto (`gate_set_sha256`) cobre só as declarações `GATE`: declarar, mudar ou retirar uma
+`DIAGNOSTIC` não o move, e qualquer mudança numa `GATE` o move. É ele que o D cita.
+
+Datas (assinatura SEI das fichas, fim do quadrimestre) são metadado dos dossiês, nunca critério de seleção.
 Quadrimestres: Q1 = jan–abr, Q2 = mai–ago, Q3 = set–dez.
 
-Datas tiradas das linhas de assinatura em `docs/metodologia/fontes/*.txt` (NT 8/2026: 01/06/2026, a
-última de suas seis assinaturas):
+### Seleção `ALL_REQUIRED`
 
-| Pack | Última assinatura da ficha | Maior data (ficha, NT 8/2026) | Primeiro quadrimestre elegível |
-|---|---|---|---|
-| C1 | 24/06/2026 | 24/06/2026 | 2026Q2 (termina 31/08/2026) |
-| C2 | 22/06/2026 | 22/06/2026 | 2026Q2 |
-| C3 | 22/06/2026 | 22/06/2026 | 2026Q2 |
-| C4 | 21/06/2026 | 21/06/2026 | 2026Q2 |
-| C5 | 21/06/2026 | 21/06/2026 | 2026Q2 |
-| C6 | 19/06/2026 | 19/06/2026 | 2026Q2 |
-| C7 | 22/06/2026 | 22/06/2026 | 2026Q2 |
+- sem nenhuma referência `GATE`: **PENDING** ("sem referência GATE ativa e obrigatória");
+- alguma referência **FAILED**: o conjunto é **FAILED**;
+- senão, alguma **PENDING**: o conjunto é **PENDING**;
+- todas **PASSED**: o conjunto é **PASSED**.
 
-Se nenhum quadrimestre elegível estiver publicado, o resultado é **PENDING** com a razão
-"aguardando <quadrimestre> no SIAPS".
+### Uma referência só conta se estiver apta
+
+Isso é decidido **antes** de olhar as cifras. Falta de veredito local; veredito que não é de gate ou é de outro
+pack, versão de regra ou quadrimestre; dossiê ausente ou que não é o fixado (outra referência, outra versão
+de regra, outro manifesto, outro hash, veredito diferente do declarado ou que não autoriza o gate);
+`local_source_fingerprint` do veredito diferente do do dossiê: em qualquer caso a referência é **PENDING**,
+seja qual for a cifra. Assim, um FAILED calculado sobre uma fonte que o dossiê nunca cobriu não reprova o
+conjunto. Passado esse filtro nada amacia o veredito: um erro de cálculo local numa referência `EXACT` ou
+`EQUIVALENT_FOR_REFERENCE` é **FAILED**.
 
 ## Conjunto de comparação
 
@@ -109,7 +121,7 @@ PENDING.
 
 - **PASSED** se há ao menos uma linha avaliada e toda linha avaliada (eSF e eAP) passa.
 - **FAILED** se alguma linha reprova.
-- **PENDING** se não há quadrimestre de referência elegível publicado, se faltam as entradas locais
+- **PENDING** se a referência não está apta (ver acima), se faltam as entradas locais
   dos quatro meses do quadrimestre, se a referência oficial está incompleta (equipe do arquivo sem a
   linha do indicador; linha de tipo, lista de equipes ou linha de zeros que o agregado não prova), se o
   universo de equipes é desconhecido numa rodada de gate (agregado público), ou se nenhuma linha é
@@ -118,11 +130,12 @@ PENDING.
 
 ## Mascaramento e privacidade
 
-A evidência versionada (documento-resumo) mostra, por linha: indicador, tipo de equipe, N_S e N_L
-(escritos `<10` quando menores que 10), D, T, veredito, quadrimestre de referência, versão da regra,
-id do check e data. **Contagens por classe e classes por INE ficam só em um diretório local ignorado
-pelo git.** Nunca há dado de paciente. O resumo traz também o fingerprint da fonte local (um hash dos
-extratos de que as classes locais saíram).
+A evidência versionada (o resumo do conjunto) mostra, por referência e tipo de equipe: N_S e N_L
+(escritos `<10` quando menores que 10), equipes sem classe local, D, T e veredito; e, por referência, o
+bloco `official_field_comparison` do dossiê (contagens mascaradas e a maior diferença absoluta de pontuação),
+o fingerprint da fonte local (um hash dos extratos de que as classes locais saíram), a versão da regra, o id
+do check e a data. **Contagens por classe e classes por INE ficam só em um diretório local ignorado pelo
+git.** Nunca há dado de paciente, INE, CNES, nome de equipe, IP ou usuário.
 
 ## Escopo e adiamentos
 
@@ -131,15 +144,24 @@ ficam adiados: os portões não precisam deles e o produto não chama o SIAPS.
 
 ## Modo diagnóstico
 
-A ferramenta também roda, em modo **diagnóstico**, uma referência que não decide o portão: um
-quadrimestre inelegível (por exemplo 2026Q1) ou o agregado público, que não traz o universo histórico. O
+A ferramenta também roda, em modo **diagnóstico**, uma referência que não decide o portão: uma
+declaração `DIAGNOSTIC`, ou o agregado público, que não traz o universo histórico. O
 documento gerado (`diagnostico-portao-d-...md`) leva a marca "não é evidência do Portão D" e **nunca** é
 gravado no registro de portões. O modo diagnóstico nunca produz PASSED nem FAILED no registro.
 
 ## Como o D é gravado
 
-O registro de portões (ADR 0032, `contracts/indicators/release-gates.json`) já está em `main`. A
-ferramenta grava `gates.D` da entrada do pack e da `rule_version` com o check
-`siaps-distribuicao-por-classe@1`, a data e uma evidência (`kind`, `ref` do resumo no repositório e
-`sha256`); o carregador do registro e o teste de consistência conferem que o arquivo existe e que o
-hash confere. Enquanto não houver quadrimestre de referência elegível (2026Q2), o D segue PENDING.
+O registro de portões (ADR 0032, `contracts/indicators/release-gates.json`) já está em `main`. O gate
+(`PortaoDGateLiveTest`, modo `gate`) calcula o veredito de cada referência `GATE` só a partir do cache,
+decide o conjunto e grava `gates.D` da entrada do pack e da `rule_version` com o check
+`siaps-distribuicao-por-classe@2`, a data e **uma** evidência: o resumo do conjunto em JSON,
+`docs/indicadores/portoes/resultado-d/<rule_version>.json` (`kind` `conciliacao-siaps`, `ref` e `sha256`),
+com o `.md` renderizado a partir dele. Um conjunto PENDING grava `{status: PENDING, evidence: []}`.
+
+Offline, no CI, `ReleaseGatesConsistencyTest`, `PortaoDEvidenceConsistencyTest` e
+`PortaoDEvidencePrivacyTest` conferem: o check é o `@2` do pack; o `gate_set_sha256` do resumo é o recalculado
+da política vigente para aquele `pack + rule_version`; o resumo lista exatamente as referências `GATE` do
+conjunto, cada uma `ACTIVE`, com o manifesto e o dossiê que a declaração fixa (existentes, com o hash) e a
+compatibilidade igual ao veredito do dossiê; todo manifesto e todo dossiê versionado é citado por uma
+declaração com o mesmo hash; cada `.md` é byte a byte a renderização do seu `.json`; e nada versionado traz
+INE, CNES, IP, e-mail ou chave de senha. Enquanto nenhuma referência `GATE` existir, o D segue PENDING.

@@ -23,7 +23,7 @@ import java.util.function.BiFunction;
 import org.junit.jupiter.api.Test;
 
 /**
- * The Nota Final side of {@code siaps-nota-final-por-classe@1}: the final class of each team from
+ * The Nota Final side of {@code siaps-nota-final-por-classe@2}: the final class of each team from
  * the ungated monthly results of the seven packs, by the product's own consolidation. Invented data.
  */
 class NotaFinalLocalClassesTest {

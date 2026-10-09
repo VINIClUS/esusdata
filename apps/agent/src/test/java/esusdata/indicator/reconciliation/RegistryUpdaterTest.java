@@ -12,50 +12,31 @@ import esusdata.indicator.model.GateId;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.pack.c4.C4Pack;
 import esusdata.indicator.reconciliation.PackVerdict.Status;
+import esusdata.indicator.reconciliation.PortaoDEvidenceFixtures.Tree;
+import esusdata.indicator.reconciliation.RegistryUpdater.CitedFile;
+import esusdata.indicator.reconciliation.RegistryUpdater.EvidenceBundle;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** The updater against a temporary copy of the real {@code release-gates.json}, never the file itself. */
+/**
+ * The updater against a temporary copy of the real {@code release-gates.json}, never the file
+ * itself, with the evidence of a set built by the real writers ({@link PortaoDEvidenceFixtures}).
+ */
 class RegistryUpdaterTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Path REPO = Path.of("..", "..");
     private static final Path REAL = REPO.resolve("contracts/indicators/release-gates.json");
-    private static final String EVIDENCE = "docs/indicadores/portoes/portao-d-conciliacao-siaps.md";
     private static final PackDescriptor DESCRIPTOR = new C4Pack().descriptor();
-    private static final GatePack PACK = GatePack.byPackId(DESCRIPTOR.id()).orElseThrow();
-    private static final LocalDate DAY = LocalDate.of(2026, 10, 7);
-
-    private static PackVerdict verdict(ReferencePurpose purpose, Status status) {
-        return new PackVerdict(
-                PACK,
-                DESCRIPTOR.ruleVersion(),
-                purpose,
-                status,
-                "",
-                "2026Q2",
-                List.of(),
-                0,
-                List.of(),
-                PackVerdict.NO_LOCAL_SOURCE);
-    }
-
-    private static Path copyOfTheRealRegistry(Path directory) throws IOException {
-        Path file = directory.resolve("release-gates.json");
-        Files.copy(REAL, file);
-        return file;
-    }
-
-    private static String sha() throws IOException {
-        return SummaryWriter.sha256(REPO.resolve(EVIDENCE));
-    }
+    private static final LocalDate DAY = PortaoDEvidenceFixtures.DAY;
 
     private static JsonNode gateD(Path file, String pack) throws IOException {
         for (JsonNode entry : MAPPER.readTree(Files.readString(file)).path("packs")) {
@@ -66,23 +47,39 @@ class RegistryUpdaterTest {
         throw new AssertionError(pack);
     }
 
+    private static ReferenceSetVerdict with(ReferenceSetVerdict verdict, Status status, String check) {
+        return new ReferenceSetVerdict(
+                verdict.pack(),
+                verdict.ruleVersion(),
+                check,
+                verdict.gateSetSha256(),
+                status,
+                verdict.reason(),
+                verdict.references());
+    }
+
+    private static ReferenceSetVerdict pending(Tree tree) throws IOException {
+        ReferenceSet set =
+                tree.loadedPolicy().referenceSet(tree.packId(), tree.verdict().ruleVersion());
+        return ReferenceSetVerdict.aggregate(set, Map.of(), Map.of());
+    }
+
     @Test
     void aPassedGateIsWrittenInTheShapeTheLoaderTheSchemaAndTheConsistencyCheckAccept(@TempDir Path directory)
             throws Exception {
-        Path file = copyOfTheRealRegistry(directory);
-        String before = Files.readString(file);
+        String before = Files.readString(REAL);
 
-        RegistryUpdater.record(file, REPO, verdict(ReferencePurpose.GATE, Status.PASSED), DAY, EVIDENCE, sha());
+        Tree tree = PortaoDEvidenceFixtures.decided(directory, DESCRIPTOR, Status.PASSED);
 
-        JsonNode d = gateD(file, DESCRIPTOR.id());
+        JsonNode d = gateD(tree.registry(), DESCRIPTOR.id());
         assertThat(d.path("status").asString()).isEqualTo("PASSED");
-        assertThat(d.path("check").asString()).isEqualTo("siaps-distribuicao-por-classe@1");
-        assertThat(d.path("checked_at").asString()).isEqualTo("2026-10-07");
+        assertThat(d.path("check").asString()).isEqualTo("siaps-distribuicao-por-classe@2");
+        assertThat(d.path("checked_at").asString()).isEqualTo("2026-10-09");
         assertThat(d.path("evidence")).hasSize(1);
         assertThat(d.path("evidence").get(0).path("kind").asString()).isEqualTo("conciliacao-siaps");
 
         // the loader accepts it
-        String written = Files.readString(file);
+        String written = Files.readString(tree.registry());
         GateCheck loaded =
                 ReleaseGateRegistry.fromJson(written).statusOf(DESCRIPTOR).check(GateId.D);
         assertThat(loaded.isPassed()).isTrue();
@@ -94,37 +91,41 @@ class RegistryUpdaterTest {
         }
         // the consistency check (existing file, same sha256) holds
         GateCheck.Evidence evidence = loaded.evidence().getFirst();
-        assertThat(SummaryWriter.sha256(REPO.resolve(evidence.ref()))).isEqualTo(evidence.sha256());
+        assertThat(SummaryWriter.sha256(tree.root().resolve(evidence.ref()))).isEqualTo(evidence.sha256());
+        assertThat(PortaoDEvidenceChecks.registryProblems(MAPPER.readTree(written), tree.loadedPolicy(), tree.root()))
+                .isEmpty();
 
-        // only D of that pack changed: the same document, with that one gate put back, is the original
-        Path restored = directory.resolve("restored.json");
-        Files.writeString(restored, before);
-        assertThat(MAPPER.readTree(written).path("packs").size())
-                .isEqualTo(MAPPER.readTree(before).path("packs").size());
-        assertThat(gateD(restored, "c1-mais-acesso")).isEqualTo(gateD(file, "c1-mais-acesso"));
-        assertThat(MAPPER.readTree(written).path("packs").get(0))
-                .isEqualTo(MAPPER.readTree(before).path("packs").get(0));
+        // only D of that pack changed: every other entry is the original one
+        JsonNode original = MAPPER.readTree(before).path("packs");
+        JsonNode now = MAPPER.readTree(written).path("packs");
+        assertThat(now.size()).isEqualTo(original.size());
+        for (int i = 0; i < original.size(); i++) {
+            if (!DESCRIPTOR.id().equals(original.get(i).path("pack").asString())) {
+                assertThat(now.get(i)).isEqualTo(original.get(i));
+            }
+        }
     }
 
     @Test
     void aFailedGateIsValidAndAPendingOneCarriesNoCheckNorDate(@TempDir Path directory) throws Exception {
-        Path file = copyOfTheRealRegistry(directory);
+        Tree tree = PortaoDEvidenceFixtures.decided(directory, DESCRIPTOR, Status.FAILED);
 
-        RegistryUpdater.record(file, REPO, verdict(ReferencePurpose.GATE, Status.FAILED), DAY, EVIDENCE, sha());
-        assertThat(gateD(file, DESCRIPTOR.id()).path("status").asString()).isEqualTo("FAILED");
-        assertThat(ReleaseGateRegistry.fromJson(Files.readString(file))
+        assertThat(gateD(tree.registry(), DESCRIPTOR.id()).path("status").asString())
+                .isEqualTo("FAILED");
+        assertThat(ReleaseGateRegistry.fromJson(Files.readString(tree.registry()))
                         .statusOf(DESCRIPTOR)
                         .check(GateId.D)
                         .check())
-                .isEqualTo("siaps-distribuicao-por-classe@1");
+                .isEqualTo("siaps-distribuicao-por-classe@2");
 
-        RegistryUpdater.record(file, REPO, verdict(ReferencePurpose.GATE, Status.PENDING), DAY, null, null);
-        JsonNode d = gateD(file, DESCRIPTOR.id());
+        RegistryUpdater.record(tree.registry(), tree.root(), pending(tree), DAY, EvidenceBundle.none());
+
+        JsonNode d = gateD(tree.registry(), DESCRIPTOR.id());
         assertThat(d.path("status").asString()).isEqualTo("PENDING");
         assertThat(d.has("check")).isFalse();
         assertThat(d.has("checked_at")).isFalse();
         assertThat(d.path("evidence")).isEmpty();
-        assertThat(ReleaseGateRegistry.fromJson(Files.readString(file))
+        assertThat(ReleaseGateRegistry.fromJson(Files.readString(tree.registry()))
                         .statusOf(DESCRIPTOR)
                         .check(GateId.D)
                         .isPassed())
@@ -132,63 +133,101 @@ class RegistryUpdaterTest {
     }
 
     @Test
-    void neverRecordsADiagnosticResult(@TempDir Path directory) throws Exception {
-        Path file = copyOfTheRealRegistry(directory);
-        String before = Files.readString(file);
+    void refusesABundleOfAnotherSetOrWithAFileThatIsMissingOrChanged(@TempDir Path directory) throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(directory, DESCRIPTOR, Status.PASSED);
+        String before = Files.readString(tree.registry());
+        EvidenceBundle bundle = tree.bundle();
+        List<CitedFile> cited = bundle.cited();
 
-        assertThatThrownBy(() -> RegistryUpdater.record(
-                        file, REPO, verdict(ReferencePurpose.DIAGNOSTIC, Status.PASSED), DAY, EVIDENCE, sha()))
+        assertThatThrownBy(() -> record(tree, tree.verdict(), withSet(bundle, "ab".repeat(32))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("diagnostic");
-        assertThatThrownBy(() -> RegistryUpdater.record(
-                        file, REPO, verdict(ReferencePurpose.DIAGNOSTIC, Status.PENDING), DAY, null, null))
+                .hasMessageContaining("gate_set_sha256");
+        assertThatThrownBy(() -> record(tree, tree.verdict(), EvidenceBundle.none()))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThat(Files.readString(file)).isEqualTo(before);
+        assertThatThrownBy(() ->
+                        record(tree, tree.verdict(), withSummary(bundle, "docs/nope.json", bundle.summarySha256())))
+                .hasMessageContaining("does not exist");
+        assertThatThrownBy(
+                        () -> record(tree, tree.verdict(), withSummary(bundle, bundle.summaryRef(), "ab".repeat(32))))
+                .hasMessageContaining("does not match");
+        assertThatThrownBy(
+                        () -> record(tree, tree.verdict(), withSummary(bundle, "../../etc/hostname", "ab".repeat(32))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> record(
+                        tree,
+                        tree.verdict(),
+                        new EvidenceBundle(
+                                bundle.summaryRef(),
+                                bundle.summarySha256(),
+                                bundle.gateSetSha256(),
+                                List.of(new CitedFile(cited.getFirst().ref(), "ab".repeat(32))))))
+                .hasMessageContaining("does not match");
+        // a file that exists and has its hash, but is not the one the reference pins
+        assertThatThrownBy(() -> record(
+                        tree,
+                        tree.verdict(),
+                        new EvidenceBundle(
+                                bundle.summaryRef(),
+                                bundle.summarySha256(),
+                                bundle.gateSetSha256(),
+                                List.of(cited.getFirst()))))
+                .hasMessageContaining("does not cite");
+        assertThat(Files.readString(tree.registry())).isEqualTo(before);
     }
 
     @Test
-    void refusesADecidedGateWhoseEvidenceIsMissingOrDoesNotMatch(@TempDir Path directory) throws Exception {
-        Path file = copyOfTheRealRegistry(directory);
-        String before = Files.readString(file);
-        PackVerdict passed = verdict(ReferencePurpose.GATE, Status.PASSED);
+    void refusesADecidedStatusThatDoesNotFollowFromTheReferencesAndACheckThatIsNotTheSets(@TempDir Path directory)
+            throws Exception {
+        Tree tree = PortaoDEvidenceFixtures.decided(directory, DESCRIPTOR, Status.PASSED);
+        String before = Files.readString(tree.registry());
 
-        assertThatThrownBy(() -> RegistryUpdater.record(file, REPO, passed, DAY, null, null))
+        assertThatThrownBy(() -> record(
+                        tree, with(tree.verdict(), Status.FAILED, tree.verdict().check()), tree.bundle()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not follow");
+        assertThatThrownBy(() -> record(
+                        tree, with(tree.verdict(), Status.PASSED, "siaps-distribuicao-por-classe@1"), tree.bundle()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("siaps-distribuicao-por-classe@2");
+        assertThatThrownBy(() -> record(
+                        tree, with(tree.verdict(), Status.PASSED, "siaps-nota-final-por-classe@2"), tree.bundle()))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> RegistryUpdater.record(file, REPO, passed, DAY, EVIDENCE, "nope"))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> RegistryUpdater.record(file, REPO, passed, DAY, "docs/does-not-exist.md", sha()))
-                .hasMessageContaining("does not exist");
-        assertThatThrownBy(() -> RegistryUpdater.record(file, REPO, passed, DAY, EVIDENCE, "ab".repeat(32)))
-                .hasMessageContaining("does not match");
-        assertThatThrownBy(() -> RegistryUpdater.record(file, REPO, passed, DAY, "../../etc/hostname", sha()))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThat(Files.readString(file)).isEqualTo(before);
+        assertThat(Files.readString(tree.registry())).isEqualTo(before);
     }
 
     @Test
     void neverCreatesAnEntryAndMatchesTheRuleVersion(@TempDir Path directory) throws Exception {
-        Path file = copyOfTheRealRegistry(directory);
-        String before = Files.readString(file);
-        PackVerdict otherVersion = new PackVerdict(
-                PACK,
-                PACK.packId() + "@9.9.9",
-                ReferencePurpose.GATE,
+        Tree tree = PortaoDEvidenceFixtures.decided(directory, DESCRIPTOR, Status.PASSED);
+        String before = Files.readString(tree.registry());
+        ReferenceSetVerdict otherVersion = new ReferenceSetVerdict(
+                tree.verdict().pack(),
+                tree.verdict().pack() + "@9.9.9",
+                tree.verdict().check(),
+                tree.verdict().gateSetSha256(),
                 Status.PASSED,
                 "",
-                "2026Q2",
-                List.of(),
-                0,
-                List.of(),
-                PackVerdict.NO_LOCAL_SOURCE);
+                tree.verdict().references());
 
-        assertThatThrownBy(() -> RegistryUpdater.record(file, REPO, otherVersion, DAY, EVIDENCE, sha()))
+        assertThatThrownBy(() -> record(tree, otherVersion, tree.bundle()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("no registry entry");
-        assertThat(Files.readString(file)).isEqualTo(before);
+        assertThat(Files.readString(tree.registry())).isEqualTo(before);
     }
 
     @Test
     void theRealRegistryIsNeverTheOneWritten() throws Exception {
         assertThat(Files.readString(REAL)).contains("\"schema_version\": \"1\"");
+    }
+
+    private static void record(Tree tree, ReferenceSetVerdict verdict, EvidenceBundle bundle) throws IOException {
+        RegistryUpdater.record(tree.registry(), tree.root(), verdict, DAY, bundle);
+    }
+
+    private static EvidenceBundle withSet(EvidenceBundle bundle, String gateSetSha256) {
+        return new EvidenceBundle(bundle.summaryRef(), bundle.summarySha256(), gateSetSha256, bundle.cited());
+    }
+
+    private static EvidenceBundle withSummary(EvidenceBundle bundle, String ref, String sha256) {
+        return new EvidenceBundle(ref, sha256, bundle.gateSetSha256(), bundle.cited());
     }
 }
