@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -29,6 +30,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -39,7 +41,8 @@ import tools.jackson.databind.node.ObjectNode;
  * The build-time half of the reference policy, as {@code ReleaseGatesConsistencyTest} is for the
  * release-gate registry (ADR 0032): the loader checks the shape of the policy, and here it is
  * checked against the repository. Every declaration has its manifest under {@code
- * docs/indicadores/portoes/references/} with the SHA-256 it pins, and a dossier under {@code
+ * docs/indicadores/portoes/references/} with the SHA-256 it pins, naming the reference, municipality,
+ * quadrimestre and source kind the declaration does, and a dossier under {@code
  * docs/indicadores/portoes/compatibilidade/} that agrees with it (spec §8.1 rules 3, 7 and 9).
  * Missing directories mean no evidence yet, which the seeded policy relies on.
  *
@@ -58,6 +61,14 @@ class ReferencePolicyConsistencyTest {
     private static final String GATE_ID = "sp-3541307-2026q1-c1-team-r1";
     private static final String DIAGNOSTIC_ID = "sp-3541307-2025q3-c1-agg-r1";
 
+    private static final String REFERENCE_ID = "reference_id";
+    private static final String MUNICIPALITY = "municipality_ibge";
+    private static final String QUADRIMESTRE = "quadrimestre";
+    private static final String SOURCE_KIND = "source_kind";
+    private static final String TEAM_EXPORT = "OFFICIAL_TEAM_EXPORT_CSV";
+    private static final String AGGREGATE = "PUBLIC_AGGREGATE";
+    private static final Map<String, String> SOURCE_KIND_OF = Map.of(GATE_ID, TEAM_EXPORT, DIAGNOSTIC_ID, AGGREGATE);
+
     // ---- the check
 
     /**
@@ -65,6 +76,9 @@ class ReferencePolicyConsistencyTest {
      *
      * <ul>
      *   <li>the manifest of every declaration exists and has the pinned SHA-256 over its bytes;</li>
+     *   <li>that manifest repeats the declaration's {@code reference_id}, {@code municipality_ibge},
+     *       {@code quadrimestre} and {@code source_kind}: the policy is read by the id and the
+     *       manifest holds the facts, so a pin to the wrong file would otherwise go unnoticed;</li>
      *   <li>a cited dossier exists and has the pinned SHA-256;</li>
      *   <li>any dossier that exists, cited or not, names its reference and pack, carries a decided
      *       verdict, and that verdict is the declared {@code compatibility} (rule 9);</li>
@@ -98,7 +112,32 @@ class ReferencePolicyConsistencyTest {
             return List.of(
                     declaration.referenceId() + ": the manifest " + path + " changed since the policy pinned it");
         }
-        return List.of();
+        return manifestFieldViolations(manifest, path, declaration);
+    }
+
+    private static List<String> manifestFieldViolations(Path manifest, String path, ReferenceDeclaration declaration) {
+        JsonNode tree;
+        try {
+            tree = MAPPER.readTree(manifest);
+        } catch (JacksonException e) {
+            return List.of(declaration.referenceId() + ": the manifest " + path + " is not valid JSON ("
+                    + e.getOriginalMessage() + ")");
+        }
+        String who = declaration.referenceId() + ": the manifest " + path;
+        List<String> found = new ArrayList<>();
+        disagreement(who, tree, REFERENCE_ID, declaration.referenceId()).ifPresent(found::add);
+        disagreement(who, tree, MUNICIPALITY, declaration.municipalityIbge()).ifPresent(found::add);
+        disagreement(who, tree, QUADRIMESTRE, declaration.quadrimestre()).ifPresent(found::add);
+        disagreement(who, tree, SOURCE_KIND, declaration.sourceKind().name()).ifPresent(found::add);
+        return found;
+    }
+
+    private static Optional<String> disagreement(String who, JsonNode manifest, String field, String declared) {
+        String written = text(manifest, field);
+        return declared.equals(written)
+                ? Optional.empty()
+                : Optional.of(
+                        who + " says " + field + " \"" + written + "\" but the declaration says \"" + declared + "\"");
     }
 
     private static List<String> dossierViolations(Path repo, ReferenceSet set, ReferenceDeclaration declaration)
@@ -128,9 +167,9 @@ class ReferencePolicyConsistencyTest {
             return List.of(who + ": the dossier is not valid JSON (" + e.getOriginalMessage() + ")");
         }
         List<String> found = new ArrayList<>();
-        if (!declaration.referenceId().equals(text(tree, "reference_id"))
+        if (!declaration.referenceId().equals(text(tree, REFERENCE_ID))
                 || !set.pack().equals(text(tree, "pack"))) {
-            found.add(who + ": the dossier names reference_id " + text(tree, "reference_id") + " and pack "
+            found.add(who + ": the dossier names reference_id " + text(tree, REFERENCE_ID) + " and pack "
                     + text(tree, "pack"));
         }
         Optional<ReferenceCompatibility> verdict = decidedVerdict(tree);
@@ -238,17 +277,17 @@ class ReferencePolicyConsistencyTest {
         Matcher shape = ReferenceDeclaration.ID.matcher(id);
         assertThat(shape.matches()).as("shape of %s", id).isTrue();
         return MAPPER.createObjectNode()
-                .put("reference_id", id)
-                .put("quadrimestre", shape.group("year") + "Q" + shape.group("index"))
-                .put("municipality_ibge", shape.group("ibge"))
-                .put("source_kind", sourceKind)
+                .put(REFERENCE_ID, id)
+                .put(QUADRIMESTRE, shape.group("year") + "Q" + shape.group("index"))
+                .put(MUNICIPALITY, shape.group("ibge"))
+                .put(SOURCE_KIND, sourceKind)
                 .put("reference_manifest_sha256", manifestSha);
     }
 
     /** A GATE declaration of C1 whose dossier says EXACT. */
     private static ObjectNode gate(String id, String manifestSha, String dossierSha) {
         return decided(
-                base(id, "OFFICIAL_TEAM_EXPORT_CSV", manifestSha)
+                base(id, TEAM_EXPORT, manifestSha)
                         .put("purpose", "GATE")
                         .put("required", true)
                         .put("status", "ACTIVE"),
@@ -258,7 +297,7 @@ class ReferencePolicyConsistencyTest {
 
     /** A DIAGNOSTIC declaration of C1 that no dossier has judged. */
     private static ObjectNode diagnostic(String id, String manifestSha) {
-        return base(id, "PUBLIC_AGGREGATE", manifestSha)
+        return base(id, AGGREGATE, manifestSha)
                 .put("purpose", "DIAGNOSTIC")
                 .put("required", false)
                 .put("status", "ACTIVE")
@@ -271,7 +310,7 @@ class ReferencePolicyConsistencyTest {
         return node.put("compatibility", verdict)
                 .put(
                         "compatibility_evidence_ref",
-                        ReferencePolicy.dossierPath(node.get("reference_id").asString(), C1.id()))
+                        ReferencePolicy.dossierPath(node.get(REFERENCE_ID).asString(), C1.id()))
                 .put("compatibility_evidence_sha256", dossierSha);
     }
 
@@ -299,14 +338,21 @@ class ReferencePolicyConsistencyTest {
 
     private static String dossier(String id, String pack, String verdict) {
         return MAPPER.createObjectNode()
-                .put("reference_id", id)
+                .put(REFERENCE_ID, id)
                 .put("pack", pack)
                 .put("verdict", verdict)
                 .toString();
     }
 
+    /** A manifest with the four facts the declaration of {@code id} repeats; the rest is not read here. */
+    private static ObjectNode manifestOf(String id) {
+        ObjectNode manifest = base(id, SOURCE_KIND_OF.get(id), "0".repeat(64));
+        manifest.remove("reference_manifest_sha256");
+        return manifest;
+    }
+
     private static String manifestSha(Path repo, String id) throws IOException {
-        return write(repo, ReferencePolicy.manifestPath(id), "{\"reference_id\":\"" + id + "\"}");
+        return write(repo, ReferencePolicy.manifestPath(id), manifestOf(id).toString());
     }
 
     private static String dossierSha(Path repo, String id, String verdict) throws IOException {
@@ -348,6 +394,50 @@ class ReferencePolicyConsistencyTest {
         assertThat(violations(repo, policy))
                 .singleElement(InstanceOfAssertFactories.STRING)
                 .contains(DIAGNOSTIC_ID, "the manifest", "changed since the policy pinned it");
+    }
+
+    @ParameterizedTest(name = "a manifest that says {0} is {1} is reported")
+    @MethodSource("factsAManifestMayGetWrong")
+    void aManifestThatDisagreesWithItsDeclarationIsReported(String field, String written, @TempDir Path repo)
+            throws Exception {
+        ObjectNode manifest = manifestOf(DIAGNOSTIC_ID).put(field, written);
+        String pinned = write(repo, ReferencePolicy.manifestPath(DIAGNOSTIC_ID), manifest.toString());
+        ReferencePolicy policy = policyOf(diagnostic(DIAGNOSTIC_ID, pinned));
+
+        assertThat(violations(repo, policy))
+                .singleElement(InstanceOfAssertFactories.STRING)
+                .contains(DIAGNOSTIC_ID, "the manifest", "says " + field + " \"" + written + "\"");
+    }
+
+    static Stream<Arguments> factsAManifestMayGetWrong() {
+        return Stream.of(
+                Arguments.of(REFERENCE_ID, "sp-3541307-2025q3-c1-agg-r2"),
+                Arguments.of(MUNICIPALITY, "3550308"),
+                Arguments.of(QUADRIMESTRE, "2025Q2"),
+                Arguments.of(SOURCE_KIND, TEAM_EXPORT));
+    }
+
+    @ParameterizedTest(name = "a manifest without {0} is reported")
+    @ValueSource(strings = {REFERENCE_ID, MUNICIPALITY, QUADRIMESTRE, SOURCE_KIND})
+    void aManifestThatLeavesOutOneOfTheFourFactsIsReported(String field, @TempDir Path repo) throws Exception {
+        ObjectNode manifest = manifestOf(DIAGNOSTIC_ID);
+        manifest.remove(field);
+        String pinned = write(repo, ReferencePolicy.manifestPath(DIAGNOSTIC_ID), manifest.toString());
+        ReferencePolicy policy = policyOf(diagnostic(DIAGNOSTIC_ID, pinned));
+
+        assertThat(violations(repo, policy))
+                .singleElement(InstanceOfAssertFactories.STRING)
+                .contains(DIAGNOSTIC_ID, "says " + field + " \"\"");
+    }
+
+    @Test
+    void aManifestThatIsNotJsonIsReported(@TempDir Path repo) throws Exception {
+        String pinned = write(repo, ReferencePolicy.manifestPath(DIAGNOSTIC_ID), "not json at all");
+        ReferencePolicy policy = policyOf(diagnostic(DIAGNOSTIC_ID, pinned));
+
+        assertThat(violations(repo, policy))
+                .singleElement(InstanceOfAssertFactories.STRING)
+                .contains(DIAGNOSTIC_ID, "the manifest", "is not valid JSON");
     }
 
     @Test

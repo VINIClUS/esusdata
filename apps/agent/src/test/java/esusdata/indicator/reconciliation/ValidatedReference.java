@@ -1,6 +1,9 @@
 package esusdata.indicator.reconciliation;
 
 import esusdata.indicator.model.Classification;
+import esusdata.indicator.reconciliation.NormalizedReference.FinalRow;
+import esusdata.indicator.reconciliation.NormalizedReference.IndicatorRow;
+import esusdata.indicator.reconciliation.NormalizedReference.TeamRow;
 import esusdata.indicator.reconciliation.SiapsSnapshot.Team;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,8 +15,9 @@ import java.util.TreeMap;
 /**
  * What {@link PackVerdict#evaluate} compares the local classes with: the official side of one
  * pack, once it was checked for what can make a comparison wrong (spec §11 and §12). It is built
- * only by {@link #from} (an official team export) and {@link #fromPublicAggregate} (the public
- * SIAPS answer), which say what is missing instead of filling it in:
+ * only by {@link #from} (an official team export), {@link #fromStored} (the subset of one, stored
+ * and verified again) and {@link #fromPublicAggregate} (the public SIAPS answer), which say what
+ * is missing instead of filling it in:
  *
  * <ul>
  *   <li>the official counts of a team type are present or the reference has a gap; an absent row
@@ -110,6 +114,57 @@ record ValidatedReference(
                 counts,
                 teams,
                 classes);
+    }
+
+    /**
+     * The reference of one pack from its stored subset ({@link ReferenceArtifactStore#load}, which
+     * re-verified its hashes). A subset is whole by construction ({@link OfficialTeamReference#subset}
+     * refuses a pack some team has no row for), so there is no gap, and its teams are the official
+     * universe: the result equals {@link #from} over the export the subset was taken from.
+     *
+     * @throws IllegalArgumentException if the subset is not an official team export's, or is of
+     *     another pack
+     */
+    static ValidatedReference fromStored(NormalizedReference stored, GatePack pack) {
+        if (stored.sourceKind() != SourceKind.OFFICIAL_TEAM_EXPORT_CSV) {
+            throw new IllegalArgumentException("only an official team export has a historical universe");
+        }
+        if (stored.indicatorCode() != pack.siapsCode()) {
+            throw new IllegalArgumentException("the stored subset is not that of " + pack.code());
+        }
+        Map<String, Classification> classes = new TreeMap<>();
+        for (TeamRow row : stored.rows()) {
+            classes.put(row.ine(), classOf(row));
+        }
+        List<Team> teams = new ArrayList<>();
+        Map<String, ClassCounts> counts = new TreeMap<>();
+        for (String type : TYPES) {
+            ClassCounts ofType = ClassCounts.EMPTY;
+            for (TeamRow row : stored.rows()) {
+                if (row.teamType().equals(type)) {
+                    teams.add(new Team(row.ine(), type));
+                    ofType = ofType.plus(classes.get(row.ine()));
+                }
+            }
+            counts.put(type, ofType);
+        }
+        return new ValidatedReference(
+                pack,
+                stored.sourceKind(),
+                stored.municipalityIbge(),
+                stored.quadrimestre(),
+                UniverseConfidence.OFFICIAL,
+                List.of(),
+                counts,
+                teams,
+                classes);
+    }
+
+    private static Classification classOf(TeamRow row) {
+        return switch (row) {
+            case IndicatorRow indicator -> indicator.concept();
+            case FinalRow last -> last.finalClass();
+        };
     }
 
     /**

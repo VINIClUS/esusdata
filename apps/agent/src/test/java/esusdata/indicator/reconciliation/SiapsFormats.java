@@ -20,6 +20,12 @@ public final class SiapsFormats {
     private static final int IBGE_SIAPS_LENGTH = 6;
     private static final int IBGE_LENGTH = 7;
     private static final int INE_LENGTH = 10;
+    private static final int UF_ENTRY = 4;
+
+    /** The IBGE state codes and their two letters, four characters each. */
+    private static final String UF_CODES =
+            "11RO12AC13AM14RR15PA16AP17TO21MA22PI23CE24RN25PB26PE27AL28SE29BA31MG32ES33RJ"
+                    + "35SP41PR42SC43RS50MS51MT52GO53DF";
 
     private SiapsFormats() {}
 
@@ -64,6 +70,22 @@ public final class SiapsFormats {
             return ibge;
         }
         throw new IllegalArgumentException("not a municipality code: " + ibge);
+    }
+
+    /**
+     * The two-letter code of the state of a municipality, {@code SP}: the first two digits of its
+     * IBGE code are the state's.
+     *
+     * @throws IllegalArgumentException when they are not those of a state
+     */
+    public static String uf(String ibge) {
+        String siaps = ibgeOfSiaps(ibge);
+        for (int at = 0; at < UF_CODES.length(); at += UF_ENTRY) {
+            if (UF_CODES.startsWith(siaps.substring(0, 2), at)) {
+                return UF_CODES.substring(at + 2, at + UF_ENTRY);
+            }
+        }
+        throw new IllegalArgumentException("not the IBGE code of a municipality of a state: " + ibge);
     }
 
     /** The INE as 10 digits, zero-padded on the left. */
