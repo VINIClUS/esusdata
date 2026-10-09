@@ -53,15 +53,18 @@ class PortaoDEvidenceReplayLiveTest {
                     scratch);
 
             log.info(
-                    "replay: {} files regenerated, {} missing, {} extra, {} different, {} references failed",
+                    "replay: {} files regenerated, {} missing, {} extra, {} different, {} references failed, {} gaps",
                     result.regenerated().size(),
                     result.missing().size(),
                     result.extra().size(),
                     result.different().size(),
-                    result.errors().size());
+                    result.errors().size(),
+                    result.gaps().size());
             result.different().forEach(name -> log.warn("replay: {} differs", name));
             result.errors()
                     .forEach(error -> log.warn("replay: {} {}: {}", error.pack(), error.referenceId(), error.detail()));
+            result.gaps()
+                    .forEach(gap -> log.warn("replay: gap {} {}: {}", gap.pack(), gap.referenceId(), gap.detail()));
 
             assertThat(result.identical())
                     .as("every dossier reproduced byte for byte: see the lines above")

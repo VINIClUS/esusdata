@@ -458,6 +458,21 @@ class PortaoDCompatibilityRunTest {
     }
 
     @Test
+    void aReferenceThatIsAGapInAReplayedPeriodFailsTheReplay() throws IOException {
+        capture();
+        Profiles profiles = profiles(OfficialReading.SAME, OfficialReading.SAME, false);
+        run(new FixturePec(IBGE), profiles, cleanProbes());
+        Profiles withoutC3 = (packId, ruleVersion) ->
+                C3.packId().equals(packId) ? Optional.empty() : profiles.of(packId, ruleVersion);
+
+        ReplayResult result = replay(withoutC3, workspace.resolve("scratch"));
+
+        assertThat(result.identical()).isFalse();
+        assertThat(result.gaps()).extracting(Outcome::pack).contains(C3.code());
+        assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
     void theReplayRefusesToAcquireAndFailsWhenAPartitionIsGone() throws IOException {
         capture();
         FixturePec pec = new FixturePec(IBGE);

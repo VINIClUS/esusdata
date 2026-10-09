@@ -14,6 +14,7 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -34,9 +35,13 @@ class CommonMethodologyProbesTest {
     private static final String OTHER_TYPE = "72";
 
     private static ProbeResult probe(CanonicalDataset data, String revisionIne) {
+        return probe(month -> data, revisionIne);
+    }
+
+    private static ProbeResult probe(Function<YearMonth, CanonicalDataset> dataOf, String revisionIne) {
         C6Pack rule = new C6Pack();
         List<PackInput> inputs = Q1.months().stream()
-                .map(month -> new PackInput(rule, data, EvaluationContext.endOfMonth(IBGE, month)))
+                .map(month -> new PackInput(rule, dataOf.apply(month), EvaluationContext.endOfMonth(IBGE, month)))
                 .toList();
         return PROBE.evaluate(SyntheticProbeContexts.pack(inputs, Map.of(revisionIne, SiapsParser.ESF)));
     }
@@ -174,6 +179,20 @@ class CommonMethodologyProbesTest {
         assertThat(result.observability()).isEqualTo(Observability.PARTIAL);
         assertThat(result.affected()).hasValue(1);
         assertThat(result.reason()).contains("current type standing in");
+    }
+
+    @Test
+    void aMonthWithoutTeamStatesLeavesTheOtherMonthsReadAndTheCountsALowerBound() {
+        CanonicalDataset data =
+                states(state(INE, ESF_TYPE, "2024-01-01", "2026-02-15"), state(INE, EAP_TYPE, "2026-02-15", null));
+
+        ProbeResult result = probe(
+                month -> month.getMonthValue() == 4 ? CanonicalDataset.builder().build() : data, INE);
+
+        assertThat(result.observability()).isEqualTo(Observability.PARTIAL);
+        assertThat(result.affected()).hasValue(1);
+        assertThat(result.reason()).contains("no team state in some month");
+        assertThat(result.localDetail()).anyMatch(line -> line.contains("2026-04"));
     }
 
     @Test

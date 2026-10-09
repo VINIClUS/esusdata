@@ -130,14 +130,16 @@ cleanup; trap - EXIT INT TERM                         # túnel fechado antes do 
   não lê de novo.
 - Um período a que faltam meses locais não gera dossiê (um dossiê precisa da impressão digital de uma fonte lida):
   vira linha do `registro.txt` com os meses que faltam. Um pack sem perfil também não gera dossiê: é lacuna,
-  nunca veredito. Em ambos os casos o teste lista o que faltou e a campanha não termina até isso ser tratado.
+  nunca veredito. Em ambos os casos o teste falha e lista o que faltou no `registro.txt`: a campanha não termina
+  até isso ser tratado. Um período a que faltam meses locais fica de fora por `periods` e é registrado pela matriz do
+  diagnóstico.
 - Uma sonda que falha não derruba a rodada: vira linha do `registro.txt` e ausência de resultado, que o
   avaliador lê como não observado.
 
 ### 3. Replay (sem PEC, túnel fechado)
 
 Regenera cada dossiê do diretório a partir dos artefatos do cache e compara os bytes (JSON e Markdown). Não
-adquire: se faltar uma partição, falha. Fica na máquina local; o CI não roda (as entradas nunca entram no Git).
+adquire: se faltar uma partição, falha. Uma referência de um período reproduzido que vire lacuna também é falha. Fica na máquina local; o CI não roda (as entradas nunca entram no Git).
 
 ```bash
 "${MVN[@]}" -Dtest=PortaoDEvidenceReplayLiveTest \

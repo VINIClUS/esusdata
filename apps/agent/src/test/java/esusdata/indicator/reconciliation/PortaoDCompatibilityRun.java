@@ -234,9 +234,16 @@ final class PortaoDCompatibilityRun {
         }
 
         List<Outcome> errors() {
-            return outcomes.stream()
-                    .filter(outcome -> outcome.kind() == Kind.ERROR)
-                    .toList();
+            return of(Kind.ERROR);
+        }
+
+        /** The references with nothing to decide on: no dossier, and no verdict either. */
+        List<Outcome> gaps() {
+            return of(Kind.GAP);
+        }
+
+        private List<Outcome> of(Kind kind) {
+            return outcomes.stream().filter(outcome -> outcome.kind() == kind).toList();
         }
 
         long countVerdict(ReferenceCompatibility verdict) {
@@ -779,13 +786,16 @@ final class PortaoDCompatibilityRun {
      * @param extra files it regenerated that the dossier directory lacks
      * @param different files whose bytes differ
      * @param errors references it could not regenerate
+     * @param gaps references of a replayed period with nothing to decide on (a missing profile,
+     *     sibling or reference): the evidence of that period is incomplete, so the replay fails
      */
     record ReplayResult(
             List<String> regenerated,
             List<String> missing,
             List<String> extra,
             List<String> different,
-            List<Outcome> errors) {
+            List<Outcome> errors,
+            List<Outcome> gaps) {
 
         ReplayResult {
             regenerated = List.copyOf(regenerated);
@@ -793,6 +803,7 @@ final class PortaoDCompatibilityRun {
             extra = List.copyOf(extra);
             different = List.copyOf(different);
             errors = List.copyOf(errors);
+            gaps = List.copyOf(gaps);
         }
 
         boolean identical() {
@@ -800,6 +811,7 @@ final class PortaoDCompatibilityRun {
                     && extra.isEmpty()
                     && different.isEmpty()
                     && errors.isEmpty()
+                    && gaps.isEmpty()
                     && !regenerated.isEmpty();
         }
     }
@@ -808,7 +820,9 @@ final class PortaoDCompatibilityRun {
      * Regenerates the dossiers of every period that has one in {@code dossierDir} from the cached
      * artifacts alone ({@link AcquisitionInputs#none()}: it refuses to acquire, and needs no PEC),
      * into {@code scratch}, and compares both the JSON and the Markdown byte for byte. A file on one
-     * side only, a reference it cannot regenerate and a different byte are all failures.
+     * side only, a reference it cannot regenerate or that is a gap, and a different byte are all
+     * failures. A period with no dossier at all is not replayed: that the campaign left no gap is
+     * what the compatibility run asserts.
      *
      * @param scratch an empty directory outside {@code docs/}; the regenerated dossiers and their
      *     local detail are written there
@@ -854,7 +868,7 @@ final class PortaoDCompatibilityRun {
                 allMonthsOf(run.periods()),
                 AcquisitionInputs.none(),
                 new Output(scratch, scratch));
-        return compare(dossierDir, scratch, report.errors());
+        return compare(dossierDir, scratch, report);
     }
 
     private static Set<YearMonth> allMonthsOf(List<Quadrimestre> periods) {
@@ -873,7 +887,7 @@ final class PortaoDCompatibilityRun {
         }
     }
 
-    private static ReplayResult compare(Path dossierDir, Path scratch, List<Outcome> errors) throws IOException {
+    private static ReplayResult compare(Path dossierDir, Path scratch, Report report) throws IOException {
         Set<String> kept = namesOf(dossierFiles(dossierDir));
         Set<String> regenerated = namesOf(dossierFiles(scratch));
         List<String> missing =
@@ -888,7 +902,7 @@ final class PortaoDCompatibilityRun {
                 different.add(name);
             }
         }
-        return new ReplayResult(List.copyOf(regenerated), missing, extra, different, errors);
+        return new ReplayResult(List.copyOf(regenerated), missing, extra, different, report.errors(), report.gaps());
     }
 
     private static Set<String> namesOf(List<Path> files) {

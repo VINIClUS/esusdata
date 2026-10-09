@@ -151,6 +151,11 @@ class PortaoDCompatibilityLiveTest {
         assertThat(report.errors())
                 .as("references whose dossier could not be produced: see registro.txt")
                 .isEmpty();
+        assertThat(report.gaps())
+                .as("references with nothing to decide on (a missing local month, profile or sibling): see"
+                        + " registro.txt; the campaign is not done while one is left, so run only the periods with"
+                        + " every local month and record the others from the diagnostic")
+                .isEmpty();
     }
 
     private static void writeLog(Path directory, Report report) throws IOException {

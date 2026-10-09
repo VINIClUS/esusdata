@@ -41,6 +41,9 @@ import java.util.stream.Collectors;
  *       holding through the month ({@link #firstDayTypes}); {@code affected} is the number of those
  *       teams and {@code divergent} the teams of the revision whose result changes.
  * </ul>
+ *
+ * <p>A month whose extract carries no team state is not read, and the counts of the other months
+ * are a lower bound; only when no month carries one is the probe not observed at all.
  */
 public final class CommonMethodologyProbes {
 
@@ -52,7 +55,11 @@ public final class CommonMethodologyProbes {
                     + " carry.";
 
     private static final String NO_TEAM_STATES =
-            "The extract carries no team state in some month, so the type of no team can be read on either day.";
+            "The extract carries no team state in any month, so the type of no team can be read on either day.";
+
+    private static final String MONTHS_UNREAD =
+            "The extract carries no team state in some month, whose teams are not read; the counts are a lower"
+                    + " bound.";
 
     private static final String FALLBACK_READ =
             "The type of a team of the revision is its current type standing in for a past the source did not"
@@ -87,17 +94,52 @@ public final class CommonMethodologyProbes {
     }
 
     private static ProbeResult measure(PackProbeContext context) {
-        if (context.inputs().stream().anyMatch(input -> input.data().teams().isEmpty())) {
+        if (context.inputs().stream().allMatch(input -> input.data().teams().isEmpty())) {
             return ProbeResult.none(TEAM_TYPE_REFERENCE_DATE, NO_TEAM_STATES);
         }
-        Set<String> revision = context.revisionTeams().keySet();
-        Set<String> changed = new TreeSet<>();
-        Set<String> fallback = new TreeSet<>();
+        Months months = new Months(context.revisionTeams().keySet());
         List<RuleOutcome> alternative = new ArrayList<>();
         for (int month = 0; month < context.inputs().size(); month++) {
-            PackInput input = context.inputs().get(month);
-            TeamTimeline timeline = TeamTimeline.of(input.data().teams());
+            alternative.add(months.otherReading(
+                    context.inputs().get(month), context.baseline().get(month)));
+        }
+        Divergence divergence = ProbeDiff.compare(context.baseline(), alternative, context.revisionTeams());
+        List<String> detail = new ArrayList<>(divergence.localDetail());
+        detail.addAll(months.detail());
+        List<String> limits = months.limits();
+        return limits.isEmpty()
+                ? ProbeResult.complete(TEAM_TYPE_REFERENCE_DATE, months.changed.size(), divergence.teams(), detail)
+                : ProbeResult.partial(
+                        TEAM_TYPE_REFERENCE_DATE,
+                        months.changed.size(),
+                        divergence.teams(),
+                        String.join(" ", limits),
+                        detail);
+    }
+
+    /**
+     * What the months of the quadrimestre showed: the teams of the revision whose type differs on the
+     * two days, those read through a stand-in, and the months with no team state to read.
+     */
+    private static final class Months {
+
+        private final Set<String> revision;
+        private final Set<String> changed = new TreeSet<>();
+        private final Set<String> fallback = new TreeSet<>();
+        private final List<YearMonth> unread = new ArrayList<>();
+
+        Months(Set<String> revision) {
+            this.revision = revision;
+        }
+
+        /** The outcome of the month under the reading on the first day; the baseline where nothing differs. */
+        RuleOutcome otherReading(PackInput input, RuleOutcome baseline) {
             YearMonth competencia = input.context().competencia();
+            if (input.data().teams().isEmpty()) {
+                unread.add(competencia);
+                return baseline;
+            }
+            TeamTimeline timeline = TeamTimeline.of(input.data().teams());
             Set<String> changedInMonth = new TreeSet<>();
             for (String ine : revision) {
                 sort(
@@ -108,27 +150,37 @@ public final class CommonMethodologyProbes {
                         fallback);
             }
             changed.addAll(changedInMonth);
-            alternative.add(
-                    changedInMonth.isEmpty()
-                            ? context.baseline().get(month)
-                            : input.rule()
-                                    .evaluate(
-                                            firstDayTypes(input.data(), competencia, changedInMonth), input.context()));
+            return changedInMonth.isEmpty()
+                    ? baseline
+                    : input.rule().evaluate(firstDayTypes(input.data(), competencia, changedInMonth), input.context());
         }
-        Divergence divergence = ProbeDiff.compare(context.baseline(), alternative, context.revisionTeams());
-        List<String> detail = new ArrayList<>(divergence.localDetail());
-        if (!changed.isEmpty()) {
-            detail.add(changed.size() + " team(s) of the revision with another type on the first day of some month: "
-                    + String.join(", ", changed));
+
+        List<String> limits() {
+            List<String> limits = new ArrayList<>();
+            if (!unread.isEmpty()) {
+                limits.add(MONTHS_UNREAD);
+            }
+            if (!fallback.isEmpty()) {
+                limits.add(FALLBACK_READ);
+            }
+            return limits;
         }
-        if (!fallback.isEmpty()) {
-            detail.add(fallback.size() + " team(s) of the revision read through their current type in some month: "
-                    + String.join(", ", fallback));
+
+        List<String> detail() {
+            List<String> detail = new ArrayList<>();
+            if (!changed.isEmpty()) {
+                detail.add(changed.size() + " team(s) of the revision with another type on the first day of some"
+                        + " month: " + String.join(", ", changed));
+            }
+            if (!fallback.isEmpty()) {
+                detail.add(fallback.size() + " team(s) of the revision read through their current type in some"
+                        + " month: " + String.join(", ", fallback));
+            }
+            if (!unread.isEmpty()) {
+                detail.add("months without team states, not read: " + unread);
+            }
+            return detail;
         }
-        return fallback.isEmpty()
-                ? ProbeResult.complete(TEAM_TYPE_REFERENCE_DATE, changed.size(), divergence.teams(), detail)
-                : ProbeResult.partial(
-                        TEAM_TYPE_REFERENCE_DATE, changed.size(), divergence.teams(), FALLBACK_READ, detail);
     }
 
     /**
