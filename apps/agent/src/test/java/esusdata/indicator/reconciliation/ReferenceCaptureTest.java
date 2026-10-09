@@ -293,6 +293,28 @@ class ReferenceCaptureTest {
         }
     }
 
+    @Test
+    void aStoreThatHoldsTheContentsWithAnotherDownloadsBytesIsReportedAndNotTakenAsUnchanged() throws IOException {
+        byte[] original = SiapsTeamExportFixtures.standard().bytes();
+        write("team.csv", original);
+        capture();
+        Map<String, String> manifestsBefore = stateOf(manifests());
+        // another capture, into another manifest directory, fills the store again from a later download
+        // of the same contents: only the generation line, and so the raw hash, differ
+        deleteEverythingIn(artifacts);
+        write("team.csv", SiapsTeamExportFixtures.standard().generatedAt(LATER).bytes());
+        new ReferenceCapture(artifacts, workspace.resolve("other-manifests"), UF, CLOCK).capture(exports, IBGE);
+        Map<String, String> stored = stateOf(artifacts);
+        write("team.csv", original);
+
+        List<FileReport> again = capture();
+
+        assertThat(actionsOf(again.getFirst())).containsOnly(Action.ARTIFACT_MISMATCH);
+        assertThat(textOf(again)).contains("raw bytes of another download");
+        assertThat(stateOf(artifacts)).isEqualTo(stored);
+        assertThat(stateOf(manifests())).isEqualTo(manifestsBefore);
+    }
+
     private static void deleteEverythingIn(Path directory) throws IOException {
         try (Stream<Path> paths = Files.walk(directory)) {
             for (Path path : paths.sorted(Comparator.reverseOrder())

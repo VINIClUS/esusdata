@@ -72,7 +72,8 @@ class PortaoDReferenceCaptureLiveTest {
 
         assertThat(reports).as("official exports read").anyMatch(report -> !report.cvat());
         assertThat(actions)
-                .as("registered revisions whose artifact is missing and cannot be put back from this download")
-                .doesNotContainKey(Action.ARTIFACT_MISSING);
+                .as("registered revisions whose artifact is missing, or is another download's, in the store")
+                .doesNotContainKey(Action.ARTIFACT_MISSING)
+                .doesNotContainKey(Action.ARTIFACT_MISMATCH);
     }
 }

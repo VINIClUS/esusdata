@@ -77,7 +77,14 @@ final class ReferenceCapture {
          * this file is not the one the manifest pins (another download, with other raw bytes): nothing
          * was written. The original file puts the artifact back.
          */
-        ARTIFACT_MISSING
+        ARTIFACT_MISSING,
+        /**
+         * The manifest directory has these normalized contents and the store has their directory, but
+         * not the artifact the manifest pins: the same contents under the raw bytes of another
+         * download, stored by another capture. Nothing was written; the registered revision loads
+         * again once the store's directory is the one its own capture wrote.
+         */
+        ARTIFACT_MISMATCH
     }
 
     /**
@@ -284,18 +291,7 @@ final class ReferenceCapture {
                 .filter(known -> ReferenceDrift.compare(known, captured) == DriftStatus.SAME_REVISION)
                 .findFirst();
         if (unchanged.isPresent()) {
-            SiapsReferenceManifest known = unchanged.get();
-            if (!Files.exists(store.directoryOf(known)) && !known.rawSha256().equals(captured.rawSha256())) {
-                return new PackReport(
-                        pack,
-                        Action.ARTIFACT_MISSING,
-                        known.referenceId(),
-                        known.normalizedSha256(),
-                        "the store lacks the registered revision and this file has other raw bytes: restore the"
-                                + " original file to put it back");
-            }
-            store.store(raw, subset, metadataOf(known));
-            return new PackReport(pack, Action.UNCHANGED, known.referenceId(), known.normalizedSha256(), "");
+            return unchanged(pack, unchanged.get(), captured, raw, subset, store);
         }
         SiapsReferenceManifest stored = store.store(raw, subset, metadataOf(captured));
         Files.createDirectories(manifestOutput);
@@ -312,6 +308,47 @@ final class ReferenceCapture {
                 stored.referenceId(),
                 stored.normalizedSha256(),
                 "");
+    }
+
+    /**
+     * A pack whose normalized contents the manifest directory has: unchanged only when the store holds
+     * the artifact the registered manifest pins, raw bytes included. A missing artifact is put back
+     * from the file the manifest pins and from no other download; a store that holds the contents
+     * with another download's bytes is reported, never taken as unchanged.
+     */
+    private static PackReport unchanged(
+            GatePack pack,
+            SiapsReferenceManifest known,
+            SiapsReferenceManifest captured,
+            byte[] raw,
+            NormalizedReference subset,
+            ReferenceArtifactStore store)
+            throws IOException {
+        boolean missing = !Files.exists(store.directoryOf(known));
+        if (missing && !known.rawSha256().equals(captured.rawSha256())) {
+            return new PackReport(
+                    pack,
+                    Action.ARTIFACT_MISSING,
+                    known.referenceId(),
+                    known.normalizedSha256(),
+                    "the store lacks the registered revision and this file has other raw bytes: restore the"
+                            + " original file to put it back");
+        }
+        if (missing) {
+            store.store(raw, subset, metadataOf(known));
+        }
+        try {
+            store.load(known);
+        } catch (IllegalStateException otherBytes) {
+            return new PackReport(
+                    pack,
+                    Action.ARTIFACT_MISMATCH,
+                    known.referenceId(),
+                    known.normalizedSha256(),
+                    "the store holds these contents with the raw bytes of another download than the one the"
+                            + " manifest pins: put back the store of the capture that registered it");
+        }
+        return new PackReport(pack, Action.UNCHANGED, known.referenceId(), known.normalizedSha256(), "");
     }
 
     private String referenceId(GatePack pack, NormalizedReference subset, int revision) {
