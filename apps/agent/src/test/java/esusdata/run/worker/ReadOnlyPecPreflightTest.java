@@ -233,6 +233,14 @@ class ReadOnlyPecPreflightTest {
     }
 
     @Test
+    void theSourceIsLookedForInItsRecentMonthsTheNewestFirstAndNotInThePeriodsOfTheRun() {
+        assertThat(ReadOnlyPecPreflight.recentMonths(YearMonth.of(2026, 2), 3))
+                .containsExactly(YearMonth.of(2026, 2), YearMonth.of(2026, 1), YearMonth.of(2025, 12));
+        assertThatThrownBy(() -> ReadOnlyPecPreflight.recentMonths(YearMonth.of(2026, 2), 0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void aRunWithoutAnyMonthToLookInIsRefusedBeforeConnecting() {
         FakePec pec = new FakePec("on");
         ReadOnlyPecPreflight preflight = preflight(pec);

@@ -12,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,10 @@ import java.util.Properties;
  * co_ibge}, no row of the PEC) over the months the caller names, stopping at the first in which the
  * registered municipality has any. That is the existing read-only mechanism of the product for "is
  * this municipality in this source"; it is run here, in the one transaction, because the preflight
- * must prove the municipality before the execution plane is spawned.
+ * must prove the municipality before the execution plane is spawned. The months are the source's
+ * recent ones ({@link #recentMonths}), never the periods a run asks for: the identity of the source
+ * does not depend on them, and a period the source lacks is a row of the diagnostic that names its
+ * missing months, not a refused source.
  *
  * <p>The password is resolved at the point of use, copied into the login properties only, and
  * zeroed; it is in no URL, no message and no log.
@@ -72,6 +76,21 @@ public final class ReadOnlyPecPreflight {
     public ReadOnlyPecPreflight(Connector connector, PecSecretResolver secrets) {
         this.connector = connector;
         this.secrets = secrets;
+    }
+
+    /**
+     * The months to look for the municipality in: {@code count} months back from {@code current},
+     * the newest first, where a source in use is most likely to have atendimentos.
+     */
+    public static List<YearMonth> recentMonths(YearMonth current, int count) {
+        if (count < 1) {
+            throw new IllegalArgumentException("look in at least one month");
+        }
+        List<YearMonth> months = new ArrayList<>();
+        for (int back = 0; back < count; back++) {
+            months.add(current.minusMonths(back));
+        }
+        return List.copyOf(months);
     }
 
     /** The preflight of the PEC the secret file describes. */

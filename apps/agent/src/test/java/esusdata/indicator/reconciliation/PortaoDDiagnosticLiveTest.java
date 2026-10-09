@@ -24,7 +24,6 @@ import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.YearMonth;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,6 +65,8 @@ class PortaoDDiagnosticLiveTest {
     private static final String HOST_KEY = "PEC_DB_HOST";
     private static final String PORT_KEY = "PEC_DB_PORT";
     private static final String MUNICIPALITY_KEY = "PEC_MUNICIPALITY_IBGE";
+    /** How far back the preflight looks for the municipality: the source's identity, not the run's periods. */
+    private static final int RECENT_MONTHS = 24;
 
     @Test
     void runsEveryCapturedPeriodAndWritesTheMaskedMatrix() throws IOException, SQLException {
@@ -105,8 +106,8 @@ class PortaoDDiagnosticLiveTest {
                 .isEqualTo(run.municipalityIbge());
 
         // 1. Read-only preflight: proved, recorded, rolled back and closed before anything is computed.
-        SourceIdentity source =
-                ReadOnlyPecPreflight.live(configuration.envFile()).run(environment, newestFirst(periods));
+        SourceIdentity source = ReadOnlyPecPreflight.live(configuration.envFile())
+                .run(environment, ReadOnlyPecPreflight.recentMonths(YearMonth.now(clock), RECENT_MONTHS));
         log.info(
                 "preflight: read-only session proved, PostgreSQL {} recorded, municipality found",
                 source.postgresVersion());
@@ -138,14 +139,5 @@ class PortaoDDiagnosticLiveTest {
         assertThat(matrix.errors())
                 .as("cells that could not be computed: see matriz.md")
                 .isEmpty();
-    }
-
-    /** The months of the periods, the newest first: where the municipality is most likely to be found. */
-    private static List<YearMonth> newestFirst(List<Quadrimestre> periods) {
-        List<YearMonth> months = new ArrayList<>();
-        for (Quadrimestre period : periods.reversed()) {
-            months.addAll(period.months().reversed());
-        }
-        return months;
     }
 }
