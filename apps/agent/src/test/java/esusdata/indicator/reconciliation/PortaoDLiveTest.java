@@ -10,6 +10,7 @@ import esusdata.indicator.pack.componente3.ComponentIII;
 import esusdata.result.model.InputFingerprint;
 import esusdata.run.extract.ExtractionManifest;
 import esusdata.run.extract.FileExtractStore;
+import esusdata.run.extract.ManifestPart;
 import esusdata.run.worker.SensitivityExtracts;
 import esusdata.run.worker.SensitivityExtracts.PackInput;
 import esusdata.testsupport.LivePecAssumptions;
@@ -169,7 +170,7 @@ class PortaoDLiveTest {
                     .isEqualTo(SiapsFormats.ibgeOfSiaps(pec.environment().get("PEC_MUNICIPALITY_IBGE")));
             snapshots.put(quadrimestre, snapshot);
             local.put(quadrimestre, acquire(quadrimestre, out, pec));
-            fingerprints.put(quadrimestre, fingerprintOf(out.resolve("extratos"), quadrimestre));
+            fingerprints.put(quadrimestre, fingerprintOf(out.resolve("extratos"), quadrimestre, pec.environment()));
         }
         List<PackVerdict> verdicts = new ArrayList<>();
         for (Map.Entry<GatePack, Quadrimestre> entry : references.entrySet()) {
@@ -243,12 +244,18 @@ class PortaoDLiveTest {
 
     /**
      * What the local classes of a quadrimestre were computed from: the {@code InputFingerprint} of
-     * the extraction id and checksum of each extract manifest of its four months (C1's {@code -team}
-     * supplement among them) in {@code extracts}.
+     * the identity the secret file gives and, of each extract manifest of its four months (C1's
+     * {@code -team} supplement among them) in {@code extracts}, its source, municipality, checksum,
+     * query checksum, adapter version and the version and query of each part, so that another source
+     * or another acquisition plan changes it even when the extracted bytes are equal.
      */
-    private static String fingerprintOf(Path extracts, Quadrimestre quadrimestre) throws IOException {
+    private static String fingerprintOf(Path extracts, Quadrimestre quadrimestre, Map<String, String> environment)
+            throws IOException {
         FileExtractStore store = new FileExtractStore(extracts);
-        Map<String, String> checksums = new TreeMap<>();
+        Map<String, String> fields = new TreeMap<>();
+        for (String key : List.of("PEC_SOURCE_ID", "PEC_VERSION", "PEC_MUNICIPALITY_IBGE")) {
+            fields.put("identity/" + key, environment.get(key));
+        }
         try (Stream<Path> files = Files.list(extracts)) {
             for (Path file : files.sorted().toList()) {
                 String name = file.getFileName().toString();
@@ -259,11 +266,24 @@ class PortaoDLiveTest {
                         store.readManifest(name.substring(0, name.length() - MANIFEST_SUFFIX.length()));
                 if (quadrimestre.months().stream()
                         .anyMatch(month -> manifest.extractionId().contains(month.toString()))) {
-                    checksums.put(manifest.extractionId(), manifest.checksum());
+                    addExtract(fields, manifest.extractionId() + "/", manifest);
                 }
             }
         }
-        return InputFingerprint.compute(checksums);
+        return InputFingerprint.compute(fields);
+    }
+
+    private static void addExtract(Map<String, String> fields, String prefix, ExtractionManifest manifest) {
+        fields.put(prefix + "source_id", manifest.sourceId());
+        fields.put(prefix + "municipality_ibge", manifest.municipalityIbge());
+        fields.put(prefix + "checksum", manifest.checksum());
+        fields.put(prefix + "query_checksum", manifest.queryChecksum());
+        fields.put(prefix + "adapter_version", manifest.adapterVersion());
+        for (ManifestPart part : manifest.parts()) {
+            fields.put(
+                    prefix + "part/" + part.index() + "/" + part.capability(),
+                    part.adapterVersion() + ":" + part.queryChecksum());
+        }
     }
 
     private static SiapsSnapshot readSnapshot(String file) throws IOException {
