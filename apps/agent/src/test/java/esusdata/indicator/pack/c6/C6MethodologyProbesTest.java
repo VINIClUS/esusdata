@@ -11,21 +11,30 @@ import esusdata.indicator.model.Capabilities;
 import esusdata.indicator.model.CboGroups;
 import esusdata.indicator.model.DateWindow;
 import esusdata.indicator.model.EvaluationContext;
+import esusdata.indicator.model.EvidenceDecision;
 import esusdata.indicator.model.Quadrimestre;
+import esusdata.indicator.model.RuleOutcome;
+import esusdata.indicator.model.TeamScope;
 import esusdata.indicator.reconciliation.MethodologyProbe;
 import esusdata.indicator.reconciliation.Observability;
 import esusdata.indicator.reconciliation.ProbeResult;
 import esusdata.indicator.reconciliation.SyntheticProbeContexts;
 import esusdata.run.worker.SensitivityExtracts.PackInput;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 
 /**
- * The two CBO probes of C6 on invented elders of the first quadrimestre of 2026: the weight and
- * height of each lie inside the twelve-month window of every month, so a person whose only measure
- * comes from a CBO the other reading moves changes practice B in all four of them.
+ * The probes of C6 on invented elders of the first quadrimestre of 2026. The two CBO probes: the
+ * weight and height of each lie inside the twelve-month window of every month, so a person whose only
+ * measure comes from a CBO the other reading moves changes practice B in all four of them. The two
+ * convention probes (age on the first day, credit of practice C to eAP) are recorded in the dossier
+ * and never decide the verdict (ADR 0034 §7); here they are checked for what they count and for the
+ * exactness of the rewrite behind them.
  */
 class C6MethodologyProbesTest {
 
@@ -34,6 +43,8 @@ class C6MethodologyProbesTest {
     private static final MethodologyProbe WEIGHT_HEIGHT =
             C6MethodologyProbes.all().get(0);
     private static final MethodologyProbe TSB_3224 = C6MethodologyProbes.all().get(1);
+    private static final MethodologyProbe BIRTHDAY = C6MethodologyProbes.all().get(2);
+    private static final MethodologyProbe EAP_CREDIT = C6MethodologyProbes.all().get(3);
 
     private static final String ESF = "eSF";
     private static final String ONLY_NUTRITIONIST = "so-nutricionista";
@@ -43,9 +54,15 @@ class C6MethodologyProbesTest {
     private static final String HEIGHT = "165.0";
     private static final LocalDate DAY = LocalDate.of(2025, 11, 20);
     private static final LocalDate OTHER_DAY = LocalDate.of(2025, 12, 3);
+    private static final LocalDate TURNS_60_IN_MARCH_2026 = LocalDate.of(1966, 3, 10);
 
     private static ProbeResult probe(MethodologyProbe probe, CanonicalDataset data, Map<String, String> revision) {
-        List<PackInput> inputs = Q1.months().stream()
+        return probe(probe, Q1, data, revision);
+    }
+
+    private static ProbeResult probe(
+            MethodologyProbe probe, Quadrimestre quadrimestre, CanonicalDataset data, Map<String, String> revision) {
+        List<PackInput> inputs = quadrimestre.months().stream()
                 .map(month -> new PackInput(PACK, data, EvaluationContext.endOfMonth(C6Scenario.IBGE, month)))
                 .toList();
         return probe.evaluate(SyntheticProbeContexts.pack(inputs, revision));
@@ -67,10 +84,11 @@ class C6MethodologyProbesTest {
     }
 
     @Test
-    void theProbesAreTheTwoCboDimensionsOfPracticeB() {
+    void theProbesAreTheTwoCboDimensionsOfPracticeBAndTheTwoConventions() {
         assertThat(C6MethodologyProbes.all())
                 .extracting(MethodologyProbe::id)
-                .containsExactly("c6.cbo.weight-height", "c6.cbo.tsb-3224");
+                .containsExactly(
+                        "c6.cbo.weight-height", "c6.cbo.tsb-3224", "c6.age.birthday-rule", "c6.team.eap-credit");
         assertThat(C6MethodologyProbes.all())
                 .allSatisfy(probe -> assertThat(probe.packs()).containsExactly(C6Pack.ID));
     }
@@ -137,7 +155,7 @@ class C6MethodologyProbesTest {
                 .add(measuredBy("enfermeiro-e-tsb", OTHER_DAY, C6Scenario.CBO_ENFERMEIRO))
                 .build();
 
-        for (MethodologyProbe each : C6MethodologyProbes.all()) {
+        for (MethodologyProbe each : List.of(WEIGHT_HEIGHT, TSB_3224)) {
             ProbeResult result = probe(each, data, revisionOfA());
             assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
             assertThat(result.affected()).as(each.id()).hasValue(0);
@@ -254,5 +272,255 @@ class C6MethodologyProbesTest {
             assertThat(rewritten.persons()).isEqualTo(data.persons());
             assertThat(rewritten.windows()).isEqualTo(data.windows());
         }
+    }
+
+    // ---- c6.age.birthday-rule
+
+    private static CanonicalDataset personBorn(String key, String ine, LocalDate birth) {
+        return C6Scenario.scenario().person(key, birth).linked(key, ine).build();
+    }
+
+    @Test
+    void aPersonTurning60BetweenTheFirstAndTheLastDayOfAMonthIsCountedOnHerTeam() {
+        ProbeResult result =
+                probe(BIRTHDAY, personBorn("faz-60", C6Scenario.INE_A, TURNS_60_IN_MARCH_2026), revisionOfA());
+
+        assertThat(result.probeId()).isEqualTo("c6.age.birthday-rule");
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
+        // eligible on 31/03 by the rule, not on 01/03: only March differs
+        assertThat(result.affected()).hasValue(1);
+        assertThat(result.divergent()).hasValue(1);
+        assertThat(result.localDetail())
+                .anyMatch(line -> line.startsWith(C6Scenario.INE_A + " 2026-03"))
+                .anyMatch(line -> line.contains("1 person(s) of the revision with another eligibility"));
+    }
+
+    @Test
+    void aBirthdayOnA29thOfFebruaryTurning60InALeapYearIsCountedInFebruary() {
+        Quadrimestre q1In2024 = new Quadrimestre(2024, 1);
+
+        ProbeResult result = probe(
+                BIRTHDAY, q1In2024, personBorn("bissexto", C6Scenario.INE_A, LocalDate.of(1964, 2, 29)), revisionOfA());
+
+        // 29/02/2024 is the last day of February: 60 on it by the rule, still 59 on 01/02
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
+        assertThat(result.affected()).hasValue(1);
+        assertThat(result.divergent()).hasValue(1);
+    }
+
+    @Test
+    void theBirthdayProbeFindsNothingWhereTheTwoReadingsAgree() {
+        CanonicalDataset data = C6Scenario.scenario()
+                .elder("sempre-idosa")
+                .person("faz-60-no-dia-1", LocalDate.of(1966, 3, 1))
+                .linked("faz-60-no-dia-1", C6Scenario.INE_A)
+                .person("jovem", LocalDate.of(1990, 3, 10))
+                .linked("jovem", C6Scenario.INE_A)
+                .build();
+
+        ProbeResult result = probe(BIRTHDAY, data, revisionOfA());
+
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
+        assertThat(result.affected()).hasValue(0);
+        assertThat(result.divergent()).hasValue(0);
+    }
+
+    @Test
+    void a29thOfFebruaryAloneChangesNothingAt60UntilTheYear2100() {
+        ProbeResult result = probe(
+                BIRTHDAY,
+                new Quadrimestre(2100, 1),
+                personBorn("de-2040", C6Scenario.INE_A, LocalDate.of(2040, 2, 29)),
+                revisionOfA());
+
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
+        assertThat(result.affected()).hasValue(0);
+        assertThat(result.divergent()).hasValue(0);
+    }
+
+    @Test
+    void theBirthdayChangeOnATeamOutsideTheRevisionIsNotCounted() {
+        CanonicalDataset data = personBorn("faz-60", C6Scenario.INE_B, TURNS_60_IN_MARCH_2026);
+
+        ProbeResult outside = probe(BIRTHDAY, data, revisionOfA());
+        ProbeResult inside = probe(BIRTHDAY, data, Map.of(C6Scenario.INE_B, ESF));
+
+        assertThat(outside.affected()).hasValue(0);
+        assertThat(outside.divergent()).hasValue(0);
+        assertThat(inside.affected()).hasValue(1);
+        assertThat(inside.divergent()).hasValue(1);
+    }
+
+    @Test
+    void theStandInBirthGivesTheRuleTheEligibilityOfTheFirstDayForEveryBirthDateAroundTheBoundary() {
+        List<YearMonth> months = List.of(
+                YearMonth.of(2024, 2),
+                YearMonth.of(2024, 3),
+                YearMonth.of(2025, 2),
+                YearMonth.of(2025, 3),
+                YearMonth.of(2026, 3),
+                YearMonth.of(2100, 2),
+                YearMonth.of(2100, 3));
+        int rewritten = 0;
+        for (YearMonth month : months) {
+            LocalDate first = month.atDay(1);
+            LocalDate last = month.atEndOfMonth();
+            Set<LocalDate> births = new TreeSet<>();
+            for (int day = -3; day <= 3; day++) {
+                births.add(first.minusYears(60).plusDays(day));
+                births.add(last.minusYears(60).plusDays(day));
+            }
+            for (int year = 1936; year <= 2040; year += 4) {
+                births.add(LocalDate.of(year, 2, 29));
+            }
+            C6Scenario scenario = C6Scenario.scenario();
+            births.forEach(birth -> scenario.person("p" + birth, birth).linked("p" + birth, C6Scenario.INE_A));
+            CanonicalDataset data = scenario.build();
+
+            RuleOutcome asIs = C6Pack.compute(data, C6Scenario.context(month));
+            RuleOutcome rewrittenOutcome =
+                    C6Pack.compute(C6MethodologyProbes.ageOnFirstDay(data, month), C6Scenario.context(month));
+
+            for (LocalDate birth : births) {
+                // java.time clamps 29/02 + 60 years to 28/02: the other reading, written without AgeAt
+                boolean sixtyOnTheFirstDay = !birth.plusYears(60).isAfter(first);
+                EvidenceDecision expected = sixtyOnTheFirstDay ? EvidenceDecision.ELIGIBLE : EvidenceDecision.EXCLUDED;
+                assertThat(C6Scenario.subjectRow(rewrittenOutcome, "p" + birth).decision())
+                        .as("born %s, %s", birth, month)
+                        .isEqualTo(expected);
+                if (C6Scenario.subjectRow(asIs, "p" + birth).decision() != expected) {
+                    rewritten++;
+                }
+            }
+        }
+        assertThat(rewritten)
+                .as("the grid reaches people the two readings decide differently")
+                .isPositive();
+    }
+
+    @Test
+    void theBirthRewriteTouchesOnlyTheBirthDateOfThePeopleTheTwoReadingsDecideDifferently() {
+        YearMonth march = YearMonth.of(2026, 3);
+        CanonicalDataset data = C6Scenario.scenario()
+                .person("faz-60", TURNS_60_IN_MARCH_2026)
+                .linked("faz-60", C6Scenario.INE_A)
+                .elder("sempre-idosa")
+                .add(CanonicalFixtures.person("duas-datas", LocalDate.of(1966, 3, 10), "FEMININO"))
+                .add(CanonicalFixtures.person("duas-datas", LocalDate.of(1966, 3, 11), "FEMININO"))
+                .linked("duas-datas", C6Scenario.INE_A)
+                .visit("sempre-idosa", DAY)
+                .build();
+
+        CanonicalDataset rewritten = C6MethodologyProbes.ageOnFirstDay(data, march);
+
+        assertThat(rewritten.persons())
+                .filteredOn(person -> "faz-60".equals(person.personKey()))
+                .singleElement()
+                .satisfies(person -> assertThat(person.birthDate())
+                        .isEqualTo(LocalDate.of(2026, 3, 31).minusYears(59).toString()));
+        assertThat(rewritten.persons())
+                .filteredOn(person -> !"faz-60".equals(person.personKey()))
+                .containsExactlyElementsOf(data.persons().stream()
+                        .filter(person -> !"faz-60".equals(person.personKey()))
+                        .toList());
+        assertThat(rewritten.registrations()).isEqualTo(data.registrations());
+        assertThat(rewritten.homeVisits()).isEqualTo(data.homeVisits());
+        assertThat(rewritten.teams()).isEqualTo(data.teams());
+        assertThat(rewritten.windows()).isEqualTo(data.windows());
+    }
+
+    // ---- c6.team.eap-credit
+
+    private static CanonicalDataset eapPerson(String key, String ine) {
+        return C6Scenario.scenario().team(ine, "76").elder(key, ine).build();
+    }
+
+    @Test
+    void anEapPersonWithoutTwoVisitsIsCountedOnHerTeam() {
+        ProbeResult result = probe(EAP_CREDIT, eapPerson("eap-sem-visitas", C6Scenario.INE_A), revisionOfA());
+
+        assertThat(result.probeId()).isEqualTo("c6.team.eap-credit");
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
+        assertThat(result.affected()).hasValue(1);
+        assertThat(result.divergent()).hasValue(1);
+        assertThat(result.localDetail())
+                .anyMatch(line -> line.startsWith(C6Scenario.INE_A))
+                .anyMatch(line -> line.contains("1 person(s) of the revision with another decision on practice C"));
+    }
+
+    @Test
+    void anEapPersonWhoMetTheVisitsAndAnEsfPersonWithoutThemAreNotCounted() {
+        CanonicalDataset data = C6Scenario.scenario()
+                .team(C6Scenario.INE_A, "76")
+                .elder("eap-com-visitas", C6Scenario.INE_A)
+                .practiceC("eap-com-visitas")
+                .team(C6Scenario.INE_B, "70")
+                .elder("esf-sem-visitas", C6Scenario.INE_B)
+                .build();
+
+        ProbeResult result = probe(EAP_CREDIT, data, Map.of(C6Scenario.INE_A, "eAP", C6Scenario.INE_B, ESF));
+
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
+        assertThat(result.affected()).hasValue(0);
+        assertThat(result.divergent()).hasValue(0);
+    }
+
+    @Test
+    void theEapCreditOfATeamOutsideTheRevisionIsNotCounted() {
+        CanonicalDataset data = eapPerson("eap-sem-visitas", C6Scenario.INE_B);
+
+        ProbeResult outside = probe(EAP_CREDIT, data, revisionOfA());
+        ProbeResult inside = probe(EAP_CREDIT, data, Map.of(C6Scenario.INE_B, "eAP"));
+
+        assertThat(outside.affected()).hasValue(0);
+        assertThat(outside.divergent()).hasValue(0);
+        assertThat(inside.affected()).hasValue(1);
+        assertThat(inside.divergent()).hasValue(1);
+    }
+
+    @Test
+    void theRewriteRetypesOnlyTheStatesOfTheInesTheRuleReadsAsEapAndNothingElse() {
+        String conflicted = "0000000003";
+        CanonicalDataset data = C6Scenario.scenario()
+                .add(C6Scenario.teamState(C6Scenario.INE_A, "76", "2020-01-01", null))
+                .add(C6Scenario.teamState(C6Scenario.INE_B, "70", "2020-01-01", null))
+                .add(C6Scenario.teamState(conflicted, "70", "2020-01-01", null))
+                .add(C6Scenario.teamState(conflicted, "76", "2020-01-01", null))
+                .elder("eap", C6Scenario.INE_A)
+                .elder("esf", C6Scenario.INE_B)
+                .elder("em-conflito", conflicted)
+                .build();
+        YearMonth march = C6Scenario.COMPETENCIA;
+
+        CanonicalDataset rewritten = C6MethodologyProbes.withoutEapCredit(data, march);
+
+        assertThat(rewritten.teams())
+                .filteredOn(team -> C6Scenario.INE_A.equals(team.ine()))
+                .singleElement()
+                .satisfies(team -> {
+                    assertThat(team.teamTypeCode()).isEqualTo("70");
+                    assertThat(team)
+                            .usingRecursiveComparison()
+                            .ignoringFields("teamTypeCode")
+                            .isEqualTo(data.teams().get(0));
+                });
+        assertThat(rewritten.teams().subList(1, 4)).isEqualTo(data.teams().subList(1, 4));
+        assertThat(rewritten.persons()).isEqualTo(data.persons());
+        assertThat(rewritten.registrations()).isEqualTo(data.registrations());
+
+        RuleOutcome asIs = C6Pack.compute(data, C6Scenario.context(march));
+        RuleOutcome withoutCredit = C6Pack.compute(rewritten, C6Scenario.context(march));
+
+        assertThat(C6Scenario.practiceRow(asIs, "eap", "C").reasonCode()).isEqualTo(C6Pack.C_REASON_CREDITED_EAP);
+        assertThat(C6Scenario.met(withoutCredit, "eap", "C")).isFalse();
+        assertThat(C6Scenario.points(asIs, "eap"))
+                .isEqualTo(C6Scenario.points(withoutCredit, "eap").add(C6Scenario.pts(25)));
+        // still considered and still in its team
+        assertThat(C6Scenario.subjectRow(withoutCredit, "eap").ine()).isEqualTo(C6Scenario.INE_A);
+        // the eSF person and the person of the INE with two types are read exactly as before
+        assertThat(C6Scenario.subjectRow(withoutCredit, "em-conflito").reasonCode())
+                .isEqualTo(C6Scenario.subjectRow(asIs, "em-conflito").reasonCode())
+                .isEqualTo(TeamScope.REASON_CONFLICT);
+        assertThat(C6Scenario.points(withoutCredit, "esf")).isEqualTo(C6Scenario.points(asIs, "esf"));
     }
 }
