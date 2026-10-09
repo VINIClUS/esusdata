@@ -202,8 +202,12 @@ O texto final é o que viaja com o resultado publicado. Só `BLOCKING_GAP` mant�
 | C7-LIM-13 | Pessoa com registros divergentes | DECLARED_CONVENTION | «Pessoa com nascimento, sexo ou identidade divergentes, ou versões do cadastro do mesmo dia em conflito, fica fora, com motivo próprio; nenhuma versão é escolhida pela ordem.» |
 | C7-LIM-14 (nova) | P10/AMB-C7-01 | DECLARED_CONVENTION | «Subgrupo sem denominador sai da soma e do divisor: o escore é reescalado sobre os pesos dos subgrupos presentes. Com os quatro vazios, o mês não tem valor e fica fora da média quadrimestral. n e d de cada subgrupo estão publicados.» |
 | C7-LIM-15 (nova; vale após `team` VALIDATED) | Regra de tipo de equipe | DECLARED_CONVENTION | «Só equipes com tipo 70 ou 76 vigente no fim da competência entram. Equipes de outro tipo, com tipo conflitante ou sem tipo registrado ficam fora, com motivo e contagem.» |
+| C7-LIM-16 (nova; declarada para o Portão D, entra em `STANDING_LIMITATIONS` na próxima `rule_version` de C7) | Identificação conforme CadSUS (item 24 a) | OUT_OF_REACH | «A conformidade da identificação com o CadSUS não é conferida.» |
+| C7-LIM-17 (nova; declarada para o Portão D, entra em `STANDING_LIMITATIONS` na próxima `rule_version` de C7) | Validação de equipes e profissionais no SCNES (item 24 b; Portaria GM/MS nº 3.493/2024) e CNS profissional (item 24 e) | OUT_OF_REACH | «Composição e carga horária da equipe (SCNES) e estabelecimento de APS não são conferidos; vale o tipo 70/76 da capacidade `team`. O CNS profissional é presumido presente em registro do PEC.» |
 
-Totais: **1 BLOCKING_GAP** (C7-LIM-04, temporária), 4 OUT_OF_REACH (01, 02, 03, 07), 10 DECLARED_CONVENTION. Nenhuma limitação de C7 é lacuna de dado permanente.
+Totais: **1 BLOCKING_GAP** (C7-LIM-04, temporária), 6 OUT_OF_REACH (01, 02, 03, 07, 16, 17), 10 DECLARED_CONVENTION. Nenhuma limitação de C7 é lacuna de dado permanente.
+
+C7-LIM-16 e C7-LIM-17 (2026-10-09) corrigem uma omissão: os outros packs já declaravam a identificação no CadSUS e a validação no SCNES (C1-LIM-07/11, C2-LIM-23/24, C3-LIM-30/31, C5-LIM-06/07, C6-LIM-06/07; C4 declara o SCNES em C4-LIM-09 e ganha a identificação em C4-LIM-21), e a nota de edições oficiais (`docs/indicadores/portoes/edicoes-oficiais-siaps.md`, seção 7) as lista para C1 a C7 (`oor.scnes-validation`, `oor.cadsus-identification`). Os textos são os de C5 e C6. Nada no cálculo muda; o resultado publicado por `c7-prevencao-cancer@0.3.0` segue com as 14 limitações de `C7Pack.STANDING_LIMITATIONS`, e as duas entram na lista na próxima `rule_version` de C7 (subir a versão agora anularia o Portão A, ADR 0032). A habilitação de CBO na tabela SIGTAP segue em C7-LIM-05.
 
 ## Resumo
 
