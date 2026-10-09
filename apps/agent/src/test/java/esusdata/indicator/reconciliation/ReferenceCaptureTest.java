@@ -78,7 +78,7 @@ class ReferenceCaptureTest {
         SiapsTeamExportFixtures.Export export =
                 SiapsTeamExportFixtures.standard().generatedAt(LATER);
         export.row(SiapsTeamExportFixtures.ESF_1, SiapsTeamExportFixtures.INDICATOR_NAMES.getFirst())[
-                SiapsTeamExportFixtures.RESULT_COLUMN] = "12.75";
+                SiapsTeamExportFixtures.RESULT_COLUMN] = "9.25";
         return export.bytes();
     }
 

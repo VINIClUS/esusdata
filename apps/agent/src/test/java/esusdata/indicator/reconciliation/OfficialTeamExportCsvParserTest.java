@@ -41,7 +41,9 @@ class OfficialTeamExportCsvParserTest {
     private static final GatePack C1 = GatePack.bySiapsCode(110).orElseThrow();
     private static final GatePack C2 = GatePack.bySiapsCode(108).orElseThrow();
     private static final String C1_NAME = INDICATOR_NAMES.get(0);
+    private static final String C2_NAME = INDICATOR_NAMES.get(1);
     private static final String C3_NAME = INDICATOR_NAMES.get(2);
+    private static final String C4_NAME = INDICATOR_NAMES.get(3);
     private static final String ESF = SiapsParser.ESF;
     private static final String EAP = SiapsParser.EAP;
     private static final String KNOWN_LAYOUT = "known layout";
@@ -116,7 +118,7 @@ class OfficialTeamExportCsvParserTest {
                 .isEqualTo(new NormalizedReference.IndicatorRow(
                         ESF_1,
                         ESF,
-                        new BigDecimal("12.5"),
+                        new BigDecimal("8.5"),
                         Classification.REGULAR,
                         new BigDecimal("0.25"),
                         BigDecimal.ONE,
@@ -355,6 +357,48 @@ class OfficialTeamExportCsvParserTest {
     }
 
     @Test
+    void refusesAConceptThatIsNotTheBandOfItsResult() {
+        // C4 at 88.75 is Ótimo; Regular is refused even with its factor, note and final note made to agree
+        Export shifted = SiapsTeamExportFixtures.standard();
+        shifted.row(ESF_2, C4_NAME)[CONCEPT_COLUMN] = "REGULAR";
+        shifted.row(ESF_2, C4_NAME)[SiapsTeamExportFixtures.FACTOR_COLUMN] = "0.25";
+        shifted.row(ESF_2, C4_NAME)[SiapsTeamExportFixtures.NOTE_COLUMN] = "0.25";
+        shifted.row(ESF_2, TOTAL_NAME)[SiapsTeamExportFixtures.FINAL_NOTE_COLUMN] = "9.25";
+
+        assertThat(refusal(shifted))
+                .contains("CONCEITO OBTIDO DO INDICADOR NO QUADRIMESTRE is not the band the indicator's ficha gives");
+    }
+
+    @Test
+    void readsC1OnItsOwnBandsWhereAboveSeventyIsRegular() {
+        // 88.75 is Ótimo for C2 to C7 but Regular for C1, whose Ótimo ends at 70
+        Export shifted = SiapsTeamExportFixtures.standard();
+        shifted.row(ESF_2, C1_NAME)[SiapsTeamExportFixtures.RESULT_COLUMN] = "88.75";
+
+        assertThat(refusal(shifted)).contains("is not the band the indicator's ficha gives the result");
+    }
+
+    @Test
+    void aResultShownOnTheEdgeOfABandTakesTheConceptOfEitherSide() {
+        // shown with two decimals, 50 may be 50.004 (Bom) or 49.996 (Suficiente); 49.99 is Suficiente only
+        Export edge = SiapsTeamExportFixtures.standard();
+        edge.row(EAP_1, C2_NAME)[SiapsTeamExportFixtures.RESULT_COLUMN] = "50";
+        Export below = SiapsTeamExportFixtures.standard();
+        below.row(EAP_1, C2_NAME)[SiapsTeamExportFixtures.RESULT_COLUMN] = "49.99";
+
+        assertThat(parse(edge).subset(C2).rows())
+                .contains(new NormalizedReference.IndicatorRow(
+                        EAP_1,
+                        EAP,
+                        new BigDecimal("50"),
+                        Classification.BOM,
+                        new BigDecimal("0.75"),
+                        BigDecimal.TWO,
+                        new BigDecimal("1.5")));
+        assertThat(refusal(below)).contains("is not the band the indicator's ficha gives the result");
+    }
+
+    @Test
     void refusesAFinalNoteThatIsNotTheSumOfTheNotesOfItsSevenIndicators() {
         // ESF_2 has seven Ótimo indicators whose notes sum to 10; 9 is still in the band of Ótimo
         Export shifted = SiapsTeamExportFixtures.standard();
@@ -515,6 +559,7 @@ class OfficialTeamExportCsvParserTest {
     void changingOneClassChangesTheHashOfItsPackAndOfTheNotaFinalOnly() {
         OfficialTeamReference before = parse(SiapsTeamExportFixtures.standard());
         Export changed = SiapsTeamExportFixtures.standard();
+        changed.row(ESF_1, C3_NAME)[SiapsTeamExportFixtures.RESULT_COLUMN] = "88.75";
         changed.row(ESF_1, C3_NAME)[CONCEPT_COLUMN] = "ÓTIMO";
         changed.row(ESF_1, C3_NAME)[SiapsTeamExportFixtures.FACTOR_COLUMN] = "1";
         changed.row(ESF_1, C3_NAME)[SiapsTeamExportFixtures.NOTE_COLUMN] = "2";

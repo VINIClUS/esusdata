@@ -127,7 +127,17 @@ final class SiapsTeamExportFixtures {
         };
     }
 
-    private static String resultOf(Classification classification) {
+    /** A result in the band the ficha of the indicator at {@code index} (0 is C1) gives the concept. */
+    private static String resultOf(int index, Classification classification) {
+        if (index == 0) {
+            // C1 has bands of its own: Regular ≤ 10 (and above 70), Suficiente ≤ 30, Bom ≤ 50, Ótimo ≤ 70
+            return switch (classification) {
+                case REGULAR -> "8.5";
+                case SUFICIENTE -> "20.5";
+                case BOM -> "40.25";
+                case OTIMO -> "63";
+            };
+        }
         return switch (classification) {
             case REGULAR -> "12.5";
             case SUFICIENTE -> "40.25";
@@ -219,7 +229,7 @@ final class SiapsTeamExportFixtures {
                 String[] cells = base(ine, type, INDICATOR_NAMES.get(index));
                 BigDecimal weight = BigDecimal.valueOf(WEIGHTS.get(index));
                 BigDecimal note = factorOf(concepts[index]).multiply(weight);
-                cells[RESULT_COLUMN] = resultOf(concepts[index]);
+                cells[RESULT_COLUMN] = resultOf(index, concepts[index]);
                 cells[CONCEPT_COLUMN] = label(concepts[index]);
                 cells[FACTOR_COLUMN] = plain(factorOf(concepts[index]));
                 cells[WEIGHT_COLUMN] = plain(weight);

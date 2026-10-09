@@ -1,7 +1,9 @@
 package esusdata.indicator.reconciliation;
 
+import esusdata.indicator.model.Bands;
 import esusdata.indicator.model.Classification;
 import esusdata.indicator.model.ExactRatio;
+import esusdata.indicator.pack.c1.C1Rule;
 import esusdata.indicator.pack.componente3.ComponentIII;
 import esusdata.indicator.pack.componente3.Nt08Tables;
 import esusdata.indicator.reconciliation.NormalizedReference.FinalRow;
@@ -19,6 +21,7 @@ import java.nio.file.Path;
 import java.text.Normalizer;
 import java.time.DateTimeException;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -46,8 +49,8 @@ import java.util.regex.Pattern;
  * <p>The file is refused when it is a person-level export (a column named CPF, CNS, nome,
  * nascimento, telefone or endereço, apart from the team's own name), when its municipality or
  * quadrimestre is not the expected one anywhere, when it repeats a team and indicator, when a team
- * type, an indicator, a class or a number is not one it knows, when a factor disagrees with its
- * class, when a weight is not the one the NT 8/2026 gives the indicator, or when the final note of
+ * type, an indicator, a class or a number is not one it knows, when an indicator's concept is not
+ * the band its ficha gives the result, when a factor disagrees with its class, when a weight is not the one the NT 8/2026 gives the indicator, or when the final note of
  * a team with all seven indicator rows is not the sum of their notes. Teams of the types outside the Componente de Qualidade of eSF/eAP (eSB, eMulti) are
  * counted and left unread. A team that lacks a row is not refused: the reference reports it as
  * incomplete ({@link OfficialTeamReference#isComplete}).
@@ -79,6 +82,9 @@ final class OfficialTeamExportCsvParser {
     private static final int FINAL_CLASS = 16;
     private static final List<Integer> TOTAL_DASHES_AT_START = List.of(UF, IBGE, MUNICIPALITY_NAME);
     private static final List<Integer> TOTAL_DASHES = List.of(RESULT, CONCEPT, FACTOR, WEIGHT, NOTE);
+
+    /** The SIAPS shows a result with at most two decimals, and drops their trailing zeros. */
+    private static final int SHOWN_DECIMALS = 2;
 
     private static final String DASH = "-";
     private static final String TOTAL = "Total";
@@ -499,6 +505,9 @@ final class OfficialTeamExportCsvParser {
             int code = indicatorCode(cells.get(INDICATOR));
             BigDecimal result = decimal(cells, RESULT);
             Classification concept = classification(cells.get(CONCEPT), HEADER.get(CONCEPT));
+            if (!conceptsOf(code, result).contains(concept)) {
+                throw fail(HEADER.get(CONCEPT) + " is not the band the indicator's ficha gives the result");
+            }
             BigDecimal factor = decimal(cells, FACTOR);
             if (factor.compareTo(factorOf(concept)) != 0) {
                 throw fail(HEADER.get(FACTOR) + " does not agree with the concept");
@@ -581,6 +590,27 @@ final class OfficialTeamExportCsvParser {
                     .map(component -> new BigDecimal(component.weight()))
                     .findFirst()
                     .orElseThrow();
+        }
+
+        /**
+         * The concepts the ficha's bands give a result the file shows rounded to two decimals: its band, and on the edge of a band the band on the other side as well, since the value
+         * the SIAPS classified may lie just across it. C1 has bands of its own ({@link C1Rule#classify},
+         * where above 70 is Regular); C2 to C7 share theirs. Above 100, C2 to C7 have no band.
+         */
+        private static Set<Classification> conceptsOf(int code, BigDecimal result) {
+            BigDecimal half = BigDecimal.valueOf(5, Math.max(SHOWN_DECIMALS, result.scale()) + 1);
+            boolean c1 = C1Rule.INDICATOR_PACK.equals(
+                    GatePack.bySiapsCode(code).orElseThrow().packId());
+            Set<Classification> concepts = EnumSet.noneOf(Classification.class);
+            for (BigDecimal value : List.of(result.subtract(half).max(BigDecimal.ZERO), result.add(half))) {
+                ExactRatio exact = exact(value);
+                if (c1) {
+                    concepts.add(C1Rule.classify(exact));
+                } else {
+                    Bands.QUALIDADE_C2_C7.classify(exact).ifPresent(concepts::add);
+                }
+            }
+            return concepts;
         }
 
         /** A decimal of the file as an exact fraction, for the bands that are never rounded first. */
