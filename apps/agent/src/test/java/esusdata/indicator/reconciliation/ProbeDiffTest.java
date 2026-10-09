@@ -140,6 +140,36 @@ class ProbeDiffTest {
     }
 
     @Test
+    void aTeamWithNoDenominatorPublishesNothingAsATeamWithNoResultDoes() {
+        IndicatorResult empty = new IndicatorResult(
+                IndicatorStatus.NO_DENOMINATOR,
+                null,
+                BigInteger.ZERO,
+                BigInteger.ZERO,
+                "PEOPLE",
+                null,
+                JANUARY,
+                "fixture@1.0.0",
+                JANUARY + "-28",
+                "3541307",
+                List.of(),
+                "policy@1");
+        List<RuleOutcome> baseline =
+                List.of(month(JANUARY, List.of(new TeamResult(REVISION_TEAM, "0000001", empty)), List.of()));
+        List<RuleOutcome> other = List.of(month(JANUARY, List.of(), List.of()));
+
+        assertThat(ProbeDiff.compare(baseline, other, REVISION).teams()).isZero();
+    }
+
+    @Test
+    void aBucketWithoutAnIneIsNoTeamOfTheRevision() {
+        List<RuleOutcome> baseline = List.of(month(JANUARY, List.of(team(null, JANUARY, 1, 2)), List.of()));
+        List<RuleOutcome> other = List.of(month(JANUARY, List.of(team(null, JANUARY, 2, 2)), List.of()));
+
+        assertThat(ProbeDiff.compare(baseline, other, REVISION).teams()).isZero();
+    }
+
+    @Test
     void readingsOfDifferentMonthsAreRefused() {
         List<RuleOutcome> january = List.of(month(JANUARY, List.of(), List.of()));
         List<RuleOutcome> february = List.of(month(FEBRUARY, List.of(), List.of()));

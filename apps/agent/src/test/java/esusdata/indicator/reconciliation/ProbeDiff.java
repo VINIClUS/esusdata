@@ -4,6 +4,7 @@ import esusdata.indicator.model.EvidenceItem;
 import esusdata.indicator.model.EvidenceSubjectKind;
 import esusdata.indicator.model.ExactRatio;
 import esusdata.indicator.model.IndicatorResult;
+import esusdata.indicator.model.IndicatorResult.IndicatorStatus;
 import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamResult;
 import java.util.ArrayList;
@@ -136,24 +137,34 @@ public final class ProbeDiff {
         }
     }
 
+    /** The results by INE; a bucket without an INE is no team of any revision and is left out. */
     private static Map<String, IndicatorResult> byIne(List<TeamResult> teams) {
         Map<String, IndicatorResult> results = new TreeMap<>();
         for (TeamResult team : teams) {
-            results.put(team.ine(), team.result());
+            if (team.ine() != null) {
+                results.put(team.ine(), team.result());
+            }
         }
         return results;
     }
 
-    /** Same status, NM, DN, value and class; a team on one side only is a change. */
+    /**
+     * Same status, NM, DN, value and class. A team with no denominator publishes no value, as a
+     * team with no result does, so the two are the same; a value on one side only is a change.
+     */
     private static boolean sameResult(IndicatorResult a, IndicatorResult b) {
-        if (a == null || b == null) {
-            return a == null && b == null;
+        if (publishesNothing(a) || publishesNothing(b)) {
+            return publishesNothing(a) && publishesNothing(b);
         }
         return a.status() == b.status()
                 && Objects.equals(a.numerator(), b.numerator())
                 && Objects.equals(a.denominator(), b.denominator())
                 && a.classification() == b.classification()
                 && sameValue(a.valueExact(), b.valueExact());
+    }
+
+    private static boolean publishesNothing(IndicatorResult result) {
+        return result == null || result.status() == IndicatorStatus.NO_DENOMINATOR;
     }
 
     private static boolean sameValue(ExactRatio a, ExactRatio b) {
