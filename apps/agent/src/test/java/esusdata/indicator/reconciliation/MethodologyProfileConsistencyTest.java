@@ -60,13 +60,6 @@ class MethodologyProfileConsistencyTest {
     private static final String COMMON_CONVENTION = CommonMethodologyProbes.TEAM_TYPE_REFERENCE_DATE;
 
     /**
-     * The convention probes another slice adds (C6 and C7). Until it is integrated the catalog
-     * does not hold them yet; remove this set then, and the test demands them.
-     */
-    private static final Set<String> PENDING_INTEGRATION =
-            Set.of("c6.age.birthday-rule", "c6.team.eap-credit", "c7.age-and-window.civil");
-
-    /**
      * The structural blockers of the user decision (b'): dimensions this installation cannot
      * observe completely in any quadrimestre, and the only values a placeholder may name.
      */
@@ -191,7 +184,6 @@ class MethodologyProfileConsistencyTest {
             Set<String> catalog = catalogIds(profile.pack());
             Set<String> missing = new TreeSet<>(namedProbes(profile));
             missing.removeAll(catalog);
-            missing.removeAll(PENDING_INTEGRATION);
 
             assertThat(missing)
                     .as("probes of %s missing from the catalog", profile.ruleVersion())
@@ -211,19 +203,6 @@ class MethodologyProfileConsistencyTest {
         }
         assertThat(MethodologyProbeCatalog.all())
                 .allSatisfy(probe -> assertThat(probe.packs()).isNotEmpty().isSubsetOf(COMPILED.keySet()));
-    }
-
-    @Test
-    void theOnlyProbesMissingFromTheCatalogAreThoseAnotherSliceIsAdding() {
-        Set<String> named = new TreeSet<>();
-        Set<String> inCatalog = new TreeSet<>();
-        for (MethodologyProfile profile : registry.profiles()) {
-            named.addAll(namedProbes(profile));
-            inCatalog.addAll(catalogIds(profile.pack()));
-        }
-        named.removeAll(inCatalog);
-
-        assertThat(PENDING_INTEGRATION).containsAll(named);
     }
 
     private static Set<String> catalogIds(String packId) {
