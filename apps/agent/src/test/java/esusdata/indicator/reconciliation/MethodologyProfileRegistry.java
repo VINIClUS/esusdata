@@ -1,6 +1,8 @@
 package esusdata.indicator.reconciliation;
 
 import esusdata.indicator.reconciliation.MethodologyProfile.DataTiming;
+import esusdata.indicator.reconciliation.MethodologyProfile.DeclaredConvention;
+import esusdata.indicator.reconciliation.MethodologyProfile.DeclaredLimitation;
 import esusdata.indicator.reconciliation.MethodologyProfile.Dimension;
 import esusdata.indicator.reconciliation.MethodologyProfile.OfficialEdition;
 import esusdata.indicator.reconciliation.MethodologyProfile.Reading;
@@ -16,6 +18,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
@@ -31,7 +34,8 @@ import tools.jackson.databind.JsonNode;
  * things itself, so the two cannot drift apart ({@code MethodologyProfileRegistryTest} feeds both
  * the same bad documents). It is strict by design: a repeated key, a field the contract does not
  * name (a date, "latest", a validity window), a value of the wrong JSON type, a dimension without
- * its probe, a timing item with one, a reading of a dimension that is not there, a dimension a
+ * a probe that some quadrimestre does not read SAME, a timing item with a probe, a convention that
+ * takes the id or the probe of a dimension, a quadrimestre that reads a convention, a reading of a dimension that is not there, a dimension a
  * quadrimestre leaves unclassified, a source that does not resolve or a duplicate of anything that
  * must be unique is refused, with a message that gives the path of the offending object. What the
  * invariants of one profile are lives in {@link MethodologyProfile}; this class reads the document
@@ -57,6 +61,10 @@ public final class MethodologyProfileRegistry {
     private static final String RULE_VERSION = "rule_version";
     private static final String DIMENSIONS = "dimensions";
     private static final String DATA_TIMING = "data_timing";
+    private static final String DECLARED_LIMITATIONS = "declared_limitations";
+    private static final String DECLARED_CONVENTIONS = "declared_conventions";
+    private static final String WHAT = "what";
+    private static final String RESEARCH_REF = "research_ref";
     private static final String OFFICIAL_READINGS = "official_readings";
     private static final String LOCAL_READING = "local_reading";
     private static final String DECISION_REFS = "decision_refs";
@@ -70,9 +78,12 @@ public final class MethodologyProfileRegistry {
 
     private static final Set<String> ROOT_KEYS = Set.of(SCHEMA_VERSION_KEY, SOURCES, PROFILES);
     private static final Set<String> SOURCE_KEYS = Set.of(ID, TITLE, URL, PUBLISHED, KIND);
-    private static final Set<String> PROFILE_KEYS =
-            Set.of(PACK, RULE_VERSION, DIMENSIONS, DATA_TIMING, OFFICIAL_READINGS);
-    private static final Set<String> DIMENSION_KEYS = Set.of(ID, LOCAL_READING, DECISION_REFS, PROBE_ID);
+    private static final Set<String> PROFILE_KEYS = Set.of(
+            PACK, RULE_VERSION, DIMENSIONS, DATA_TIMING, DECLARED_LIMITATIONS, DECLARED_CONVENTIONS, OFFICIAL_READINGS);
+    private static final Set<String> DIMENSION_KEYS = Set.of(ID, LOCAL_READING, DECISION_REFS);
+    private static final Set<String> PROBE_OPTIONAL_KEYS = Set.of(PROBE_ID);
+    private static final Set<String> LIMITATION_KEYS = Set.of(ID, WHAT, DECISION_REFS);
+    private static final Set<String> CONVENTION_KEYS = Set.of(ID, LOCAL_READING, DECISION_REFS, RESEARCH_REF);
     private static final Set<String> TIMING_KEYS = Set.of(ID, KIND, LOCAL_READING, DECISION_REFS);
     private static final Set<String> QUADRIMESTRE_KEYS = Set.of(EDITION, READINGS);
     private static final Set<String> EDITION_KEYS = Set.of(ID, SOURCE_REFS);
@@ -194,6 +205,10 @@ public final class MethodologyProfileRegistry {
         Fields fields = new Fields(node, where, PROFILE_KEYS, Set.of());
         List<Dimension> dimensions = each(fields, DIMENSIONS, MethodologyProfileRegistry::parseDimension);
         List<DataTiming> timing = each(fields, DATA_TIMING, MethodologyProfileRegistry::parseTiming);
+        List<DeclaredLimitation> limitations =
+                each(fields, DECLARED_LIMITATIONS, MethodologyProfileRegistry::parseLimitation);
+        List<DeclaredConvention> conventions =
+                each(fields, DECLARED_CONVENTIONS, MethodologyProfileRegistry::parseConvention);
         Map<String, OfficialEdition> editions = new LinkedHashMap<>();
         for (Map.Entry<String, JsonNode> entry : fields.entries(OFFICIAL_READINGS)) {
             String quadrimestre = entry.getKey();
@@ -204,21 +219,46 @@ public final class MethodologyProfileRegistry {
         return build(
                 where,
                 () -> new MethodologyProfile(
-                        fields.text(PACK), fields.text(RULE_VERSION), dimensions, timing, editions));
+                        fields.text(PACK),
+                        fields.text(RULE_VERSION),
+                        dimensions,
+                        timing,
+                        limitations,
+                        conventions,
+                        editions));
     }
 
     private static Dimension parseDimension(JsonNode node, String where) {
-        if (node.isObject() && !node.has(PROBE_ID)) {
-            throw invalid(where + " has no probe_id: every methodology dimension is proved by a probe");
-        }
-        Fields fields = new Fields(node, where, DIMENSION_KEYS, Set.of());
+        Fields fields = new Fields(node, where, DIMENSION_KEYS, PROBE_OPTIONAL_KEYS);
         return build(
                 where,
                 () -> new Dimension(
                         fields.text(ID),
                         fields.text(LOCAL_READING),
                         fields.strings(DECISION_REFS),
-                        fields.text(PROBE_ID)));
+                        optionalProbe(fields)));
+    }
+
+    private static DeclaredLimitation parseLimitation(JsonNode node, String where) {
+        Fields fields = new Fields(node, where, LIMITATION_KEYS, Set.of());
+        return build(
+                where, () -> new DeclaredLimitation(fields.text(ID), fields.text(WHAT), fields.strings(DECISION_REFS)));
+    }
+
+    private static DeclaredConvention parseConvention(JsonNode node, String where) {
+        Fields fields = new Fields(node, where, CONVENTION_KEYS, PROBE_OPTIONAL_KEYS);
+        return build(
+                where,
+                () -> new DeclaredConvention(
+                        fields.text(ID),
+                        fields.text(LOCAL_READING),
+                        fields.strings(DECISION_REFS),
+                        fields.text(RESEARCH_REF),
+                        optionalProbe(fields)));
+    }
+
+    private static Optional<String> optionalProbe(Fields fields) {
+        return fields.has(PROBE_ID) ? Optional.of(fields.text(PROBE_ID)) : Optional.empty();
     }
 
     private static DataTiming parseTiming(JsonNode node, String where) {

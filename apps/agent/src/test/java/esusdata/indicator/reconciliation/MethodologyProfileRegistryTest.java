@@ -9,6 +9,8 @@ import com.networknt.schema.SpecificationVersion;
 import esusdata.indicator.ReleaseGateRegistry;
 import esusdata.indicator.model.PackDescriptor;
 import esusdata.indicator.reconciliation.MethodologyProfile.DataTiming;
+import esusdata.indicator.reconciliation.MethodologyProfile.DeclaredConvention;
+import esusdata.indicator.reconciliation.MethodologyProfile.DeclaredLimitation;
 import esusdata.indicator.reconciliation.MethodologyProfile.Dimension;
 import esusdata.indicator.reconciliation.MethodologyProfile.OfficialEdition;
 import esusdata.indicator.reconciliation.MethodologyProfile.Reading;
@@ -21,6 +23,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
@@ -59,6 +62,8 @@ class MethodologyProfileRegistryTest {
     private static final String CUTOFF = "fx.timing.transmission-cutoff";
     private static final String LATE = "fx.timing.late-sending";
     private static final String REPROCESSING = "fx.timing.reprocessing";
+    private static final String LIMITATION = "fx.limitation.person-identification";
+    private static final String CONVENTION = "fx.convention.team-type-date";
     private static final String Q_2025 = "2025Q3";
     private static final String Q_2026 = "2026Q1";
     private static final String NT_2026 = "fx-nt-2026";
@@ -115,6 +120,14 @@ class MethodologyProfileRegistryTest {
 
     private static ObjectNode timing(ObjectNode root, int index) {
         return (ObjectNode) profile(root).get("data_timing").get(index);
+    }
+
+    private static ObjectNode limitation(ObjectNode root, int index) {
+        return (ObjectNode) profile(root).get("declared_limitations").get(index);
+    }
+
+    private static ObjectNode convention(ObjectNode root, int index) {
+        return (ObjectNode) profile(root).get("declared_conventions").get(index);
     }
 
     private static ObjectNode source(ObjectNode root, int index) {
@@ -174,7 +187,7 @@ class MethodologyProfileRegistryTest {
         Dimension sameDay = profile.dimensions().get(1);
         assertThat(sameDay.localReading()).isEqualTo("Two visits on the same day count once.");
         assertThat(sameDay.decisionRefs()).containsExactly("AMB-FX-02", "LACUNA-L3");
-        assertThat(sameDay.probeId()).isEqualTo(SAME_DAY);
+        assertThat(sameDay.probeId()).contains(SAME_DAY);
         assertThat(profile.dimensions().get(2).decisionRefs()).isEmpty();
         assertThat(profile.dataTiming()).extracting(DataTiming::id).containsExactly(CUTOFF, LATE, REPROCESSING);
         assertThat(profile.dataTiming())
@@ -227,6 +240,117 @@ class MethodologyProfileRegistryTest {
         assertThat(registry.profile(PACK, V1).requiredProbeIds()).containsExactly(ANCHOR, SAME_DAY, CREDIT);
         assertThat(registry.profile(PACK, V1_1).requiredProbeIds()).containsExactly(ANCHOR);
         assertThat(registry.profile(PACK, V1).dataTiming()).hasSize(3);
+    }
+
+    @Test
+    void limitationsAndConventionsRoundTripAndTheProfileFindsALimitationById() throws Exception {
+        MethodologyProfile profile = load().profile(PACK, V1);
+
+        assertThat(profile.declaredLimitations())
+                .extracting(DeclaredLimitation::id)
+                .containsExactly(LIMITATION);
+        DeclaredLimitation limitation = profile.declaredLimitations().get(0);
+        assertThat(limitation.what()).startsWith("The local rule cannot see the national registry");
+        assertThat(limitation.decisionRefs()).containsExactly("FX-LIM-02");
+        assertThat(profile.limitation(LIMITATION)).contains(limitation);
+        assertThat(profile.limitation(CONVENTION)).isEmpty();
+        assertThat(profile.declaresLimitation(LIMITATION)).isTrue();
+        assertThat(profile.declaresLimitation("fx.limitation.other")).isFalse();
+        assertThat(profile.declaresLimitation(ANCHOR)).isFalse();
+
+        assertThat(profile.declaredConventions())
+                .extracting(DeclaredConvention::id)
+                .containsExactly(CONVENTION);
+        DeclaredConvention convention = profile.declaredConventions().get(0);
+        assertThat(convention.localReading())
+                .isEqualTo("The team type is read at the reference date of the quadrimestre.");
+        assertThat(convention.decisionRefs()).containsExactly("AMB-FX-03");
+        assertThat(convention.researchRef()).isEqualTo("fixture-research.md section 1 (K3)");
+        assertThat(convention.probeId()).contains(CONVENTION);
+    }
+
+    @Test
+    void emptyLimitationAndConventionArraysAreFine() throws Exception {
+        MethodologyProfile bare = load().profile(PACK, V1_1);
+
+        assertThat(bare.declaredLimitations()).isEmpty();
+        assertThat(bare.declaredConventions()).isEmpty();
+        assertThat(bare.conventionProbeIds()).isEmpty();
+        assertThat(bare.limitation(LIMITATION)).isEmpty();
+    }
+
+    @Test
+    void theRequiredProbesLeaveOutTheConventionsAndTheConventionProbesListOnlyThem() throws Exception {
+        MethodologyProfile profile = load().profile(PACK, V1);
+
+        assertThat(profile.requiredProbeIds())
+                .containsExactly(ANCHOR, SAME_DAY, CREDIT)
+                .doesNotContain(CONVENTION);
+        assertThat(profile.conventionProbeIds()).containsExactly(CONVENTION);
+    }
+
+    @Test
+    void aConventionWithoutAProbeAddsNoConventionProbe() throws Exception {
+        ObjectNode root = fixture();
+        convention(root, 0).remove("probe_id");
+        MethodologyProfile profile =
+                MethodologyProfileRegistry.fromJson(root.toString()).profile(PACK, V1);
+
+        assertThat(profile.declaredConventions().get(0).probeId()).isEmpty();
+        assertThat(profile.conventionProbeIds()).isEmpty();
+        assertThat(schema().validate(root)).isEmpty();
+    }
+
+    @Test
+    void aDimensionWithoutAProbeMustReadSameEverywhereAndThenItLoadsAndIsNotRequired() throws Exception {
+        ObjectNode root = fixture();
+        dimension(root, 0).remove("probe_id");
+        MethodologyProfile profile =
+                MethodologyProfileRegistry.fromJson(root.toString()).profile(PACK, V1);
+
+        assertThat(profile.dimensions().get(0).probeId()).isEmpty();
+        assertThat(profile.dimensions().get(1).probeId()).contains(SAME_DAY);
+        assertThat(profile.requiredProbeIds()).containsExactly(SAME_DAY, CREDIT);
+        assertThat(schema().validate(root)).isEmpty();
+    }
+
+    @Test
+    void aDimensionWithoutAProbeThatReadsDifferentSomewhereIsRefusedNamingTheDimension() throws Exception {
+        ObjectNode root = fixture();
+        dimension(root, 1).remove("probe_id");
+        String json = root.toString();
+
+        assertThatThrownBy(() -> MethodologyProfileRegistry.fromJson(json))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("dimension " + SAME_DAY + " has no probe_id")
+                .hasMessageContaining("2026Q1 must read it SAME, not DIFFERENT");
+    }
+
+    @Test
+    void aDimensionWithoutAProbeThatReadsUnknownSomewhereIsRefusedNamingTheDimension() throws Exception {
+        ObjectNode root = fixture();
+        dimension(root, 2).remove("probe_id");
+        String json = root.toString();
+
+        assertThatThrownBy(() -> MethodologyProfileRegistry.fromJson(json))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("dimension " + CREDIT + " has no probe_id")
+                .hasMessageContaining("2025Q3 must read it SAME, not UNKNOWN");
+    }
+
+    @Test
+    void theModelRefusesWhatTheLoaderRefusesWithoutTheJson() {
+        assertThatThrownBy(() -> new DeclaredLimitation("fx.limitation.x", "what", List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("needs at least one decision_ref");
+        assertThatThrownBy(() -> new DeclaredConvention("fx.convention.x", "reads", List.of(), "ref", Optional.empty()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("needs at least one decision_ref");
+        assertThatThrownBy(() -> new Dimension("fx.dimension.x", "reads", List.of(), Optional.of("probe")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("probe_id of fx.dimension.x must look like");
+        assertThat(new Dimension("fx.dimension.x", "reads", List.of(), "fx.dimension.x").probeId())
+                .contains("fx.dimension.x");
     }
 
     @Test
@@ -466,9 +590,45 @@ class MethodologyProfileRegistryTest {
                         root -> profile(root).remove("data_timing"),
                         "needs data_timing"),
                 new Bad(
-                        "a dimension without a probe_id",
-                        root -> dimension(root, 1).remove("probe_id"),
-                        "profiles[0].dimensions[1] has no probe_id"),
+                        "a profile without the declared_limitations field",
+                        root -> profile(root).remove("declared_limitations"),
+                        "needs declared_limitations"),
+                new Bad(
+                        "a profile without the declared_conventions field",
+                        root -> profile(root).remove("declared_conventions"),
+                        "needs declared_conventions"),
+                new Bad(
+                        "a limitation without decision_refs",
+                        root -> limitation(root, 0).set("decision_refs", array()),
+                        "needs at least one decision_ref"),
+                new Bad(
+                        "a limitation without its text",
+                        root -> limitation(root, 0).remove("what"),
+                        "needs what"),
+                new Bad(
+                        "a limitation id that is not a stable id",
+                        root -> limitation(root, 0).put("id", "Person"),
+                        "declared limitation id must look like"),
+                new Bad(
+                        "a limitation with a probe_id",
+                        root -> limitation(root, 0).put("probe_id", ANCHOR),
+                        "has unknown field probe_id"),
+                new Bad(
+                        "a convention without decision_refs",
+                        root -> convention(root, 0).set("decision_refs", array()),
+                        "needs at least one decision_ref"),
+                new Bad(
+                        "a convention without its research_ref",
+                        root -> convention(root, 0).remove("research_ref"),
+                        "needs research_ref"),
+                new Bad(
+                        "a convention with a blank research_ref",
+                        root -> convention(root, 0).put("research_ref", " "),
+                        "research_ref of fx.convention.team-type-date must not be blank"),
+                new Bad(
+                        "a convention probe_id that is not a stable id",
+                        root -> convention(root, 0).put("probe_id", "team"),
+                        "probe_id of fx.convention.team-type-date must look like"),
                 new Bad(
                         "a data-timing item that names a probe_id",
                         root -> timing(root, 0).put("probe_id", ANCHOR),
@@ -598,6 +758,37 @@ class MethodologyProfileRegistryTest {
                         "a probe shared by two dimensions of a profile",
                         root -> dimension(root, 1).put("probe_id", ANCHOR),
                         "duplicate probe_id fx.cohort.anchor-date across the dimensions"),
+                new Bad(
+                        "a repeated declared limitation id",
+                        root -> ((ArrayNode) profile(root).get("declared_limitations"))
+                                .add(limitation(root, 0).deepCopy()),
+                        "duplicate declared limitation id " + LIMITATION),
+                new Bad(
+                        "a convention id that is a dimension id",
+                        root -> convention(root, 0).put("id", ANCHOR),
+                        "id " + ANCHOR + " is both a convention and a dimension or data-timing item"),
+                new Bad(
+                        "a convention id that is a data-timing id",
+                        root -> convention(root, 0).put("id", CUTOFF),
+                        "id " + CUTOFF + " is both a convention and a dimension or data-timing item"),
+                new Bad(
+                        "a repeated declared convention id",
+                        root -> ((ArrayNode) profile(root).get("declared_conventions"))
+                                .add(convention(root, 0).deepCopy()),
+                        "duplicate declared convention id " + CONVENTION),
+                new Bad(
+                        "a convention probe_id that is the probe of a dimension",
+                        root -> convention(root, 0).put("probe_id", SAME_DAY),
+                        "probe_id " + SAME_DAY + " of convention " + CONVENTION + " is also the probe of a dimension"),
+                new Bad(
+                        "a convention probe_id used by two conventions",
+                        root -> ((ArrayNode) profile(root).get("declared_conventions"))
+                                .add(convention(root, 0).deepCopy().put("id", "fx.convention.other")),
+                        "duplicate probe_id " + CONVENTION + " across the conventions"),
+                new Bad(
+                        "a quadrimestre that reads a declared convention",
+                        root -> readings(root, Q_2026).set(CONVENTION, sameReading(NT_2026)),
+                        "2026Q1 reads " + CONVENTION + ", a declared convention"),
                 new Bad(
                         "an id that is a dimension and a data-timing item",
                         root -> timing(root, 0).put("id", CREDIT),

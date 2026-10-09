@@ -18,8 +18,14 @@ import java.util.regex.Pattern;
  *
  * <ul>
  *   <li>the METHODOLOGY {@link Dimension}s of the rule, each with the local reading, the decision
- *       and limitation records behind it and the one probe that proves, on the data of a
- *       reference, whether the other reading changes the result;
+ *       and limitation records behind it and the probe that proves, on the data of a reference,
+ *       whether the other reading changes the result; a dimension without a probe must read
+ *       {@code SAME} in every quadrimestre, as there is nothing left for a probe to prove;
+ *   <li>the {@link DeclaredLimitation}s (ADR 0034 §6): what the local rule cannot reach. They have
+ *       no probe and no official reading, and they are recorded in the dossier;
+ *   <li>the {@link DeclaredConvention}s (ADR 0034 §7): what the ficha leaves open and the local
+ *       rule settles by a stated reading. A convention may have a probe, recorded in the dossier
+ *       and never read by the verdict, and it is never a reading of a quadrimestre;
  *   <li>the {@link DataTiming} items (transmission cutoff, late sending, reprocessing), which are
  *       not probed and never enter the compatibility verdict: the reconciliation judges them by
  *       tolerance (spec §14, §22);
@@ -29,13 +35,16 @@ import java.util.regex.Pattern;
  * <p>Compatibility is decided by these readings and by the probes, never by a date and never by
  * comparing the local output with the official one (spec §6.3, §9.5). The only date in a profile
  * is {@link Source#published()}, metadata for people. A profile is valid or it does not exist: the
- * constructors refuse a profile without dimensions, ids or probes that repeat, and a quadrimestre
- * that leaves a dimension unclassified or reads one that is not there.
+ * constructors refuse a profile without dimensions, ids or probes that repeat, a convention that
+ * takes the id or the probe of a dimension, and a quadrimestre that leaves a dimension
+ * unclassified or reads one that is not there (a convention included).
  *
  * @param pack the pack id, e.g. {@code c2-desenvolvimento-infantil}
  * @param ruleVersion the compiled rule version, {@code <pack>@<version>}
  * @param dimensions the METHODOLOGY dimensions, in declaration order; never empty
  * @param dataTiming the DATA_TIMING items, possibly none
+ * @param declaredLimitations the declared limitations (ADR 0034 §6), possibly none
+ * @param declaredConventions the declared conventions (ADR 0034 §7), possibly none
  * @param officialReadings the readings by quadrimestre in the SIAPS spelling ({@code 2026Q1}); an
  *     identification, nothing orders or selects by it
  */
@@ -44,6 +53,8 @@ public record MethodologyProfile(
         String ruleVersion,
         List<Dimension> dimensions,
         List<DataTiming> dataTiming,
+        List<DeclaredLimitation> declaredLimitations,
+        List<DeclaredConvention> declaredConventions,
         Map<String, OfficialEdition> officialReadings) {
 
     /** The shape of the stable ids of dimensions, probes and timing items, e.g. {@code c2.cohort.second-birthday}. */
@@ -65,14 +76,62 @@ public record MethodologyProfile(
      * @param decisionRefs the decision and limitation records behind it ({@code AMB-C2-03},
      *     {@code LACUNA-L3}); possibly none
      * @param probeId the probe that proves it; unique in the profile, shared by no other dimension
+     *     and no convention. Empty only for a dimension that every quadrimestre reads {@code SAME}
+     *     (the profile checks it)
      */
-    public record Dimension(String id, String localReading, List<String> decisionRefs, String probeId) {
+    public record Dimension(String id, String localReading, List<String> decisionRefs, Optional<String> probeId) {
 
         public Dimension {
             matching(STABLE_ID, id, "dimension id", STABLE_ID_EXAMPLE);
             text(localReading, "local_reading of " + id);
             decisionRefs = distinctDecisionRefs(decisionRefs, id);
-            matching(STABLE_ID, probeId, "probe_id of " + id, STABLE_ID_EXAMPLE);
+            probeId = optionalStableId(probeId, "probe_id of " + id);
+        }
+
+        /** A dimension proved by the probe {@code probeId}. */
+        public Dimension(String id, String localReading, List<String> decisionRefs, String probeId) {
+            this(id, localReading, decisionRefs, Optional.of(probeId));
+        }
+    }
+
+    /**
+     * A declared limitation (ADR 0034 §6): something the local rule cannot reach. It has no probe
+     * and no official reading; the dossier records it.
+     *
+     * @param id the stable id, unique among the limitations of the profile
+     * @param what what the local rule cannot reach, in words
+     * @param decisionRefs the decision and limitation records behind it; never empty
+     */
+    public record DeclaredLimitation(String id, String what, List<String> decisionRefs) {
+
+        public DeclaredLimitation {
+            matching(STABLE_ID, id, "declared limitation id", STABLE_ID_EXAMPLE);
+            text(what, "what of " + id);
+            decisionRefs = requiredDecisionRefs(decisionRefs, id);
+        }
+    }
+
+    /**
+     * A declared convention (ADR 0034 §7): something the ficha leaves open and the local rule
+     * settles by a stated reading. It never appears in the readings of a quadrimestre. Its probe,
+     * when it has one, is recorded in the dossier and the verdict never reads it.
+     *
+     * @param id the stable id, disjoint from the dimension and data-timing ids of the profile
+     * @param localReading what the local rule does, in words
+     * @param decisionRefs the decision records behind it; never empty
+     * @param researchRef where the omission of the ficha is tagged (K3), e.g. {@code
+     *     edicoes-oficiais-siaps.md §6.6 n1 (K3)}
+     * @param probeId the probe recorded for it, if any; unique, and not the probe of a dimension
+     */
+    public record DeclaredConvention(
+            String id, String localReading, List<String> decisionRefs, String researchRef, Optional<String> probeId) {
+
+        public DeclaredConvention {
+            matching(STABLE_ID, id, "declared convention id", STABLE_ID_EXAMPLE);
+            text(localReading, "local_reading of " + id);
+            decisionRefs = requiredDecisionRefs(decisionRefs, id);
+            text(researchRef, "research_ref of " + id);
+            probeId = optionalStableId(probeId, "probe_id of " + id);
         }
     }
 
@@ -204,6 +263,8 @@ public record MethodologyProfile(
         }
         dimensions = List.copyOf(dimensions);
         dataTiming = List.copyOf(dataTiming);
+        declaredLimitations = List.copyOf(declaredLimitations);
+        declaredConventions = List.copyOf(declaredConventions);
         officialReadings = ordered(officialReadings);
         if (dimensions.isEmpty()) {
             throw new IllegalArgumentException(
@@ -214,17 +275,46 @@ public record MethodologyProfile(
         }
         requireDistinctIds(dimensions, dataTiming);
         requireDistinctProbes(dimensions);
+        requireDistinctLimitations(declaredLimitations);
+        requireDisjointConventions(declaredConventions, dimensions, dataTiming);
         for (Map.Entry<String, OfficialEdition> entry : officialReadings.entrySet()) {
-            requireClassified(entry.getKey(), entry.getValue(), dimensions, dataTiming);
+            requireClassified(entry.getKey(), entry.getValue(), dimensions, dataTiming, declaredConventions);
         }
+        requireSameWithoutProbe(dimensions, officialReadings);
     }
 
     /**
-     * The probes the profile requires: one per dimension, in the order of the dimensions. This is
-     * what a compatibility verdict needs executed. Data-timing items add none.
+     * The probes the verdict reads: those of the dimensions that have one, in the order of the
+     * dimensions. Data-timing items, limitations and conventions add none.
      */
     public List<String> requiredProbeIds() {
-        return dimensions.stream().map(Dimension::probeId).toList();
+        return dimensions.stream()
+                .map(Dimension::probeId)
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    /**
+     * The probes of the conventions that have one, in declaration order. They are recorded in the
+     * dossier and never read by the verdict (ADR 0034 §7).
+     */
+    public List<String> conventionProbeIds() {
+        return declaredConventions.stream()
+                .map(DeclaredConvention::probeId)
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    /** The declared limitation with this id (ADR 0034 §6), if the profile declares it. */
+    public Optional<DeclaredLimitation> limitation(String id) {
+        return declaredLimitations.stream()
+                .filter(limitation -> limitation.id().equals(id))
+                .findFirst();
+    }
+
+    /** Whether the profile declares the limitation with this id. */
+    public boolean declaresLimitation(String id) {
+        return limitation(id).isPresent();
     }
 
     /**
@@ -258,22 +348,88 @@ public record MethodologyProfile(
     private static void requireDistinctProbes(List<Dimension> dimensions) {
         Set<String> probeIds = new HashSet<>();
         for (Dimension dimension : dimensions) {
-            if (!probeIds.add(dimension.probeId())) {
-                throw new IllegalArgumentException("duplicate probe_id " + dimension.probeId()
+            Optional<String> probe = dimension.probeId();
+            if (probe.isPresent() && !probeIds.add(probe.get())) {
+                throw new IllegalArgumentException("duplicate probe_id " + probe.get()
                         + " across the dimensions: each dimension has a probe of its own");
+            }
+        }
+    }
+
+    private static void requireDistinctLimitations(List<DeclaredLimitation> limitations) {
+        Set<String> ids = new HashSet<>();
+        for (DeclaredLimitation limitation : limitations) {
+            if (!ids.add(limitation.id())) {
+                throw new IllegalArgumentException("duplicate declared limitation id " + limitation.id());
+            }
+        }
+    }
+
+    /** A convention takes no id and no probe of a dimension or a timing item, and none of another convention. */
+    private static void requireDisjointConventions(
+            List<DeclaredConvention> conventions, List<Dimension> dimensions, List<DataTiming> timing) {
+        Set<String> taken = new HashSet<>();
+        dimensions.forEach(dimension -> taken.add(dimension.id()));
+        timing.forEach(item -> taken.add(item.id()));
+        Set<String> dimensionProbes = new HashSet<>();
+        dimensions.forEach(dimension -> dimension.probeId().ifPresent(dimensionProbes::add));
+        Set<String> conventionIds = new HashSet<>();
+        Set<String> conventionProbes = new HashSet<>();
+        for (DeclaredConvention convention : conventions) {
+            if (taken.contains(convention.id())) {
+                throw new IllegalArgumentException("id " + convention.id()
+                        + " is both a convention and a dimension or data-timing item: ids are unique in a profile");
+            }
+            if (!conventionIds.add(convention.id())) {
+                throw new IllegalArgumentException("duplicate declared convention id " + convention.id());
+            }
+            Optional<String> probe = convention.probeId();
+            if (probe.isPresent() && dimensionProbes.contains(probe.get())) {
+                throw new IllegalArgumentException("probe_id " + probe.get() + " of convention " + convention.id()
+                        + " is also the probe of a dimension: the verdict reads the probes of the dimensions only");
+            }
+            if (probe.isPresent() && !conventionProbes.add(probe.get())) {
+                throw new IllegalArgumentException("duplicate probe_id " + probe.get() + " across the conventions");
+            }
+        }
+    }
+
+    /** A dimension without a probe has nothing proving it, so no quadrimestre may read it otherwise than SAME. */
+    private static void requireSameWithoutProbe(
+            List<Dimension> dimensions, Map<String, OfficialEdition> officialReadings) {
+        for (Dimension dimension : dimensions) {
+            if (dimension.probeId().isPresent()) {
+                continue;
+            }
+            for (Map.Entry<String, OfficialEdition> entry : officialReadings.entrySet()) {
+                Reading read = entry.getValue().readings().get(dimension.id());
+                if (read.reading() != OfficialReading.SAME) {
+                    throw new IllegalArgumentException("dimension " + dimension.id() + " has no probe_id, so "
+                            + entry.getKey() + " must read it SAME, not " + read.reading());
+                }
             }
         }
     }
 
     /** One quadrimestre reads exactly the dimensions of the profile: none left unclassified, none invented. */
     private static void requireClassified(
-            String quadrimestre, OfficialEdition edition, List<Dimension> dimensions, List<DataTiming> timing) {
+            String quadrimestre,
+            OfficialEdition edition,
+            List<Dimension> dimensions,
+            List<DataTiming> timing,
+            List<DeclaredConvention> conventions) {
         ReferenceFormats.quadrimestre(quadrimestre);
         Set<String> dimensionIds = new HashSet<>();
         dimensions.forEach(dimension -> dimensionIds.add(dimension.id()));
         Set<String> timingIds = new HashSet<>();
         timing.forEach(item -> timingIds.add(item.id()));
+        Set<String> conventionIds = new HashSet<>();
+        conventions.forEach(convention -> conventionIds.add(convention.id()));
         for (String read : edition.readings().keySet()) {
+            if (conventionIds.contains(read)) {
+                throw new IllegalArgumentException(quadrimestre + " reads " + read + ", a declared convention: a"
+                        + " convention is never a reading of a quadrimestre (ADR 0034 section 7)");
+            }
             if (timingIds.contains(read)) {
                 throw new IllegalArgumentException(quadrimestre + " reads " + read + ", a data-timing item: timing is"
                         + " judged by the reconciliation and has no official reading");
@@ -304,6 +460,20 @@ public record MethodologyProfile(
             }
         }
         return copy;
+    }
+
+    private static List<String> requiredDecisionRefs(List<String> refs, String owner) {
+        List<String> distinct = distinctDecisionRefs(refs, owner);
+        if (distinct.isEmpty()) {
+            throw new IllegalArgumentException(owner + " needs at least one decision_ref");
+        }
+        return distinct;
+    }
+
+    private static Optional<String> optionalStableId(Optional<String> value, String what) {
+        Objects.requireNonNull(value, what);
+        value.ifPresent(id -> matching(STABLE_ID, id, what, STABLE_ID_EXAMPLE));
+        return value;
     }
 
     private static void matching(Pattern shape, String value, String what, String example) {

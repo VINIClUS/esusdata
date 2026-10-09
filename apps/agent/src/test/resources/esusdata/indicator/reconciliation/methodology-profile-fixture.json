@@ -67,6 +67,22 @@
           "decision_refs": []
         }
       ],
+      "declared_limitations": [
+        {
+          "id": "fx.limitation.person-identification",
+          "what": "The local rule cannot see the national registry, so a person is identified by the local key only.",
+          "decision_refs": ["FX-LIM-02"]
+        }
+      ],
+      "declared_conventions": [
+        {
+          "id": "fx.convention.team-type-date",
+          "local_reading": "The team type is read at the reference date of the quadrimestre.",
+          "decision_refs": ["AMB-FX-03"],
+          "research_ref": "fixture-research.md section 1 (K3)",
+          "probe_id": "fx.convention.team-type-date"
+        }
+      ],
       "official_readings": {
         "2025Q3": {
           "edition": { "id": "fixture-2025-v1", "source_refs": ["fx-ficha-2025"] },
@@ -102,6 +118,8 @@
         }
       ],
       "data_timing": [],
+      "declared_limitations": [],
+      "declared_conventions": [],
       "official_readings": {
         "2026Q1": {
           "edition": { "id": "fixture-2026-v1", "source_refs": ["fx-nt-2026"] },

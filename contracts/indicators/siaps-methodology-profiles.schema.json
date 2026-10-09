@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://observatorio-aps.local/contracts/indicators/siaps-methodology-profiles.schema.json",
   "title": "SIAPS methodology profiles",
-  "description": "Schema for contracts/indicators/siaps-methodology-profiles.json (spec 2026-10-08, §8.3). One profile per compiled pack and rule_version. A profile lists the METHODOLOGY dimensions of the local rule, each proved by exactly one executable probe (probe_id), and the DATA_TIMING items (transmission cutoff, late sending, reprocessing), which are never probed and never enter the compatibility verdict: the reconciliation judges them by tolerance. Per quadrimestre it records the official edition and, for every dimension, whether the official reading is SAME, DIFFERENT (quoting it) or UNKNOWN, with the source it rests on. Compatibility is decided by these readings and the probes, never by a date and never by comparing local and official output: dates are metadata (sources[].published is the only one). Dev tooling of the Portão D: not packaged in the jar. Rules a schema cannot state (unique ids, unique probe_ids, one profile per pack and rule_version, rule_version agreeing with pack, the readings of a quadrimestre being exactly the dimensions of the profile, source references resolving to sources[] and to the sources of their edition, published being a real date) are enforced by MethodologyProfileRegistry.load.",
+  "description": "Schema for contracts/indicators/siaps-methodology-profiles.json (spec 2026-10-08, §8.3). One profile per compiled pack and rule_version. A profile lists the METHODOLOGY dimensions of the local rule, each proved by at most one executable probe (probe_id; a dimension without one must read SAME in every quadrimestre, so there is nothing for a probe to prove), the declared_limitations (what the local rule cannot reach, ADR 0034 §6: no probe, no reading), the declared_conventions (what the ficha leaves open and the local rule settles by a stated reading, ADR 0034 §7: an optional probe that is recorded in the dossier and never read by the verdict, and never a reading of a quadrimestre), and the DATA_TIMING items (transmission cutoff, late sending, reprocessing), which are never probed and never enter the compatibility verdict: the reconciliation judges them by tolerance. Per quadrimestre it records the official edition and, for every dimension, whether the official reading is SAME, DIFFERENT (quoting it) or UNKNOWN, with the source it rests on. Compatibility is decided by these readings and the probes, never by a date and never by comparing local and official output: dates are metadata (sources[].published is the only one). Dev tooling of the Portão D: not packaged in the jar. Rules a schema cannot state (unique ids, unique probe_ids, unique limitation ids, convention ids disjoint from dimension and data_timing ids, convention probe_ids disjoint from dimension probe_ids, a dimension without probe_id reading SAME everywhere, one profile per pack and rule_version, rule_version agreeing with pack, the readings of a quadrimestre being exactly the dimensions of the profile, source references resolving to sources[] and to the sources of their edition, published being a real date) are enforced by MethodologyProfileRegistry.load.",
   "type": "object",
   "required": ["schema_version", "sources", "profiles"],
   "additionalProperties": false,
@@ -59,7 +59,7 @@
     },
     "profile": {
       "type": "object",
-      "required": ["pack", "rule_version", "dimensions", "data_timing", "official_readings"],
+      "required": ["pack", "rule_version", "dimensions", "data_timing", "declared_limitations", "declared_conventions", "official_readings"],
       "additionalProperties": false,
       "properties": {
         "pack": { "type": "string", "pattern": "^[a-z0-9-]+$" },
@@ -79,6 +79,16 @@
           "items": { "$ref": "#/$defs/dataTiming" },
           "description": "The DATA_TIMING items: recorded for the reconciliation, not probed, never part of the verdict."
         },
+        "declared_limitations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/declaredLimitation" },
+          "description": "What the local rule cannot reach (ADR 0034 §6). Recorded in the dossier; no probe, no official reading. May be empty."
+        },
+        "declared_conventions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/declaredConvention" },
+          "description": "What the ficha leaves open and the local rule settles by a declared reading (ADR 0034 §7). Never read by the verdict and never a reading of a quadrimestre. May be empty."
+        },
         "official_readings": {
           "type": "object",
           "minProperties": 1,
@@ -90,7 +100,7 @@
     },
     "dimension": {
       "type": "object",
-      "required": ["id", "local_reading", "decision_refs", "probe_id"],
+      "required": ["id", "local_reading", "decision_refs"],
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/stableId" },
@@ -98,9 +108,36 @@
         "decision_refs": { "$ref": "#/$defs/decisionRefs" },
         "probe_id": {
           "$ref": "#/$defs/stableId",
-          "description": "The probe that proves, on the data of a reference, whether the other reading changes the result. Unique within the profile."
+          "description": "The probe that proves, on the data of a reference, whether the other reading changes the result. Unique within the profile. Optional: a dimension without one must read SAME in every quadrimestre."
         }
       }
+    },
+    "declaredLimitation": {
+      "type": "object",
+      "required": ["id", "what", "decision_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "what": { "$ref": "#/$defs/text", "description": "What the local rule cannot reach, in words." },
+        "decision_refs": { "$ref": "#/$defs/decisionRefs", "minItems": 1 }
+      },
+      "description": "A declared limitation (ADR 0034 §6): unique id in the profile, no probe, no official reading."
+    },
+    "declaredConvention": {
+      "type": "object",
+      "required": ["id", "local_reading", "decision_refs", "research_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId", "description": "Disjoint from the dimension and data_timing ids of the profile." },
+        "local_reading": { "$ref": "#/$defs/text" },
+        "decision_refs": { "$ref": "#/$defs/decisionRefs", "minItems": 1 },
+        "research_ref": { "$ref": "#/$defs/text", "description": "Where the ficha omission is tagged (K3), e.g. edicoes-oficiais-siaps.md §6.6 n1 (K3)." },
+        "probe_id": {
+          "$ref": "#/$defs/stableId",
+          "description": "Optional probe, run when the extract allows and recorded in the dossier; the verdict never reads it (ADR 0034 §7). Unique, and disjoint from the probe_ids of the dimensions."
+        }
+      },
+      "description": "A declared convention (ADR 0034 §7): a ficha omission settled by a stated local reading. It never appears in official_readings."
     },
     "dataTiming": {
       "type": "object",
