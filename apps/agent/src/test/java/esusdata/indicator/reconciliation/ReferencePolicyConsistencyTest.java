@@ -89,8 +89,9 @@ class ReferencePolicyConsistencyTest {
      *       verdict, and that verdict is the declared {@code compatibility} (rule 9);</li>
      *   <li>a decided dossier carries what binds it to its declaration: its schema version, the
      *       rule version of the set, the manifest the declaration pins, the fingerprint of the local
-     *       source it was decided on, its sources, probes, local × official comparison and coverage.
-     *       A skeletal or stale file decides nothing;</li>
+     *       source it was decided on, and the other minimum fields of spec §8.4 under the names the
+     *       spec gives them (official methodology sources, normative deltas, probe results, local ×
+     *       official comparison, coverage and reason). A skeletal or stale file decides nothing;</li>
      *   <li>an {@code ACTIVE} reference whose dossier is {@code EXACT} or {@code
      *       EQUIVALENT_FOR_REFERENCE} is a {@code GATE} one (rule 7: the gate set is derived);</li>
      *   <li>no dossier is left without a declaration, or a compatible reference that was never
@@ -195,8 +196,8 @@ class ReferencePolicyConsistencyTest {
     /**
      * The fields of a decided dossier that are missing, or that do not bind it to {@code declaration}:
      * a verdict counts only from a dossier of the known version, decided for the set's rule version,
-     * on the manifest the declaration pins and on an identified local source, with its sources,
-     * probes, comparison and coverage. The rest of the dossier is the model's (Task 7) to check.
+     * on the manifest the declaration pins and on an identified local source, with the other minimum
+     * fields of spec §8.4 under its names. What those fields hold is the model's (Task 7) to check.
      */
     private static List<String> bindingViolations(
             JsonNode tree, ReferenceSet set, ReferenceDeclaration declaration, String who) {
@@ -211,14 +212,16 @@ class ReferencePolicyConsistencyTest {
                         .matcher(text(node, "local_source_fingerprint"))
                         .matches());
         binding.put(
-                "methodology_sources",
-                node -> node.path("methodology_sources").isArray()
-                        && !node.path("methodology_sources").isEmpty());
-        binding.put("probes", node -> node.path("probes").isArray());
+                "official_methodology_sources",
+                node -> node.path("official_methodology_sources").isArray()
+                        && !node.path("official_methodology_sources").isEmpty());
+        binding.put("normative_deltas", node -> node.path("normative_deltas").isArray());
+        binding.put("probe_results", node -> node.path("probe_results").isArray());
         binding.put(
                 "official_field_comparison",
                 node -> node.path("official_field_comparison").isObject());
         binding.put("coverage", node -> node.path("coverage").isObject());
+        binding.put("reason", node -> node.path("reason").isString());
         List<String> unbound = binding.entrySet().stream()
                 .filter(field -> !field.getValue().test(tree))
                 .map(Map.Entry::getKey)
@@ -398,10 +401,12 @@ class ReferencePolicyConsistencyTest {
                         SummaryWriter.sha256(manifestOf(id).toString().getBytes(StandardCharsets.UTF_8)))
                 .put("local_source_fingerprint", "sha256:" + "a".repeat(64))
                 .put("verdict", verdict);
-        dossier.putArray("methodology_sources").add("docs/indicadores/portoes/edicoes-oficiais-siaps.md");
-        dossier.putArray("probes");
+        dossier.putArray("official_methodology_sources").add("docs/indicadores/portoes/edicoes-oficiais-siaps.md");
+        dossier.putArray("normative_deltas");
+        dossier.putArray("probe_results");
         dossier.putObject("official_field_comparison");
         dossier.putObject("coverage");
+        dossier.put("reason", "");
         return dossier;
     }
 
@@ -609,10 +614,12 @@ class ReferencePolicyConsistencyTest {
                 "rule_version",
                 MANIFEST_SHA,
                 "local_source_fingerprint",
-                "methodology_sources",
-                "probes",
+                "official_methodology_sources",
+                "normative_deltas",
+                "probe_results",
                 "official_field_comparison",
-                "coverage"
+                "coverage",
+                "reason"
             })
     void aDecidedDossierThatIsNotBoundToItsDeclarationIsReported(String field, @TempDir Path repo) throws Exception {
         String manifest = manifestSha(repo, GATE_ID);
@@ -623,6 +630,19 @@ class ReferencePolicyConsistencyTest {
         assertThat(violations(repo, policyOf(gate(GATE_ID, manifest, sha))))
                 .singleElement(InstanceOfAssertFactories.STRING)
                 .contains("what binds it to its declaration", field);
+    }
+
+    @Test
+    void aDossierThatNamesItsFieldsOtherwiseThanSpec84IsReported(@TempDir Path repo) throws Exception {
+        String manifest = manifestSha(repo, GATE_ID);
+        ObjectNode renamed = boundDossier(GATE_ID, C1.id(), "EXACT");
+        renamed.set("methodology_sources", renamed.remove("official_methodology_sources"));
+        renamed.set("probes", renamed.remove("probe_results"));
+        String sha = write(repo, ReferencePolicy.dossierPath(GATE_ID, C1.id()), renamed.toString());
+
+        assertThat(violations(repo, policyOf(gate(GATE_ID, manifest, sha))))
+                .singleElement(InstanceOfAssertFactories.STRING)
+                .contains("[official_methodology_sources, probe_results]");
     }
 
     @Test
