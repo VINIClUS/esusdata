@@ -36,11 +36,12 @@ import java.util.TreeSet;
  * month that way, runs the rule on it, and reports the teams of the revision whose result changes
  * under either reading (the union of the candidates).
  *
- * <p>Observability is never complete. No capability reads the pregnancy outcome ({@code
- * C3Pack#requirements} lists none and {@code Capabilities} has no constant for it: the DW has no
- * outcome date, gap L2), so the E26 reading's effect through registered outcomes cannot be seen:
- * the counts are lower bounds. The E25 reading, and E26 through W78, are exact. With no result for
- * a month there is nothing to compare, and the probe says so instead of counting zero.
+ * <p>Observability is complete within a declared limitation (ADR 0034 §6). No capability reads the
+ * pregnancy outcome ({@code C3Pack#requirements} lists none and {@code Capabilities} has no constant
+ * for it: the DW has no outcome date, gap L2, and C3-LIM-06 declares it), so {@value #LIMITATION}
+ * puts the E26 reading through registered outcomes outside the verdict. The probe names it and
+ * counts exactly over the rest: the E25 reading, and E26 through W78. With no result for a month
+ * there is nothing to compare, and the probe says so instead of counting zero.
  *
  * <p>{@code affected} counts episodes (subjects of the {@code EPISODE} evidence kind) of the teams
  * of the revision whose cohort row, its decision, reason or end date, is not the same under a
@@ -60,11 +61,13 @@ public final class C3MethodologyProbes {
             "At least one month of the extract does not cover what C3 reads, so the rule gave no result there and"
                     + " nothing can be compared with the other reading.";
 
-    private static final String OUTCOME_NOT_READ =
-            "The registered outcome date of the pregnancy (items 17 and 4.1 of the E26 ficha) is not in the extract,"
-                    + " because no capability reads it: the E26 reading is measured only through the W78 resolution it"
-                    + " stops using, and pregnancies whose outcome was registered are not seen. The counts are lower"
-                    + " bounds.";
+    /** The declared limitation of the outcome date field (items 17 and 4.1 of the E26 ficha). */
+    static final String LIMITATION = "oor.c3.outcome-date-field";
+
+    private static final String OUTCOME_OUTSIDE =
+            "The registered outcome date of the pregnancy (items 17 and 4.1 of the E26 ficha) is not in the data of"
+                    + " this installation, so the E26 reading is measured through the W78 resolution it stops using,"
+                    + " and the counts are exact over it.";
 
     private C3MethodologyProbes() {}
 
@@ -111,7 +114,8 @@ public final class C3MethodologyProbes {
         List<String> detail = new ArrayList<>(divergence.localDetail());
         detail.add(
                 affected.size() + " episode(s) of the revision with another cohort row under the candidate readings");
-        return ProbeResult.partial(END_DATE, affected.size(), divergence.teams(), OUTCOME_NOT_READ, detail);
+        return ProbeResult.completeWithin(
+                END_DATE, affected.size(), divergence.teams(), List.of(LIMITATION), OUTCOME_OUTSIDE, detail);
     }
 
     /**

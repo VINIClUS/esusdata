@@ -68,10 +68,11 @@ class C4MethodologyProbesTest {
         ProbeResult result = probe(onlyPressure(ACS_ONLY, C4Data.INE_ESF, C4Data.ACS), Map.of(C4Data.INE_ESF, ESF));
 
         assertThat(result.probeId()).isEqualTo("c4.cbo.bp-measurement");
-        assertThat(result.observability()).isEqualTo(Observability.PARTIAL);
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
         assertThat(result.affected()).hasValue(1);
         assertThat(result.divergent()).hasValue(1);
-        assertThat(result.reason()).contains("home-visit form (MIVDT)").contains("lower bounds");
+        assertThat(result.reason()).contains("home visit (MIVDT)").contains("exact over them");
+        assertThat(result.limitations()).containsExactly("oor.l5.bp-collective-participant", "oor.l6.bp-home-visit");
         assertThat(result.localDetail()).anyMatch(line -> line.contains(C4Data.INE_ESF));
     }
 
@@ -79,7 +80,7 @@ class C4MethodologyProbesTest {
     void aPersonWhoseOnlyPressureIsFromThe3224FamilyIsCountedOnHerTeam() {
         ProbeResult result = probe(onlyPressure(TSB_ONLY, C4Data.INE_ESF, C4Data.TSB), Map.of(C4Data.INE_ESF, ESF));
 
-        assertThat(result.observability()).isEqualTo(Observability.PARTIAL);
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
         assertThat(result.affected()).hasValue(1);
         assertThat(result.divergent()).hasValue(1);
     }
@@ -121,7 +122,7 @@ class C4MethodologyProbesTest {
 
         ProbeResult result = probe(data, Map.of(C4Data.INE_ESF, ESF));
 
-        assertThat(result.observability()).isEqualTo(Observability.PARTIAL);
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
         assertThat(result.affected()).hasValue(0);
         assertThat(result.divergent()).hasValue(0);
     }
@@ -133,7 +134,7 @@ class C4MethodologyProbesTest {
         ProbeResult outside = probe(data, Map.of(C4Data.INE_ESF, ESF));
         ProbeResult inside = probe(data, Map.of(C4Data.INE_ESF_2, ESF));
 
-        assertThat(outside.observability()).isEqualTo(Observability.PARTIAL);
+        assertThat(outside.observability()).isEqualTo(Observability.COMPLETE);
         assertThat(outside.affected()).hasValue(0);
         assertThat(outside.divergent()).hasValue(0);
         assertThat(inside.affected()).hasValue(1);
@@ -160,7 +161,7 @@ class C4MethodologyProbesTest {
 
         assertThat(result.versionedForm())
                 .containsEntry("probe_id", "c4.cbo.bp-measurement")
-                .containsEntry("observability", "PARTIAL")
+                .containsEntry("observability", "COMPLETE")
                 .containsEntry("affected", "<10")
                 .containsEntry("divergent", "<10")
                 .containsKey("reason");

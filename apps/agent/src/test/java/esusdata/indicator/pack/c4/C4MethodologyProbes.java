@@ -40,13 +40,17 @@ import java.util.TreeSet;
  * {@link #NO_LIST} answers like 3224 in every list except Quadro 03. The seven groups that Quadro
  * 03 added in 2026 are left alone.
  *
- * <p>Observability is never complete. The extract holds the blood pressure of the three records
+ * <p>Observability is complete within two declared limitations (ADR 0034 §6). The extract holds the blood pressure of the three records
  * the rule reads (the individual-care header, the MIP measurement and the SIGTAP procedure) with
  * their CBO and no filter on it ({@code care_encounter}, {@code measurement_record} and {@code
  * procedure_performed} queries), so both halves are measured there. It does not hold the pressure
  * of a home visit (MIVDT), which the {@code home_visit} query leaves out (lacuna L6), nor of a
- * collective-activity participant (MIAC), which {@code measurement_record} writes as null; the ACS
- * works mostly in those forms, so its half is a lower bound. The 3224 half removes support the rule
+ * collective-activity participant (MIAC), which {@code measurement_record} writes as null (lacuna
+ * L5). This installation does not have them: the pressure column of the visit is almost empty in
+ * PEC 5.5.28 and the DW has no pressure of a participant, so C4-LIM-05 and C4-LIM-06 declare both
+ * out of reach. A channel of a declared limitation is outside the verdict and does not make the
+ * probe partial: the probe names {@link #LIMITATIONS} and counts exactly over the records the
+ * extract holds, which is where the ACS half is measured. The 3224 half removes support the rule
  * had, all of it in records the extract holds.
  *
  * <p>{@code affected} counts people of the teams of the revision whose practice B is met under one
@@ -80,11 +84,16 @@ public final class C4MethodologyProbes {
             "At least one month of the extract does not cover what C4 reads, so the rule gave no result there and"
                     + " nothing can be compared with the other reading.";
 
-    private static final String FORMS_NOT_READ =
-            "The blood pressure that a community health agent writes in the home-visit form (MIVDT) or for a"
-                    + " participant of a collective activity (MIAC) is not in the extract, because neither has a"
-                    + " pressure column in the canonical record: the ACS reading is measured only through the"
-                    + " individual-care, MIP and SIGTAP records. The counts are lower bounds.";
+    /**
+     * The declared limitations whose forms carry the pressure the ACS writes: the home visit (L6)
+     * and the collective-activity participant (L5).
+     */
+    static final List<String> LIMITATIONS = List.of("oor.l5.bp-collective-participant", "oor.l6.bp-home-visit");
+
+    private static final String FORMS_OUTSIDE =
+            "The blood pressure of a home visit (MIVDT) and of a participant of a collective activity (MIAC) is not"
+                    + " in the data of this installation, so the ACS reading is measured through the individual-care, MIP and SIGTAP records,"
+                    + " and the counts are exact over them.";
 
     private C4MethodologyProbes() {}
 
@@ -129,7 +138,8 @@ public final class C4MethodologyProbes {
                 context.baseline(), alternative, context.revisionTeams().keySet());
         List<String> detail = new ArrayList<>(divergence.localDetail());
         detail.add(people.size() + " person(s) of the revision with another decision on practice B");
-        return ProbeResult.partial(BP_MEASUREMENT, people.size(), divergence.teams(), FORMS_NOT_READ, detail);
+        return ProbeResult.completeWithin(
+                BP_MEASUREMENT, people.size(), divergence.teams(), LIMITATIONS, FORMS_OUTSIDE, detail);
     }
 
     /** The dataset with the ACS and 3224 records of the rule's three record kinds re-attributed. */

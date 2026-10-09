@@ -713,6 +713,7 @@ quadrimestres, salvo nota. Eles já constam como limitações declaradas nas dec
 | `oor.scnes-validation` | validação de profissionais, equipes e estabelecimentos no SCNES; habilitação de CBO por SIGTAP; CNS do profissional | C1 a C7 | FAQ Q34; item 24 | não conferido |
 | `oor.cadsus-identification` | identificação da pessoa "em conformidade com o Sistema de Cadastramento de Usuários" (CadSUS) | C1 a C7 | item 24-a | não conferido |
 | `oor.l6.bp-home-visit` | pressão arterial registrada em visita domiciliar (MIVDT) | C3, C4, C5 | Quadro 03 | campo ausente no PEC 5.5.28 (coluna quase vazia) |
+| `oor.l5.bp-collective-participant` | pressão arterial de participante de atividade coletiva (MIAC) | C4, C5 | Quadros 03 e 04 (aceitam o MIAC) | campo ausente no DW (`measurement_record` grava nulo; lacuna L5; C4-LIM-06, C5-LIM-11) |
 | `oor.c4.foot-exam` | avaliação dos pés (prática F) | C4 | Quadro 07; rodapés 7 e 8 (o CBO 2234 do rodapé 7 está, no texto de 2026, no Quadro 07; leitura local C4-06) | campo ausente no DW |
 | `oor.c3.outcome-date-field` | campo Data de desfecho da gestação (itens 17 e 4.1 da E26; rodapés 2 e 8) | C3 | ficha E26 | campo vazio no DW; o W78 é aproximação (C3-LIM-06) |
 | `oor.payment-valid-months` | meses válidos para pagamento e suspensão (NT 4.1.1) | Nota Final | NT 6/2025 e NT 8/2026 | não observável |

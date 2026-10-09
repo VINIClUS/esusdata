@@ -2,6 +2,9 @@ package esusdata.indicator.reconciliation;
 
 import esusdata.indicator.pack.c1.C1MethodologyProbes;
 import esusdata.indicator.pack.c2.C2MethodologyProbes;
+import esusdata.indicator.pack.c3.C3MethodologyProbes;
+import esusdata.indicator.pack.c4.C4MethodologyProbes;
+import esusdata.indicator.pack.c5.C5MethodologyProbes;
 import esusdata.indicator.pack.c7.C7MethodologyProbes;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +24,9 @@ public final class MethodologyProbeCatalog {
         List<MethodologyProbe> probes = new ArrayList<>();
         probes.addAll(C1MethodologyProbes.all());
         probes.addAll(C2MethodologyProbes.all());
+        probes.addAll(C3MethodologyProbes.all());
+        probes.addAll(C4MethodologyProbes.all());
+        probes.addAll(C5MethodologyProbes.all());
         probes.addAll(C7MethodologyProbes.all());
         return List.copyOf(probes);
     }

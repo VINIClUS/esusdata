@@ -139,6 +139,12 @@ condições:
 - `EXACT` e `EQUIVALENT_FOR_REFERENCE` passam a valer "dentro das limitações declaradas".
 - O resíduo de uma limitação aparece na reconciliação como divergência de saída e é julgado pelo limiar T,
   como a defasagem de dado.
+- Um canal coberto por limitação declarada não torna o probe `PARTIAL`. O probe é `COMPLETE` sobre todo o
+  resto, com contagens exatas ali, e cita a limitação pelo id (`ProbeResult.completeWithin`, campo
+  `limitations`). Exemplos: a PA da visita domiciliar (`oor.l6.bp-home-visit`) e a de participante de
+  atividade coletiva (`oor.l5.bp-collective-participant`) nos probes de CBO de C4 e C5, e o campo de data de
+  desfecho (`oor.c3.outcome-date-field`) no probe de fim da gestação de C3. Toda limitação citada por um
+  probe precisa estar declarada no perfil do pack.
 - Acrescentar ou retirar uma limitação muda o perfil e obriga a reavaliar os dossiês que o citam.
 
 **O que nunca é limitação declarada.**

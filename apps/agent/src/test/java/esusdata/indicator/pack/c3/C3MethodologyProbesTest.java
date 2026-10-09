@@ -109,10 +109,11 @@ class C3MethodologyProbesTest {
         ProbeResult result = probe(records, Map.of(REVISED, ESF));
 
         assertThat(result.probeId()).isEqualTo("c3.episode.end-date");
-        assertThat(result.observability()).isEqualTo(Observability.PARTIAL);
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
         assertThat(result.affected()).hasValue(1);
         assertThat(result.divergent()).hasValue(1);
-        assertThat(result.reason()).contains("registered outcome date").contains("lower bounds");
+        assertThat(result.reason()).contains("registered outcome date").contains("exact over it");
+        assertThat(result.limitations()).containsExactly("oor.c3.outcome-date-field");
         assertThat(result.localDetail()).anyMatch(line -> line.contains(REVISED));
     }
 
@@ -126,7 +127,7 @@ class C3MethodologyProbesTest {
 
         ProbeResult result = probe(records, Map.of(REVISED, ESF));
 
-        assertThat(result.observability()).isEqualTo(Observability.PARTIAL);
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
         assertThat(result.affected()).hasValue(0);
         assertThat(result.divergent()).hasValue(0);
     }
@@ -140,7 +141,7 @@ class C3MethodologyProbesTest {
 
         assertThat(outside.affected()).hasValue(0);
         assertThat(outside.divergent()).hasValue(0);
-        assertThat(outside.observability()).isEqualTo(Observability.PARTIAL);
+        assertThat(outside.observability()).isEqualTo(Observability.COMPLETE);
         assertThat(inside.affected()).hasValue(1);
         assertThat(inside.divergent()).hasValue(1);
     }
@@ -184,7 +185,7 @@ class C3MethodologyProbesTest {
 
         assertThat(result.versionedForm())
                 .containsEntry("probe_id", "c3.episode.end-date")
-                .containsEntry("observability", "PARTIAL")
+                .containsEntry("observability", "COMPLETE")
                 .containsEntry("affected", "<10")
                 .containsEntry("divergent", "<10")
                 .containsKey("reason");

@@ -261,17 +261,20 @@ class MethodologyProbeContractTest {
         OptionalInt zero = OptionalInt.of(0);
         OptionalInt one = OptionalInt.of(1);
         for (Observability counted : List.of(Observability.COMPLETE, Observability.PARTIAL)) {
-            assertThatThrownBy(() -> new ProbeResult(PROBE, counted, absent, absent, NONE_BECAUSE, NO_DETAIL))
+            assertThatThrownBy(
+                            () -> new ProbeResult(PROBE, counted, absent, absent, NONE_BECAUSE, List.of(), NO_DETAIL))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("counts both affected and divergent");
-            assertThatThrownBy(() -> new ProbeResult(PROBE, counted, one, absent, NONE_BECAUSE, NO_DETAIL))
+            assertThatThrownBy(() -> new ProbeResult(PROBE, counted, one, absent, NONE_BECAUSE, List.of(), NO_DETAIL))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("counts both affected and divergent");
         }
-        assertThatThrownBy(() -> new ProbeResult(PROBE, Observability.NONE, zero, zero, NONE_BECAUSE, NO_DETAIL))
+        assertThatThrownBy(() ->
+                        new ProbeResult(PROBE, Observability.NONE, zero, zero, NONE_BECAUSE, List.of(), NO_DETAIL))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("an unobservable probe is not one that found zero");
-        assertThatThrownBy(() -> new ProbeResult(PROBE, Observability.NONE, zero, absent, NONE_BECAUSE, NO_DETAIL))
+        assertThatThrownBy(() ->
+                        new ProbeResult(PROBE, Observability.NONE, zero, absent, NONE_BECAUSE, List.of(), NO_DETAIL))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -324,6 +327,45 @@ class MethodologyProbeContractTest {
         // the raw counts stay available to the evaluator, which needs them exact
         assertThat(mixed.affected()).hasValue(9);
         assertThat(mixed.divergent()).hasValue(10);
+    }
+
+    @Test
+    void aChannelOfADeclaredLimitationLeavesTheProbeCompleteAndNamed() {
+        List<String> limitations = List.of("oor.l6.bp-home-visit", "oor.l5.bp-collective-participant");
+
+        ProbeResult result = ProbeResult.completeWithin(PROBE, 14, 0, limitations, NONE_BECAUSE, NO_DETAIL);
+
+        assertThat(result.observability()).isEqualTo(Observability.COMPLETE);
+        assertThat(result.affected()).hasValue(14);
+        assertThat(result.divergent()).hasValue(0);
+        assertThat(result.limitations()).containsExactly("oor.l5.bp-collective-participant", "oor.l6.bp-home-visit");
+        assertThat(result.maskedSummary())
+                .isEqualTo("affected 14; divergent <10; within oor.l5.bp-collective-participant, oor.l6.bp-home-visit");
+        assertThat(result.versionedForm().keySet())
+                .containsExactly("probe_id", "observability", "affected", "divergent", "limitations", "reason");
+        assertThat(result.versionedForm())
+                .containsEntry("limitations", "oor.l5.bp-collective-participant, oor.l6.bp-home-visit");
+        assertThat(ProbeResult.complete(PROBE, 14, 0, NO_DETAIL).versionedForm())
+                .doesNotContainKey("limitations");
+    }
+
+    @Test
+    void aDeclaredLimitationIsNamedByItsIdAndSaysWhatItLeavesOut() {
+        List<String> limitation = List.of("oor.l6.bp-home-visit");
+
+        assertThatThrownBy(() -> ProbeResult.completeWithin(PROBE, 1, 1, List.of(), NONE_BECAUSE, NO_DETAIL))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names no declared limitation");
+        assertThatThrownBy(() -> ProbeResult.completeWithin(PROBE, 1, 1, limitation, " ", NO_DETAIL))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("what they leave out");
+        assertThatThrownBy(() ->
+                        ProbeResult.completeWithin(PROBE, 1, 1, List.of("l6.bp-home-visit"), NONE_BECAUSE, NO_DETAIL))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("oor.l6.bp-home-visit");
+        assertThatThrownBy(
+                        () -> ProbeResult.completeWithin(PROBE, 1, 1, List.of("oor.L6 visit"), NONE_BECAUSE, NO_DETAIL))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

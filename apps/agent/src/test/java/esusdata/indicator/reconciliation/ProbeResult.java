@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
+import java.util.TreeSet;
 
 /**
  * What a {@link MethodologyProbe} found on the data of one reference (spec §9.4): how much of what
@@ -20,6 +21,11 @@ import java.util.OptionalInt;
  * result has both counts as lower bounds. Both of them need a {@code reason}, which names what could
  * not be observed and, as it is versioned as written, never how many subjects or which.
  *
+ * <p>A channel that a declared limitation covers (ADR 0034 §6: data the installation does not have,
+ * declared by the pack) is outside the verdict, so it does not make a probe {@code PARTIAL}: the
+ * probe is {@link #completeWithin} the limitations it names, its counts are exact over everything
+ * else, and its {@code reason} says what the limitations leave out.
+ *
  * <p>What may leave the machine is {@link #versionedForm()} (and {@link #maskedSummary()}, which says
  * the same in a line): counts below 10 are {@code <10}. The {@code localDetail} may hold one line
  * per team or subject, INEs included, stays on the local disk, and appears in neither of them nor in
@@ -31,8 +37,10 @@ import java.util.OptionalInt;
  * @param affected subjects the other reading applies to differently; absent exactly when {@code NONE}
  * @param divergent subjects or teams whose result changes under the other reading; absent exactly
  *     when {@code NONE}. Both counts are lower bounds when {@code PARTIAL}
- * @param reason why the probe could not observe everything; required unless {@code COMPLETE}, and
- *     empty when there is nothing to say
+ * @param reason why the probe could not observe everything, or what its declared limitations leave
+ *     out; required unless {@code COMPLETE} with no limitation, and empty when there is nothing to say
+ * @param limitations the declared limitations whose channels the probe does not observe, by id
+ *     ({@code oor.l6.bp-home-visit}), sorted and each once
  * @param localDetail local-only lines, possibly per team; never versioned
  */
 public record ProbeResult(
@@ -41,11 +49,13 @@ public record ProbeResult(
         OptionalInt affected,
         OptionalInt divergent,
         String reason,
+        List<String> limitations,
         List<String> localDetail) {
 
     private static final String PROBE_ID = "probe_id";
     private static final String AFFECTED = "affected";
     private static final String DIVERGENT = "divergent";
+    private static final String LIMITATION_PREFIX = "oor.";
 
     public ProbeResult {
         if (probeId == null || !MethodologyProfile.STABLE_ID.matcher(probeId).matches()) {
@@ -55,18 +65,61 @@ public record ProbeResult(
         Objects.requireNonNull(affected, AFFECTED);
         Objects.requireNonNull(divergent, DIVERGENT);
         reason = reason == null ? "" : reason.strip();
+        limitations = List.copyOf(new TreeSet<>(limitations));
         localDetail = List.copyOf(localDetail);
         requireCounts(probeId, observability, affected, divergent);
+        for (String limitation : limitations) {
+            if (!limitation.startsWith(LIMITATION_PREFIX)
+                    || !MethodologyProfile.STABLE_ID.matcher(limitation).matches()) {
+                throw new IllegalArgumentException(
+                        "a declared limitation id looks like oor.l6.bp-home-visit, not " + limitation);
+            }
+        }
         if (observability != Observability.COMPLETE && reason.isEmpty()) {
             throw new IllegalArgumentException(
                     probeId + " is " + observability + " and needs a reason that says what could not be observed");
+        }
+        if (!limitations.isEmpty() && reason.isEmpty()) {
+            throw new IllegalArgumentException(
+                    probeId + " names declared limitations and needs a reason that says what they leave out");
         }
     }
 
     /** Every subject was observable: {@code affected} and {@code divergent} are exact, and zero means zero. */
     public static ProbeResult complete(String probeId, int affected, int divergent, List<String> localDetail) {
         return new ProbeResult(
-                probeId, Observability.COMPLETE, OptionalInt.of(affected), OptionalInt.of(divergent), "", localDetail);
+                probeId,
+                Observability.COMPLETE,
+                OptionalInt.of(affected),
+                OptionalInt.of(divergent),
+                "",
+                List.of(),
+                localDetail);
+    }
+
+    /**
+     * Every subject was observable but through the channels of {@code limitations}, declared
+     * limitations that are outside the verdict: the counts are exact over everything else, zero
+     * means zero there, and {@code reason} says what the limitations leave out.
+     */
+    public static ProbeResult completeWithin(
+            String probeId,
+            int affected,
+            int divergent,
+            List<String> limitations,
+            String reason,
+            List<String> localDetail) {
+        if (limitations.isEmpty()) {
+            throw new IllegalArgumentException(probeId + " names no declared limitation: it is complete");
+        }
+        return new ProbeResult(
+                probeId,
+                Observability.COMPLETE,
+                OptionalInt.of(affected),
+                OptionalInt.of(divergent),
+                reason,
+                limitations,
+                localDetail);
     }
 
     /** Part of the subjects was observable: the counts are lower bounds and {@code reason} says what is missing. */
@@ -78,13 +131,14 @@ public record ProbeResult(
                 OptionalInt.of(affected),
                 OptionalInt.of(divergent),
                 reason,
+                List.of(),
                 localDetail);
     }
 
     /** Nothing was observable: no counts, which is not zero counts, and {@code reason} says why. */
     public static ProbeResult none(String probeId, String reason) {
         return new ProbeResult(
-                probeId, Observability.NONE, OptionalInt.empty(), OptionalInt.empty(), reason, List.of());
+                probeId, Observability.NONE, OptionalInt.empty(), OptionalInt.empty(), reason, List.of(), List.of());
     }
 
     private static void requireCounts(
@@ -103,22 +157,27 @@ public record ProbeResult(
 
     /**
      * The result in one line for a Markdown table: counts masked below 10, lower bounds marked as
-     * such, and nothing said of a count that does not exist.
+     * such, nothing said of a count that does not exist, and the declared limitations it is within.
      */
     public String maskedSummary() {
         return switch (observability) {
-            case COMPLETE -> AFFECTED + " " + masked(affected) + "; " + DIVERGENT + " " + masked(divergent);
+            case COMPLETE -> AFFECTED + " " + masked(affected) + "; " + DIVERGENT + " " + masked(divergent) + within();
             case PARTIAL ->
                 "partial (lower bounds): " + AFFECTED + " " + masked(affected) + "; " + DIVERGENT + " "
-                        + masked(divergent);
+                        + masked(divergent) + within();
             case NONE -> "not observable";
         };
+    }
+
+    private String within() {
+        return limitations.isEmpty() ? "" : "; within " + String.join(", ", limitations);
     }
 
     /**
      * The only form of this result that may be versioned, with keys in a fixed order: {@code
      * probe_id}, {@code observability}, then {@code affected} and {@code divergent} (masked, and
-     * absent for {@code NONE}) and {@code reason} when there is one. The local detail is not in it.
+     * absent for {@code NONE}), {@code limitations} when there are any and {@code reason} when there
+     * is one. The local detail is not in it.
      */
     public Map<String, String> versionedForm() {
         Map<String, String> form = new LinkedHashMap<>();
@@ -126,6 +185,9 @@ public record ProbeResult(
         form.put("observability", observability.name());
         affected.ifPresent(count -> form.put(AFFECTED, SummaryWriter.mask(count)));
         divergent.ifPresent(count -> form.put(DIVERGENT, SummaryWriter.mask(count)));
+        if (!limitations.isEmpty()) {
+            form.put("limitations", String.join(", ", limitations));
+        }
         if (!reason.isEmpty()) {
             form.put("reason", reason);
         }

@@ -55,10 +55,12 @@ final class DiagnosticMatrixWriter {
             "## Probes metodológicos",
             "",
             "Diagnóstico: o que cada probe mediu na entrada da célula. Divergentes são equipes da revisão cujo"
-                    + " resultado muda sob a outra leitura; `NONE` não tem contagem, e não é zero.",
+                    + " resultado muda sob a outra leitura; `NONE` não tem contagem, e não é zero. Um canal coberto"
+                    + " por limitação declarada fica fora do veredito: o probe é completo no resto e cita a limitação.",
             "",
-            "| Período | Pack | Referência | Probe | Observabilidade | Afetados | Divergentes | Motivo |",
-            "|---|---|---|---|---|---|---|---|");
+            "| Período | Pack | Referência | Probe | Observabilidade | Afetados | Divergentes | Limitações declaradas"
+                    + " | Motivo |",
+            "|---|---|---|---|---|---|---|---|---|");
     private static final String OBSERVABILITY = "observability";
     private static final String PROBE_ID = "probe_id";
     private static final String REASON = "reason";
@@ -121,6 +123,7 @@ final class DiagnosticMatrixWriter {
                 probe.result().get(OBSERVABILITY),
                 probe.result().getOrDefault("affected", Row.NONE),
                 probe.result().getOrDefault("divergent", Row.NONE),
+                probe.result().getOrDefault("limitations", Row.NONE),
                 probe.result().getOrDefault(REASON, "").replace("|", "/"));
     }
 
