@@ -16,8 +16,10 @@ import esusdata.run.worker.ReferenceScopedExtracts;
 import esusdata.run.worker.SourceIdentity;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.YearMonth;
@@ -25,7 +27,9 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -49,6 +53,8 @@ class PortaoDDiagnosticRunTest {
     private static final Set<YearMonth> ALL_MONTHS = months(YearMonth.of(2025, 9), YearMonth.of(2026, 4));
     private static final String LATER = "09 de outubro de 2026 - 08:15h";
     private static final String CIII = "CIII";
+    private static final String C1_PACK = GatePack.all().getFirst().packId();
+    private static final String PROBE_ID = "c1.fixture.every-team";
     private static final List<String> FIXTURE_INES = List.of(
             SiapsTeamExportFixtures.ESF_1,
             SiapsTeamExportFixtures.ESF_2,
@@ -105,6 +111,48 @@ class PortaoDDiagnosticRunTest {
                 requested,
                 new ReferenceScopedExtracts(artifacts().resolve("extratos"), CLOCK),
                 CLOCK);
+    }
+
+    private PortaoDDiagnosticRun open(Set<Quadrimestre> requested, Function<String, List<MethodologyProbe>> probes)
+            throws IOException {
+        return PortaoDDiagnosticRun.open(
+                manifests(),
+                artifacts(),
+                requested,
+                new ReferenceScopedExtracts(artifacts().resolve("extratos"), CLOCK),
+                CLOCK,
+                probes);
+    }
+
+    /**
+     * A probe of C1 that counts every team of the revision as divergent and names them in its local
+     * detail, or that breaks with an INE in its message.
+     */
+    private static MethodologyProbe c1Probe(String id, boolean breaks) {
+        return new MethodologyProbe() {
+            @Override
+            public String id() {
+                return id;
+            }
+
+            @Override
+            public Set<String> packs() {
+                return Set.of(C1_PACK);
+            }
+
+            @Override
+            public ProbeResult evaluate(ProbeContext context) {
+                if (breaks) {
+                    throw new IllegalStateException("the probe broke on " + SiapsTeamExportFixtures.ESF_1);
+                }
+                Map<String, String> teams = context.revisionTeams();
+                return ProbeResult.complete(id, 12, teams.size(), List.copyOf(teams.keySet()));
+            }
+        };
+    }
+
+    private static Function<String, List<MethodologyProbe>> onlyC1(MethodologyProbe probe) {
+        return pack -> C1_PACK.equals(pack) ? List.of(probe) : List.of();
     }
 
     private DiagnosticMatrix runAll(FixturePec pec) throws IOException {
@@ -389,6 +437,75 @@ class PortaoDDiagnosticRunTest {
 
         assertThat(markdown).contains("| 2026Q1 | MISSING_LOCAL_MONTHS | 2026-02 |");
         assertThat(markdown).contains("| 2025Q3 | RUN | - |");
+    }
+
+    // ---- methodology probes
+
+    @Test
+    void theProbesOfAPackRunOnItsCellAndJoinTheMatrixMaskedWithTheirDetailKeptLocal() throws IOException {
+        captureTwoQuadrimestres();
+        FixturePec pec = new FixturePec(IBGE);
+
+        DiagnosticMatrix matrix =
+                open(Set.of(), onlyC1(c1Probe(PROBE_ID, false))).run(pec.sourceIdentity(), ALL_MONTHS, pec.inputs());
+
+        assertThat(matrix.probes())
+                .extracting(probe -> SiapsFormats.quadrimestre(probe.period()) + " " + probe.pack())
+                .containsExactly("2025Q3 C1", "2026Q1 C1");
+        assertThat(matrix.probes())
+                .allSatisfy(probe -> assertThat(probe.result())
+                        .containsEntry("probe_id", PROBE_ID)
+                        .containsEntry("observability", "COMPLETE")
+                        .containsEntry("affected", "12")
+                        .containsEntry("divergent", "<10"));
+        assertThat(matrix.probeErrors()).isEmpty();
+        Path directory = DiagnosticMatrixWriter.write(matrix, artifacts());
+        String markdown = Files.readString(directory.resolve(DiagnosticMatrixWriter.MARKDOWN));
+        String json = Files.readString(directory.resolve(DiagnosticMatrixWriter.JSON));
+        assertThat(markdown).contains("## Probes metodológicos").contains("| " + PROBE_ID + " | COMPLETE | 12 | <10 |");
+        assertThat(new ObjectMapper().readTree(json).get("probes")).hasSize(2);
+        for (String written : List.of(markdown, json)) {
+            assertThat(INE_SHAPE.matcher(written).find()).isFalse();
+        }
+        Path detail = DiagnosticMatrixWriter.writeLocalDetail(matrix, directory);
+        assertThat(Files.readString(detail))
+                .contains(SiapsTeamExportFixtures.ESF_1)
+                .startsWith("# LOCAL");
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(detail)))
+                    .isEqualTo("rw-------");
+        }
+    }
+
+    @Test
+    void aProbeThatBreaksIsARowOfItsOwnAndTheCellKeepsItsVerdict() throws IOException {
+        captureTwoQuadrimestres();
+        FixturePec pec = new FixturePec(IBGE);
+        DiagnosticMatrix without = runAll(pec);
+
+        DiagnosticMatrix with =
+                open(Set.of(), onlyC1(c1Probe(PROBE_ID, true))).run(pec.sourceIdentity(), ALL_MONTHS, pec.inputs());
+
+        assertThat(with.rows()).extracting(Row::status).containsExactlyElementsOf(statuses(without));
+        assertThat(with.probeErrors())
+                .hasSize(2)
+                .allSatisfy(probe -> assertThat(probe.result().get("reason"))
+                        .startsWith("IllegalStateException")
+                        .doesNotContain(SiapsTeamExportFixtures.ESF_1));
+    }
+
+    @Test
+    void aRunWithoutProbesWritesNoProbeSection() throws IOException {
+        captureTwoQuadrimestres();
+
+        DiagnosticMatrix matrix = runAll(new FixturePec(IBGE));
+
+        assertThat(matrix.probes()).isEmpty();
+        assertThat(DiagnosticMatrixWriter.markdown(matrix)).doesNotContain("## Probes metodológicos");
+    }
+
+    private static List<Cell> statuses(DiagnosticMatrix matrix) {
+        return matrix.rows().stream().map(Row::status).toList();
     }
 
     /** The standard export with the first concept of the first eSF team (C1) changed, generated later. */

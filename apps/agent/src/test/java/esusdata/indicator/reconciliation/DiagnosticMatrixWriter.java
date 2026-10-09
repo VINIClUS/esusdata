@@ -2,13 +2,16 @@ package esusdata.indicator.reconciliation;
 
 import esusdata.indicator.reconciliation.DiagnosticMatrix.Cell;
 import esusdata.indicator.reconciliation.DiagnosticMatrix.Figures;
+import esusdata.indicator.reconciliation.DiagnosticMatrix.ProbeRow;
 import esusdata.indicator.reconciliation.DiagnosticMatrix.Row;
 import esusdata.run.worker.SourceIdentity;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -28,6 +31,7 @@ final class DiagnosticMatrixWriter {
     static final String DIRECTORY = "diagnostico";
     static final String MARKDOWN = "matriz.md";
     static final String JSON = "matriz.json";
+    static final String LOCAL_DETAIL = "probes-detalhe-local.txt";
 
     private static final DateTimeFormatter STAMP =
             DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC);
@@ -46,6 +50,18 @@ final class DiagnosticMatrixWriter {
             "| Período | Pack | Referência | Veredito | Tipo | N_S | N_L | Sem classe local | D | T | Linha"
                     + " | Fora da lista do SIAPS | Fingerprint da fonte local |",
             "|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+    private static final List<String> PROBES_HEADER = List.of(
+            "",
+            "## Probes metodológicos",
+            "",
+            "Diagnóstico: o que cada probe mediu na entrada da célula. Divergentes são equipes da revisão cujo"
+                    + " resultado muda sob a outra leitura; `NONE` não tem contagem, e não é zero.",
+            "",
+            "| Período | Pack | Referência | Probe | Observabilidade | Afetados | Divergentes | Motivo |",
+            "|---|---|---|---|---|---|---|---|");
+    private static final String OBSERVABILITY = "observability";
+    private static final String PROBE_ID = "probe_id";
+    private static final String REASON = "reason";
     private static final List<String> PERIODS_HEADER =
             List.of("", "## Períodos", "", "| Período | Execução | Meses locais ausentes |", "|---|---|---|");
 
@@ -89,7 +105,52 @@ final class DiagnosticMatrixWriter {
         lines.addAll(MATRIX_HEADER);
         matrix.rows().forEach(row -> lines.addAll(rowLines(row)));
         lines.addAll(reasons(matrix.rows()));
+        if (!matrix.probes().isEmpty()) {
+            lines.addAll(PROBES_HEADER);
+            matrix.probes().forEach(probe -> lines.add(probeLine(probe)));
+        }
         return String.join("\n", lines) + "\n";
+    }
+
+    private static String probeLine(ProbeRow probe) {
+        return tableRow(
+                SiapsFormats.quadrimestre(probe.period()),
+                probe.pack(),
+                probe.referenceId(),
+                probe.result().get(PROBE_ID),
+                probe.result().get(OBSERVABILITY),
+                probe.result().getOrDefault("affected", Row.NONE),
+                probe.result().getOrDefault("divergent", Row.NONE),
+                probe.result().getOrDefault(REASON, "").replace("|", "/"));
+    }
+
+    /**
+     * Writes the local detail of the probes (one line per team and month that changed, INEs
+     * included) next to the matrix, readable by the owner only where the file system allows it. It
+     * is for the person who runs the diagnostic and is never versioned or copied to {@code docs/}.
+     *
+     * @return the file written
+     */
+    static Path writeLocalDetail(DiagnosticMatrix matrix, Path directory) throws IOException {
+        List<String> lines = new ArrayList<>();
+        lines.add("# LOCAL: detalhe por equipe dos probes. Não versionar e não copiar para docs/.");
+        for (ProbeRow probe : matrix.probes()) {
+            String prefix = "%s %s %s %s: "
+                    .formatted(
+                            SiapsFormats.quadrimestre(probe.period()),
+                            probe.pack(),
+                            probe.referenceId(),
+                            probe.result().get(PROBE_ID));
+            probe.localDetail().forEach(line -> lines.add(prefix + line));
+        }
+        Path file = directory.resolve(LOCAL_DETAIL);
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+            Files.createFile(file, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+        } else {
+            Files.createFile(file);
+        }
+        Files.writeString(file, String.join("\n", lines) + "\n", StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+        return file;
     }
 
     private static String summary(DiagnosticMatrix matrix) {
@@ -191,6 +252,14 @@ final class DiagnosticMatrixWriter {
         ArrayNode rows = root.putArray("rows");
         for (Row row : matrix.rows()) {
             rows.add(rowNode(row));
+        }
+        ArrayNode probes = root.putArray("probes");
+        for (ProbeRow probe : matrix.probes()) {
+            ObjectNode node = probes.addObject();
+            node.put("quadrimestre", SiapsFormats.quadrimestre(probe.period()));
+            node.put("pack", probe.pack());
+            node.put("reference_id", probe.referenceId());
+            probe.result().forEach(node::put);
         }
         return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(root) + "\n";
     }

@@ -57,7 +57,8 @@ import org.slf4j.LoggerFactory;
  * plane alone, one partition at a time, and the Nota Final from the partitions the seven packs left.
  * A period the PEC lacks months of is a row of the matrix with the months it lacks. The log carries
  * counts and the directory of the matrix; the matrix carries masked counts, hashes and reference
- * ids, never an INE.
+ * ids, never an INE. The methodology probes of {@link MethodologyProbeCatalog} run on every pack cell
+ * and join the matrix; their per-team detail goes to a separate local file next to it.
  */
 class PortaoDDiagnosticLiveTest {
 
@@ -101,7 +102,8 @@ class PortaoDDiagnosticLiveTest {
                 configuration.artifactDir(),
                 configuration.periods(),
                 new ReferenceScopedExtracts(configuration.artifactDir().resolve("extratos"), clock),
-                clock);
+                clock,
+                MethodologyProbeCatalog::forPack);
         List<Quadrimestre> periods = run.periods();
         // Everything that can be wrong without the PEC is checked before the PEC is touched.
         AcquisitionInputs.Live live =
@@ -136,13 +138,21 @@ class PortaoDDiagnosticLiveTest {
         // 3. The run, the matrix, and only then the verdict of the test.
         DiagnosticMatrix matrix = run.run(source, held, live);
         Path directory = DiagnosticMatrixWriter.write(matrix, configuration.artifactDir());
+        DiagnosticMatrixWriter.writeLocalDetail(matrix, directory);
         log.info("diagnostic matrix: {} rows written to {}", matrix.rows().size(), directory);
         for (Cell cell : Cell.values()) {
             log.info("  {}: {}", cell, matrix.count(cell));
         }
+        log.info(
+                "methodology probes: {} results, {} failed",
+                matrix.probes().size(),
+                matrix.probeErrors().size());
 
         assertThat(matrix.errors())
                 .as("cells that could not be computed: see matriz.md")
+                .isEmpty();
+        assertThat(matrix.probeErrors())
+                .as("probes that could not run: see matriz.md")
                 .isEmpty();
     }
 }
