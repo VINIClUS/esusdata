@@ -24,7 +24,7 @@ import java.util.function.Function;
  *       told of one;
  *   <li>{@link Diagnostic} reads captured manifests and the PEC and writes one masked matrix under
  *       the artifact directory. It has no registry, no policy and no output beside the artifact
- *       directory, none of it under {@code docs/}; {@code periods} only chooses which of the
+ *       directory, none of it under {@code docs/} nor in a Git working tree; {@code periods} only chooses which of the
  *       captured periods it runs, and the purpose of everything it computes is {@link
  *       ReferencePurpose#DIAGNOSTIC}.
  * </ul>
@@ -51,6 +51,9 @@ final class PortaoDRunnerConfiguration {
 
     /** The one directory name under which a runner never writes: where the versioned evidence lives. */
     static final String DOCS = "docs";
+
+    /** What marks the top of a Git working tree: a directory, or a file in a linked worktree. */
+    static final String GIT = ".git";
 
     private static final List<String> NOT_FOR_CAPTURE =
             List.of(ENV_FILE, BINARY, REGISTRY, REPO_ROOT, POLICY, MANIFESTS_DIR, PERIODS);
@@ -80,12 +83,17 @@ final class PortaoDRunnerConfiguration {
 
         /**
          * The store holds the raw exports, INEs and team names included, so it is never under {@code
-         * docs/}, not even through a link; the manifests, which carry none, may be.
+         * docs/} nor anywhere in a Git working tree, not even through a link; the manifests, which
+         * carry none, may be.
          */
         Capture {
             if (leadsUnder(artifactDir, DOCS)) {
                 throw new IllegalArgumentException(
                         "the capture never writes the raw exports under " + DOCS + "/: " + ARTIFACT_DIR);
+            }
+            if (isInAGitWorkingTree(artifactDir)) {
+                throw new IllegalArgumentException("the capture never writes the raw exports in a Git working tree,"
+                        + " where an add would stage them: " + ARTIFACT_DIR);
             }
         }
 
@@ -116,6 +124,10 @@ final class PortaoDRunnerConfiguration {
             periods = Set.copyOf(periods);
             if (leadsUnder(artifactDir, DOCS)) {
                 throw new IllegalArgumentException("the diagnostic never writes under " + DOCS + "/: " + ARTIFACT_DIR);
+            }
+            if (isInAGitWorkingTree(artifactDir)) {
+                throw new IllegalArgumentException("the diagnostic never writes the extracts in a Git working tree,"
+                        + " where an add would stage them: " + ARTIFACT_DIR);
             }
         }
 
@@ -194,29 +206,45 @@ final class PortaoDRunnerConfiguration {
     /**
      * Whether {@code path} is, or would be created, under a directory called {@code name}: as it is
      * written, and as the filesystem resolves it, so that a link into such a directory (say {@code
-     * artifacts -> docs/private}) is refused like the directory itself. The links are followed before
-     * any {@code ..} is applied, as the writes will follow them; the part of the path that does not
-     * exist yet has no link to follow and is taken as written, below the real path of its nearest
-     * existing ancestor. A link that leads nowhere is refused rather than guessed.
+     * artifacts -> docs/private}) is refused like the directory itself.
      */
     private static boolean leadsUnder(Path path, String name) {
         Path absolute = path.toAbsolutePath();
-        if (hasSegment(absolute.normalize(), name)) {
-            return true;
+        return hasSegment(absolute.normalize(), name) || hasSegment(resolved(absolute), name);
+    }
+
+    /**
+     * Whether {@code path}, as the filesystem resolves it, is or would be created in a Git working
+     * tree: some directory from it up holds a {@code .git}. Ignored or not, the raw exports and the
+     * extracts never go there.
+     */
+    private static boolean isInAGitWorkingTree(Path path) {
+        for (Path directory = resolved(path.toAbsolutePath()); directory != null; directory = directory.getParent()) {
+            if (Files.exists(directory.resolve(GIT), LinkOption.NOFOLLOW_LINKS)) {
+                return true;
+            }
         }
+        return false;
+    }
+
+    /**
+     * Where the writes to {@code absolute} will land: the real path of its nearest existing ancestor,
+     * with the part that does not exist yet, which has no link to follow, appended as written. The
+     * links are followed before any {@code ..} is applied, as the writes follow them; a link that
+     * leads nowhere is refused rather than guessed.
+     */
+    private static Path resolved(Path absolute) {
         Path existing = absolute;
         while (existing != null && !Files.exists(existing, LinkOption.NOFOLLOW_LINKS)) {
             existing = existing.getParent();
         }
         if (existing == null) {
-            return false;
+            return absolute.normalize();
         }
         try {
-            return hasSegment(
-                    existing.toRealPath().resolve(existing.relativize(absolute)).normalize(), name);
+            return existing.toRealPath().resolve(existing.relativize(absolute)).normalize();
         } catch (IOException unresolvable) {
-            throw new IllegalArgumentException(
-                    "cannot resolve the path to tell whether it leads under " + name + "/", unresolvable);
+            throw new IllegalArgumentException("cannot resolve the path a runner would write to", unresolvable);
         }
     }
 

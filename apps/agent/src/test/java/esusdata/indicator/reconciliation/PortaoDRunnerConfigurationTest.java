@@ -3,6 +3,7 @@ package esusdata.indicator.reconciliation;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.ARTIFACT_DIR;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.BINARY;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.ENV_FILE;
+import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.GIT;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.MANIFESTS_DIR;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.MANIFEST_OUTPUT;
 import static esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.MODE;
@@ -40,17 +41,21 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 class PortaoDRunnerConfigurationTest {
 
+    /** Outside any working tree, as the runners require: this module's directory is in one. */
+    private static final Path ARTIFACTS =
+            Path.of(System.getProperty("java.io.tmpdir"), "portao-d-runner-configuration", "artifacts");
+
     private static final Map<String, String> CAPTURE = Map.of(
             MODE, "capture",
             OFFICIAL_EXPORT_DIR, "exports",
             OFFICIAL_EXPORT_IBGE, "3541307",
-            ARTIFACT_DIR, "artifacts",
+            ARTIFACT_DIR, ARTIFACTS.toString(),
             MANIFEST_OUTPUT, "manifests");
 
     private static final Map<String, String> DIAGNOSTIC = Map.of(
             MODE, "diagnostic",
             MANIFESTS_DIR, "manifests",
-            ARTIFACT_DIR, "artifacts",
+            ARTIFACT_DIR, ARTIFACTS.toString(),
             ENV_FILE, "pec.env",
             BINARY, "execplane");
 
@@ -102,8 +107,7 @@ class PortaoDRunnerConfigurationTest {
     void theCaptureIsParsedIntoItsFourInputs() {
         Capture capture = Capture.parse(CAPTURE::get);
 
-        assertThat(capture)
-                .isEqualTo(new Capture(Path.of("exports"), "3541307", Path.of("artifacts"), Path.of("manifests")));
+        assertThat(capture).isEqualTo(new Capture(Path.of("exports"), "3541307", ARTIFACTS, Path.of("manifests")));
     }
 
     @ParameterizedTest(name = "the capture takes no {0}")
@@ -169,7 +173,7 @@ class PortaoDRunnerConfigurationTest {
         Diagnostic diagnostic = Diagnostic.parse(DIAGNOSTIC::get);
 
         assertThat(diagnostic.manifestsDir()).isEqualTo(Path.of("manifests"));
-        assertThat(diagnostic.artifactDir()).isEqualTo(Path.of("artifacts"));
+        assertThat(diagnostic.artifactDir()).isEqualTo(ARTIFACTS);
         assertThat(diagnostic.envFile()).isEqualTo(Path.of("pec.env"));
         assertThat(diagnostic.binary()).isEqualTo("execplane");
         assertThat(diagnostic.periods()).isEmpty();
@@ -214,9 +218,11 @@ class PortaoDRunnerConfigurationTest {
 
     @Test
     void aDirectoryThatMerelyHasDocsInItsNameIsNotTheDocsDirectory() {
-        Diagnostic diagnostic = Diagnostic.parse(plus(DIAGNOSTIC, ARTIFACT_DIR, "docs-copy/out")::get);
+        Path docsCopy = ARTIFACTS.resolveSibling("docs-copy").resolve("out");
 
-        assertThat(diagnostic.artifactDir()).isEqualTo(Path.of("docs-copy/out"));
+        Diagnostic diagnostic = Diagnostic.parse(plus(DIAGNOSTIC, ARTIFACT_DIR, docsCopy.toString())::get);
+
+        assertThat(diagnostic.artifactDir()).isEqualTo(docsCopy);
     }
 
     // ---- docs/ through a link
@@ -253,6 +259,33 @@ class PortaoDRunnerConfigurationTest {
         assertThatThrownBy(() -> Diagnostic.parse(plus(DIAGNOSTIC, ARTIFACT_DIR, link.toString())::get))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cannot resolve");
+    }
+
+    // ---- nowhere in a Git working tree
+
+    @ParameterizedTest(name = "a working tree marked by a .git {0} is refused")
+    @ValueSource(strings = {"directory", "file"})
+    void noRunnerWritesInAGitWorkingTreeEvenOutsideDocs(String marker, @TempDir Path temp) throws IOException {
+        Path repository = Files.createDirectories(temp.resolve("repo"));
+        if ("directory".equals(marker)) {
+            Files.createDirectory(repository.resolve(GIT));
+        } else {
+            // a linked worktree: its .git is a file that names the main repository's
+            Files.writeString(repository.resolve(GIT), "gitdir: elsewhere\n");
+        }
+        String inside = repository.resolve("artifacts/sp").toString();
+        String throughALink = Files.createSymbolicLink(
+                        temp.resolve("store"), Files.createDirectories(repository.resolve("data")))
+                .toString();
+
+        for (String artifactDir : List.of(inside, throughALink)) {
+            assertThatThrownBy(() -> Capture.parse(plus(CAPTURE, ARTIFACT_DIR, artifactDir)::get))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Git working tree");
+            assertThatThrownBy(() -> Diagnostic.parse(plus(DIAGNOSTIC, ARTIFACT_DIR, artifactDir)::get))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Git working tree");
+        }
     }
 
     @Test
