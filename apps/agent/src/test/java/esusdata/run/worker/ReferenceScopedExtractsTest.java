@@ -383,6 +383,28 @@ class ReferenceScopedExtractsTest {
     }
 
     @Test
+    void aStagingDirectoryAFailedAcquisitionLeftBehindIsNoSourceOfTheRevision() throws Exception {
+        IndicatorRule rule = new C7Pack();
+        ReferenceExecutionContext context = context(rule, JANUARY, pec);
+        cache().loadOrAcquire(context, pec.inputs());
+        // an acquisition from another source wrote its sidecar, failed, and could not remove its staging
+        ReferenceExecutionContext other = readFrom(context, pec.sourceIdentity(OTHER_POSTGRES));
+        Path staging = cache().partitionOf(other).resolveSibling(".staging-2026-01-left");
+        Files.createDirectories(staging);
+        Files.writeString(
+                staging.resolve(PartitionSidecar.FILE),
+                PartitionSidecar.of(other, CLOCK.instant(), sidecarOf(context).extracts())
+                        .toJson());
+
+        assertThat(cache().recordedSources(
+                                IBGE,
+                                FIRST,
+                                referenceOf(rule),
+                                rule.descriptor().ruleVersion()))
+                .containsExactly(pec.sourceIdentity());
+    }
+
+    @Test
     void theSourceTheCacheMayReadMustBeTheOneItsPartitionIsKeyedBy() {
         ReferenceExecutionContext context = context(new C7Pack(), JANUARY, pec);
         ReferenceScopedExtracts cache = cache();

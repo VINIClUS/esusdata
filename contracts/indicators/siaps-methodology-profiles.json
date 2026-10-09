@@ -1,0 +1,2811 @@
+{
+  "schema_version": "1",
+  "sources": [
+    {
+      "id": "faq-siaps-2025-11-11",
+      "title": "FAQ do Siaps, Componentes do Cofinanciamento Federal da APS (Q26 a Q36)",
+      "url": "https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/perguntas-frequentes",
+      "published": "2025-11-11",
+      "kind": "FAQ"
+    },
+    {
+      "id": "siaps-release-1-4",
+      "title": "Manual do Siaps, release v1.4: reprocessamento de janeiro a outubro/2025 e primeira Avaliação do Quadrimestre",
+      "url": "https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/release-1-4",
+      "published": "2025-12-30",
+      "kind": "SIAPS_RELEASE"
+    },
+    {
+      "id": "siaps-release-1-8-1",
+      "title": "Manual do Siaps, release v1.8.1: carga de abril/2026 e atualização das regras de C3 (rótulo) e C7",
+      "url": "https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/release-1-8",
+      "published": "2026-06-23",
+      "kind": "SIAPS_RELEASE"
+    },
+    {
+      "id": "siaps-release-2-0-2",
+      "title": "Manual do Siaps, release v2.0.2: correção da apresentação das equipes válidas na Avaliação do Quadrimestre",
+      "url": "https://sisaps.saude.gov.br/sistemas/siaps/docs/manual/release-2-0",
+      "published": "2026-09-02",
+      "kind": "SIAPS_RELEASE"
+    },
+    {
+      "id": "nt-06-2025",
+      "title": "NT 6/2025-DEAPS/SAPS/MS (SEI 0052386354), metodologia dos Componentes II e III",
+      "url": "https://sisaps.saude.gov.br/sistemas/esusaps/assets/files/NT_06-2025_cvat-6a5e06dd9db348ec560999f7839da273.pdf",
+      "published": "2025-12-12",
+      "kind": "TECHNICAL_NOTE"
+    },
+    {
+      "id": "nt-08-2026",
+      "title": "NT 8/2026-DEAPS/SAPS/MS (SEI 0055690090), metodologia dos Componentes II e III",
+      "url": "https://sisaps.saude.gov.br/sistemas/siaps/assets/files/NT_08-2025_cvat-8638ee08a7310014262c2326c234d35a.pdf",
+      "published": "2026-06-01",
+      "kind": "TECHNICAL_NOTE"
+    },
+    {
+      "id": "portaria-gm-ms-10994-2026",
+      "title": "Portaria GM/MS nº 10.994/2026 (transição do incentivo de qualidade)",
+      "url": "https://www.in.gov.br/web/dou/-/portaria-gm/ms-n-10.994-de-13-de-maio-de-2026-705373819",
+      "published": "2026-05-13",
+      "kind": "ORDINANCE"
+    },
+    {
+      "id": "ficha-c1-2026",
+      "title": "Nota Metodológica C1, edição vigente em 2026 (assinada até 2026-06-24)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c1-mais-acesso/view",
+      "published": "2026-06-24",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c1-2025",
+      "title": "Nota Metodológica C1, edição de 2025 revogada em 2026 (texto não acessado)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c1-mais-acesso/view",
+      "published": "2025-09-23",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c2-2026",
+      "title": "Nota Metodológica C2, edição vigente em 2026 (assinada até 2026-06-22)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c2-cuidado-no-desenvolvimento-infantil/view",
+      "published": "2026-06-22",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c2-2025",
+      "title": "Nota Metodológica C2, edição de 2025 revogada em 2026 (texto não acessado)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c2-cuidado-no-desenvolvimento-infantil/view",
+      "published": "2025-09-23",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c3-2026",
+      "title": "Nota Metodológica C3, edição vigente em 2026 (assinada até 2026-06-22)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c3-cuidado-na-gestacao-e-puerperio/view",
+      "published": "2026-06-22",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c3-2025",
+      "title": "Nota Metodológica C3, edição de 2025 revogada em 2026 (texto não acessado)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c3-cuidado-na-gestacao-e-puerperio/view",
+      "published": "2025-09-23",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c4-2026",
+      "title": "Nota Metodológica C4, edição vigente em 2026 (assinada até 2026-06-21)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c4-cuidado-da-pessoa-com-diabetes/view",
+      "published": "2026-06-21",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c4-2025",
+      "title": "Nota Metodológica C4, edição de 2025 revogada em 2026 (texto não acessado)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c4-cuidado-da-pessoa-com-diabetes/view",
+      "published": "2025-09-23",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c5-2026",
+      "title": "Nota Metodológica C5, edição vigente em 2026 (assinada até 2026-06-21)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c5-cuidado-da-pessoa-com-hipertensao/view",
+      "published": "2026-06-21",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c5-2025",
+      "title": "Nota Metodológica C5, edição de 2025 revogada em 2026 (texto não acessado)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c5-cuidado-da-pessoa-com-hipertensao/view",
+      "published": "2025-09-23",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c6-2026",
+      "title": "Nota Metodológica C6, edição vigente em 2026 (assinada até 2026-06-19)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c6-cuidado-da-pessoa-idosa/view",
+      "published": "2026-06-19",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c6-2025",
+      "title": "Nota Metodológica C6, edição de 2025 revogada em 2026 (texto não acessado)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c6-cuidado-da-pessoa-idosa/view",
+      "published": "2025-09-23",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c7-2026",
+      "title": "Nota Metodológica C7, edição vigente em 2026 (assinada até 2026-06-22)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c7-cuidado-da-mulher-na-prevencao-do-cancer/view",
+      "published": "2026-06-22",
+      "kind": "FICHA"
+    },
+    {
+      "id": "ficha-c7-2025",
+      "title": "Nota Metodológica C7, edição de 2025 revogada em 2026 (texto não acessado)",
+      "url": "https://www.gov.br/saude/pt-br/composicao/saps/publicacoes/fichas-tecnicas/equipe-de-atencao-primaria-e-saude-da-familia/nota-metodologica-c7-cuidado-da-mulher-na-prevencao-do-cancer/view",
+      "published": "2025-09-23",
+      "kind": "FICHA"
+    }
+  ],
+  "profiles": [
+    {
+      "pack": "c1-mais-acesso",
+      "rule_version": "c1-mais-acesso@0.5.0",
+      "dimensions": [
+        {
+          "id": "c1.cbo.list",
+          "local_reading": "sete CBO (225142, 225170, 225130, 225125, 225250, 223565, 223505) em toda competência",
+          "decision_refs": [
+            "C1-D1"
+          ],
+          "probe_id": "c1.cbo.list"
+        },
+        {
+          "id": "c1.team.type-filter",
+          "local_reading": "só atendimento de INE tipo 70 (eSF) ou 76 (eAP)",
+          "decision_refs": []
+        },
+        {
+          "id": "c1.modality.mapping",
+          "local_reading": "programada = tipos 2 e 3; espontânea = 5, 6 e 7; 8 a 11 fora",
+          "decision_refs": [
+            "C1-LIM-05"
+          ]
+        }
+      ],
+      "data_timing": [
+        {
+          "id": "dt.extraction-day",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O SIAPS extrai os dados no 20º dia útil de cada mês (item 11 das fichas) e trata a apresentação como aproximada; o corte local é o fim da competência.",
+          "decision_refs": [
+            "C1-LIM-06"
+          ]
+        },
+        {
+          "id": "dt.submission-deadline",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O prazo de envio é o 10º dia útil após o fechamento da competência (FAQ Q34; calendário); o PEC local pode conter registros enviados depois.",
+          "decision_refs": [
+            "C1-LIM-06"
+          ]
+        },
+        {
+          "id": "dt.late-data",
+          "kind": "LATE_SENDING",
+          "local_reading": "Dados enviados depois do prazo são recebidos por até 4 competências só para complementar a informação, não para o cálculo do financiamento (FAQ Q34).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.validation",
+          "kind": "VALIDATION",
+          "local_reading": "O SIAPS valida duplicidade, data de registro, data de envio, profissionais, equipes e estabelecimentos no SCNES da competência e a identificação do usuário, e invalida o dado incompatível (FAQ Q34); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.version-validation",
+          "kind": "VALIDATION",
+          "local_reading": "Desde 01/01/2026 o SIAPS não considera válidos os dados enviados por versões incompatíveis do e-SUS APS, com prazo de 12 meses para as descontinuadas (NT 12/2025); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.preliminary",
+          "kind": "REPROCESSING",
+          "local_reading": "O resultado oficial é Dado preliminar desde a v1.4 e pode mudar por atualização ou reprocessamento (manual do SIAPS).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.load-calendar",
+          "kind": "REPROCESSING",
+          "local_reading": "Cada competência foi carregada por uma versão do SIAPS em data própria (por exemplo abril/2026 só em 23/06/2026), e as notas de lançamento não são um registro completo das cargas.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.d-rev-1",
+          "kind": "REPROCESSING",
+          "local_reading": "A v2.0.3 (10/09/2026) corrigiu dados de C1 na competência 10/2025 e no 3º quadrimestre de 2025; a natureza da correção não foi publicada (D-REV-1).",
+          "decision_refs": []
+        }
+      ],
+      "declared_limitations": [
+        {
+          "id": "oor.scnes-validation",
+          "what": "A validação de profissionais, equipes e estabelecimentos no SCNES, a habilitação de CBO por SIGTAP e o CNS do profissional não são conferidas.",
+          "decision_refs": [
+            "C1-LIM-11"
+          ]
+        },
+        {
+          "id": "oor.cadsus-identification",
+          "what": "A conformidade da identificação da pessoa com o CadSUS não é conferida.",
+          "decision_refs": [
+            "C1-LIM-07"
+          ]
+        }
+      ],
+      "declared_conventions": [
+        {
+          "id": "c1.window.reference-period",
+          "local_reading": "competência civil (mês)",
+          "decision_refs": [
+            "C1-LIM-12"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.1 n3 (K3)"
+        },
+        {
+          "id": "c1.encounter.without-ine",
+          "local_reading": "atendimento sem INE fora do numerador e do denominador",
+          "decision_refs": [
+            "C1-LIM-10",
+            "C1-LIM-09"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.1 n4 (K3)"
+        },
+        {
+          "id": "common.team.type-reference-date",
+          "local_reading": "tipo da equipe vigente no último dia da competência (`valid_to` exclusivo; sem estado vigente, o mais recente anterior)",
+          "decision_refs": [
+            "C1-LIM-10"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §5 n1 (K3)",
+          "probe_id": "common.team.type-reference-date"
+        }
+      ],
+      "official_readings": {
+        "2025Q1": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c1-2025",
+              "siaps-release-1-4",
+              "ficha-c1-2026"
+            ]
+          },
+          "readings": {
+            "c1.cbo.list": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "Cinco CBO no numerador e no denominador (2251-42, 2251-70, 2251-30, 2235-65 e 2235-05), sem 2251-25 e 2252-50: a edição de 2025 listava cinco CBO (rodapés 1 e 2 da ficha de 2026; FAQ Q28).",
+              "source_ref": "ficha-c1-2026"
+            },
+            "c1.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c1-2026"
+            },
+            "c1.modality.mapping": {
+              "reading": "SAME",
+              "source_ref": "ficha-c1-2026"
+            }
+          }
+        },
+        "2025Q2": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c1-2025",
+              "siaps-release-1-4",
+              "ficha-c1-2026"
+            ]
+          },
+          "readings": {
+            "c1.cbo.list": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "Cinco CBO no numerador e no denominador (2251-42, 2251-70, 2251-30, 2235-65 e 2235-05), sem 2251-25 e 2252-50: a edição de 2025 listava cinco CBO (rodapés 1 e 2 da ficha de 2026; FAQ Q28).",
+              "source_ref": "ficha-c1-2026"
+            },
+            "c1.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c1-2026"
+            },
+            "c1.modality.mapping": {
+              "reading": "SAME",
+              "source_ref": "ficha-c1-2026"
+            }
+          }
+        },
+        "2025Q3": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c1-2025",
+              "siaps-release-1-4",
+              "ficha-c1-2026"
+            ]
+          },
+          "readings": {
+            "c1.cbo.list": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "Cinco CBO no numerador e no denominador (2251-42, 2251-70, 2251-30, 2235-65 e 2235-05), sem 2251-25 e 2252-50: a edição de 2025 listava cinco CBO (rodapés 1 e 2 da ficha de 2026; FAQ Q28).",
+              "source_ref": "ficha-c1-2026"
+            },
+            "c1.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c1-2026"
+            },
+            "c1.modality.mapping": {
+              "reading": "SAME",
+              "source_ref": "ficha-c1-2026"
+            }
+          }
+        },
+        "2026Q1": {
+          "edition": {
+            "id": "edition-indeterminate",
+            "source_refs": [
+              "ficha-c1-2025",
+              "ficha-c1-2026"
+            ]
+          },
+          "readings": {
+            "c1.cbo.list": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c1-2026"
+            },
+            "c1.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c1-2026"
+            },
+            "c1.modality.mapping": {
+              "reading": "SAME",
+              "source_ref": "ficha-c1-2026"
+            }
+          }
+        }
+      }
+    },
+    {
+      "pack": "c2-desenvolvimento-infantil",
+      "rule_version": "c2-desenvolvimento-infantil@0.3.0",
+      "dimensions": [
+        {
+          "id": "c2.consult.puericultura-filter",
+          "local_reading": "A e B só com problema ou condição avaliada Puericultura (CIAP A98 ou CID Z001)",
+          "decision_refs": [
+            "C2-LIM-07"
+          ],
+          "probe_id": "c2.consult.puericultura-filter"
+        },
+        {
+          "id": "c2.consult.encounter-team-scope",
+          "local_reading": "consulta de A e B só conta se o INE do atendimento é tipo 70 ou 76 (ou desconhecido)",
+          "decision_refs": [
+            "AMB-C2-11"
+          ],
+          "probe_id": "c2.consult.encounter-team-scope"
+        },
+        {
+          "id": "c2.visit.outcome",
+          "local_reading": "só visita com desfecho \"realizada\"",
+          "decision_refs": [
+            "AMB-C2-08"
+          ],
+          "probe_id": "c2.visit.outcome"
+        },
+        {
+          "id": "c2.visit.motive-cbo",
+          "local_reading": "ACS ou TACS (5151-05, 3222-55), motivo recém-nascido ou criança",
+          "decision_refs": []
+        },
+        {
+          "id": "c2.vaccine.transcription",
+          "local_reading": "transcrição de dose conta, pela data de aplicação",
+          "decision_refs": [],
+          "probe_id": "c2.vaccine.transcription"
+        },
+        {
+          "id": "c2.cbo.weight-height",
+          "local_reading": "Quadro 03 de 2026, com 2232, 2234, 2236, 2238, 2237, 2241, 2239, 3222 e 5151-05",
+          "decision_refs": [],
+          "probe_id": "c2.cbo.weight-height"
+        },
+        {
+          "id": "c2.team.type-filter",
+          "local_reading": "só equipe tipo 70 ou 76",
+          "decision_refs": []
+        },
+        {
+          "id": "c2.team.eap-credit",
+          "local_reading": "prática D vale integral para criança de eAP 76",
+          "decision_refs": []
+        }
+      ],
+      "data_timing": [
+        {
+          "id": "dt.extraction-day",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O SIAPS extrai os dados no 20º dia útil de cada mês (item 11 das fichas) e trata a apresentação como aproximada; o corte local é o fim da competência.",
+          "decision_refs": [
+            "C2-LIM-13"
+          ]
+        },
+        {
+          "id": "dt.submission-deadline",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O prazo de envio é o 10º dia útil após o fechamento da competência (FAQ Q34; calendário); o PEC local pode conter registros enviados depois.",
+          "decision_refs": [
+            "C2-LIM-13"
+          ]
+        },
+        {
+          "id": "dt.late-data",
+          "kind": "LATE_SENDING",
+          "local_reading": "Dados enviados depois do prazo são recebidos por até 4 competências só para complementar a informação, não para o cálculo do financiamento (FAQ Q34).",
+          "decision_refs": [
+            "C2-LIM-25"
+          ]
+        },
+        {
+          "id": "dt.validation",
+          "kind": "VALIDATION",
+          "local_reading": "O SIAPS valida duplicidade, data de registro, data de envio, profissionais, equipes e estabelecimentos no SCNES da competência e a identificação do usuário, e invalida o dado incompatível (FAQ Q34); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.version-validation",
+          "kind": "VALIDATION",
+          "local_reading": "Desde 01/01/2026 o SIAPS não considera válidos os dados enviados por versões incompatíveis do e-SUS APS, com prazo de 12 meses para as descontinuadas (NT 12/2025); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.preliminary",
+          "kind": "REPROCESSING",
+          "local_reading": "O resultado oficial é Dado preliminar desde a v1.4 e pode mudar por atualização ou reprocessamento (manual do SIAPS).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.load-calendar",
+          "kind": "REPROCESSING",
+          "local_reading": "Cada competência foi carregada por uma versão do SIAPS em data própria (por exemplo abril/2026 só em 23/06/2026), e as notas de lançamento não são um registro completo das cargas.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.d-rev-3",
+          "kind": "REPROCESSING",
+          "local_reading": "A v1.8.1 (23/06/2026) atualizou as regras dos indicadores conforme as novas Notas Metodológicas e não diz se a atualização foi retroativa (D-REV-3).",
+          "decision_refs": []
+        }
+      ],
+      "declared_limitations": [
+        {
+          "id": "oor.vinculo.nt30",
+          "what": "O vínculo pessoa-equipe da NT 30/2025 e o desempate do FAQ Q26 não são reproduzidos: vale a versão vigente do cadastro individual local (24 meses lidos).",
+          "decision_refs": [
+            "C2-LIM-03"
+          ]
+        },
+        {
+          "id": "oor.death.cadsus",
+          "what": "O óbito no CadSUS não está no PEC local: só o óbito e a saída do cadastro local interrompem o acompanhamento.",
+          "decision_refs": [
+            "C2-LIM-02"
+          ]
+        },
+        {
+          "id": "oor.other-installations",
+          "what": "Registros de outros municípios e estabelecimentos e doses só no RIA ou na RNDS não estão no PEC local.",
+          "decision_refs": [
+            "C2-LIM-01"
+          ]
+        },
+        {
+          "id": "oor.scnes-validation",
+          "what": "A validação de profissionais, equipes e estabelecimentos no SCNES, a habilitação de CBO por SIGTAP e o CNS do profissional não são conferidas.",
+          "decision_refs": [
+            "C2-LIM-23"
+          ]
+        },
+        {
+          "id": "oor.cadsus-identification",
+          "what": "A conformidade da identificação da pessoa com o CadSUS não é conferida.",
+          "decision_refs": [
+            "C2-LIM-24"
+          ]
+        }
+      ],
+      "declared_conventions": [
+        {
+          "id": "c2.cohort.second-birthday",
+          "local_reading": "denominador do mês = crianças vinculadas que completam 2 anos na competência; mês sem elas é \"-\"",
+          "decision_refs": [
+            "C2-LIM-08"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.2 n1 (K3)"
+        },
+        {
+          "id": "c2.age.boundaries",
+          "local_reading": "dia do nascimento = dia 0; \"até o 30º dia\" inclui N+30; aniversários de 6 meses e de 2 anos dentro; 29/02 vale 01/03",
+          "decision_refs": [
+            "C2-LIM-09"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.2 n2 (K3)"
+        },
+        {
+          "id": "c2.consult.modality",
+          "local_reading": "presencial salvo marcador de remoto (participação 3 a 7 ou 03.01.01.025-0 no mesmo dia)",
+          "decision_refs": [
+            "C2-LIM-20"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.2 n4 (K3)"
+        },
+        {
+          "id": "c2.consult.same-day-count",
+          "local_reading": "atendimentos distintos no mesmo dia contam separadamente em B",
+          "decision_refs": [
+            "C2-LIM-19"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.2 n5 (K3)"
+        },
+        {
+          "id": "c2.visit.second-visit-window",
+          "local_reading": "2ª visita só depois do 30º dia e até 6 meses; dois registros no mesmo dia são uma visita",
+          "decision_refs": [
+            "C2-LIM-15",
+            "AMB-C2-08"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.2 n9 (K3)"
+        },
+        {
+          "id": "c2.vaccine.dose-scheme",
+          "local_reading": "doses por componente (não por ocasião); hepatite B ao nascer conta; campo dose não lido; SCR e SCRV pela data de aplicação, só a partir de 12 meses",
+          "decision_refs": [
+            "C2-LIM-10"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.2 n10 (K3)"
+        },
+        {
+          "id": "c2.vaccine.interval-and-window",
+          "local_reading": "dose com menos de 30 dias de intervalo é descartada e as seguintes contam; dose depois do 2º aniversário conta",
+          "decision_refs": [
+            "C2-LIM-10"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.2 n11 (K3)"
+        },
+        {
+          "id": "common.team.type-reference-date",
+          "local_reading": "tipo da equipe vigente no último dia da competência (`valid_to` exclusivo; sem estado vigente, o mais recente anterior)",
+          "decision_refs": [
+            "C2-LIM-16"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §5 n1 (K3)",
+          "probe_id": "common.team.type-reference-date"
+        }
+      ],
+      "official_readings": {
+        "2025Q1": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-recalculation-open",
+            "source_refs": [
+              "ficha-c2-2025",
+              "siaps-release-1-4",
+              "siaps-release-1-8-1",
+              "ficha-c2-2026",
+              "faq-siaps-2025-11-11"
+            ]
+          },
+          "readings": {
+            "c2.consult.puericultura-filter": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.consult.encounter-team-scope": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "A consulta conta qualquer que seja o tipo da equipe do profissional, desde que cadastrado em equipe ou estabelecimento da APS (FAQ Q28 e Q29).",
+              "source_ref": "faq-siaps-2025-11-11"
+            },
+            "c2.visit.outcome": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "A visita de qualquer desfecho (realizada, recusada, ausente) conta, desde que o motivo esteja preenchido (FAQ Q30).",
+              "source_ref": "faq-siaps-2025-11-11"
+            },
+            "c2.visit.motive-cbo": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.vaccine.transcription": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.team.eap-credit": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            }
+          }
+        },
+        "2025Q2": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-recalculation-open",
+            "source_refs": [
+              "ficha-c2-2025",
+              "siaps-release-1-4",
+              "siaps-release-1-8-1",
+              "ficha-c2-2026",
+              "faq-siaps-2025-11-11"
+            ]
+          },
+          "readings": {
+            "c2.consult.puericultura-filter": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.consult.encounter-team-scope": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "A consulta conta qualquer que seja o tipo da equipe do profissional, desde que cadastrado em equipe ou estabelecimento da APS (FAQ Q28 e Q29).",
+              "source_ref": "faq-siaps-2025-11-11"
+            },
+            "c2.visit.outcome": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "A visita de qualquer desfecho (realizada, recusada, ausente) conta, desde que o motivo esteja preenchido (FAQ Q30).",
+              "source_ref": "faq-siaps-2025-11-11"
+            },
+            "c2.visit.motive-cbo": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.vaccine.transcription": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.team.eap-credit": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            }
+          }
+        },
+        "2025Q3": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-recalculation-open",
+            "source_refs": [
+              "ficha-c2-2025",
+              "siaps-release-1-4",
+              "siaps-release-1-8-1",
+              "ficha-c2-2026",
+              "faq-siaps-2025-11-11"
+            ]
+          },
+          "readings": {
+            "c2.consult.puericultura-filter": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.consult.encounter-team-scope": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "A consulta conta qualquer que seja o tipo da equipe do profissional, desde que cadastrado em equipe ou estabelecimento da APS (FAQ Q28 e Q29).",
+              "source_ref": "faq-siaps-2025-11-11"
+            },
+            "c2.visit.outcome": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "A visita de qualquer desfecho (realizada, recusada, ausente) conta, desde que o motivo esteja preenchido (FAQ Q30).",
+              "source_ref": "faq-siaps-2025-11-11"
+            },
+            "c2.visit.motive-cbo": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.vaccine.transcription": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.team.eap-credit": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            }
+          }
+        },
+        "2026Q1": {
+          "edition": {
+            "id": "edition-indeterminate-mixed-possible",
+            "source_refs": [
+              "ficha-c2-2025",
+              "ficha-c2-2026",
+              "siaps-release-1-8-1",
+              "faq-siaps-2025-11-11"
+            ]
+          },
+          "readings": {
+            "c2.consult.puericultura-filter": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.consult.encounter-team-scope": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "A consulta conta qualquer que seja o tipo da equipe do profissional, desde que cadastrado em equipe ou estabelecimento da APS (FAQ Q28 e Q29).",
+              "source_ref": "faq-siaps-2025-11-11"
+            },
+            "c2.visit.outcome": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "A visita de qualquer desfecho (realizada, recusada, ausente) conta, desde que o motivo esteja preenchido (FAQ Q30).",
+              "source_ref": "faq-siaps-2025-11-11"
+            },
+            "c2.visit.motive-cbo": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.vaccine.transcription": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            },
+            "c2.team.eap-credit": {
+              "reading": "SAME",
+              "source_ref": "ficha-c2-2026"
+            }
+          }
+        }
+      }
+    },
+    {
+      "pack": "c3-gestacao-puerperio",
+      "rule_version": "c3-gestacao-puerperio@0.3.0",
+      "dimensions": [
+        {
+          "id": "c3.episode.end-date",
+          "local_reading": "desfecho registrado (hoje vazio), senão resolução do W78 na lista de problemas em (DUM, DUM+294], senão DUM+294; puerpério (D, D+42]",
+          "decision_refs": [
+            "C3-LIM-06"
+          ],
+          "probe_id": "c3.episode.end-date"
+        },
+        {
+          "id": "c3.codes.pregnancy-puerperium",
+          "local_reading": "listas do item 24-f de 2026 (CIAP-2 exato, CID-10 por categoria)",
+          "decision_refs": [],
+          "probe_id": "c3.codes.pregnancy-puerperium"
+        },
+        {
+          "id": "c3.visit.outcome-motive",
+          "local_reading": "ACS ou TACS, motivo preenchido, qualquer desfecho",
+          "decision_refs": []
+        },
+        {
+          "id": "c3.team.eap-credit",
+          "local_reading": "E e J valem integral para eAP 76",
+          "decision_refs": [],
+          "probe_id": "c3.team.eap-credit"
+        },
+        {
+          "id": "c3.team.type-filter",
+          "local_reading": "só equipe tipo 70 ou 76; alocação do profissional não verificada",
+          "decision_refs": [
+            "AMB-C3-13"
+          ]
+        },
+        {
+          "id": "c3.cbo.practices",
+          "local_reading": "listas de CBO de 2026 nos Quadros 03, 04 e 07 e 3224 do item 24-d",
+          "decision_refs": [],
+          "probe_id": "c3.cbo.practices"
+        },
+        {
+          "id": "c3.exams.sigtap-additions",
+          "local_reading": "G e H aceitam 02.02.03.030-0 e 02.02.03.031-8",
+          "decision_refs": [],
+          "probe_id": "c3.exams.sigtap-additions"
+        },
+        {
+          "id": "c3.miac.counting-rule",
+          "local_reading": "regra de contagem do MIAC da E26",
+          "decision_refs": [],
+          "probe_id": "c3.miac.counting-rule"
+        }
+      ],
+      "data_timing": [
+        {
+          "id": "dt.extraction-day",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O SIAPS extrai os dados no 20º dia útil de cada mês (item 11 das fichas) e trata a apresentação como aproximada; o corte local é o fim da competência.",
+          "decision_refs": [
+            "C3-LIM-18"
+          ]
+        },
+        {
+          "id": "dt.submission-deadline",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O prazo de envio é o 10º dia útil após o fechamento da competência (FAQ Q34; calendário); o PEC local pode conter registros enviados depois.",
+          "decision_refs": [
+            "C3-LIM-18"
+          ]
+        },
+        {
+          "id": "dt.late-data",
+          "kind": "LATE_SENDING",
+          "local_reading": "Dados enviados depois do prazo são recebidos por até 4 competências só para complementar a informação, não para o cálculo do financiamento (FAQ Q34).",
+          "decision_refs": [
+            "C3-LIM-34"
+          ]
+        },
+        {
+          "id": "dt.validation",
+          "kind": "VALIDATION",
+          "local_reading": "O SIAPS valida duplicidade, data de registro, data de envio, profissionais, equipes e estabelecimentos no SCNES da competência e a identificação do usuário, e invalida o dado incompatível (FAQ Q34); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.version-validation",
+          "kind": "VALIDATION",
+          "local_reading": "Desde 01/01/2026 o SIAPS não considera válidos os dados enviados por versões incompatíveis do e-SUS APS, com prazo de 12 meses para as descontinuadas (NT 12/2025); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.preliminary",
+          "kind": "REPROCESSING",
+          "local_reading": "O resultado oficial é Dado preliminar desde a v1.4 e pode mudar por atualização ou reprocessamento (manual do SIAPS).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.load-calendar",
+          "kind": "REPROCESSING",
+          "local_reading": "Cada competência foi carregada por uma versão do SIAPS em data própria (por exemplo abril/2026 só em 23/06/2026), e as notas de lançamento não são um registro completo das cargas.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.d-rev-2",
+          "kind": "REPROCESSING",
+          "local_reading": "A v1.7.2 (15/05/2026) corrigiu dados de C3 relacionados à marcação de aborto na gestação, sem dizer o alcance (D-REV-2).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.d-rev-3",
+          "kind": "REPROCESSING",
+          "local_reading": "A v1.8.1 (23/06/2026) atualizou as regras dos indicadores conforme as novas Notas Metodológicas e não diz se a atualização foi retroativa (D-REV-3).",
+          "decision_refs": []
+        }
+      ],
+      "declared_limitations": [
+        {
+          "id": "oor.vinculo.nt30",
+          "what": "O vínculo pessoa-equipe da NT 30/2025 e o desempate do FAQ Q26 não são reproduzidos: vale a versão vigente do cadastro individual local (24 meses lidos).",
+          "decision_refs": [
+            "C3-LIM-04"
+          ]
+        },
+        {
+          "id": "oor.death.cadsus",
+          "what": "O óbito no CadSUS não está no PEC local: só o óbito e a saída do cadastro local interrompem o acompanhamento.",
+          "decision_refs": [
+            "C3-LIM-03"
+          ]
+        },
+        {
+          "id": "oor.other-installations",
+          "what": "Registros de outros municípios e estabelecimentos e doses só no RIA ou na RNDS não estão no PEC local.",
+          "decision_refs": [
+            "C3-LIM-01",
+            "C3-LIM-02"
+          ]
+        },
+        {
+          "id": "oor.scnes-validation",
+          "what": "A validação de profissionais, equipes e estabelecimentos no SCNES, a habilitação de CBO por SIGTAP e o CNS do profissional não são conferidas.",
+          "decision_refs": [
+            "C3-LIM-31"
+          ]
+        },
+        {
+          "id": "oor.cadsus-identification",
+          "what": "A conformidade da identificação da pessoa com o CadSUS não é conferida.",
+          "decision_refs": [
+            "C3-LIM-30"
+          ]
+        },
+        {
+          "id": "oor.l6.bp-home-visit",
+          "what": "A pressão arterial registrada em visita domiciliar (MIVDT) não está registrada no DW desta instalação (PEC 5.5.28).",
+          "decision_refs": [
+            "C3-LIM-07"
+          ]
+        },
+        {
+          "id": "oor.c3.outcome-date-field",
+          "what": "O campo Data de desfecho da gestação está vazio no DW; a resolução do W78 é a aproximação local.",
+          "decision_refs": [
+            "C3-LIM-06"
+          ]
+        }
+      ],
+      "declared_conventions": [
+        {
+          "id": "c3.episode.dum-anchor",
+          "local_reading": "DUM do primeiro registro, válida se data do atendimento − 294 ≤ DUM ≤ data",
+          "decision_refs": [
+            "C3-LIM-20"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.3 n2 (K3)"
+        },
+        {
+          "id": "c3.gestational-week.limits",
+          "local_reading": "semanas completas: A até DUM+90, F desde DUM+140",
+          "decision_refs": [
+            "C3-LIM-17"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.3 n3 (K3)"
+        },
+        {
+          "id": "c3.trimester.limits",
+          "local_reading": "1º trimestre até DUM+97; 3º a partir de DUM+196",
+          "decision_refs": [
+            "C3-LIM-15"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.3 n4 (K3)"
+        },
+        {
+          "id": "c3.consult.code-filter",
+          "local_reading": "A, B e I só com código da lista de gestação (A, B) ou de puerpério (I)",
+          "decision_refs": [
+            "C3-LIM-23"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.3 n6 (K3)"
+        },
+        {
+          "id": "c3.consult.same-day",
+          "local_reading": "B conta dias distintos",
+          "decision_refs": [
+            "C3-LIM-23"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.3 n7 (K3)"
+        },
+        {
+          "id": "c3.visit.order-and-days",
+          "local_reading": "\"após\" estritamente posterior; dias distintos",
+          "decision_refs": [
+            "C3-LIM-23",
+            "AMB-C3-16"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.3 n9 (K3)"
+        },
+        {
+          "id": "c3.abortion.exclusion",
+          "local_reading": "código de aborto dentro de [DUM, D] exclui o episódio a partir da competência do registro; \"ativos\" inclui resolvido",
+          "decision_refs": [
+            "C3-LIM-27"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.3 n15 (K3)"
+        },
+        {
+          "id": "common.team.type-reference-date",
+          "local_reading": "tipo da equipe vigente no último dia da competência (`valid_to` exclusivo; sem estado vigente, o mais recente anterior)",
+          "decision_refs": [
+            "C3-LIM-10"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §5 n1 (K3)",
+          "probe_id": "common.team.type-reference-date"
+        }
+      ],
+      "official_readings": {
+        "2025Q1": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-recalculation-open",
+            "source_refs": [
+              "ficha-c3-2025",
+              "siaps-release-1-4",
+              "siaps-release-1-8-1",
+              "faq-siaps-2025-11-11",
+              "ficha-c3-2026"
+            ]
+          },
+          "readings": {
+            "c3.episode.end-date": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "O encerramento da gestação é DUM + 294 dias sempre, sem ler o desfecho registrado nem o W78, e o puerpério tem 42 dias depois (FAQ Q32).",
+              "source_ref": "faq-siaps-2025-11-11"
+            },
+            "c3.codes.pregnancy-puerperium": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.visit.outcome-motive": {
+              "reading": "SAME",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.team.eap-credit": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.cbo.practices": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.exams.sigtap-additions": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.miac.counting-rule": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            }
+          }
+        },
+        "2025Q2": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-recalculation-open",
+            "source_refs": [
+              "ficha-c3-2025",
+              "siaps-release-1-4",
+              "siaps-release-1-8-1",
+              "faq-siaps-2025-11-11",
+              "ficha-c3-2026"
+            ]
+          },
+          "readings": {
+            "c3.episode.end-date": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "O encerramento da gestação é DUM + 294 dias sempre, sem ler o desfecho registrado nem o W78, e o puerpério tem 42 dias depois (FAQ Q32).",
+              "source_ref": "faq-siaps-2025-11-11"
+            },
+            "c3.codes.pregnancy-puerperium": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.visit.outcome-motive": {
+              "reading": "SAME",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.team.eap-credit": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.cbo.practices": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.exams.sigtap-additions": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.miac.counting-rule": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            }
+          }
+        },
+        "2025Q3": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-recalculation-open",
+            "source_refs": [
+              "ficha-c3-2025",
+              "siaps-release-1-4",
+              "siaps-release-1-8-1",
+              "faq-siaps-2025-11-11",
+              "ficha-c3-2026"
+            ]
+          },
+          "readings": {
+            "c3.episode.end-date": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "O encerramento da gestação é DUM + 294 dias sempre, sem ler o desfecho registrado nem o W78, e o puerpério tem 42 dias depois (FAQ Q32).",
+              "source_ref": "faq-siaps-2025-11-11"
+            },
+            "c3.codes.pregnancy-puerperium": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.visit.outcome-motive": {
+              "reading": "SAME",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.team.eap-credit": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.cbo.practices": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.exams.sigtap-additions": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.miac.counting-rule": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            }
+          }
+        },
+        "2026Q1": {
+          "edition": {
+            "id": "edition-indeterminate-mixed-possible",
+            "source_refs": [
+              "ficha-c3-2025",
+              "ficha-c3-2026",
+              "siaps-release-1-8-1"
+            ]
+          },
+          "readings": {
+            "c3.episode.end-date": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.codes.pregnancy-puerperium": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.visit.outcome-motive": {
+              "reading": "SAME",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.team.eap-credit": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.cbo.practices": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.exams.sigtap-additions": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            },
+            "c3.miac.counting-rule": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c3-2026"
+            }
+          }
+        }
+      }
+    },
+    {
+      "pack": "c4-cuidado-diabetes",
+      "rule_version": "c4-cuidado-diabetes@0.3.0",
+      "dimensions": [
+        {
+          "id": "c4.condition.code-list",
+          "local_reading": "CID-10 E10, E11 e E14 (com subcódigos) e CIAP-2 T89 e T90",
+          "decision_refs": [],
+          "probe_id": "c4.condition.code-list"
+        },
+        {
+          "id": "c4.condition.entry-history",
+          "local_reading": "condição avaliada na lista de problemas desde 2013 ou em atendimento individual dos últimos 12 meses",
+          "decision_refs": [
+            "C4-04"
+          ],
+          "probe_id": "c4.condition.entry-history"
+        },
+        {
+          "id": "c4.team.type-filter",
+          "local_reading": "só equipe tipo 70 ou 76",
+          "decision_refs": []
+        },
+        {
+          "id": "c4.cbo.bp-measurement",
+          "local_reading": "Quadro 03 de 2026: sem 5151-05; com 2232, 2234, 2236, 2238, 2237, 2241, 2239 e 3224",
+          "decision_refs": [],
+          "probe_id": "c4.cbo.bp-measurement"
+        },
+        {
+          "id": "c4.cbo.weight-height",
+          "local_reading": "Quadro 04 de 2026, com os sete grupos adicionados",
+          "decision_refs": [],
+          "probe_id": "c4.cbo.weight-height"
+        },
+        {
+          "id": "c4.visit.outcome",
+          "local_reading": "visita de qualquer desfecho, motivo preenchido",
+          "decision_refs": []
+        },
+        {
+          "id": "c4.visit.interval-30-days",
+          "local_reading": "duas visitas com data2 − data1 ≥ 30 dias; mesmo dia não forma par",
+          "decision_refs": []
+        }
+      ],
+      "data_timing": [
+        {
+          "id": "dt.extraction-day",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O SIAPS extrai os dados no 20º dia útil de cada mês (item 11 das fichas) e trata a apresentação como aproximada; o corte local é o fim da competência.",
+          "decision_refs": [
+            "C4-LIM-12"
+          ]
+        },
+        {
+          "id": "dt.submission-deadline",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O prazo de envio é o 10º dia útil após o fechamento da competência (FAQ Q34; calendário); o PEC local pode conter registros enviados depois.",
+          "decision_refs": [
+            "C4-LIM-12"
+          ]
+        },
+        {
+          "id": "dt.late-data",
+          "kind": "LATE_SENDING",
+          "local_reading": "Dados enviados depois do prazo são recebidos por até 4 competências só para complementar a informação, não para o cálculo do financiamento (FAQ Q34).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.validation",
+          "kind": "VALIDATION",
+          "local_reading": "O SIAPS valida duplicidade, data de registro, data de envio, profissionais, equipes e estabelecimentos no SCNES da competência e a identificação do usuário, e invalida o dado incompatível (FAQ Q34); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.version-validation",
+          "kind": "VALIDATION",
+          "local_reading": "Desde 01/01/2026 o SIAPS não considera válidos os dados enviados por versões incompatíveis do e-SUS APS, com prazo de 12 meses para as descontinuadas (NT 12/2025); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.preliminary",
+          "kind": "REPROCESSING",
+          "local_reading": "O resultado oficial é Dado preliminar desde a v1.4 e pode mudar por atualização ou reprocessamento (manual do SIAPS).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.load-calendar",
+          "kind": "REPROCESSING",
+          "local_reading": "Cada competência foi carregada por uma versão do SIAPS em data própria (por exemplo abril/2026 só em 23/06/2026), e as notas de lançamento não são um registro completo das cargas.",
+          "decision_refs": []
+        }
+      ],
+      "declared_limitations": [
+        {
+          "id": "oor.vinculo.nt30",
+          "what": "O vínculo pessoa-equipe da NT 30/2025 e o desempate do FAQ Q26 não são reproduzidos: vale a versão vigente do cadastro individual local (24 meses lidos).",
+          "decision_refs": [
+            "C4-LIM-02"
+          ]
+        },
+        {
+          "id": "oor.death.cadsus",
+          "what": "O óbito no CadSUS não está no PEC local: só o óbito e a saída do cadastro local interrompem o acompanhamento.",
+          "decision_refs": [
+            "C4-LIM-02"
+          ]
+        },
+        {
+          "id": "oor.other-installations",
+          "what": "Registros de outros municípios e estabelecimentos e doses só no RIA ou na RNDS não estão no PEC local.",
+          "decision_refs": [
+            "C4-LIM-01"
+          ]
+        },
+        {
+          "id": "oor.scnes-validation",
+          "what": "A validação de profissionais, equipes e estabelecimentos no SCNES, a habilitação de CBO por SIGTAP e o CNS do profissional não são conferidas.",
+          "decision_refs": [
+            "C4-LIM-09"
+          ]
+        },
+        {
+          "id": "oor.cadsus-identification",
+          "what": "A conformidade da identificação da pessoa com o CadSUS não é conferida.",
+          "decision_refs": [
+            "C4-LIM-21"
+          ]
+        },
+        {
+          "id": "oor.l6.bp-home-visit",
+          "what": "A pressão arterial registrada em visita domiciliar (MIVDT) não está registrada no DW desta instalação (PEC 5.5.28).",
+          "decision_refs": [
+            "C4-LIM-05"
+          ]
+        },
+        {
+          "id": "oor.l5.bp-collective-participant",
+          "what": "A pressão arterial de participante de atividade coletiva (MIAC) não existe no DW: measurement_record grava nulo.",
+          "decision_refs": [
+            "C4-LIM-06"
+          ]
+        },
+        {
+          "id": "oor.c4.foot-exam",
+          "what": "A avaliação dos pés (prática F) só é comprovada pelo procedimento 03.01.04.009-5: o DW não tem o campo do atendimento individual.",
+          "decision_refs": [
+            "C4-LIM-07"
+          ]
+        }
+      ],
+      "declared_conventions": [
+        {
+          "id": "c4.condition.status",
+          "local_reading": "sai quem tem todas as condições elegíveis com último estado resolvido; latente é ativo; concluído vale só como resolvido",
+          "decision_refs": [
+            "C4-LIM-04"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.4 n2 (K3)"
+        },
+        {
+          "id": "c4.team.eap-credit",
+          "local_reading": "D vale integral (20 pontos) para eAP 76",
+          "decision_refs": [
+            "C4-LIM-18"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.4 n5 (K3)"
+        },
+        {
+          "id": "c4.window.civil-months",
+          "local_reading": "6 e 12 meses civis terminando no último dia da competência",
+          "decision_refs": [
+            "C4-LIM-13"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.4 n10 (K3)"
+        },
+        {
+          "id": "common.team.type-reference-date",
+          "local_reading": "tipo da equipe vigente no último dia da competência (`valid_to` exclusivo; sem estado vigente, o mais recente anterior)",
+          "decision_refs": [
+            "C4-LIM-19"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §5 n1 (K3)",
+          "probe_id": "common.team.type-reference-date"
+        }
+      ],
+      "official_readings": {
+        "2025Q1": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c4-2025",
+              "siaps-release-1-4",
+              "ficha-c4-2026"
+            ]
+          },
+          "readings": {
+            "c4.condition.code-list": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.condition.entry-history": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.cbo.bp-measurement": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "O ACS (5151-05) conta na aferição de pressão arterial e o 3224 não conta (Quadro 03 e item 24-d da edição de 2025; rodapés 2 e 4 da ficha de 2026).",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.visit.outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.visit.interval-30-days": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            }
+          }
+        },
+        "2025Q2": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c4-2025",
+              "siaps-release-1-4",
+              "ficha-c4-2026"
+            ]
+          },
+          "readings": {
+            "c4.condition.code-list": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.condition.entry-history": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.cbo.bp-measurement": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "O ACS (5151-05) conta na aferição de pressão arterial e o 3224 não conta (Quadro 03 e item 24-d da edição de 2025; rodapés 2 e 4 da ficha de 2026).",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.visit.outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.visit.interval-30-days": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            }
+          }
+        },
+        "2025Q3": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c4-2025",
+              "siaps-release-1-4",
+              "ficha-c4-2026"
+            ]
+          },
+          "readings": {
+            "c4.condition.code-list": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.condition.entry-history": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.cbo.bp-measurement": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "O ACS (5151-05) conta na aferição de pressão arterial e o 3224 não conta (Quadro 03 e item 24-d da edição de 2025; rodapés 2 e 4 da ficha de 2026).",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.visit.outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.visit.interval-30-days": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            }
+          }
+        },
+        "2026Q1": {
+          "edition": {
+            "id": "edition-indeterminate",
+            "source_refs": [
+              "ficha-c4-2025",
+              "ficha-c4-2026"
+            ]
+          },
+          "readings": {
+            "c4.condition.code-list": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.condition.entry-history": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.cbo.bp-measurement": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.visit.outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            },
+            "c4.visit.interval-30-days": {
+              "reading": "SAME",
+              "source_ref": "ficha-c4-2026"
+            }
+          }
+        }
+      }
+    },
+    {
+      "pack": "c5-cuidado-hipertensao",
+      "rule_version": "c5-cuidado-hipertensao@0.3.0",
+      "dimensions": [
+        {
+          "id": "c5.condition.code-list",
+          "local_reading": "26 CID-10 e 2 CIAP-2 da ficha, casamento exato",
+          "decision_refs": [
+            "C5-04"
+          ]
+        },
+        {
+          "id": "c5.condition.entry-history",
+          "local_reading": "condição avaliada na lista de problemas desde 2013 ou em atendimento individual dos últimos 12 meses",
+          "decision_refs": [
+            "C5-04"
+          ],
+          "probe_id": "c5.condition.entry-history"
+        },
+        {
+          "id": "c5.team.type-filter",
+          "local_reading": "só equipe tipo 70 ou 76",
+          "decision_refs": []
+        },
+        {
+          "id": "c5.cbo.bp-measurement",
+          "local_reading": "Quadro 03 de 2026: sem 5151-05; com os grupos adicionados e 3224",
+          "decision_refs": [],
+          "probe_id": "c5.cbo.bp-measurement"
+        },
+        {
+          "id": "c5.cbo.weight-height",
+          "local_reading": "Quadro 04 de 2026, com os sete grupos adicionados",
+          "decision_refs": [],
+          "probe_id": "c5.cbo.weight-height"
+        },
+        {
+          "id": "c5.visit.outcome",
+          "local_reading": "visita de qualquer desfecho, motivo preenchido",
+          "decision_refs": [
+            "C5-09"
+          ]
+        },
+        {
+          "id": "c5.visit.interval-30-days",
+          "local_reading": "data2 − data1 ≥ 30 dias; mesmo dia não forma par",
+          "decision_refs": []
+        }
+      ],
+      "data_timing": [
+        {
+          "id": "dt.extraction-day",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O SIAPS extrai os dados no 20º dia útil de cada mês (item 11 das fichas) e trata a apresentação como aproximada; o corte local é o fim da competência.",
+          "decision_refs": [
+            "C5-LIM-08"
+          ]
+        },
+        {
+          "id": "dt.submission-deadline",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O prazo de envio é o 10º dia útil após o fechamento da competência (FAQ Q34; calendário); o PEC local pode conter registros enviados depois.",
+          "decision_refs": [
+            "C5-LIM-08"
+          ]
+        },
+        {
+          "id": "dt.late-data",
+          "kind": "LATE_SENDING",
+          "local_reading": "Dados enviados depois do prazo são recebidos por até 4 competências só para complementar a informação, não para o cálculo do financiamento (FAQ Q34).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.validation",
+          "kind": "VALIDATION",
+          "local_reading": "O SIAPS valida duplicidade, data de registro, data de envio, profissionais, equipes e estabelecimentos no SCNES da competência e a identificação do usuário, e invalida o dado incompatível (FAQ Q34); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.version-validation",
+          "kind": "VALIDATION",
+          "local_reading": "Desde 01/01/2026 o SIAPS não considera válidos os dados enviados por versões incompatíveis do e-SUS APS, com prazo de 12 meses para as descontinuadas (NT 12/2025); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.preliminary",
+          "kind": "REPROCESSING",
+          "local_reading": "O resultado oficial é Dado preliminar desde a v1.4 e pode mudar por atualização ou reprocessamento (manual do SIAPS).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.load-calendar",
+          "kind": "REPROCESSING",
+          "local_reading": "Cada competência foi carregada por uma versão do SIAPS em data própria (por exemplo abril/2026 só em 23/06/2026), e as notas de lançamento não são um registro completo das cargas.",
+          "decision_refs": []
+        }
+      ],
+      "declared_limitations": [
+        {
+          "id": "oor.vinculo.nt30",
+          "what": "O vínculo pessoa-equipe da NT 30/2025 e o desempate do FAQ Q26 não são reproduzidos: vale a versão vigente do cadastro individual local (24 meses lidos).",
+          "decision_refs": [
+            "C5-LIM-03"
+          ]
+        },
+        {
+          "id": "oor.death.cadsus",
+          "what": "O óbito no CadSUS não está no PEC local: só o óbito e a saída do cadastro local interrompem o acompanhamento.",
+          "decision_refs": [
+            "C5-LIM-02"
+          ]
+        },
+        {
+          "id": "oor.other-installations",
+          "what": "Registros de outros municípios e estabelecimentos e doses só no RIA ou na RNDS não estão no PEC local.",
+          "decision_refs": [
+            "C5-LIM-01"
+          ]
+        },
+        {
+          "id": "oor.scnes-validation",
+          "what": "A validação de profissionais, equipes e estabelecimentos no SCNES, a habilitação de CBO por SIGTAP e o CNS do profissional não são conferidas.",
+          "decision_refs": [
+            "C5-LIM-06"
+          ]
+        },
+        {
+          "id": "oor.cadsus-identification",
+          "what": "A conformidade da identificação da pessoa com o CadSUS não é conferida.",
+          "decision_refs": [
+            "C5-LIM-07"
+          ]
+        },
+        {
+          "id": "oor.l6.bp-home-visit",
+          "what": "A pressão arterial registrada em visita domiciliar (MIVDT) não está registrada no DW desta instalação (PEC 5.5.28).",
+          "decision_refs": [
+            "C5-LIM-10"
+          ]
+        },
+        {
+          "id": "oor.l5.bp-collective-participant",
+          "what": "A pressão arterial de participante de atividade coletiva (MIAC) não existe no DW: measurement_record grava nulo.",
+          "decision_refs": [
+            "C5-LIM-11"
+          ]
+        }
+      ],
+      "declared_conventions": [
+        {
+          "id": "c5.condition.status",
+          "local_reading": "sai quem tem todas as condições elegíveis com último estado resolvido; latente é ativo; concluído vale só como resolvido",
+          "decision_refs": [
+            "C5-LIM-09",
+            "C5-LIM-19"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.5 n2 (K3)"
+        },
+        {
+          "id": "c5.team.eap-credit",
+          "local_reading": "D vale integral (25 pontos) para eAP 76",
+          "decision_refs": [
+            "C5-LIM-24"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.5 n5 (K3)"
+        },
+        {
+          "id": "c5.window.month-anchoring",
+          "local_reading": "6 e 12 meses civis terminando no último dia da competência",
+          "decision_refs": [
+            "C5-LIM-17"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.5 n10 (K3)"
+        },
+        {
+          "id": "common.team.type-reference-date",
+          "local_reading": "tipo da equipe vigente no último dia da competência (`valid_to` exclusivo; sem estado vigente, o mais recente anterior)",
+          "decision_refs": [
+            "C5-LIM-25"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §5 n1 (K3)",
+          "probe_id": "common.team.type-reference-date"
+        }
+      ],
+      "official_readings": {
+        "2025Q1": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c5-2025",
+              "siaps-release-1-4",
+              "ficha-c5-2026"
+            ]
+          },
+          "readings": {
+            "c5.condition.code-list": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.condition.entry-history": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.cbo.bp-measurement": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "O ACS (5151-05) conta na aferição de pressão arterial e o 3224 não conta (Quadro 03 e item 24-d da edição de 2025; rodapés 3 e 4 da ficha de 2026).",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.visit.outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.visit.interval-30-days": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            }
+          }
+        },
+        "2025Q2": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c5-2025",
+              "siaps-release-1-4",
+              "ficha-c5-2026"
+            ]
+          },
+          "readings": {
+            "c5.condition.code-list": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.condition.entry-history": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.cbo.bp-measurement": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "O ACS (5151-05) conta na aferição de pressão arterial e o 3224 não conta (Quadro 03 e item 24-d da edição de 2025; rodapés 3 e 4 da ficha de 2026).",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.visit.outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.visit.interval-30-days": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            }
+          }
+        },
+        "2025Q3": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c5-2025",
+              "siaps-release-1-4",
+              "ficha-c5-2026"
+            ]
+          },
+          "readings": {
+            "c5.condition.code-list": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.condition.entry-history": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.cbo.bp-measurement": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "O ACS (5151-05) conta na aferição de pressão arterial e o 3224 não conta (Quadro 03 e item 24-d da edição de 2025; rodapés 3 e 4 da ficha de 2026).",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.visit.outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.visit.interval-30-days": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            }
+          }
+        },
+        "2026Q1": {
+          "edition": {
+            "id": "edition-indeterminate",
+            "source_refs": [
+              "ficha-c5-2025",
+              "ficha-c5-2026"
+            ]
+          },
+          "readings": {
+            "c5.condition.code-list": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.condition.entry-history": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.cbo.bp-measurement": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.visit.outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            },
+            "c5.visit.interval-30-days": {
+              "reading": "SAME",
+              "source_ref": "ficha-c5-2026"
+            }
+          }
+        }
+      }
+    },
+    {
+      "pack": "c6-cuidado-pessoa-idosa",
+      "rule_version": "c6-cuidado-pessoa-idosa@0.3.0",
+      "dimensions": [
+        {
+          "id": "c6.team.type-filter",
+          "local_reading": "só equipe tipo 70 ou 76",
+          "decision_refs": []
+        },
+        {
+          "id": "c6.visit.interval-outcome",
+          "local_reading": "duas visitas com ≥ 30 dias; desfecho não filtrado",
+          "decision_refs": []
+        },
+        {
+          "id": "c6.vaccine.influenza",
+          "local_reading": "uma dose de 33 ou 77 nos 12 meses; transcrição conta; sem filtro de CBO",
+          "decision_refs": []
+        },
+        {
+          "id": "c6.cbo.weight-height",
+          "local_reading": "Quadro 03 de 2026, com os sete grupos adicionados",
+          "decision_refs": [],
+          "probe_id": "c6.cbo.weight-height"
+        },
+        {
+          "id": "c6.cbo.tsb-3224",
+          "local_reading": "3224 (TSB) não conta em B",
+          "decision_refs": [
+            "C6-07"
+          ],
+          "probe_id": "c6.cbo.tsb-3224"
+        }
+      ],
+      "data_timing": [
+        {
+          "id": "dt.extraction-day",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O SIAPS extrai os dados no 20º dia útil de cada mês (item 11 das fichas) e trata a apresentação como aproximada; o corte local é o fim da competência.",
+          "decision_refs": [
+            "C6-LIM-08"
+          ]
+        },
+        {
+          "id": "dt.submission-deadline",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O prazo de envio é o 10º dia útil após o fechamento da competência (FAQ Q34; calendário); o PEC local pode conter registros enviados depois.",
+          "decision_refs": [
+            "C6-LIM-08"
+          ]
+        },
+        {
+          "id": "dt.late-data",
+          "kind": "LATE_SENDING",
+          "local_reading": "Dados enviados depois do prazo são recebidos por até 4 competências só para complementar a informação, não para o cálculo do financiamento (FAQ Q34).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.validation",
+          "kind": "VALIDATION",
+          "local_reading": "O SIAPS valida duplicidade, data de registro, data de envio, profissionais, equipes e estabelecimentos no SCNES da competência e a identificação do usuário, e invalida o dado incompatível (FAQ Q34); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.version-validation",
+          "kind": "VALIDATION",
+          "local_reading": "Desde 01/01/2026 o SIAPS não considera válidos os dados enviados por versões incompatíveis do e-SUS APS, com prazo de 12 meses para as descontinuadas (NT 12/2025); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.preliminary",
+          "kind": "REPROCESSING",
+          "local_reading": "O resultado oficial é Dado preliminar desde a v1.4 e pode mudar por atualização ou reprocessamento (manual do SIAPS).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.load-calendar",
+          "kind": "REPROCESSING",
+          "local_reading": "Cada competência foi carregada por uma versão do SIAPS em data própria (por exemplo abril/2026 só em 23/06/2026), e as notas de lançamento não são um registro completo das cargas.",
+          "decision_refs": []
+        }
+      ],
+      "declared_limitations": [
+        {
+          "id": "oor.vinculo.nt30",
+          "what": "O vínculo pessoa-equipe da NT 30/2025 e o desempate do FAQ Q26 não são reproduzidos: vale a versão vigente do cadastro individual local (24 meses lidos).",
+          "decision_refs": [
+            "C6-LIM-02"
+          ]
+        },
+        {
+          "id": "oor.death.cadsus",
+          "what": "O óbito no CadSUS não está no PEC local: só o óbito e a saída do cadastro local interrompem o acompanhamento.",
+          "decision_refs": [
+            "C6-LIM-01"
+          ]
+        },
+        {
+          "id": "oor.other-installations",
+          "what": "Registros de outros municípios e estabelecimentos e doses só no RIA ou na RNDS não estão no PEC local.",
+          "decision_refs": [
+            "C6-LIM-01"
+          ]
+        },
+        {
+          "id": "oor.scnes-validation",
+          "what": "A validação de profissionais, equipes e estabelecimentos no SCNES, a habilitação de CBO por SIGTAP e o CNS do profissional não são conferidas.",
+          "decision_refs": [
+            "C6-LIM-06"
+          ]
+        },
+        {
+          "id": "oor.cadsus-identification",
+          "what": "A conformidade da identificação da pessoa com o CadSUS não é conferida.",
+          "decision_refs": [
+            "C6-LIM-07"
+          ]
+        }
+      ],
+      "declared_conventions": [
+        {
+          "id": "c6.age.birthday-rule",
+          "local_reading": "idade completa no último dia da competência; quem faz 60 anos em qualquer dia do mês entra; 29/02 vale 01/03",
+          "decision_refs": [
+            "C6-LIM-09"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.6 n1 (K3)",
+          "probe_id": "c6.age.birthday-rule"
+        },
+        {
+          "id": "c6.team.eap-credit",
+          "local_reading": "C vale integral (25 pontos) para eAP 76",
+          "decision_refs": [
+            "C6-LIM-14"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.6 n3 (K3)",
+          "probe_id": "c6.team.eap-credit"
+        },
+        {
+          "id": "c6.window.civil-months",
+          "local_reading": "12 meses civis terminando no último dia da competência",
+          "decision_refs": [
+            "C6-LIM-09"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.6 n8 (K3)"
+        },
+        {
+          "id": "common.team.type-reference-date",
+          "local_reading": "tipo da equipe vigente no último dia da competência (`valid_to` exclusivo; sem estado vigente, o mais recente anterior)",
+          "decision_refs": [
+            "C6-LIM-15"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §5 n1 (K3)",
+          "probe_id": "common.team.type-reference-date"
+        }
+      ],
+      "official_readings": {
+        "2025Q1": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c6-2025",
+              "siaps-release-1-4",
+              "ficha-c6-2026"
+            ]
+          },
+          "readings": {
+            "c6.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.visit.interval-outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.vaccine.influenza": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.cbo.tsb-3224": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c6-2026"
+            }
+          }
+        },
+        "2025Q2": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c6-2025",
+              "siaps-release-1-4",
+              "ficha-c6-2026"
+            ]
+          },
+          "readings": {
+            "c6.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.visit.interval-outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.vaccine.influenza": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.cbo.tsb-3224": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c6-2026"
+            }
+          }
+        },
+        "2025Q3": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-2025-12-30",
+            "source_refs": [
+              "ficha-c6-2025",
+              "siaps-release-1-4",
+              "ficha-c6-2026"
+            ]
+          },
+          "readings": {
+            "c6.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.visit.interval-outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.vaccine.influenza": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.cbo.tsb-3224": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c6-2026"
+            }
+          }
+        },
+        "2026Q1": {
+          "edition": {
+            "id": "edition-indeterminate",
+            "source_refs": [
+              "ficha-c6-2025",
+              "ficha-c6-2026"
+            ]
+          },
+          "readings": {
+            "c6.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.visit.interval-outcome": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.vaccine.influenza": {
+              "reading": "SAME",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.cbo.weight-height": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c6-2026"
+            },
+            "c6.cbo.tsb-3224": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c6-2026"
+            }
+          }
+        }
+      }
+    },
+    {
+      "pack": "c7-prevencao-cancer",
+      "rule_version": "c7-prevencao-cancer@0.3.0",
+      "dimensions": [
+        {
+          "id": "c7.exam.molecular-hpv-validity",
+          "local_reading": "02.02.10.025-1 conta a partir da competência 2026-01, com janela de 60 meses que inclui 2025",
+          "decision_refs": [],
+          "probe_id": "c7.exam.molecular-hpv-validity"
+        },
+        {
+          "id": "c7.team.type-filter",
+          "local_reading": "só equipe tipo 70 ou 76; sem crédito eAP",
+          "decision_refs": []
+        }
+      ],
+      "data_timing": [
+        {
+          "id": "dt.extraction-day",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O SIAPS extrai os dados no 20º dia útil de cada mês (item 11 das fichas) e trata a apresentação como aproximada; o corte local é o fim da competência.",
+          "decision_refs": [
+            "C7-LIM-07"
+          ]
+        },
+        {
+          "id": "dt.submission-deadline",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O prazo de envio é o 10º dia útil após o fechamento da competência (FAQ Q34; calendário); o PEC local pode conter registros enviados depois.",
+          "decision_refs": [
+            "C7-LIM-07"
+          ]
+        },
+        {
+          "id": "dt.late-data",
+          "kind": "LATE_SENDING",
+          "local_reading": "Dados enviados depois do prazo são recebidos por até 4 competências só para complementar a informação, não para o cálculo do financiamento (FAQ Q34).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.validation",
+          "kind": "VALIDATION",
+          "local_reading": "O SIAPS valida duplicidade, data de registro, data de envio, profissionais, equipes e estabelecimentos no SCNES da competência e a identificação do usuário, e invalida o dado incompatível (FAQ Q34); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.version-validation",
+          "kind": "VALIDATION",
+          "local_reading": "Desde 01/01/2026 o SIAPS não considera válidos os dados enviados por versões incompatíveis do e-SUS APS, com prazo de 12 meses para as descontinuadas (NT 12/2025); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.preliminary",
+          "kind": "REPROCESSING",
+          "local_reading": "O resultado oficial é Dado preliminar desde a v1.4 e pode mudar por atualização ou reprocessamento (manual do SIAPS).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.load-calendar",
+          "kind": "REPROCESSING",
+          "local_reading": "Cada competência foi carregada por uma versão do SIAPS em data própria (por exemplo abril/2026 só em 23/06/2026), e as notas de lançamento não são um registro completo das cargas.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.d-rev-3",
+          "kind": "REPROCESSING",
+          "local_reading": "A v1.8.1 (23/06/2026) atualizou as regras dos indicadores conforme as novas Notas Metodológicas e não diz se a atualização foi retroativa (D-REV-3).",
+          "decision_refs": []
+        }
+      ],
+      "declared_limitations": [
+        {
+          "id": "oor.vinculo.nt30",
+          "what": "O vínculo pessoa-equipe da NT 30/2025 e o desempate do FAQ Q26 não são reproduzidos: vale a versão vigente do cadastro individual local (24 meses lidos).",
+          "decision_refs": [
+            "C7-LIM-01"
+          ]
+        },
+        {
+          "id": "oor.death.cadsus",
+          "what": "O óbito no CadSUS não está no PEC local: só o óbito e a saída do cadastro local interrompem o acompanhamento.",
+          "decision_refs": [
+            "C7-LIM-02"
+          ]
+        },
+        {
+          "id": "oor.other-installations",
+          "what": "Registros de outros municípios e estabelecimentos e doses só no RIA ou na RNDS não estão no PEC local.",
+          "decision_refs": [
+            "C7-LIM-03"
+          ]
+        },
+        {
+          "id": "oor.scnes-validation",
+          "what": "A validação de profissionais, equipes e estabelecimentos no SCNES, a habilitação de CBO por SIGTAP e o CNS do profissional não são conferidas.",
+          "decision_refs": [
+            "C7-LIM-17"
+          ]
+        },
+        {
+          "id": "oor.cadsus-identification",
+          "what": "A conformidade da identificação da pessoa com o CadSUS não é conferida.",
+          "decision_refs": [
+            "C7-LIM-16"
+          ]
+        }
+      ],
+      "declared_conventions": [
+        {
+          "id": "c7.vaccine.hpv-window",
+          "local_reading": "dose do 9º aniversário em diante, sem teto em meses",
+          "decision_refs": [
+            "C7-LIM-12"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.7 n1 (K3)"
+        },
+        {
+          "id": "c7.subgroup.trans-man-in-b",
+          "local_reading": "homem transgênero fora do subgrupo B",
+          "decision_refs": [
+            "C7-LIM-12",
+            "C7-LIM-10"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.7 n3 (K3)"
+        },
+        {
+          "id": "c7.score.empty-subgroup",
+          "local_reading": "subgrupo sem denominador sai da soma e do divisor (reescala); quatro vazios: mês \"-\"",
+          "decision_refs": [
+            "C7-LIM-14"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.7 n4 (K3)"
+        },
+        {
+          "id": "c7.cbo.sets",
+          "local_reading": "A, C e D só com médicos e enfermeiros; B sem filtro de CBO",
+          "decision_refs": [
+            "C7-LIM-05"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.7 n6 (K3)"
+        },
+        {
+          "id": "c7.age-and-window.civil",
+          "local_reading": "idade completa no último dia da competência; 29/02 vale 01/03; janelas de 36, 12, 24 e 60 meses civis",
+          "decision_refs": [
+            "C7-LIM-08"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.7 n7 (K3)",
+          "probe_id": "c7.age-and-window.civil"
+        },
+        {
+          "id": "common.team.type-reference-date",
+          "local_reading": "tipo da equipe vigente no último dia da competência (`valid_to` exclusivo; sem estado vigente, o mais recente anterior)",
+          "decision_refs": [
+            "C7-LIM-15"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §5 n1 (K3)",
+          "probe_id": "common.team.type-reference-date"
+        }
+      ],
+      "official_readings": {
+        "2025Q1": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-recalculation-open",
+            "source_refs": [
+              "ficha-c7-2025",
+              "siaps-release-1-4",
+              "siaps-release-1-8-1",
+              "ficha-c7-2026"
+            ]
+          },
+          "readings": {
+            "c7.exam.molecular-hpv-validity": {
+              "reading": "SAME",
+              "source_ref": "ficha-c7-2026"
+            },
+            "c7.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c7-2026"
+            }
+          }
+        },
+        "2025Q2": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-recalculation-open",
+            "source_refs": [
+              "ficha-c7-2025",
+              "siaps-release-1-4",
+              "siaps-release-1-8-1",
+              "ficha-c7-2026"
+            ]
+          },
+          "readings": {
+            "c7.exam.molecular-hpv-validity": {
+              "reading": "SAME",
+              "source_ref": "ficha-c7-2026"
+            },
+            "c7.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c7-2026"
+            }
+          }
+        },
+        "2025Q3": {
+          "edition": {
+            "id": "ficha-2025-reprocessed-recalculation-open",
+            "source_refs": [
+              "ficha-c7-2025",
+              "siaps-release-1-4",
+              "siaps-release-1-8-1",
+              "ficha-c7-2026"
+            ]
+          },
+          "readings": {
+            "c7.exam.molecular-hpv-validity": {
+              "reading": "SAME",
+              "source_ref": "ficha-c7-2026"
+            },
+            "c7.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c7-2026"
+            }
+          }
+        },
+        "2026Q1": {
+          "edition": {
+            "id": "edition-indeterminate-mixed-possible",
+            "source_refs": [
+              "ficha-c7-2025",
+              "ficha-c7-2026",
+              "siaps-release-1-8-1"
+            ]
+          },
+          "readings": {
+            "c7.exam.molecular-hpv-validity": {
+              "reading": "UNKNOWN",
+              "source_ref": "ficha-c7-2026"
+            },
+            "c7.team.type-filter": {
+              "reading": "SAME",
+              "source_ref": "ficha-c7-2026"
+            }
+          }
+        }
+      }
+    },
+    {
+      "pack": "componente-iii-nota-final",
+      "rule_version": "componente-iii-nota-final@0.3.0",
+      "dimensions": [
+        {
+          "id": "ciii.weights",
+          "local_reading": "C1=1, C2=2, C3=2, C4=1, C5=1, C6=1, C7=2 (total 10)",
+          "decision_refs": []
+        },
+        {
+          "id": "ciii.class-factors",
+          "local_reading": "Regular 0,25; Suficiente 0,50; Bom 0,75; Ótimo 1,00",
+          "decision_refs": []
+        },
+        {
+          "id": "ciii.indicator-bands",
+          "local_reading": "faixas do item 30 de cada ficha",
+          "decision_refs": []
+        },
+        {
+          "id": "ciii.final-bands",
+          "local_reading": "> 7,5 Ótimo; ≥ 5 e ≤ 7,5 Bom; > 2,5 e < 5 Suficiente; ≤ 2,5 Regular",
+          "decision_refs": []
+        },
+        {
+          "id": "ciii.quarter-mean",
+          "local_reading": "média simples dos valores mensais",
+          "decision_refs": []
+        },
+        {
+          "id": "ciii.dash-months.c2-c3",
+          "local_reading": "mês sem criança completando 2 anos ou sem gestação que atingiu D+42 sai da média",
+          "decision_refs": []
+        },
+        {
+          "id": "ciii.monthly-rule-versions",
+          "local_reading": "não mistura meses de versões diferentes do mesmo pack",
+          "decision_refs": [],
+          "probe_id": "ciii.monthly-rule-versions"
+        },
+        {
+          "id": "ciii.team-universe",
+          "local_reading": "interseção das listas correntes de equipes de C1 a C7 (regra `@1`)",
+          "decision_refs": [],
+          "probe_id": "ciii.team-universe"
+        },
+        {
+          "id": "ciii.class-vs-payment",
+          "local_reading": "classe metodológica pelas faixas, não a classe de pagamento da Portaria 10.994/2026",
+          "decision_refs": [],
+          "probe_id": "ciii.class-vs-payment"
+        }
+      ],
+      "data_timing": [
+        {
+          "id": "dt.extraction-day",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O SIAPS extrai os dados no 20º dia útil de cada mês (item 11 das fichas) e trata a apresentação como aproximada; o corte local é o fim da competência.",
+          "decision_refs": [
+            "CIII-LIM-08"
+          ]
+        },
+        {
+          "id": "dt.submission-deadline",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "O prazo de envio é o 10º dia útil após o fechamento da competência (FAQ Q34; calendário); o PEC local pode conter registros enviados depois.",
+          "decision_refs": [
+            "CIII-LIM-08"
+          ]
+        },
+        {
+          "id": "dt.late-data",
+          "kind": "LATE_SENDING",
+          "local_reading": "Dados enviados depois do prazo são recebidos por até 4 competências só para complementar a informação, não para o cálculo do financiamento (FAQ Q34).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.validation",
+          "kind": "VALIDATION",
+          "local_reading": "O SIAPS valida duplicidade, data de registro, data de envio, profissionais, equipes e estabelecimentos no SCNES da competência e a identificação do usuário, e invalida o dado incompatível (FAQ Q34); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.version-validation",
+          "kind": "VALIDATION",
+          "local_reading": "Desde 01/01/2026 o SIAPS não considera válidos os dados enviados por versões incompatíveis do e-SUS APS, com prazo de 12 meses para as descontinuadas (NT 12/2025); o PEC guarda o dado.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.preliminary",
+          "kind": "REPROCESSING",
+          "local_reading": "O resultado oficial é Dado preliminar desde a v1.4 e pode mudar por atualização ou reprocessamento (manual do SIAPS).",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.load-calendar",
+          "kind": "REPROCESSING",
+          "local_reading": "Cada competência foi carregada por uma versão do SIAPS em data própria (por exemplo abril/2026 só em 23/06/2026), e as notas de lançamento não são um registro completo das cargas.",
+          "decision_refs": []
+        },
+        {
+          "id": "dt.d-rev-4",
+          "kind": "REPROCESSING",
+          "local_reading": "As versões v2.0.1 (29/07/2026) e v2.0.2 (02/09/2026) acrescentaram os rótulos Válida e Homologada e corrigiram a apresentação das equipes válidas na Avaliação do Quadrimestre (D-REV-4).",
+          "decision_refs": []
+        }
+      ],
+      "declared_limitations": [
+        {
+          "id": "oor.payment-valid-months",
+          "what": "Os meses válidos para pagamento e a suspensão (NT 4.1.1) não são observáveis localmente.",
+          "decision_refs": [
+            "CIII-LIM-06"
+          ]
+        },
+        {
+          "id": "oor.new-teams",
+          "what": "A classificação bom das equipes novas até o segundo recálculo (NT 8/2026 §2.6) não é observável localmente.",
+          "decision_refs": [
+            "CIII-LIM-09"
+          ]
+        }
+      ],
+      "declared_conventions": [
+        {
+          "id": "ciii.quarter-mean.with-dash-months",
+          "local_reading": "média simples dos meses com valor, dividida pelo número de meses com valor",
+          "decision_refs": [
+            "CIII-LIM-03"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.8 n7 (K3)"
+        },
+        {
+          "id": "ciii.dash-months.other-indicators",
+          "local_reading": "mês sem denominador em C1, C4, C5, C6 e C7 também sai da média",
+          "decision_refs": [
+            "CIII-LIM-05"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.8 n8 (K3)"
+        },
+        {
+          "id": "ciii.missing-indicator",
+          "local_reading": "indicador sem mês elegível: Nota Final indisponível, sem imputar fator nem renormalizar pesos",
+          "decision_refs": [
+            "CIII-LIM-05"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.8 n9 (K3)"
+        },
+        {
+          "id": "ciii.rounding",
+          "local_reading": "sem arredondamento; faixa sobre o valor exato",
+          "decision_refs": [
+            "CIII-LIM-03"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §6.8 n13 (K3)"
+        },
+        {
+          "id": "common.team.type-reference-date",
+          "local_reading": "tipo da equipe vigente no último dia da competência (`valid_to` exclusivo; sem estado vigente, o mais recente anterior)",
+          "decision_refs": [
+            "CIII-LIM-10"
+          ],
+          "research_ref": "edicoes-oficiais-siaps.md §5 n1 (K3)"
+        }
+      ],
+      "official_readings": {
+        "2025Q1": {
+          "edition": {
+            "id": "nt-06-2025-probable",
+            "source_refs": [
+              "nt-06-2025",
+              "siaps-release-1-4",
+              "siaps-release-2-0-2",
+              "portaria-gm-ms-10994-2026"
+            ]
+          },
+          "readings": {
+            "ciii.weights": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.class-factors": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.indicator-bands": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.final-bands": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.quarter-mean": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.dash-months.c2-c3": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.monthly-rule-versions": {
+              "reading": "SAME",
+              "source_ref": "siaps-release-1-4"
+            },
+            "ciii.team-universe": {
+              "reading": "UNKNOWN",
+              "source_ref": "siaps-release-2-0-2"
+            },
+            "ciii.class-vs-payment": {
+              "reading": "UNKNOWN",
+              "source_ref": "portaria-gm-ms-10994-2026"
+            }
+          }
+        },
+        "2025Q2": {
+          "edition": {
+            "id": "nt-06-2025-probable",
+            "source_refs": [
+              "nt-06-2025",
+              "siaps-release-1-4",
+              "siaps-release-2-0-2",
+              "portaria-gm-ms-10994-2026"
+            ]
+          },
+          "readings": {
+            "ciii.weights": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.class-factors": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.indicator-bands": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.final-bands": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.quarter-mean": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.dash-months.c2-c3": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.monthly-rule-versions": {
+              "reading": "SAME",
+              "source_ref": "siaps-release-1-4"
+            },
+            "ciii.team-universe": {
+              "reading": "UNKNOWN",
+              "source_ref": "siaps-release-2-0-2"
+            },
+            "ciii.class-vs-payment": {
+              "reading": "UNKNOWN",
+              "source_ref": "portaria-gm-ms-10994-2026"
+            }
+          }
+        },
+        "2025Q3": {
+          "edition": {
+            "id": "nt-06-2025-probable",
+            "source_refs": [
+              "nt-06-2025",
+              "siaps-release-1-4",
+              "siaps-release-2-0-2",
+              "portaria-gm-ms-10994-2026"
+            ]
+          },
+          "readings": {
+            "ciii.weights": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.class-factors": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.indicator-bands": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.final-bands": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.quarter-mean": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.dash-months.c2-c3": {
+              "reading": "SAME",
+              "source_ref": "nt-06-2025"
+            },
+            "ciii.monthly-rule-versions": {
+              "reading": "UNKNOWN",
+              "source_ref": "siaps-release-1-4"
+            },
+            "ciii.team-universe": {
+              "reading": "UNKNOWN",
+              "source_ref": "siaps-release-2-0-2"
+            },
+            "ciii.class-vs-payment": {
+              "reading": "UNKNOWN",
+              "source_ref": "portaria-gm-ms-10994-2026"
+            }
+          }
+        },
+        "2026Q1": {
+          "edition": {
+            "id": "nt-08-2026",
+            "source_refs": [
+              "nt-08-2026",
+              "siaps-release-1-8-1",
+              "siaps-release-2-0-2",
+              "portaria-gm-ms-10994-2026"
+            ]
+          },
+          "readings": {
+            "ciii.weights": {
+              "reading": "SAME",
+              "source_ref": "nt-08-2026"
+            },
+            "ciii.class-factors": {
+              "reading": "SAME",
+              "source_ref": "nt-08-2026"
+            },
+            "ciii.indicator-bands": {
+              "reading": "SAME",
+              "source_ref": "nt-08-2026"
+            },
+            "ciii.final-bands": {
+              "reading": "SAME",
+              "source_ref": "nt-08-2026"
+            },
+            "ciii.quarter-mean": {
+              "reading": "SAME",
+              "source_ref": "nt-08-2026"
+            },
+            "ciii.dash-months.c2-c3": {
+              "reading": "SAME",
+              "source_ref": "nt-08-2026"
+            },
+            "ciii.monthly-rule-versions": {
+              "reading": "UNKNOWN",
+              "source_ref": "siaps-release-1-8-1"
+            },
+            "ciii.team-universe": {
+              "reading": "UNKNOWN",
+              "source_ref": "siaps-release-2-0-2"
+            },
+            "ciii.class-vs-payment": {
+              "reading": "UNKNOWN",
+              "source_ref": "portaria-gm-ms-10994-2026"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

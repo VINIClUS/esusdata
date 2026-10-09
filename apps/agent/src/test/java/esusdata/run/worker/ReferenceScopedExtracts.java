@@ -28,6 +28,7 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -72,6 +73,7 @@ public final class ReferenceScopedExtracts {
     private static final String EXTRACT = "extract/";
     private static final String SUPPLEMENT = "supplement/";
     private static final Pattern IBGE = Pattern.compile("\\d{7}");
+    private static final Pattern MONTH = Pattern.compile("\\d{4}-\\d{2}");
 
     private final Path root;
     private final Clock clock;
@@ -224,6 +226,54 @@ public final class ReferenceScopedExtracts {
             fingerprints.put(pack, inputs.localSourceFingerprint());
         }
         return new NotaFinalInputs<>(byPack, InputFingerprint.compute(fingerprints));
+    }
+
+    /**
+     * The sources the partitions kept for one reference revision and rule version were acquired
+     * from, as their sidecars recorded them: what a run that has no PEC (a replay, a gate check)
+     * needs to name the partitions it reads. Nothing is validated here; {@link #loadOrAcquire} still
+     * checks every partition against the identity it is then given.
+     *
+     * @return empty when nothing was kept; more than one when the revision was read from more than
+     *     one source, in which case the caller must not guess
+     */
+    public Set<SourceIdentity> recordedSources(
+            String municipalityIbge, Quadrimestre quadrimestre, String referenceManifestSha256, String ruleVersion)
+            throws IOException {
+        Path rule = root.resolve(municipalityIbge)
+                .resolve(quadrimestre.year() + "Q" + quadrimestre.index())
+                .resolve(referenceManifestSha256)
+                .resolve(ruleVersion);
+        Set<SourceIdentity> sources = new LinkedHashSet<>();
+        if (!Files.isDirectory(rule)) {
+            return sources;
+        }
+        try (Stream<Path> keys = Files.list(rule)) {
+            for (Path key : keys.filter(Files::isDirectory).sorted().toList()) {
+                try (Stream<Path> months = Files.list(key)) {
+                    for (Path month : months.filter(ReferenceScopedExtracts::isPartition)
+                            .sorted()
+                            .toList()) {
+                        Path sidecar = month.resolve(PartitionSidecar.FILE);
+                        if (Files.isRegularFile(sidecar)) {
+                            sources.add(PartitionSidecar.fromJson(Files.readString(sidecar, StandardCharsets.UTF_8))
+                                    .identity());
+                        }
+                    }
+                }
+            }
+        }
+        return sources;
+    }
+
+    /**
+     * A published partition: a directory named as its month. A staging directory a failed acquisition
+     * could not remove ({@code .staging-*}, removal is best-effort) was never published, so the source
+     * its sidecar names is no source of the revision.
+     */
+    private static boolean isPartition(Path month) {
+        return Files.isDirectory(month)
+                && MONTH.matcher(month.getFileName().toString()).matches();
     }
 
     private Loaded loaded(ReferenceExecutionContext context, AcquisitionInputs acquisition) throws IOException {

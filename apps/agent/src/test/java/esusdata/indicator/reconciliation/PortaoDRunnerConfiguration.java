@@ -15,7 +15,7 @@ import java.util.TreeSet;
 import java.util.function.Function;
 
 /**
- * The properties of the two Portão D runners, parsed into a record each so that what a runner
+ * The properties of the Portão D runners, parsed into a record each so that what a runner
  * <em>can</em> be told is a fact of its type and not a habit of its body (spec 2026-10-08 §18):
  *
  * <ul>
@@ -27,12 +27,21 @@ import java.util.function.Function;
  *       directory, none of it under {@code docs/} nor in a Git working tree; {@code periods} only chooses which of the
  *       captured periods it runs, and the purpose of everything it computes is {@link
  *       ReferencePurpose#DIAGNOSTIC}.
+ *   <li>{@link Compatibility} reads the same manifests and the PEC and writes one compatibility
+ *       dossier per reference to {@code dossier-dir}, which may be the versioned directory; its
+ *       per-team detail and log go under the artifact directory. No registry, no policy;
+ *   <li>{@link Replay} regenerates the dossiers of {@code dossier-dir} from the cached artifacts and
+ *       compares bytes. It has no PEC, no execution plane and no period: it refuses to acquire;
+ *   <li>{@link GateRun} checks the GATE declarations of the policy of the repository, which it reads
+ *       from the working tree and from {@code HEAD}. It has no period, no PEC, no manifest or
+ *       dossier directory of its own and no registry (yet).
  * </ul>
  *
- * A property of the other runner, or of the registry, is a refusal rather than something ignored:
- * a command line that mixes the two would otherwise do less than it says without saying so.
- * {@code observatorio.gate.d.mode} chooses the runner; unset, neither runs (the live tests skip),
- * and anything but {@code capture} or {@code diagnostic} is refused.
+ * A property of another runner, or of the registry, is a refusal rather than something ignored: a
+ * command line that mixes them would otherwise do less than it says without saying so. {@code
+ * observatorio.gate.d.mode} chooses the runner; unset, none runs (the live tests skip), and
+ * anything but {@code capture}, {@code diagnostic}, {@code compatibility}, {@code replay} or {@code
+ * gate} is refused.
  */
 final class PortaoDRunnerConfiguration {
 
@@ -48,6 +57,11 @@ final class PortaoDRunnerConfiguration {
     static final String REGISTRY = "observatorio.gate.d.registry";
     static final String REPO_ROOT = "observatorio.gate.d.repo-root";
     static final String POLICY = "observatorio.gate.d.policy";
+    static final String DOSSIER_DIR = "observatorio.gate.d.dossier-dir";
+    static final String PROFILES = "observatorio.gate.d.profiles";
+
+    /** The methodology profiles, relative to the repository root. */
+    static final String DEFAULT_PROFILES = "contracts/indicators/siaps-methodology-profiles.json";
 
     /** The one directory name under which a runner never writes: where the versioned evidence lives. */
     static final String DOCS = "docs";
@@ -56,14 +70,49 @@ final class PortaoDRunnerConfiguration {
     static final String GIT = ".git";
 
     private static final List<String> NOT_FOR_CAPTURE =
-            List.of(ENV_FILE, BINARY, REGISTRY, REPO_ROOT, POLICY, MANIFESTS_DIR, PERIODS);
-    private static final List<String> NOT_FOR_DIAGNOSTIC =
+            List.of(ENV_FILE, BINARY, REGISTRY, REPO_ROOT, POLICY, MANIFESTS_DIR, PERIODS, DOSSIER_DIR, PROFILES);
+    private static final List<String> NOT_FOR_DIAGNOSTIC = List.of(
+            REGISTRY,
+            REPO_ROOT,
+            POLICY,
+            OFFICIAL_EXPORT_DIR,
+            OFFICIAL_EXPORT_IBGE,
+            MANIFEST_OUTPUT,
+            DOSSIER_DIR,
+            PROFILES);
+
+    private static final List<String> NOT_FOR_COMPATIBILITY =
             List.of(REGISTRY, REPO_ROOT, POLICY, OFFICIAL_EXPORT_DIR, OFFICIAL_EXPORT_IBGE, MANIFEST_OUTPUT);
+    private static final List<String> NOT_FOR_REPLAY = List.of(
+            REGISTRY,
+            REPO_ROOT,
+            POLICY,
+            ENV_FILE,
+            BINARY,
+            PERIODS,
+            OFFICIAL_EXPORT_DIR,
+            OFFICIAL_EXPORT_IBGE,
+            MANIFEST_OUTPUT);
+    private static final List<String> NOT_FOR_GATE = List.of(
+            REGISTRY,
+            POLICY,
+            ENV_FILE,
+            BINARY,
+            PERIODS,
+            MANIFESTS_DIR,
+            DOSSIER_DIR,
+            PROFILES,
+            OFFICIAL_EXPORT_DIR,
+            OFFICIAL_EXPORT_IBGE,
+            MANIFEST_OUTPUT);
 
     /** Which runner the properties ask for. */
     enum Mode {
         CAPTURE,
-        DIAGNOSTIC;
+        DIAGNOSTIC,
+        COMPATIBILITY,
+        REPLAY,
+        GATE;
 
         /** The value of {@value PortaoDRunnerConfiguration#MODE}. */
         String value() {
@@ -148,14 +197,97 @@ final class PortaoDRunnerConfiguration {
         }
     }
 
+    /**
+     * The compatibility runner: captured manifests and the PEC in, one dossier per reference out.
+     *
+     * @param manifestsDir the directory of the reference manifests the capture wrote
+     * @param artifactDir the store the manifests' artifacts are in and the extracts are cached under
+     *     ({@code <artifactDir>/extratos}); the per-team detail and the log go to {@code
+     *     <artifactDir>/compatibilidade}
+     * @param dossierDir where the dossiers go; may be {@code docs/indicadores/portoes/compatibilidade},
+     *     the versioned directory, because a dossier carries masked counts and no INE
+     * @param profiles the methodology profiles
+     * @param envFile the PEC secret file
+     * @param binary the execution plane binary
+     * @param periods the captured periods to run; empty runs every captured period
+     */
+    record Compatibility(
+            Path manifestsDir,
+            Path artifactDir,
+            Path dossierDir,
+            Path profiles,
+            Path envFile,
+            String binary,
+            Set<Quadrimestre> periods) {
+
+        Compatibility {
+            periods = Set.copyOf(periods);
+            requireLocal(artifactDir, "the compatibility run", "the per-team detail");
+        }
+
+        static Compatibility parse(Function<String, String> properties) {
+            refuse(properties, NOT_FOR_COMPATIBILITY, Mode.COMPATIBILITY);
+            String envFile = properties.apply(ENV_FILE);
+            return new Compatibility(
+                    Path.of(required(properties, MANIFESTS_DIR)),
+                    Path.of(required(properties, ARTIFACT_DIR)),
+                    Path.of(required(properties, DOSSIER_DIR)),
+                    profilesOf(properties),
+                    envFile == null || envFile.isBlank() ? LivePecAssumptions.ENV_FILE : Path.of(envFile),
+                    required(properties, BINARY),
+                    periodsOf(properties.apply(PERIODS)));
+        }
+    }
+
+    /**
+     * The replay: the dossiers of a directory regenerated from the cached artifacts, byte for byte.
+     *
+     * @param manifestsDir the directory of the reference manifests
+     * @param artifactDir the store and cache of the campaign
+     * @param dossierDir the dossiers to reproduce
+     * @param profiles the methodology profiles
+     */
+    record Replay(Path manifestsDir, Path artifactDir, Path dossierDir, Path profiles) {
+
+        Replay {
+            requireLocal(artifactDir, "the replay", "the regenerated detail");
+        }
+
+        static Replay parse(Function<String, String> properties) {
+            refuse(properties, NOT_FOR_REPLAY, Mode.REPLAY);
+            return new Replay(
+                    Path.of(required(properties, MANIFESTS_DIR)),
+                    Path.of(required(properties, ARTIFACT_DIR)),
+                    Path.of(required(properties, DOSSIER_DIR)),
+                    profilesOf(properties));
+        }
+    }
+
+    /**
+     * The gate check: the GATE declarations of the policy of a repository, and nothing to choose.
+     *
+     * @param repoRoot the root of the repository, whose policy, manifests and dossiers it reads
+     * @param artifactDir the cache of the campaign; the summary goes to {@code <artifactDir>/gate}
+     */
+    record GateRun(Path repoRoot, Path artifactDir) {
+
+        GateRun {
+            requireLocal(artifactDir, "the gate check", "the summary");
+        }
+
+        static GateRun parse(Function<String, String> properties) {
+            refuse(properties, NOT_FOR_GATE, Mode.GATE);
+            return new GateRun(Path.of(required(properties, REPO_ROOT)), Path.of(required(properties, ARTIFACT_DIR)));
+        }
+    }
+
     private PortaoDRunnerConfiguration() {}
 
     /**
      * The runner the properties ask for.
      *
      * @return empty when {@value #MODE} is not set
-     * @throws IllegalArgumentException when it is set to anything but {@code capture} or {@code
-     *     diagnostic}
+     * @throws IllegalArgumentException when it is set to anything but a runner of {@link Mode}
      */
     static Optional<Mode> modeOf(Function<String, String> properties) {
         String value = properties.apply(MODE);
@@ -167,7 +299,31 @@ final class PortaoDRunnerConfiguration {
                 return Optional.of(mode);
             }
         }
-        throw new IllegalArgumentException("unknown " + MODE + ": use capture or diagnostic");
+        throw new IllegalArgumentException(
+                "unknown " + MODE + ": use capture, diagnostic, compatibility, replay or gate");
+    }
+
+    /** The methodology profiles: the property, or the contract file of the repository. */
+    private static Path profilesOf(Function<String, String> properties) {
+        String given = properties.apply(PROFILES);
+        if (given != null && !given.isBlank()) {
+            return Path.of(given);
+        }
+        Path fromTheRoot = Path.of(DEFAULT_PROFILES);
+        Path fromTheModule = Path.of("..", "..").resolve(DEFAULT_PROFILES);
+        return !Files.isRegularFile(fromTheRoot) && Files.isRegularFile(fromTheModule) ? fromTheModule : fromTheRoot;
+    }
+
+    /** Where nothing carrying a team's INE is written: not under {@code docs/}, not in a Git working tree. */
+    private static void requireLocal(Path artifactDir, String runner, String what) {
+        if (leadsUnder(artifactDir, DOCS)) {
+            throw new IllegalArgumentException(
+                    runner + " never writes " + what + " under " + DOCS + "/: " + ARTIFACT_DIR);
+        }
+        if (isInAGitWorkingTree(artifactDir)) {
+            throw new IllegalArgumentException(runner + " never writes " + what
+                    + " in a Git working tree, where an add would stage it: " + ARTIFACT_DIR);
+        }
     }
 
     private static void refuse(Function<String, String> properties, List<String> forbidden, Mode mode) {

@@ -3,10 +3,13 @@ package esusdata.indicator.reconciliation;
 import esusdata.indicator.IndicatorRuleRegistry;
 import esusdata.indicator.model.IndicatorRule;
 import esusdata.indicator.model.Quadrimestre;
+import esusdata.indicator.model.RuleOutcome;
 import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.pack.componente3.ComponentIII;
 import esusdata.indicator.reconciliation.DiagnosticMatrix.Cell;
+import esusdata.indicator.reconciliation.DiagnosticMatrix.ProbeRow;
 import esusdata.indicator.reconciliation.DiagnosticMatrix.Row;
+import esusdata.indicator.reconciliation.ProbeContext.PackProbeContext;
 import esusdata.run.acquisition.PecAcquisitionException;
 import esusdata.run.worker.AcquisitionInputs;
 import esusdata.run.worker.QuadrimestreContext;
@@ -14,7 +17,6 @@ import esusdata.run.worker.ReferenceScopedExtracts;
 import esusdata.run.worker.ReferenceScopedExtracts.NotaFinalContext;
 import esusdata.run.worker.ReferenceScopedExtracts.NotaFinalInputs;
 import esusdata.run.worker.ReferenceScopedExtracts.QuadrimestreInputs;
-import esusdata.run.worker.SensitivityExtracts.PackInput;
 import esusdata.run.worker.SourceIdentity;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -30,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -47,6 +50,10 @@ import java.util.stream.Stream;
  * a registry. A cell that cannot be computed is an {@link Cell#ERROR} row with its reason, and the
  * others are still computed.
  *
+ * <p>When a probe catalog is given, the methodology probes of each pack (spec §9.4) run on the very
+ * inputs and baseline of the cell, and their versioned results join the matrix as diagnostics: a
+ * probe that fails is a row of its own and never takes the verdict of the cell with it.
+ *
  * <p>The Nota Final of an official export is computed from C1 to C7 of the <em>same export</em>:
  * the manifests of the same period whose {@code raw_sha256} is its own. If one of the seven is
  * missing it is {@link Cell#PENDING} and says so; no other revision is substituted. It reads the
@@ -63,9 +70,10 @@ final class PortaoDDiagnosticRun {
     private final Clock clock;
     private final String municipalityIbge;
     private final Map<Quadrimestre, List<Reference>> byPeriod;
+    private final Function<String, List<MethodologyProbe>> probes;
 
     /** A captured revision of the official reference of one pack, as the run reads it. */
-    private record Reference(SiapsReferenceManifest manifest, GatePack pack, Quadrimestre period, String sha256) {
+    record Reference(SiapsReferenceManifest manifest, GatePack pack, Quadrimestre period, String sha256) {
 
         String id() {
             return manifest.referenceId();
@@ -77,12 +85,14 @@ final class PortaoDDiagnosticRun {
             ReferenceScopedExtracts extracts,
             Clock clock,
             String municipalityIbge,
-            Map<Quadrimestre, List<Reference>> byPeriod) {
+            Map<Quadrimestre, List<Reference>> byPeriod,
+            Function<String, List<MethodologyProbe>> probes) {
         this.store = store;
         this.extracts = extracts;
         this.clock = clock;
         this.municipalityIbge = municipalityIbge;
         this.byPeriod = byPeriod;
+        this.probes = probes;
     }
 
     /**
@@ -99,22 +109,25 @@ final class PortaoDDiagnosticRun {
             ReferenceScopedExtracts extracts,
             Clock clock)
             throws IOException {
-        List<Reference> references = new ArrayList<>();
-        try (Stream<Path> files = Files.list(manifestsDir)) {
-            for (Path file : files.filter(path -> path.getFileName().toString().endsWith(".json"))
-                    .sorted()
-                    .toList()) {
-                references.add(read(file));
-            }
-        }
-        if (references.isEmpty()) {
-            throw new IllegalStateException("the manifests directory has no reference manifest: run the capture first");
-        }
+        return open(manifestsDir, artifactDir, requested, extracts, clock, pack -> List.of());
+    }
+
+    /**
+     * As {@link #open(Path, Path, Set, ReferenceScopedExtracts, Clock)}, with the methodology probes
+     * of each pack, e.g. {@code MethodologyProbeCatalog::forPack}.
+     *
+     * @param probes the probes to run on a pack, by pack id
+     */
+    static PortaoDDiagnosticRun open(
+            Path manifestsDir,
+            Path artifactDir,
+            Set<Quadrimestre> requested,
+            ReferenceScopedExtracts extracts,
+            Clock clock,
+            Function<String, List<MethodologyProbe>> probes)
+            throws IOException {
+        List<Reference> references = captured(manifestsDir);
         String municipality = references.getFirst().manifest().municipalityIbge();
-        if (references.stream()
-                .anyMatch(reference -> !municipality.equals(reference.manifest().municipalityIbge()))) {
-            throw new IllegalStateException("the manifests are about more than one municipality");
-        }
         Map<Quadrimestre, List<Reference>> byPeriod = new TreeMap<>();
         for (Reference reference : references) {
             byPeriod.computeIfAbsent(reference.period(), unused -> new ArrayList<>())
@@ -131,10 +144,36 @@ final class PortaoDDiagnosticRun {
         }
         byPeriod.values().forEach(list -> list.sort(order()));
         return new PortaoDDiagnosticRun(
-                new ReferenceArtifactStore(artifactDir), extracts, clock, municipality, byPeriod);
+                new ReferenceArtifactStore(artifactDir), extracts, clock, municipality, byPeriod, probes);
     }
 
-    private static Comparator<Reference> order() {
+    /**
+     * Every reference manifest of {@code manifestsDir}, in file order: each {@code .json} file there
+     * must be a team reference manifest named by its reference id, and all must be about one
+     * municipality. The hash of a reference is the one of the bytes of its manifest, which is what
+     * the extracts cache is keyed by.
+     */
+    static List<Reference> captured(Path manifestsDir) throws IOException {
+        List<Reference> references = new ArrayList<>();
+        try (Stream<Path> files = Files.list(manifestsDir)) {
+            for (Path file : files.filter(path -> path.getFileName().toString().endsWith(".json"))
+                    .sorted()
+                    .toList()) {
+                references.add(read(file));
+            }
+        }
+        if (references.isEmpty()) {
+            throw new IllegalStateException("the manifests directory has no reference manifest: run the capture first");
+        }
+        String municipality = references.getFirst().manifest().municipalityIbge();
+        if (references.stream()
+                .anyMatch(reference -> !municipality.equals(reference.manifest().municipalityIbge()))) {
+            throw new IllegalStateException("the manifests are about more than one municipality");
+        }
+        return references;
+    }
+
+    static Comparator<Reference> order() {
         List<GatePack> packs = GatePack.allWithNotaFinal();
         return Comparator.comparingInt((Reference reference) -> packs.indexOf(reference.pack()))
                 .thenComparingInt(reference -> revisionOf(reference.id()));
@@ -148,7 +187,7 @@ final class PortaoDDiagnosticRun {
         return Integer.parseInt(revision.group(1));
     }
 
-    private static Reference read(Path file) throws IOException {
+    static Reference read(Path file) throws IOException {
         String name = file.getFileName().toString();
         if (!MANIFEST_FILE.matcher(name).matches()) {
             throw new IllegalArgumentException(
@@ -199,10 +238,12 @@ final class PortaoDDiagnosticRun {
         }
         List<PeriodExecutionPlan> plan = PublishedPeriodCoverage.plan(periods(), localCoverage);
         List<Row> rows = new ArrayList<>();
+        List<ProbeRow> probeRows = new ArrayList<>();
         for (PeriodExecutionPlan period : plan) {
-            rows.addAll(period.runs() ? runPeriod(period.quadrimestre(), source, acquisition) : notRun(period));
+            rows.addAll(
+                    period.runs() ? runPeriod(period.quadrimestre(), source, acquisition, probeRows) : notRun(period));
         }
-        return new DiagnosticMatrix(clock.instant(), source, plan, rows);
+        return new DiagnosticMatrix(clock.instant(), source, plan, rows, probeRows);
     }
 
     private List<Reference> referencesOf(Quadrimestre period, GatePack pack) {
@@ -226,7 +267,8 @@ final class PortaoDDiagnosticRun {
         return rows;
     }
 
-    private List<Row> runPeriod(Quadrimestre period, SourceIdentity source, AcquisitionInputs acquisition) {
+    private List<Row> runPeriod(
+            Quadrimestre period, SourceIdentity source, AcquisitionInputs acquisition, List<ProbeRow> probeRows) {
         List<Row> rows = new ArrayList<>();
         for (GatePack pack : GatePack.allWithNotaFinal()) {
             List<Reference> references = referencesOf(period, pack);
@@ -235,20 +277,24 @@ final class PortaoDDiagnosticRun {
             }
             for (Reference reference : references) {
                 rows.add(
-                        pack.isNotaFinal() ? notaFinalRow(reference, source) : packRow(reference, source, acquisition));
+                        pack.isNotaFinal()
+                                ? notaFinalRow(reference, source)
+                                : packRow(reference, source, acquisition, probeRows));
             }
         }
         return rows;
     }
 
-    private Row packRow(Reference reference, SourceIdentity source, AcquisitionInputs acquisition) {
+    private Row packRow(
+            Reference reference, SourceIdentity source, AcquisitionInputs acquisition, List<ProbeRow> probeRows) {
         try {
             IndicatorRule rule = ruleOf(reference.pack());
             ValidatedReference official =
                     ValidatedReference.fromStored(store.load(reference.manifest()), reference.pack());
             QuadrimestreInputs inputs =
                     extracts.loadOrAcquireQuadrimestre(contextOf(reference, rule, source), acquisition);
-            LocalClasses local = LocalClasses.of(rule, reference.period(), monthly(inputs, reference.period()));
+            List<RuleOutcome> baseline = baseline(inputs);
+            LocalClasses local = LocalClasses.of(rule, reference.period(), monthly(baseline, reference.period()));
             PackVerdict verdict = PackVerdict.evaluate(
                     reference.pack(),
                     rule.descriptor().ruleVersion(),
@@ -256,6 +302,7 @@ final class PortaoDDiagnosticRun {
                     official,
                     local,
                     inputs.localSourceFingerprint());
+            probeRows.addAll(probe(reference, official, inputs, baseline));
             return Row.of(reference.period(), reference.id(), verdict);
         } catch (IOException
                 | IllegalStateException
@@ -264,6 +311,42 @@ final class PortaoDDiagnosticRun {
                 | PecAcquisitionException failure) {
             return Row.failed(reference.period(), reference.pack(), reference.id(), failure);
         }
+    }
+
+    /**
+     * Runs the probes of the pack on the inputs and baseline of its cell. A probe, or a context, that
+     * fails is recorded as a failed probe row: the verdict of the cell does not depend on it.
+     */
+    private List<ProbeRow> probe(
+            Reference reference, ValidatedReference official, QuadrimestreInputs inputs, List<RuleOutcome> baseline) {
+        List<MethodologyProbe> catalog = probes.apply(reference.pack().packId());
+        List<ProbeRow> rows = new ArrayList<>();
+        PackProbeContext context;
+        try {
+            context = new PackProbeContext(
+                    reference.period(),
+                    inputs.months(),
+                    baseline,
+                    official,
+                    reference.manifest(),
+                    inputs.localSourceFingerprint());
+        } catch (IllegalArgumentException | IllegalStateException failure) {
+            catalog.forEach(probe -> rows.add(failedProbe(reference, probe, failure)));
+            return rows;
+        }
+        for (MethodologyProbe probe : catalog) {
+            try {
+                rows.add(ProbeRow.of(
+                        reference.period(), reference.pack().code(), reference.id(), probe.evaluate(context)));
+            } catch (IllegalArgumentException | IllegalStateException | UnsupportedOperationException failure) {
+                rows.add(failedProbe(reference, probe, failure));
+            }
+        }
+        return rows;
+    }
+
+    private static ProbeRow failedProbe(Reference reference, MethodologyProbe probe, RuntimeException failure) {
+        return ProbeRow.failed(reference.period(), reference.pack().code(), reference.id(), probe.id(), failure);
     }
 
     private Row notaFinalRow(Reference reference, SourceIdentity source) {
@@ -337,20 +420,28 @@ final class PortaoDDiagnosticRun {
                 source);
     }
 
+    /** The outcome of the rule on each of the four months, in the order of the quadrimestre. */
+    static List<RuleOutcome> baseline(QuadrimestreInputs inputs) {
+        return inputs.months().stream()
+                .map(input -> input.rule().evaluate(input.data(), input.context()))
+                .toList();
+    }
+
     /** The ungated monthly team results of the four months, in the order of the quadrimestre. */
     private static Map<YearMonth, List<TeamResult>> monthly(QuadrimestreInputs inputs, Quadrimestre period) {
+        return monthly(baseline(inputs), period);
+    }
+
+    static Map<YearMonth, List<TeamResult>> monthly(List<RuleOutcome> baseline, Quadrimestre period) {
         Map<YearMonth, List<TeamResult>> months = new LinkedHashMap<>();
         List<YearMonth> calendar = period.months();
         for (int at = 0; at < calendar.size(); at++) {
-            PackInput input = inputs.months().get(at);
-            months.put(
-                    calendar.get(at),
-                    input.rule().evaluate(input.data(), input.context()).teams());
+            months.put(calendar.get(at), baseline.get(at).teams());
         }
         return months;
     }
 
-    private static IndicatorRule ruleOf(GatePack pack) {
+    static IndicatorRule ruleOf(GatePack pack) {
         return IndicatorRuleRegistry.all().stream()
                 .filter(rule -> rule.descriptor().id().equals(pack.packId()))
                 .findFirst()

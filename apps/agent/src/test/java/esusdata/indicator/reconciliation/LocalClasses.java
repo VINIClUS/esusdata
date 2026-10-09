@@ -10,6 +10,7 @@ import esusdata.indicator.model.TeamResult;
 import esusdata.indicator.pack.componente3.ComponentIII;
 import esusdata.indicator.pack.componente3.ComponentIIIInput;
 import esusdata.indicator.pack.componente3.ComponentIIIResult;
+import esusdata.indicator.reconciliation.OfficialFieldComparison.Values;
 import esusdata.result.ResultJson;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -39,6 +40,11 @@ public record LocalClasses(Map<String, Classification> byIne, Set<String> seen) 
 
     /** The INE the DW gives the encounters of no team. */
     static final String NO_TEAM = "-";
+
+    /** The decimals the SIAPS shows a result or a note with. */
+    private static final int SHOWN_DECIMALS = 2;
+
+    private static final String NO_RESULTS = "no results for ";
 
     public LocalClasses {
         byIne = Map.copyOf(byIne);
@@ -78,7 +84,7 @@ public record LocalClasses(Map<String, Classification> byIne, Set<String> seen) 
             IndicatorRule rule, Quadrimestre quadrimestre, Map<YearMonth, List<TeamResult>> monthly) {
         List<YearMonth> missing = missingMonths(quadrimestre, monthly);
         if (!missing.isEmpty()) {
-            throw new IllegalArgumentException("no results for " + missing);
+            throw new IllegalArgumentException(NO_RESULTS + missing);
         }
         String pack = rule.descriptor().id();
         Consolidation consolidation = consolidate(quadrimestre, Map.of(pack, rule), Map.of(pack, monthly));
@@ -105,7 +111,7 @@ public record LocalClasses(Map<String, Classification> byIne, Set<String> seen) 
             Quadrimestre quadrimestre, Map<String, Map<YearMonth, List<TeamResult>>> byPack) {
         List<String> missing = missingNotaFinalInputs(quadrimestre, byPack);
         if (!missing.isEmpty()) {
-            throw new IllegalArgumentException("no results for " + missing);
+            throw new IllegalArgumentException(NO_RESULTS + missing);
         }
         Map<String, IndicatorRule> rules = new LinkedHashMap<>();
         for (IndicatorRule rule : IndicatorRuleRegistry.all()) {
@@ -121,6 +127,74 @@ public record LocalClasses(Map<String, Classification> byIne, Set<String> seen) 
             }
         }
         return new LocalClasses(classes, consolidation.seen());
+    }
+
+    /**
+     * The quadrimestral figures of every team of one pack, as the official export shows them: the
+     * result (the exact mean of the months, shown with two decimals, HALF_UP) and the concept. A team
+     * with no computed mean has no entry. The Nota Final fields stay {@code null}.
+     *
+     * @throws IllegalArgumentException when a month of the quadrimestre is missing altogether
+     */
+    static Map<String, Values> fieldsOf(
+            IndicatorRule rule, Quadrimestre quadrimestre, Map<YearMonth, List<TeamResult>> monthly) {
+        List<YearMonth> missing = missingMonths(quadrimestre, monthly);
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException(NO_RESULTS + missing);
+        }
+        String pack = rule.descriptor().id();
+        Map<String, Values> fields = new TreeMap<>();
+        for (ComponentIIIResult.UnitResult unit : consolidate(quadrimestre, Map.of(pack, rule), Map.of(pack, monthly))
+                .result()
+                .units()) {
+            unit.indicators().stream()
+                    .filter(indicator -> indicator.indicatorPack().equals(pack))
+                    .filter(indicator ->
+                            indicator.status() == IndicatorStatus.COMPUTED && indicator.classification() != null)
+                    .findFirst()
+                    .ifPresent(indicator -> fields.put(
+                            unit.ine(),
+                            new Values(
+                                    indicator.mean().toScaledBigDecimal(SHOWN_DECIMALS),
+                                    indicator.classification(),
+                                    null,
+                                    null)));
+        }
+        return fields;
+    }
+
+    /**
+     * The final note ({@code Σ factor × weight}, two decimals) and final class of every team the
+     * Nota Final computes for; the indicator fields stay {@code null}.
+     *
+     * @throws IllegalArgumentException when a pack or month of the quadrimestre is missing altogether
+     */
+    static Map<String, Values> notaFinalFieldsOf(
+            Quadrimestre quadrimestre, Map<String, Map<YearMonth, List<TeamResult>>> byPack) {
+        List<String> missing = missingNotaFinalInputs(quadrimestre, byPack);
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException(NO_RESULTS + missing);
+        }
+        Map<String, IndicatorRule> rules = new LinkedHashMap<>();
+        for (IndicatorRule rule : IndicatorRuleRegistry.all()) {
+            rules.put(rule.descriptor().id(), rule);
+        }
+        Map<String, Values> fields = new TreeMap<>();
+        for (ComponentIIIResult.UnitResult unit :
+                consolidate(quadrimestre, rules, byPack).result().units()) {
+            if (unit.ine() != null
+                    && unit.status() == IndicatorStatus.COMPUTED
+                    && unit.methodologicalClassification() != null) {
+                fields.put(
+                        unit.ine(),
+                        new Values(
+                                null,
+                                null,
+                                unit.score().toScaledBigDecimal(SHOWN_DECIMALS),
+                                unit.methodologicalClassification()));
+            }
+        }
+        return fields;
     }
 
     private record Consolidation(ComponentIIIResult result, Set<String> seen) {}

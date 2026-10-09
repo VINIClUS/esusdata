@@ -4,7 +4,10 @@ import esusdata.indicator.model.Quadrimestre;
 import esusdata.indicator.reconciliation.Comparison.RowResult;
 import esusdata.run.worker.SourceIdentity;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -19,8 +22,14 @@ import java.util.Objects;
  * @param source the PEC the extracts were read from
  * @param plan what was decided for each period
  * @param rows the matrix
+ * @param probes what each methodology probe of the catalog measured on each pack and period it ran on
  */
-record DiagnosticMatrix(Instant generatedAt, SourceIdentity source, List<PeriodExecutionPlan> plan, List<Row> rows) {
+record DiagnosticMatrix(
+        Instant generatedAt,
+        SourceIdentity source,
+        List<PeriodExecutionPlan> plan,
+        List<Row> rows,
+        List<ProbeRow> probes) {
 
     /** A cell is a verdict of the pack, or why there is none. */
     enum Cell {
@@ -140,9 +149,61 @@ record DiagnosticMatrix(Instant generatedAt, SourceIdentity source, List<PeriodE
         }
 
         /** Shortened, and any run of ten or more digits (an INE could be one) replaced. */
-        private static String redacted(String text) {
+        static String redacted(String text) {
             String clean = text == null ? "" : text.replaceAll(LONG_NUMBER, "<n>");
             return clean.length() > REASON_LIMIT ? clean.substring(0, REASON_LIMIT) + "..." : clean;
+        }
+    }
+
+    /**
+     * What one methodology probe measured on one pack of one period (spec §9.4), in the only form
+     * that may leave the machine: {@link ProbeResult#versionedForm()}, masked counts and no INE. The
+     * probe's local detail travels in {@code localDetail}, which the matrix files never carry.
+     *
+     * @param result the versioned form of the result, or of the failure ({@code observability} {@code
+     *     ERROR} and a redacted reason)
+     * @param localDetail local-only lines, possibly per team
+     */
+    record ProbeRow(
+            Quadrimestre period,
+            String pack,
+            String referenceId,
+            Map<String, String> result,
+            List<String> localDetail) {
+
+        static final String ERROR = "ERROR";
+
+        ProbeRow {
+            Objects.requireNonNull(period, "period");
+            Objects.requireNonNull(pack, "pack");
+            Objects.requireNonNull(referenceId, "referenceId");
+            result = Collections.unmodifiableMap(new LinkedHashMap<>(result));
+            localDetail = List.copyOf(localDetail);
+        }
+
+        static ProbeRow of(Quadrimestre period, String pack, String referenceId, ProbeResult result) {
+            return new ProbeRow(period, pack, referenceId, result.versionedForm(), result.localDetail());
+        }
+
+        /** A probe that could not run: the kind of failure and its message, with no long number in it. */
+        static ProbeRow failed(
+                Quadrimestre period, String pack, String referenceId, String probeId, RuntimeException failure) {
+            Map<String, String> form = new LinkedHashMap<>();
+            form.put("probe_id", probeId);
+            form.put("observability", ERROR);
+            form.put("reason", Row.redacted(failure.getClass().getSimpleName() + ": " + failure.getMessage()));
+            return new ProbeRow(period, pack, referenceId, form, List.of());
+        }
+
+        boolean failed() {
+            return ERROR.equals(result.get("observability"));
+        }
+
+        /** The versioned form only: a log line or an assertion message must not carry the local detail. */
+        @Override
+        public String toString() {
+            return "ProbeRow[" + SiapsFormats.quadrimestre(period) + " " + pack + " " + referenceId + " " + result
+                    + "]";
         }
     }
 
@@ -151,6 +212,12 @@ record DiagnosticMatrix(Instant generatedAt, SourceIdentity source, List<PeriodE
         Objects.requireNonNull(source, "source");
         plan = List.copyOf(plan);
         rows = List.copyOf(rows);
+        probes = List.copyOf(probes);
+    }
+
+    /** The probes that could not run. */
+    List<ProbeRow> probeErrors() {
+        return probes.stream().filter(ProbeRow::failed).toList();
     }
 
     /** Always {@link ReferencePurpose#DIAGNOSTIC}. */

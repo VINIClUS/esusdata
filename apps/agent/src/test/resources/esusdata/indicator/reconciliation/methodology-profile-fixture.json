@@ -1,0 +1,133 @@
+{
+  "schema_version": "1",
+  "sources": [
+    {
+      "id": "fx-ficha-2025",
+      "title": "Fixture: ficha de qualificação do indicador, edição 2025",
+      "url": "https://example.org/fixture/ficha-2025",
+      "published": "2025-02-03",
+      "kind": "FICHA"
+    },
+    {
+      "id": "fx-nt-2026",
+      "title": "Fixture: nota técnica 1/2026",
+      "url": "https://example.org/fixture/nt-1-2026",
+      "published": "2026-03-10",
+      "kind": "TECHNICAL_NOTE"
+    },
+    {
+      "id": "fx-release-4-2",
+      "title": "Fixture: release 4.2 do SIAPS",
+      "url": "https://example.org/fixture/release-4-2",
+      "published": "2026-05-20",
+      "kind": "SIAPS_RELEASE"
+    }
+  ],
+  "profiles": [
+    {
+      "pack": "fixture-pack",
+      "rule_version": "fixture-pack@1.0.0",
+      "dimensions": [
+        {
+          "id": "fx.cohort.anchor-date",
+          "local_reading": "The cohort is anchored on the first visit of the quadrimestre.",
+          "decision_refs": ["AMB-FX-01"],
+          "probe_id": "fx.cohort.anchor-date"
+        },
+        {
+          "id": "fx.visits.same-day",
+          "local_reading": "Two visits on the same day count once.",
+          "decision_refs": ["AMB-FX-02", "LACUNA-L3"],
+          "probe_id": "fx.visits.same-day"
+        },
+        {
+          "id": "fx.team.credit",
+          "local_reading": "A visit by an eAP is credited to the team the person is registered with.",
+          "decision_refs": [],
+          "probe_id": "fx.team.credit"
+        }
+      ],
+      "data_timing": [
+        {
+          "id": "fx.timing.transmission-cutoff",
+          "kind": "TRANSMISSION_CUTOFF",
+          "local_reading": "The local result is cut at the end of the month, not at the 20th business day.",
+          "decision_refs": ["FX-LIM-01"]
+        },
+        {
+          "id": "fx.timing.late-sending",
+          "kind": "LATE_SENDING",
+          "local_reading": "Whatever the PEC holds when the extract runs counts, sent late or not.",
+          "decision_refs": ["FX-LIM-01"]
+        },
+        {
+          "id": "fx.timing.reprocessing",
+          "kind": "REPROCESSING",
+          "local_reading": "The local result is recomputed from the extract and never reprocessed on a schedule.",
+          "decision_refs": []
+        }
+      ],
+      "declared_limitations": [
+        {
+          "id": "fx.limitation.person-identification",
+          "what": "The local rule cannot see the national registry, so a person is identified by the local key only.",
+          "decision_refs": ["FX-LIM-02"]
+        }
+      ],
+      "declared_conventions": [
+        {
+          "id": "fx.convention.team-type-date",
+          "local_reading": "The team type is read at the reference date of the quadrimestre.",
+          "decision_refs": ["AMB-FX-03"],
+          "research_ref": "fixture-research.md section 1 (K3)",
+          "probe_id": "fx.convention.team-type-date"
+        }
+      ],
+      "official_readings": {
+        "2025Q3": {
+          "edition": { "id": "fixture-2025-v1", "source_refs": ["fx-ficha-2025"] },
+          "readings": {
+            "fx.cohort.anchor-date": { "reading": "SAME", "source_ref": "fx-ficha-2025" },
+            "fx.visits.same-day": { "reading": "SAME", "source_ref": "fx-ficha-2025" },
+            "fx.team.credit": { "reading": "UNKNOWN", "source_ref": "fx-ficha-2025" }
+          }
+        },
+        "2026Q1": {
+          "edition": { "id": "fixture-2026-v1", "source_refs": ["fx-nt-2026", "fx-release-4-2"] },
+          "readings": {
+            "fx.cohort.anchor-date": { "reading": "SAME", "source_ref": "fx-nt-2026" },
+            "fx.visits.same-day": {
+              "reading": "DIFFERENT",
+              "official_reading_text": "Each visit counts, even when two happen on the same day.",
+              "source_ref": "fx-release-4-2"
+            },
+            "fx.team.credit": { "reading": "SAME", "source_ref": "fx-nt-2026" }
+          }
+        }
+      }
+    },
+    {
+      "pack": "fixture-pack",
+      "rule_version": "fixture-pack@1.1.0",
+      "dimensions": [
+        {
+          "id": "fx.cohort.anchor-date",
+          "local_reading": "The cohort is anchored on the first visit of the quadrimestre.",
+          "decision_refs": ["AMB-FX-01"],
+          "probe_id": "fx.cohort.anchor-date"
+        }
+      ],
+      "data_timing": [],
+      "declared_limitations": [],
+      "declared_conventions": [],
+      "official_readings": {
+        "2026Q1": {
+          "edition": { "id": "fixture-2026-v1", "source_refs": ["fx-nt-2026"] },
+          "readings": {
+            "fx.cohort.anchor-date": { "reading": "SAME", "source_ref": "fx-nt-2026" }
+          }
+        }
+      }
+    }
+  ]
+}

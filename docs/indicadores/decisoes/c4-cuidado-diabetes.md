@@ -140,8 +140,11 @@ Princípios, nesta ordem: **P1** ficha literal; **P2** NT 8/2026 e outros atos o
 | C4-LIM-18 (nova) | P07: crédito de D para eAP 76 | DECLARED_CONVENTION | «D creditada integralmente (20 pontos) para n pessoas de equipes eAP 76, conforme o item 24 b; observada em m.» |
 | C4-LIM-19 (nova; após `team` VALIDATED) | Regra de tipo de equipe | DECLARED_CONVENTION | «Só equipes de tipo 70 ou 76 vigente no fim da competência entram; equipes de outro tipo, conflitantes ou sem tipo ficam fora, com motivo e contagem.» |
 | C4-LIM-20 | UNKNOWN_STATUS | DECLARED_CONVENTION | «n pessoas com situação de condição nula ou fora de 0/1/2 foram mantidas como não resolvidas.» |
+| C4-LIM-21 (nova; declarada para o Portão D, entra em `STANDING_LIMITATIONS` na próxima `rule_version` de C4) | Identificação conforme CadSUS (item 24 a) | OUT_OF_REACH | «A conformidade da identificação com o CadSUS não é conferida.» |
 
-Totais: **3 BLOCKING_GAP** (LIM-03 até `team`; LIM-05 e LIM-07 até o inventário e a leitura de C4-D4), 6 OUT_OF_REACH (01, 02, 06, 08, 09, 12; mais LIM-07 se o inventário provar que o campo não existe), 11 DECLARED_CONVENTION (04, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20).
+Totais: **3 BLOCKING_GAP** (LIM-03 até `team`; LIM-05 e LIM-07 até o inventário e a leitura de C4-D4), 7 OUT_OF_REACH (01, 02, 06, 08, 09, 12, 21; mais LIM-07 se o inventário provar que o campo não existe), 11 DECLARED_CONVENTION (04, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20).
+
+C4-LIM-21 (2026-10-09) corrige uma omissão: os outros packs declaram a identificação no CadSUS, e a nota de edições oficiais (`docs/indicadores/portoes/edicoes-oficiais-siaps.md`, seção 7) a lista para C1 a C7 (`oor.cadsus-identification`). O texto é o de C5-LIM-07 e C6-LIM-07. Nada no cálculo muda; a lista publicada pela regra compilada de C4 segue sem ela até a próxima `rule_version` de C4 (subir a versão agora anularia o Portão A, ADR 0032).
 
 ## Resumo
 
