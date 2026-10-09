@@ -142,7 +142,7 @@ class MethodologyProbeContractTest {
                 LocalDateTime.parse("2026-10-08T11:00:00"),
                 OfficialStatus.FINAL,
                 "SIAPS fixture",
-                "export.csv",
+                SiapsReferenceManifest.sourceFilenameOf("a".repeat(64)),
                 "a".repeat(64),
                 "b".repeat(64),
                 "siaps-team-export@1",

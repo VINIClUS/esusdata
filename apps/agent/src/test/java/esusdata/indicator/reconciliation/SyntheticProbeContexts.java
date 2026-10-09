@@ -75,7 +75,7 @@ public final class SyntheticProbeContexts {
                 LocalDateTime.parse("2026-10-08T11:00:00"),
                 OfficialStatus.FINAL,
                 "synthetic probe context",
-                "synthetic.csv",
+                SiapsReferenceManifest.sourceFilenameOf("a".repeat(64)),
                 "a".repeat(64),
                 "b".repeat(64),
                 OfficialTeamExportCsvParser.PARSER_VERSION,
