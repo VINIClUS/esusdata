@@ -69,7 +69,7 @@ public final class ReferencePolicy {
     private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
     private static final Pattern DOSSIER_REF = Pattern.compile(Pattern.quote(DOSSIER_DIR) + "[a-z0-9-]+\\.json");
     private static final Pattern DATE_LIKE = Pattern.compile(
-            "(?i).*(date|_at|since|until|after|before|latest|newest|recent|floor|signed|signature|valid|expire|deadline|cutoff).*");
+            "(?i)date|_at|since|until|after|before|latest|newest|recent|floor|signed|signature|valid|expire|deadline|cutoff");
 
     /** Strict reading: a repeated key or trailing content is a broken contract, not a last-one-wins. */
     private static final ObjectMapper MAPPER = JsonMapper.builder()
@@ -324,7 +324,7 @@ public final class ReferencePolicy {
         void done() {
             for (String name : node.propertyNames()) {
                 if (!read.contains(name)) {
-                    String hint = DATE_LIKE.matcher(name).matches()
+                    String hint = DATE_LIKE.matcher(name).find()
                             ? " (a reference is chosen by its id, never by a date or by recency)"
                             : "";
                     throw invalid(where + " has unknown field " + name + hint);
