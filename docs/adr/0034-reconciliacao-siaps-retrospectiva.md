@@ -179,6 +179,20 @@ fazem 60 anos, em 10 a 14 das 14 equipes.
   dossiês que o citam. Se o canal do SIAPS ou os campos oficiais estabelecerem a leitura, a convenção volta a
   ser dimensão.
 
+**Consequências do desenho.**
+- Todo pack tem a convenção comum do tipo de equipe (`common.team.type-reference-date`), então `EXACT` não
+  ocorre em produção. Isso é coerente: `EXACT` e `EQUIVALENT_FOR_REFERENCE` tornam a referência `GATE` do
+  mesmo modo.
+- O tipo de equipe lido por `CURRENT_FALLBACK` deixa de ser guardado pelo probe comum, que é convenção. Vai
+  para `coverage`: uma equipe da revisão lida por fallback, num mês, com tipo diferente do da revisão torna o
+  dossiê `INCONCLUSIVE`. Nos quatro quadrimestres publicados, as 14 equipes eSF e eAP da revisão resolvem o
+  tipo por auditoria em todo mês, igual ao da revisão.
+- Um probe que cita limitação não declarada no perfil é erro de código, não resultado: o avaliador recusa,
+  e o teste de consistência dos perfis falha.
+- A Nota Final é a soma dos sete packs: se a referência irmã de algum pack não for `EXACT` nem
+  `EQUIVALENT_FOR_REFERENCE`, o dossiê da Nota Final é `INCONCLUSIVE`, com o veredito de cada irmão. Medir o
+  efeito de um pack incompatível sobre a Nota Final fica fora do escopo.
+
 **O que nunca é convenção.** Dimensão K2 (as edições diferem), dimensão `DIFFERENT` e dimensão de texto
 explícito cujo dado falta no extrato (a condição "desde 2013" de C4 e C5, que segue com probe `NONE` ou
 `PARTIAL`).

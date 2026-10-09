@@ -304,7 +304,8 @@ Rodapés da E26: 1 e 2 entram em n1.
 - n4. Item 21 (granularidade INE) e item 24-d ("alocado conforme códigos das equipes e CNES descritos"): não se
   sabe se o SIAPS atribui o atendimento pelo INE registrado nele ou pela lotação do profissional no SCNES. Se
   for pela lotação, um atendimento sem INE entra numa equipe. A lotação não é observável localmente (seção 7);
-  o probe mede quantos atendimentos não têm INE. A atribuição local está em C1-LIM-09 e C1-LIM-11.
+  o probe mede quantos atendimentos não têm INE. A atribuição local está em C1-LIM-09 e C1-LIM-11. Texto igual
+  nas duas edições (K3).
 - n5. O item 24-d lista os tipos de demanda por nome, sem rodapé de alteração (B, K4). O mapeamento dos ids do DW
   para esses nomes é verificação local (C1-LIM-05), não diferença de edição.
 
@@ -336,7 +337,7 @@ Rodapés da E26: 1 entra em `oor.vinculo.nt30` (seção 7); 2 em n3; 3 em n13; 4
   todas as crianças com até 2 anos; o mês só entra na média quando alguma completa 2 anos, que era a versão
   `@0.1.0`) e com a (c) (local). Nenhum texto oficial escolhe (K3).
 - n2. Ficha silenciosa sobre dia 0, fim de "até o 30º dia de vida" e aniversário inexistente (igual em E25 e
-  E26). Convenção local AMB-C2-01 e AMB-C2-02. Alternativa: N+29, aniversários exclusivos, 29/02 vale 28/02.
+  E26). Convenção local AMB-C2-01 e AMB-C2-02. Alternativa: N+29, aniversários exclusivos, 29/02 vale 28/02 (K3).
 - n3. Rodapé 2 da E26: no Quadro 2 "foi incluída a especificação do Problema/Condição Avaliada" Puericultura
   para a boa prática (B). A E25 não a trazia no quadro; o item 24-e, igual nas duas, pede só "identificação do
   Problema/Condição Avaliada". Em 2025 a E25 é a provável, mas C2 pode ter sido atualizado em 23/06/2026
@@ -487,7 +488,9 @@ entram em `oor.c4.foot-exam` (seção 7).
 - n3. Item 14: entrada com condição avaliada "em pelo menos uma ocasião desde 2013". O local lê a lista de
   problemas desde 2013 e, nos atendimentos individuais, só os últimos 12 meses (C4-04): condição avaliada em
   atendimento mais antigo, sem linha na lista de problemas, não entra. Alternativa: atendimentos desde 2013.
-  Igual nas duas edições (K3).
+  Igual nas duas edições, mas não é K3: o texto é explícito e a leitura local se afasta dele (C4-04). `UNKNOWN`
+  porque nenhum texto diz se o SIAPS lê atendimentos desde 2013. Fica dimensão com probe; sem os atendimentos
+  anteriores à janela do extrato, o probe é `NONE` (ADR 0034 §7).
 - n4. Item 24-b; sem rodapé de alteração do tipo (B, K4).
 - n5. Item 24-b (igual em C5, com D; em C6, com C): a boa prática D "não será condicionante de pontuação para eAP,
   tipo 76". O texto não diz se isso é crédito integral (leitura local, P07), exclusão com renormalização ou só
@@ -537,7 +540,7 @@ Rodapés da E26: 1 não gera dimensão (texto do objetivo); 2 entra em `oor.vinc
 - n2. Mesmo texto e mesma ambiguidade de `c4.condition.status` (n2 da seção 6.4): item 15 e §4.1. Igual nas
   duas edições (K3).
 - n3. Item 14 e entrada como em C4 (n3 da seção 6.4); mesma convenção local de 12 meses nos atendimentos (C5-04).
-  Igual nas duas edições (K3).
+  Igual nas duas edições; como em C4, não é K3 (texto explícito).
 - n4. Item 24-b; sem rodapé de alteração do tipo (B, K4).
 - n5. Mesmo texto e mesma ambiguidade de `c4.team.eap-credit` (n5 da seção 6.4); a ficha fala em 25 pontos por
   prática (K3).
