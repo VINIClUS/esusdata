@@ -199,10 +199,12 @@ Corte do 20º dia útil, envio atrasado, reprocessamento e validações do SIAPS
   ferramenta de desenvolvimento e ficam fora do jar.
 - **Expectativa honesta:**
   - em 2026Q1, com a edição indeterminada, a maior parte dos packs deve terminar `INCONCLUSIVE`;
-  - C2 deve terminar `INCOMPATIBLE` (visita de qualquer desfecho, FAQ Q30);
   - o retorno realista é o 2026Q2, o primeiro quadrimestre sob as fichas de 2026, quando for publicado.
   
   Por isso um reconhecimento com os probes que discriminam a edição roda no `.253` antes do catálogo
-  completo.
+  completo. O de 2026Q1 (2026-10-09) não confirmou a previsão de C2 `INCOMPATIBLE`: a visita de qualquer
+  desfecho deu zero afetados, e C2 fica `INCONCLUSIVE` pelo probe parcial do filtro de puericultura. Com as
+  convenções da seção 7, os probes de edição de C6 e C7 deram zero, e os dois são os candidatos a
+  `EQUIVALENT_FOR_REFERENCE` em 2026Q1.
 - Pack sem referência compatível fica com D `PENDING`. Isso é aceito pela spec, porque um resultado
   desfavorável explícito também é evidência.

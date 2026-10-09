@@ -31,8 +31,9 @@ import java.util.function.UnaryOperator;
  * The methodology probes of C6 (spec 2026-10-08 §9.4), in the package of the pack because the
  * rewrite reads the pack's own CBO lists. Both are about the CBO of practice B (weight and height
  * the same day, Quadro 03), the two dimensions of C6 whose ficha changed between the editions (K2
- * in {@code docs/indicadores/portoes/edicoes-oficiais-siaps.md}, n6 and n7); the K3 dimensions are
- * declared conventions (ADR 0034 §7) and have no probe here.
+ * in {@code docs/indicadores/portoes/edicoes-oficiais-siaps.md}, n6 and n7), the ones that decide
+ * the verdict. The K3 dimensions are declared conventions (ADR 0034 §7): their probes only record
+ * an effect, outside the verdict.
  *
  * <ul>
  *   <li>{@value #WEIGHT_HEIGHT}: footnote 4 of the 2026 ficha added seven groups (2232, 2234, 2236,
