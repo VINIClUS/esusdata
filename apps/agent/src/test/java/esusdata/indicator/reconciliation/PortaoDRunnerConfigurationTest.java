@@ -20,13 +20,16 @@ import esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.Capture;
 import esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.Diagnostic;
 import esusdata.indicator.reconciliation.PortaoDRunnerConfiguration.Mode;
 import esusdata.testsupport.LivePecAssumptions;
+import java.io.IOException;
 import java.lang.reflect.RecordComponent;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -214,6 +217,42 @@ class PortaoDRunnerConfigurationTest {
         Diagnostic diagnostic = Diagnostic.parse(plus(DIAGNOSTIC, ARTIFACT_DIR, "docs-copy/out")::get);
 
         assertThat(diagnostic.artifactDir()).isEqualTo(Path.of("docs-copy/out"));
+    }
+
+    // ---- docs/ through a link
+
+    @ParameterizedTest(name = "a link into docs/ is refused as {0}")
+    @ValueSource(strings = {"artifacts", "artifacts/sp/2026q1"})
+    void aLinkIntoDocsIsRefusedLikeDocsItself(String artifactDir, @TempDir Path temp) throws IOException {
+        Path docs = Files.createDirectories(temp.resolve("repo/docs/private"));
+        Files.createSymbolicLink(temp.resolve("artifacts"), docs);
+        String throughTheLink = temp.resolve(artifactDir).toString();
+
+        assertThatThrownBy(() -> Capture.parse(plus(CAPTURE, ARTIFACT_DIR, throughTheLink)::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("docs/");
+        assertThatThrownBy(() -> Diagnostic.parse(plus(DIAGNOSTIC, ARTIFACT_DIR, throughTheLink)::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("docs/");
+    }
+
+    @Test
+    void aLinkThatLeadsAnywhereElseIsAccepted(@TempDir Path temp) throws IOException {
+        Path store = Files.createDirectories(temp.resolve("store"));
+        Path link = Files.createSymbolicLink(temp.resolve("artifacts"), store);
+
+        Capture capture = Capture.parse(plus(CAPTURE, ARTIFACT_DIR, link.toString())::get);
+
+        assertThat(capture.artifactDir()).isEqualTo(link);
+    }
+
+    @Test
+    void aLinkThatLeadsNowhereIsRefusedRatherThanGuessed(@TempDir Path temp) throws IOException {
+        Path link = Files.createSymbolicLink(temp.resolve("artifacts"), temp.resolve("missing"));
+
+        assertThatThrownBy(() -> Diagnostic.parse(plus(DIAGNOSTIC, ARTIFACT_DIR, link.toString())::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot resolve");
     }
 
     @Test

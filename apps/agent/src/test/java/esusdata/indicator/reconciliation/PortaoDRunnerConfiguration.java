@@ -2,6 +2,9 @@ package esusdata.indicator.reconciliation;
 
 import esusdata.indicator.model.Quadrimestre;
 import esusdata.testsupport.LivePecAssumptions;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -77,10 +80,10 @@ final class PortaoDRunnerConfiguration {
 
         /**
          * The store holds the raw exports, INEs and team names included, so it is never under {@code
-         * docs/}; the manifests, which carry none, may be.
+         * docs/}, not even through a link; the manifests, which carry none, may be.
          */
         Capture {
-            if (hasSegment(artifactDir, DOCS)) {
+            if (leadsUnder(artifactDir, DOCS)) {
                 throw new IllegalArgumentException(
                         "the capture never writes the raw exports under " + DOCS + "/: " + ARTIFACT_DIR);
             }
@@ -111,7 +114,7 @@ final class PortaoDRunnerConfiguration {
 
         Diagnostic {
             periods = Set.copyOf(periods);
-            if (hasSegment(artifactDir, DOCS)) {
+            if (leadsUnder(artifactDir, DOCS)) {
                 throw new IllegalArgumentException("the diagnostic never writes under " + DOCS + "/: " + ARTIFACT_DIR);
             }
         }
@@ -188,8 +191,37 @@ final class PortaoDRunnerConfiguration {
         return periods;
     }
 
+    /**
+     * Whether {@code path} is, or would be created, under a directory called {@code name}: as it is
+     * written, and as the filesystem resolves it, so that a link into such a directory (say {@code
+     * artifacts -> docs/private}) is refused like the directory itself. The links are followed before
+     * any {@code ..} is applied, as the writes will follow them; the part of the path that does not
+     * exist yet has no link to follow and is taken as written, below the real path of its nearest
+     * existing ancestor. A link that leads nowhere is refused rather than guessed.
+     */
+    private static boolean leadsUnder(Path path, String name) {
+        Path absolute = path.toAbsolutePath();
+        if (hasSegment(absolute.normalize(), name)) {
+            return true;
+        }
+        Path existing = absolute;
+        while (existing != null && !Files.exists(existing, LinkOption.NOFOLLOW_LINKS)) {
+            existing = existing.getParent();
+        }
+        if (existing == null) {
+            return false;
+        }
+        try {
+            return hasSegment(
+                    existing.toRealPath().resolve(existing.relativize(absolute)).normalize(), name);
+        } catch (IOException unresolvable) {
+            throw new IllegalArgumentException(
+                    "cannot resolve the path to tell whether it leads under " + name + "/", unresolvable);
+        }
+    }
+
     private static boolean hasSegment(Path path, String name) {
-        for (Path segment : path.toAbsolutePath().normalize()) {
+        for (Path segment : path) {
             if (segment.toString().equals(name)) {
                 return true;
             }
